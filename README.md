@@ -7,6 +7,7 @@ Gasket keeps the equipment a small team owns in service: one asset register, pre
 - [API.md](API.md): the JSON API people's screens and agents share.
 - [IMPORT.md](IMPORT.md): moving in from MaintainX.
 - Source code: [just-every/run-gasket](https://github.com/just-every/run-gasket).
+- Website: [run-gasket.com](https://run-gasket.com).
 
 Gasket records what people did. It never certifies equipment as safe or compliant; physical checks still need a qualified person.
 
