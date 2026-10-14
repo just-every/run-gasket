@@ -1,0 +1,54 @@
+// Every state change in Gasket, by name. The same handler serves the HTML form
+// door (/app/do/NAME) and the JSON door (/api/gasket/NAME) agents use. Each
+// handler checks the actor's role itself.
+import type { Bindings } from '../auth.server'
+import type { Actor } from './actor'
+import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from './assets'
+import { createChecklist, reviseChecklist } from './checklists'
+import type { Input } from './input'
+import { applyImport, importAction, previewImport } from './movein/maintainx'
+import { countPart, createPart, receivePart } from './parts'
+import { decide, prepare } from './proposals'
+import { review, submit } from './review'
+import { createSchedule, generateDue } from './schedules'
+import { configureSite, endAccess, giveAccess, setRole } from './site'
+import { addEvidence, assign, cancel, createCorrective, downtimeEnd, downtimeStart, giveBack, issue, recordFinding, recordReadings, recordResults } from './work'
+
+type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
+
+export const actions: Record<string, Handler> = {
+  'site.configure': (env, actor, input) => configureSite(env, actor, input),
+  'access.give': (env, actor, input, request) => giveAccess(env, actor, input, request),
+  'access.role': (env, actor, input) => setRole(env, actor, input),
+  'access.end': (env, actor, input, request) => endAccess(env, actor, input, request),
+  'asset.create': (env, actor, input) => createAsset(env, actor, input),
+  'asset.update': (env, actor, input) => updateAsset(env, actor, input),
+  'asset.retire': (env, actor, input) => retireAsset(env, actor, input),
+  'asset.sighting': (env, actor, input) => recordSighting(env, actor, input),
+  'meter.create': (env, actor, input) => addMeter(env, actor, input),
+  'part.create': (env, actor, input) => createPart(env, actor, input),
+  'part.receive': (env, actor, input) => receivePart(env, actor, input),
+  'part.count': (env, actor, input) => countPart(env, actor, input),
+  'checklist.create': (env, actor, input) => createChecklist(env, actor, input),
+  'checklist.revise': (env, actor, input) => reviseChecklist(env, actor, input),
+  'schedule.create': (env, actor, input) => createSchedule(env, actor, input),
+  'workorders.generate': (env, actor) => generateDue(env, actor),
+  'workorder.create': (env, actor, input) => createCorrective(env, actor, input),
+  'workorder.assign': (env, actor, input) => assign(env, actor, input),
+  'workorder.cancel': (env, actor, input) => cancel(env, actor, input),
+  'workorder.results': (env, actor, input) => recordResults(env, actor, input),
+  'workorder.evidence': (env, actor, input) => addEvidence(env, actor, input),
+  'workorder.readings': (env, actor, input) => recordReadings(env, actor, input),
+  'workorder.issue': (env, actor, input) => issue(env, actor, input),
+  'workorder.return': (env, actor, input) => giveBack(env, actor, input),
+  'downtime.start': (env, actor, input) => downtimeStart(env, actor, input),
+  'downtime.end': (env, actor, input) => downtimeEnd(env, actor, input),
+  'finding.record': (env, actor, input) => recordFinding(env, actor, input),
+  'workorder.submit': (env, actor, input) => submit(env, actor, input),
+  'workorder.review': (env, actor, input) => review(env, actor, input),
+  'proposal.prepare': (env, actor, input) => prepare(env, actor, input),
+  'proposal.decide': (env, actor, input) => decide(env, actor, input),
+  'import.preview': (env, actor, input) => previewImport(env, actor, input),
+  'import.apply': (env, actor, input) => applyImport(env, actor, input),
+  'import.job': (env, actor, input) => importAction(env, actor, input),
+}

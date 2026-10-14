@@ -1,0 +1,68 @@
+/* The docs, to the 12ui docs pick: section
+   names in ink with their pages indented under them, the current page violet
+   with a violet rule, a thin rule before the article, numbered steps on violet
+   discs with their content under them, code on quiet grey panels, and the
+   fine-line compressor in the right margin when there is room. */
+.docs-shell { display: grid; grid-template-columns: 240px minmax(0, 700px) minmax(0, 1fr); gap: 0 48px; width: min(1328px, calc(100% - 2 * var(--site-gutter))); margin: 0 auto; padding: 48px 0 104px; }
+.site .docs-main { width: auto; margin: 0; padding-left: 48px; border-left: 1px solid var(--gk-line); }
+.docs-art { width: 100%; max-width: 380px; height: auto; margin-top: 72px; justify-self: end; }
+.docs-nav { display: grid; align-content: start; gap: 30px; padding-top: 8px; }
+.docs-nav-section { margin: 0 0 10px; font-size: 18px; line-height: 24px; font-weight: 500; }
+.docs-nav ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.docs-nav a { display: block; padding: 6px 0 6px 18px; border-left: 3px solid transparent; color: var(--rer-muted); font-size: 17px; line-height: 24px; text-decoration: none; }
+.site .docs-nav a { color: var(--rer-muted); }
+.site .docs-nav a:hover { color: var(--rer-text); }
+.site .docs-nav a[aria-current=page] { border-left-color: var(--gk-accent); color: var(--gk-accent-strong); }
+
+.docs-article h1 { margin: 0 0 20px; font-size: 64px; line-height: 68px; letter-spacing: -.035em; }
+.docs-prose { font-size: 18px; line-height: 29px; overflow-wrap: break-word; }
+.site .docs-prose > p:first-child { font-size: 22px; line-height: 32px; }
+.site .docs-prose > * + *, .site .docs-step-section > * + * { margin-top: 16px; }
+.site .docs-prose h2 { margin-top: 48px; font-size: 32px; line-height: 38px; letter-spacing: -.02em; }
+.site .docs-prose h3 { margin-top: 32px; font-size: 22px; line-height: 28px; letter-spacing: -.01em; }
+.site .docs-prose h2 + *, .site .docs-prose h3 + * { margin-top: 12px; }
+.docs-step-section { padding-left: 70px; }
+.site .docs-prose .docs-step { position: relative; display: flex; align-items: center; min-height: 52px; }
+.docs-num { position: absolute; left: -70px; display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; background: var(--gk-accent); color: #fff; font-size: 26px; font-weight: 600; letter-spacing: 0; }
+.site .docs-prose a { color: var(--rer-link); text-underline-offset: 3px; }
+.docs-prose ul, .docs-prose ol { padding-left: 24px; }
+.site .docs-prose li + li { margin-top: 8px; }
+.docs-prose code { padding: 1px 6px; border-radius: 4px; background: var(--gk-seg); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85em; white-space: nowrap; }
+.site .docs-prose pre { margin-top: 20px; margin-bottom: 4px; padding: 22px 26px; border-radius: 10px; background: var(--gk-seg); white-space: pre; overflow-x: auto; overflow-wrap: normal; }
+.docs-prose pre code { padding: 0; background: none; font-size: 15px; line-height: 25px; white-space: pre; overflow-wrap: normal; }
+.docs-prose blockquote { margin: 16px 0 0; padding-left: 20px; border-left: 3px solid var(--gk-accent); color: var(--rer-muted); }
+.docs-table { overflow-x: auto; margin-top: 20px; border: 1px solid var(--gk-line); border-radius: 10px; background: var(--rer-surface); }
+.docs-table table { width: 100%; border-collapse: collapse; font-size: 16px; line-height: 24px; }
+.docs-table th, .docs-table td { padding: 12px 16px; border-top: 1px solid var(--gk-line); text-align: left; vertical-align: top; }
+.docs-table th { border-top: 0; color: var(--rer-muted); font-weight: 500; }
+
+@media (max-width: 1240px) {
+  .docs-shell { grid-template-columns: 240px minmax(0, 1fr); }
+  .docs-art { display: none; }
+}
+@media (max-width: 1000px) {
+  .docs-shell { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 28px; }
+  .site .docs-main { padding-left: 0; border-left: 0; }
+  .docs-nav { padding-bottom: 28px; border-bottom: 1px solid var(--gk-line); }
+}
+@media (max-width: 760px) {
+  .docs-shell { padding-bottom: 64px; }
+  /* Phones: the sections run in two columns with their names, so the article starts on the first screen. */
+  .docs-nav { display: block; columns: 2; column-gap: 16px; padding: 0 0 20px; }
+  .docs-nav-group { break-inside: avoid; margin-bottom: 14px; }
+  .docs-nav-section { margin-bottom: 4px; color: var(--rer-muted); font-size: 13px; line-height: 18px; font-weight: 400; }
+  .docs-nav a { padding: 3px 0 3px 8px; border-left-width: 2px; font-size: 15px; line-height: 21px; }
+  .docs-article h1 { font-size: 40px; line-height: 44px; }
+  .docs-prose { font-size: 16px; line-height: 26px; }
+  .site .docs-prose > p:first-child { font-size: 18px; line-height: 27px; }
+  .site .docs-prose h2 { margin-top: 36px; font-size: 24px; line-height: 30px; }
+  /* The step number sits in the heading, so code panels get the column's full width. */
+  .docs-step-section { padding-left: 0; }
+  .site .docs-prose .docs-step { min-height: 32px; gap: 12px; }
+  .docs-num { position: static; flex: none; width: 32px; height: 32px; font-size: 17px; }
+  /* Long commands scroll; the right edge fades to show there is more. */
+  .site .docs-prose pre { padding: 16px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
+  .docs-prose pre code { font-size: 13px; line-height: 22px; }
+  .docs-prose pre code::after { content: ''; display: inline-block; width: 28px; }
+  .docs-prose :not(pre) > code { white-space: normal; overflow-wrap: anywhere; }
+}

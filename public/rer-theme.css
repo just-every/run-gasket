@@ -1,0 +1,109 @@
+/* Gasket's declared theme, the one place its tokens live. The installer,
+   sign-in, confirmation, /setup, the development outbox, the Lobby, the app
+   (public/gasket.css) and the run site all read these. Paper, ink and one
+   layout-dye violet; type is Geist (SIL Open Font License 1.1), self-hosted
+   from /fonts/geist, with its size-matched Arial fallback in /fonts/fonts.css. */
+@font-face {
+  font-family: Geist;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist/geist-latin-wght-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: Geist;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/geist/geist-latin-ext-wght-normal.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+:root {
+  --rer-font-body: Geist, 'Geist Fallback', Arial, sans-serif;
+  --rer-font-heading: Geist, 'Geist Fallback', Arial, sans-serif;
+  --rer-page: #fcfbf7;
+  --rer-surface: #ffffff;
+  --rer-text: #171924;
+  --rer-muted: #5b5e6b;
+  --rer-border: #8a8c96;
+  --rer-accent: #5734eb;
+  --rer-accent-text: #ffffff;
+  --rer-link: #4322c9;
+  --rer-focus: #5734eb;
+  --rer-radius: 12px;
+  --rer-logo: url('/brand/mark.svg');
+  --rer-wordmark-weight: 700;
+  /* Gasket's own tokens, shared by the app and the run site. */
+  --gk-paper: #fefdf9;
+  --gk-line: #e4e2dc;
+  --gk-accent: #5734eb;
+  --gk-accent-strong: #4322c9;
+  --gk-accent-soft: #ece9fe;
+  --gk-seg: #f4f4f2;
+  --gk-ok: #1f6b45; --gk-ok-bg: #e6f2ea;
+  --gk-warn: #7a5200; --gk-warn-bg: #fbf0d9;
+  --gk-bad: #a32a2a; --gk-bad-bg: #fbe6e3;
+  --gk-info: #4322c9; --gk-info-bg: #ece9fe;
+  --gk-shadow: 0 1px 2px rgb(23 25 36 / 5%);
+}
+
+/* Base's frames (sign in, its confirmation, Finish setup): a centred 440px
+   white card on paper with the mark and name at its head, a centred 32px
+   heading, 48px inputs and one full-width violet pill. The sign-in frame shows
+   the fine-line compressor above the card. html.rer-themed outranks each
+   frame's own hashed style, which follows this file. */
+html.rer-themed body { font-family: var(--rer-font-body); background: var(--rer-page); }
+html.rer-themed main { max-width: 440px; width: 100%; margin-inline: auto; padding: 28px 28px 32px; border: 1px solid var(--gk-line); border-radius: var(--rer-radius); box-shadow: 0 1px 2px rgb(23 25 36 / 5%), 0 12px 32px rgb(23 25 36 / 6%); }
+html.rer-themed .brand, html.rer-themed .rer-brand { display: flex; align-items: center; gap: 10px; margin: 0 0 24px; font-size: 18px; font-weight: 700; letter-spacing: -.01em; color: var(--rer-text); }
+html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 24px; height: 24px; }
+html.rer-themed h1 { margin: 0 0 12px; font-size: 32px; line-height: 1.2; font-weight: 600; letter-spacing: -.02em; text-align: center; }
+html.rer-themed h1 + p { text-align: center; }
+html.rer-themed p { color: var(--rer-muted); }
+html.rer-themed label { font-weight: 500; font-size: 15px; }
+html.rer-themed input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { min-height: 48px; padding: 10px 14px; border: 1px solid var(--rer-border); border-radius: 10px; background: var(--rer-surface); }
+html.rer-themed input[type="checkbox"] { accent-color: var(--rer-accent); }
+html.rer-themed button, html.rer-themed .action { display: block; width: 100%; min-height: 48px; border: 0; border-radius: 999px; background: var(--rer-accent); color: var(--rer-accent-text); font-weight: 600; }
+html.rer-themed button.secondary { background: transparent; color: var(--rer-text); border: 1px solid var(--rer-text); }
+html.rer-themed button:hover, html.rer-themed .action:hover { background: var(--gk-accent-strong); box-shadow: none; }
+html.rer-themed button.secondary:hover { background: var(--gk-accent-soft); }
+/* Finish setup shows the owner as two read-only pairs: plain text, not inputs. */
+html.rer-themed dl { display: block; margin: 20px 0 24px; padding-top: 16px; border-top: 1px solid var(--gk-line); }
+html.rer-themed dt { margin: 0; font-size: 14px; color: var(--rer-muted); }
+html.rer-themed dd { margin: 4px 0 16px; font-size: 18px; line-height: 26px; color: var(--rer-text); }
+html.rer-themed body:has(main > .brand), html.rer-themed body:has(main > .rer-brand) { align-content: center; }
+html.rer-themed body:has(main > .brand)::before, html.rer-themed body:has(main > .rer-brand)::before { content: ''; display: block; width: 220px; height: 200px; margin: 0 auto -1px; background: url('/brand/hero-compressor.svg') center bottom / contain no-repeat; }
+@media (max-width: 480px) {
+  html.rer-themed main { padding: 24px 20px 28px; }
+  html.rer-themed h1 { font-size: 28px; }
+  html.rer-themed body:has(main > .brand)::before, html.rer-themed body:has(main > .rer-brand)::before { width: 180px; height: 164px; }
+}
+
+/* The Lobby (installed /): the same card on paper as sign in, with the
+   equipment row standing along the floor. */
+html[data-state] body { background: var(--rer-page); }
+html[data-state] .door { padding-top: 16vh; }
+html[data-state] .door-card { max-width: 560px; padding: 40px 44px 36px; background: var(--rer-surface); border: 1px solid var(--gk-line); border-radius: var(--rer-radius); box-shadow: 0 1px 2px rgb(23 25 36 / 5%), 0 12px 32px rgb(23 25 36 / 6%); }
+html[data-state] h1 { font-size: 44px; }
+html[data-state] .line { font-size: 19px; line-height: 28px; color: var(--rer-muted); }
+html[data-state] .btn { background: var(--rer-accent); box-shadow: none; min-height: 52px; font-size: 17px; }
+html[data-state] .btn:hover { background: var(--gk-accent-strong); }
+html[data-state] .door-art { height: 34vh; }
+html[data-state] .door-art img { object-fit: contain; object-position: center bottom; }
+@media (max-width: 640px) {
+  html[data-state] .door { padding-top: 64px; }
+  html[data-state] .door-card { padding: 28px 22px; }
+  html[data-state] h1 { font-size: 36px; }
+}
+
+/* The run site's pages (/run, the 404): the ground strip (brand/ground.svg) runs
+   the full width under the page, its equipment row small at the right; the page
+   keeps clear room above it so the row never meets a card or the footer lines. */
+body > .art { height: 200px; }
+body > .art img { object-fit: fill; }
+body > .art ~ main { padding-bottom: 232px; }
+@media (max-width: 760px) { body > .art { height: 150px; } body > .art ~ main { padding-bottom: 182px; } }
+
+/* The Lobby keeps the closing band's equipment row on its plinth. */
+html[data-state] .door-art { background: url('/brand/band.svg') center bottom / contain no-repeat; }
+html[data-state] .door-art img { visibility: hidden; }

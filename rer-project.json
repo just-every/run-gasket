@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "projectId": "just-every/run-gasket",
+  "name": "Gasket",
+  "sourceRepository": "https://github.com/just-every/run-gasket",
+  "license": "MIT"
+}

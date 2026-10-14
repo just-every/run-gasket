@@ -1,0 +1,115 @@
+// Clause 2: the asset register. Edits write the previous identity to
+// gk_asset_versions; retiring keeps every record. Sightings reconcile the
+// register against what is physically on the floor.
+import type { Bindings } from '../auth.server'
+import { requireCapability, type Actor } from './actor'
+import { all, commit, guard, insist, newId, now, one, stmt } from './core'
+import type { Input } from './input'
+
+const CRITICALITY = ['normal', 'important', 'critical']
+export const METER_KINDS = ['counter', 'gauge', 'condition']
+const IDENTITY = ['tag', 'name', 'serial', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
+
+function identity(input: Input) {
+  const value = {
+    tag: input.text('tag', { max: 60 }),
+    name: input.text('name', { max: 160 }),
+    serial: input.text('serial', { optional: true, max: 120 }) || null,
+    location: input.text('location', { max: 160 }),
+    custodian: input.text('custodian', { optional: true, max: 120 }) || null,
+    category: input.text('category', { optional: true, max: 80 }) || null,
+    criticality: input.text('criticality', { optional: true, max: 20 }) || 'normal',
+    notes: input.text('notes', { optional: true, max: 2000 }) || null,
+  }
+  insist(CRITICALITY.includes(value.criticality), 'invalid_criticality')
+  return value
+}
+
+/** Status is derived: retired, down (an open downtime) or in service. */
+export const ASSET_STATUS = `CASE WHEN a.retired_at IS NOT NULL THEN 'retired' WHEN EXISTS(SELECT 1 FROM gk_downtime d WHERE d.asset_id = a.id AND d.ended_on IS NULL) THEN 'down' ELSE 'in_service' END`
+
+export async function createAsset(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'register.manage')
+  const value = identity(input), id = newId(), at = now()
+  await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, location, custodian, category, criticality, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, at, at)],
+    { actor: actor.id, action: 'asset.create', subject: id, detail: value })
+  return { id }
+}
+
+export async function updateAsset(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'register.manage')
+  const asset = await one(env, 'SELECT * FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
+  insist(asset, 'asset_not_found', 404)
+  insist(!asset.retired_at, 'asset_retired', 409)
+  const revision = input.integer('revision', { min: 1, max: 1_000_000 })
+  insist(revision === asset.revision, 'stale', 409)
+  const value = identity(input)
+  const before = Object.fromEntries(IDENTITY.map(key => [key, asset[key]]))
+  await commit(env, [
+    guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND revision = ?)', asset.id, revision),
+    stmt(env, 'INSERT INTO gk_asset_versions (asset_id, revision, value_json, changed_by, changed_at) VALUES (?, ?, ?, ?, ?)', asset.id, asset.revision, JSON.stringify(before), actor.id, now()),
+    stmt(env, 'UPDATE gk_assets SET tag = ?, name = ?, serial = ?, location = ?, custodian = ?, category = ?, criticality = ?, notes = ?, revision = revision + 1, updated_at = ? WHERE id = ?', value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, now(), asset.id),
+  ], { actor: actor.id, action: 'asset.update', subject: asset.id, detail: { before, after: value } })
+  return { id: asset.id, revision: revision! + 1 }
+}
+
+export async function retireAsset(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'register.manage')
+  const asset = await one(env, 'SELECT * FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
+  insist(asset, 'asset_not_found', 404)
+  insist(!asset.retired_at, 'asset_retired', 409)
+  const reason = input.text('reason', { max: 500 })
+  await commit(env, [
+    guard(env, 'open_work_exists', "NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE asset_id = ? AND status NOT IN ('closed', 'cancelled'))", asset.id),
+    stmt(env, 'UPDATE gk_schedules SET active = 0, revision = revision + 1 WHERE asset_id = ?', asset.id),
+    stmt(env, 'UPDATE gk_assets SET retired_at = ?, revision = revision + 1, updated_at = ? WHERE id = ?', now(), now(), asset.id),
+  ], { actor: actor.id, action: 'asset.retire', subject: asset.id, detail: { reason } })
+  return { id: asset.id }
+}
+
+export async function addMeter(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'register.manage')
+  const asset = await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
+  insist(asset, 'asset_not_found', 404)
+  insist(!asset.retired_at, 'asset_retired', 409)
+  const name = input.text('name', { max: 80 }), unit = input.text('unit', { max: 30 }), kind = input.text('kind', { max: 20 })
+  insist(METER_KINDS.includes(kind), 'invalid_kind')
+  const id = newId()
+  await commit(env, [stmt(env, 'INSERT INTO gk_meters (id, asset_id, name, unit, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, asset.id, name, unit, kind, now())],
+    { actor: actor.id, action: 'meter.create', subject: id, detail: { asset: asset.id, name, unit, kind } })
+  return { id }
+}
+
+export async function recordSighting(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'register.manage')
+  const asset = await one(env, 'SELECT id, location FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
+  insist(asset, 'asset_not_found', 404)
+  const outcome = input.text('outcome', { max: 20 })
+  insist(['found', 'elsewhere', 'missing'].includes(outcome), 'invalid_outcome')
+  const seen = outcome === 'elsewhere' ? input.text('seenLocation', { max: 160 }) : outcome === 'found' ? asset.location : null
+  const note = input.text('note', { optional: true, max: 500 }) || null
+  const id = newId()
+  await commit(env, [stmt(env, 'INSERT INTO gk_sightings (id, asset_id, outcome, seen_location, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)', id, asset.id, outcome, seen, note, actor.id, now())],
+    { actor: actor.id, action: 'asset.sighting', subject: asset.id, detail: { outcome, seen } })
+  return { id }
+}
+
+export async function assetList(env: Bindings, _actor: Actor) {
+  return await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, a.origin, ${ASSET_STATUS} AS status,
+    (SELECT s.outcome || '|' || s.recorded_at FROM gk_sightings s WHERE s.asset_id = a.id ORDER BY s.recorded_at DESC LIMIT 1) AS last_sighting,
+    (SELECT MIN(w.due_date) FROM gk_work_orders w WHERE w.asset_id = a.id AND w.status NOT IN ('closed', 'cancelled')) AS next_due
+    FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)
+}
+
+export async function assetDetail(env: Bindings, _actor: Actor, id: string) {
+  const asset = await one(env, `SELECT a.*, ${ASSET_STATUS} AS status FROM gk_assets a WHERE a.id = ?`, id)
+  insist(asset, 'asset_not_found', 404)
+  const meters = await all(env, `SELECT m.id, m.name, m.unit, m.kind, m.revision,
+    (SELECT r.value FROM gk_readings r WHERE r.meter_id = m.id ORDER BY r.taken_on DESC, r.entered_at DESC LIMIT 1) AS latest,
+    (SELECT r.taken_on FROM gk_readings r WHERE r.meter_id = m.id ORDER BY r.taken_on DESC, r.entered_at DESC LIMIT 1) AS latest_on
+    FROM gk_meters m WHERE m.asset_id = ? ORDER BY m.name`, id)
+  const versions = await all(env, 'SELECT revision, value_json, changed_by, changed_at FROM gk_asset_versions WHERE asset_id = ? ORDER BY revision DESC', id)
+  const sightings = await all(env, 'SELECT outcome, seen_location, note, recorded_by, recorded_at FROM gk_sightings WHERE asset_id = ? ORDER BY recorded_at DESC', id)
+  const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
+  return { ...asset, meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
+}

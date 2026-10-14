@@ -1,0 +1,35 @@
+# Doing the work
+
+The person a work order is assigned to records the work on its page. Every change is kept with who made it and when.
+
+## Checklist results
+
+For each item, choose **Pass**, **Needs attention** or **Fail** and add a note, then press **Save results**. You can save part of the list and come back.
+
+## Photos and documents
+
+Under **Inspection evidence**, attach a photo or document of what you saw: PNG, JPEG, WebP, HEIC or PDF, up to 1.5 MB each. Evidence is kept inside your installation and only people with access can open it.
+
+## Readings
+
+Under **Meter and condition readings**, enter the time the readings were taken and a value for each meter you read. A counter never goes backwards: Gasket refuses a counter reading lower than an earlier one, or higher than a later one.
+
+## Parts
+
+**Issue part** takes parts off the shelf for this work order; you can never issue more than is on hand. **Return unused** puts back what you did not use; you can never return more than you issued. The card shows what was issued, returned and used.
+
+## Downtime
+
+If the asset has to come out of service, press **Record asset down** with the time it went down and why, then **Record back in service** when it is running again. Gasket works out the minutes. An asset is down only once at a time, and a new outage cannot start inside an earlier one.
+
+## Findings
+
+Under **Corrective findings**, record what you found and what you did, with a severity of Low, Medium or High. Tick **Needs follow-up work** to raise a corrective work order linked to this one.
+
+## Submit for review
+
+The bar at the bottom of the page says what still blocks submission. You can submit when every item has a result, every fail or needs-attention result has a finding, and no downtime is still open. Then press **Submit for review**.
+
+If the supervisor returns the work, their reason appears under **Reviews**; record what is missing and submit again.
+
+Next: [Review and the board](review-and-board.md).

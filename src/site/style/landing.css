@@ -1,0 +1,94 @@
+/* The homepage: a left-aligned hero beside its drawing, then one heading, one
+   or two lines and one drawing per section, sides alternating, 120px of paper
+   between them. */
+.landing-hero { display: grid; grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); gap: 24px; align-items: center; padding: 40px 0 72px; }
+.landing-hero h1 { font-size: 56px; line-height: 62px; letter-spacing: -.035em; }
+.landing-sub { margin-top: 28px; font-size: 24px; line-height: 34px; letter-spacing: -.005em; }
+.landing-alt { margin-top: 24px; font-size: 21px; line-height: 30px; }
+.landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 36px; margin-top: 40px; }
+.landing-docs { font-size: 20px; line-height: 28px; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+.landing-docs:hover { color: var(--gk-accent-strong); }
+.landing-licence { margin-top: 40px; color: var(--rer-muted); font-size: 16px; line-height: 24px; }
+
+.landing-section { display: grid; gap: 64px; align-items: center; padding: 44px 0; }
+.landing-text h2 { font-size: 46px; line-height: 52px; }
+.landing-text .landing-h2-big { font-size: 72px; line-height: 76px; }
+.landing-text p { margin-top: 22px; font-size: 22px; line-height: 32px; max-width: 34ch; }
+.landing-free, .landing-board, .landing-movein { grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); }
+.landing-story, .landing-parts { grid-template-columns: minmax(0, 52fr) minmax(0, 48fr); }
+.landing-free { padding-top: 96px; }
+.landing-free .drawing { width: min(100%, 680px); justify-self: end; }
+.landing-board .drawing { width: min(100%, 720px); justify-self: end; }
+.landing-movein { padding-bottom: 72px; border-bottom: 1px solid var(--gk-line); }
+
+/* The asset's story: a real-text card with a violet rule. */
+.story-card { padding: 28px 28px 32px; background: var(--rer-surface); border: 1.5px solid var(--gk-accent); border-radius: 10px; font-size: 16px; line-height: 22px; }
+.story-asset { display: flex; align-items: center; gap: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--gk-line); }
+.story-asset img { width: 128px; height: auto; }
+.story-asset p { font-size: 17px; }
+.story-asset .story-tag { font-size: 22px; line-height: 28px; font-weight: 600; letter-spacing: -.01em; margin-bottom: 4px; }
+.story-asset .chip { margin-top: 10px; font-size: 16px; }
+.story-card table { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 15px; line-height: 20px; }
+.story-card th { padding: 14px 8px 10px 0; text-align: left; font-weight: 500; font-size: 14px; color: var(--rer-muted); border-bottom: 1px solid var(--gk-line); }
+.story-card td { padding: 12px 8px 12px 0; border-bottom: 1px solid var(--gk-line); }
+.story-download { display: inline-flex; align-items: center; min-height: 44px; margin-top: 24px; padding: 0 36px; border: 1px solid var(--rer-text); border-radius: 999px; font-size: 17px; }
+
+/* Also included: six quiet tiles in two rows of three. */
+.landing-included { padding: 72px 0 40px; }
+.landing-included h2 { font-size: 46px; line-height: 52px; }
+.landing-included ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 32px; padding: 0; list-style: none; }
+.landing-included li { display: flex; align-items: center; gap: 40px; padding: 28px 40px 28px 80px; font-size: 21px; line-height: 28px; }
+.landing-included li:nth-child(n + 4) { border-top: 1px solid var(--gk-line); }
+.landing-included li:not(:nth-child(3n + 1)) { border-left: 1px solid var(--gk-line); }
+.landing-included li span { max-width: 13ch; }
+.landing-included svg { width: 72px; height: 72px; flex: none; }
+
+/* Closing: the hero's look returns over the equipment row. */
+.landing-closing { display: grid; grid-template-columns: minmax(0, 42fr) minmax(0, 58fr); gap: 32px; align-items: center; padding: 96px 0 56px; }
+.landing-closing h2 { font-size: 56px; line-height: 60px; letter-spacing: -.035em; }
+.landing-closing .landing-actions { margin-top: 40px; }
+
+@media (max-width: 1100px) {
+  .landing-hero h1 { font-size: 48px; line-height: 52px; }
+  .landing-text h2, .landing-included h2, .landing-closing h2 { font-size: 42px; line-height: 46px; }
+  .landing-text .landing-h2-big { font-size: 56px; line-height: 60px; }
+  .landing-included li { padding-left: 32px; gap: 24px; }
+}
+@media (max-width: 900px) {
+  .landing-hero, .landing-section, .landing-closing, .landing-free, .landing-board, .landing-movein, .landing-story, .landing-parts { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .landing-story .story-card, .landing-parts .drawing { order: 2; }
+  .landing-free .drawing, .landing-board .drawing { width: 100%; }
+  .landing-included ul { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .landing-included li:nth-child(n) { border: 0; border-top: 1px solid var(--gk-line); }
+  .landing-included li:nth-child(even) { border-left: 1px solid var(--gk-line); }
+}
+@media (max-width: 760px) {
+  .landing-hero { padding: 24px 0 48px; gap: 36px; }
+  .landing-hero h1 { font-size: 40px; line-height: 44px; }
+}
+@media (max-width: 640px) {
+  /* Two lines at 390, as the phone pick sets it. */
+  .landing-hero h1 { font-size: clamp(32px, 9vw, 40px); line-height: 1.1; }
+}
+@media (max-width: 760px) {
+  .landing-sub { margin-top: 20px; font-size: 20px; line-height: 28px; }
+  .landing-alt { margin-top: 18px; font-size: 18px; line-height: 26px; }
+  .landing-actions { flex-direction: column; align-items: stretch; gap: 16px; margin-top: 28px; text-align: center; }
+  .landing-docs { font-size: 18px; }
+  .landing-licence { margin-top: 16px; text-align: center; font-size: 15px; }
+  .pill { min-height: 56px; font-size: 19px; }
+  .landing-section { padding: 40px 0; gap: 28px; }
+  .landing-free { padding-top: 40px; }
+  .landing-text h2, .landing-included h2, .landing-closing h2 { font-size: 34px; line-height: 38px; }
+  .landing-text .landing-h2-big { font-size: 44px; line-height: 48px; }
+  .landing-text p { margin-top: 14px; font-size: 18px; line-height: 27px; }
+  .story-card { padding: 20px; }
+  .story-asset { gap: 16px; }
+  .story-asset img { width: 88px; }
+  .story-asset .story-tag { font-size: 18px; line-height: 24px; }
+  .story-card th:nth-child(2), .story-card td:nth-child(2) { display: none; }
+  .landing-included { padding: 48px 0 24px; }
+  .landing-included li { flex-direction: column; align-items: flex-start; gap: 12px; padding: 20px 16px; font-size: 17px; line-height: 24px; }
+  .landing-included svg { width: 48px; height: 48px; }
+  .landing-closing { padding: 64px 0 48px; gap: 28px; }
+}

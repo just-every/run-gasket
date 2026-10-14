@@ -1,0 +1,39 @@
+// Site-local dates (YYYY-MM-DD) and date-times (YYYY-MM-DDTHH:MM). Gasket keeps
+// what a person on site observed in the site's own clock; it never converts it.
+export const isDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [y, m, d] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d
+}
+
+export const isLocalTime = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) && isDate(value.slice(0, 10)) && Number(value.slice(11, 13)) < 24 && Number(value.slice(14, 16)) < 60
+
+export const isTimeZone = (zone: string) => {
+  try { new Intl.DateTimeFormat('en', { timeZone: zone }); return true } catch { return false }
+}
+
+export function today(zone: string, at = Date.now()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at)
+}
+
+export function localNow(zone: string, at = Date.now()): string {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(at).map(part => [part.type, part.value]))
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
+}
+
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+/** Minutes between two site-local date-times, read on one wall clock. */
+export function minutesBetween(start: string, end: string): number {
+  const at = (value: string) => Date.UTC(+value.slice(0, 4), +value.slice(5, 7) - 1, +value.slice(8, 10), +value.slice(11, 13), +value.slice(14, 16))
+  return Math.round((at(end) - at(start)) / 60_000)
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+export const showDate = (date: string | null | undefined) => date && isDate(date) ? `${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}` : '—'
+export const showLocal = (value: string | null | undefined) => value && isLocalTime(value) ? `${showDate(value.slice(0, 10))}, ${value.slice(11)}` : '—'
+export const showInstant = (instant: number | null | undefined, zone: string) => instant ? showLocal(localNow(zone, instant)) : '—'

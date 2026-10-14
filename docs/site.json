@@ -1,0 +1,40 @@
+{
+  "sections": [
+    {
+      "title": "Get started",
+      "pages": [
+        { "slug": "", "label": "Introduction", "file": "docs/introduction.md", "summary": "What Gasket is, how work moves through it, who does what and what you need to run your own copy." },
+        { "slug": "getting-started", "label": "Getting started", "file": "docs/getting-started.md", "summary": "Install rer, start Gasket on your computer, finish setup, set up your site and register your first equipment." }
+      ]
+    },
+    {
+      "title": "Keep equipment in service",
+      "pages": [
+        { "slug": "preventive-work", "label": "Preventive work", "file": "docs/preventive-work.md", "summary": "Write checklists, schedule them by calendar or meter, create due work orders and assign them." },
+        { "slug": "doing-the-work", "label": "Doing the work", "file": "docs/doing-the-work.md", "summary": "Record checklist results, photos, readings, parts, downtime and findings, then submit the work for review." },
+        { "slug": "review-and-board", "label": "Review and the board", "file": "docs/review-and-board.md", "summary": "Approve or return finished work, watch overdue work and downtime, and read every asset's history." },
+        { "slug": "parts-and-assets", "label": "Parts and assets", "file": "docs/parts-and-assets.md", "summary": "Keep the parts list and physical counts, the asset register, meters and sightings." },
+        { "slug": "people-and-agents", "label": "People, access and agents", "file": "docs/people-and-agents.md", "summary": "Give and end access, choose roles, and let an agent prepare proposals a person approves." }
+      ]
+    },
+    {
+      "title": "Move in",
+      "pages": [
+        { "slug": "move-in", "label": "Move in from MaintainX", "file": "docs/move-in.md", "summary": "Export from MaintainX, read the dry run, apply it and undo it if needed." }
+      ]
+    },
+    {
+      "title": "Operate",
+      "pages": [
+        { "slug": "backup-and-restore", "label": "Backup and restore", "file": "docs/backup-and-restore.md", "summary": "Save your Gasket to one archive with rer export and restore it into a fresh installation with rer import." }
+      ]
+    },
+    {
+      "title": "Reference",
+      "pages": [
+        { "slug": "maintainx-mapping", "label": "MaintainX mapping", "file": "IMPORT.md", "summary": "How each MaintainX export column maps into Gasket, and what is not carried." },
+        { "slug": "api", "label": "API for agents", "file": "API.md", "summary": "The JSON API Gasket's screens and agents share: signing in, reading, actions and proposals." }
+      ]
+    }
+  ]
+}

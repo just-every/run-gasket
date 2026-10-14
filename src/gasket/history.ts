@@ -1,0 +1,61 @@
+// Clause 11: one asset's whole history, in time order, with who did what.
+// The CSV download is the same rows; installation export/restore is Base's.
+import type { Bindings } from '../auth.server'
+import { requireCapability, type Actor } from './actor'
+import { all, insist, one } from './core'
+import { showInstant, showLocal } from './dates'
+import { assetDetail } from './assets'
+import { fromMilli, showNumber } from './quantity'
+
+export interface Event { when: string; at: number; kind: string; workOrder: string | null; what: string; who: string | null }
+
+const name = (row: { who?: string | null }) => row.who ?? null
+
+export async function assetHistory(env: Bindings, actor: Actor, id: string) {
+  const asset = await assetDetail(env, actor, id)
+  const orders = await all(env, `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.created_at, w.closed_at, c.name AS checklist, r.number AS revision
+    FROM gk_work_orders w LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id WHERE w.asset_id = ? ORDER BY w.number`, id)
+  const number = new Map(orders.map(order => [order.id, `WO-${String(order.number).padStart(4, '0')}`]))
+  const events: Event[] = []
+  const push = (at: number, kind: string, workOrder: string | null, what: string, who: string | null) => events.push({ when: showInstant(at, actor.zone), at, kind, workOrder: workOrder ? number.get(workOrder) ?? null : null, what, who })
+  for (const row of await all(env, `SELECT a.at, a.action, a.subject, a.detail, m.name AS who FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
+    WHERE a.subject = ? OR a.subject IN (SELECT id FROM gk_work_orders WHERE asset_id = ?) ORDER BY a.seq`, id, id)) {
+    const detail = JSON.parse(row.detail)
+    const labels: Record<string, string> = {
+      'asset.create': 'Asset registered', 'asset.update': 'Asset details changed', 'asset.retire': `Asset retired: ${detail.reason ?? ''}`,
+      'asset.sighting': `Sighting: ${detail.outcome}${detail.seen ? ` at ${detail.seen}` : ''}`, 'workorder.generate': 'Work order created from its schedule',
+      'workorder.create': 'Work order created', 'workorder.assign': 'Work order assigned', 'workorder.cancel': `Work order cancelled: ${detail.reason ?? ''}`,
+      'workorder.submit': 'Submitted for review', 'workorder.approve': 'Reviewed and closed', 'workorder.return': `Returned for more work: ${detail.reason ?? ''}`,
+      'workorder.evidence': `Evidence attached: ${detail.filename ?? ''}`,
+    }
+    if (labels[row.action]) push(row.at, row.action.split('.')[0], row.subject === id ? null : row.subject, labels[row.action].trim(), name(row))
+  }
+  for (const row of await all(env, 'SELECT r.work_order_id, r.item, r.outcome, r.note, r.recorded_at, m.name AS who, w.checklist_revision_id FROM gk_result_log r JOIN gk_work_orders w ON w.id = r.work_order_id LEFT JOIN gk_members m ON m.id = r.recorded_by WHERE w.asset_id = ? ORDER BY r.seq', id)) {
+    push(row.recorded_at, 'result', row.work_order_id, `Checklist item ${row.item + 1}: ${row.outcome === 'attention' ? 'needs attention' : row.outcome}${row.note ? ` (${row.note})` : ''}`, name(row))
+  }
+  for (const row of await all(env, 'SELECT r.work_order_id, r.value, r.taken_on, r.entered_at, r.origin, g.name AS meter, g.unit, m.name AS who FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id LEFT JOIN gk_members m ON m.id = r.entered_by WHERE r.asset_id = ? ORDER BY r.taken_on, r.entered_at, g.name, r.id', id)) {
+    push(row.entered_at, 'reading', row.work_order_id, `${row.meter}: ${row.unit === 'condition' ? row.value : showNumber(row.value)}${row.unit && row.unit !== 'condition' ? `\u00a0${row.unit}` : ''}, taken ${showLocal(row.taken_on)}${row.origin === 'import' ? ' (moved in)' : ''}`, name(row))
+  }
+  for (const row of await all(env, "SELECT mv.work_order_id, mv.kind, mv.quantity_milli, mv.at, p.number, p.name, p.unit, m.name AS who FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id LEFT JOIN gk_members m ON m.id = mv.actor WHERE mv.work_order_id IN (SELECT id FROM gk_work_orders WHERE asset_id = ?) ORDER BY mv.seq", id)) {
+    push(row.at, 'part', row.work_order_id, `${row.kind === 'issue' ? 'Issued' : 'Returned'} ${showNumber(fromMilli(Math.abs(row.quantity_milli)))}\u00a0${row.unit} of ${row.number} ${row.name}`, name(row))
+  }
+  for (const row of await all(env, 'SELECT d.work_order_id, d.started_on, d.ended_on, d.minutes, d.reason, d.recorded_at, m.name AS who FROM gk_downtime d LEFT JOIN gk_members m ON m.id = d.recorded_by WHERE d.asset_id = ? ORDER BY d.started_on, d.id', id)) {
+    push(row.recorded_at, 'downtime', row.work_order_id, `Down from ${showLocal(row.started_on)}${row.ended_on ? ` to ${showLocal(row.ended_on)} (${row.minutes} min)` : ' (still down)'}: ${row.reason}`, name(row))
+  }
+  for (const row of await all(env, 'SELECT f.work_order_id, f.severity, f.text, f.follow_up_id, f.recorded_at, m.name AS who FROM gk_findings f LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.asset_id = ? ORDER BY f.recorded_at, f.id', id)) {
+    push(row.recorded_at, 'finding', row.work_order_id, `Finding (${row.severity}): ${row.text}${row.follow_up_id ? ' — follow-up raised' : ''}`, name(row))
+  }
+  events.sort((a, b) => a.at - b.at)
+  const downtimeMinutes = (await one<{ n: number | null }>(env, 'SELECT SUM(minutes) AS n FROM gk_downtime WHERE asset_id = ?', id))!.n ?? 0
+  return { asset, orders, events, downtimeMinutes }
+}
+
+const cell = (value: unknown) => { const text = String(value ?? ''); return /[",\n\r]/.test(text) || /^[=+\-@\t]/.test(text) ? `"${(/^[=+\-@\t]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"` : text }
+
+export async function assetHistoryCsv(env: Bindings, actor: Actor, id: string) {
+  requireCapability(actor, 'history.export')
+  const history = await assetHistory(env, actor, id)
+  insist(history.asset, 'asset_not_found', 404)
+  const rows = [['When', 'Asset tag', 'Asset', 'Work order', 'Kind', 'What', 'Who'], ...history.events.map(event => [event.when, history.asset.tag, history.asset.name, event.workOrder ?? '', event.kind, event.what, event.who ?? ''])]
+  return rows.map(row => row.map(cell).join(',')).join('\r\n') + '\r\n'
+}

@@ -1,0 +1,270 @@
+// Clauses 6–8: work orders, assignment and the assigned person's record of the
+// work: checklist results, evidence, readings, parts, downtime and findings.
+// Every change bumps the work order's version, which a review names exactly.
+import type { Bindings } from '../auth.server'
+import { can, requireCapability, type Actor } from './actor'
+import { NEXT_NUMBER, all, commit, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'
+import { addDays, isDate, isLocalTime, localNow, minutesBetween } from './dates'
+import type { Input } from './input'
+import { issuePart, returnPart } from './parts'
+import type { FromProposal } from './schedules'
+import { compareMeter, fromMilli, meterNumber } from './quantity'
+
+export const OPEN = "('open', 'in_progress', 'returned')"
+export const EVIDENCE_BYTES = 1_500_000
+const EVIDENCE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic', pdf: 'application/pdf' }
+
+export async function workOrder(env: Bindings, id: string) {
+  const row = await one(env, 'SELECT * FROM gk_work_orders WHERE id = ?', id)
+  insist(row, 'work_order_not_found', 404)
+  return row
+}
+
+/** The assigned person may record on an open work order; the version they saw must still be current. */
+async function workable(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'work.do')
+  const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+  insist(order.assignee_id === actor.id, 'not_your_work', 403)
+  insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  if (input.has('version')) insist(input.integer('version', { min: 1, max: 1_000_000 }) === order.version, 'stale', 409)
+  return order
+}
+
+/** Statements that move the order to in progress and bump its version, guarded against a concurrent change. */
+const touch = (env: Bindings, order: { id: string; version: number }) => [
+  guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, order.version),
+  stmt(env, "UPDATE gk_work_orders SET version = version + 1, status = 'in_progress' WHERE id = ?", order.id),
+]
+
+export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
+  requireCapability(actor, proposal ? 'proposal.decide' : 'work.assign')
+  const asset = await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
+  insist(asset, 'asset_not_found', 404)
+  insist(!asset.retired_at, 'asset_retired', 409)
+  const title = input.text('title', { max: 160 }), description = input.text('description', { optional: true, max: 2000 }) || null
+  const due = input.text('due', { max: 10 })
+  insist(isDate(due), 'invalid_due')
+  const assignee = input.text('assignee', { optional: true, max: 100 }) || null
+  if (assignee) await assignable(env, assignee)
+  const id = newId()
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, ...(proposal ? { proposal } : {}) } })
+  return { id }
+}
+
+async function assignable(env: Bindings, member: string) {
+  insist(await one(env, "SELECT 1 FROM gk_members WHERE id = ? AND status = 'active' AND role IN ('owner', 'lead', 'maintainer')", member), 'assignee_not_assignable', 409)
+}
+
+export async function assign(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'work.assign')
+  const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+  insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  const assignee = input.text('assignee', { max: 100 })
+  await assignable(env, assignee)
+  await commit(env, [
+    guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, order.version),
+    stmt(env, 'UPDATE gk_work_orders SET assignee_id = ?, version = version + 1 WHERE id = ?', assignee, order.id),
+  ], { actor: actor.id, action: 'workorder.assign', subject: order.id, detail: { from: order.assignee_id, to: assignee } })
+  return { id: order.id }
+}
+
+export async function cancel(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'work.assign')
+  const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+  insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  const reason = input.text('reason', { max: 500 })
+  await commit(env, [
+    guard(env, 'parts_still_issued', "(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE work_order_id = ?) = 0", order.id),
+    guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', order.id),
+    stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, order.id),
+  ], { actor: actor.id, action: 'workorder.cancel', subject: order.id, detail: { reason } })
+  return { id: order.id }
+}
+
+/** Clause 7: a result for each checklist item of the pinned revision, with a note. */
+export async function recordResults(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  insist(order.checklist_revision_id, 'no_checklist', 409)
+  const revision = await one(env, 'SELECT items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id)
+  const count = (JSON.parse(revision!.items_json) as unknown[]).length
+  // JSON callers send parallel `outcome` and `note` lists; the form sends outcome-N and note-N per item.
+  const keyed = !input.has('outcome')
+  const outcomes = keyed ? Array.from({ length: count }, (_, item) => input.text(`outcome-${item}`, { optional: true, max: 20 })) : input.list('outcome', { keepEmpty: true })
+  const notes = keyed ? Array.from({ length: count }, (_, item) => input.text(`note-${item}`, { optional: true, max: 1000 })) : input.list('note', { keepEmpty: true })
+  insist(outcomes.length === count, 'invalid_outcome')
+  const statements: D1PreparedStatement[] = [], recorded: { item: number; outcome: string }[] = []
+  outcomes.forEach((outcome, item) => {
+    if (!outcome) return
+    insist(['pass', 'fail', 'attention'].includes(outcome), 'invalid_outcome')
+    const note = (notes[item] ?? '').slice(0, 1000) || null
+    statements.push(
+      stmt(env, 'INSERT INTO gk_results (work_order_id, item, outcome, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(work_order_id, item) DO UPDATE SET outcome = excluded.outcome, note = excluded.note, recorded_by = excluded.recorded_by, recorded_at = excluded.recorded_at', order.id, item, outcome, note, actor.id, now()),
+      stmt(env, 'INSERT INTO gk_result_log (work_order_id, item, outcome, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?)', order.id, item, outcome, note, actor.id, now()))
+    recorded.push({ item, outcome })
+  })
+  insist(recorded.length, 'invalid_outcome')
+  await commit(env, [...touch(env, order), ...statements], { actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded } })
+  return { id: order.id }
+}
+
+export async function addEvidence(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  const file = (await input.file('file', { maxBytes: EVIDENCE_BYTES }))!
+  const extension = file.filename.split('.').pop()?.toLowerCase() ?? ''
+  const mediaType = EVIDENCE_TYPES[extension]
+  insist(mediaType, 'unsupported_file_type')
+  const id = newId(), sha256 = await sha256Hex(file.bytes)
+  await commit(env, [...touch(env, order), stmt(env, 'INSERT INTO gk_evidence (id, work_order_id, filename, media_type, size, sha256, bytes, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, file.filename, mediaType, file.bytes.length, sha256, file.bytes, actor.id, now())],
+    { actor: actor.id, action: 'workorder.evidence', subject: order.id, detail: { evidence: id, filename: file.filename, size: file.bytes.length, sha256 } })
+  return { id: order.id, evidence: id }
+}
+
+/** Dated readings for the asset's meters. A counter never goes below an earlier reading. */
+export async function recordReadings(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  const takenOn = input.text('takenOn', { max: 16 })
+  insist(isLocalTime(takenOn), 'invalid_takenOn')
+  insist(takenOn <= localNow(actor.zone), 'reading_in_future')
+  const meters = input.list('meter', { keepEmpty: true }), values = input.list('value', { keepEmpty: true })
+  insist(meters.length === values.length && meters.length > 0, 'invalid_value')
+  const statements: D1PreparedStatement[] = [], recorded: { meter: string; value: string }[] = []
+  for (const [index, meterId] of meters.entries()) {
+    const raw = values[index]
+    if (!raw) continue
+    const meter = await one(env, 'SELECT * FROM gk_meters WHERE id = ? AND asset_id = ?', meterId, order.asset_id)
+    insist(meter, 'meter_not_found', 404)
+    let value: string
+    if (meter.kind === 'condition') {
+      insist(['good', 'fair', 'poor'].includes(raw), 'invalid_value')
+      value = raw
+    } else value = meterNumber(raw)
+    if (meter.kind === 'counter') {
+      // The checks below read outside the batch: bumping the meter's revision in the batch makes a concurrent reading on it stale.
+      statements.push(guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_meters WHERE id = ? AND revision = ?)', meter.id, meter.revision), stmt(env, 'UPDATE gk_meters SET revision = revision + 1 WHERE id = ?', meter.id))
+      const earlier = await one<{ value: string }>(env, 'SELECT value FROM gk_readings WHERE meter_id = ? AND taken_on <= ? ORDER BY taken_on DESC, entered_at DESC LIMIT 1', meter.id, takenOn)
+      insist(!earlier || compareMeter(value, earlier.value) >= 0, 'meter_went_backwards', 409, { meter: meter.name, earlier: earlier?.value })
+      const later = await one<{ value: string }>(env, 'SELECT value FROM gk_readings WHERE meter_id = ? AND taken_on > ? ORDER BY taken_on ASC LIMIT 1', meter.id, takenOn)
+      insist(!later || compareMeter(value, later.value) <= 0, 'meter_went_backwards', 409, { meter: meter.name, later: later?.value })
+    }
+    statements.push(stmt(env, 'INSERT INTO gk_readings (id, meter_id, asset_id, work_order_id, value, taken_on, entered_by, entered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', newId(), meter.id, order.asset_id, order.id, value, takenOn, actor.id, now()))
+    recorded.push({ meter: meter.name, value })
+  }
+  insist(recorded.length, 'invalid_value')
+  await commit(env, [...touch(env, order), ...statements], { actor: actor.id, action: 'workorder.readings', subject: order.id, detail: { takenOn, recorded } })
+  return { id: order.id }
+}
+
+export async function issue(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  const move = await issuePart(env, actor, input, order)
+  await commit(env, [...touch(env, order), ...move.statements], { actor: actor.id, action: 'part.issue', subject: order.id, detail: { part: move.part.id, quantity: fromMilli(move.quantity) } })
+  return { id: order.id }
+}
+
+export async function giveBack(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  const move = await returnPart(env, actor, input, order)
+  await commit(env, [...touch(env, order), ...move.statements], { actor: actor.id, action: 'part.return', subject: order.id, detail: { part: move.part.id, quantity: fromMilli(move.quantity) } })
+  return { id: order.id }
+}
+
+export async function downtimeStart(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  const startedOn = input.text('startedOn', { max: 16 }), reason = input.text('reason', { max: 300 })
+  insist(isLocalTime(startedOn), 'invalid_startedOn')
+  insist(startedOn <= localNow(actor.zone), 'downtime_in_future')
+  // Downtime never overlaps an earlier outage of the same asset (an open one is refused by gk_downtime_one_open).
+  const overlap = 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE asset_id = ? AND ended_on > ?)'
+  insist(!await one(env, `SELECT 1 WHERE ${overlap.replace('NOT EXISTS', 'EXISTS')}`, order.asset_id, startedOn), 'downtime_overlaps', 409)
+  const id = newId()
+  await commit(env, [...touch(env, order), guard(env, 'downtime_overlaps', overlap, order.asset_id, startedOn), stmt(env, 'INSERT INTO gk_downtime (id, asset_id, work_order_id, started_on, reason, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)', id, order.asset_id, order.id, startedOn, reason, actor.id, now())],
+    { actor: actor.id, action: 'downtime.start', subject: order.asset_id, detail: { workOrder: order.id, startedOn, reason } })
+  return { id: order.id, downtime: id }
+}
+
+export async function downtimeEnd(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  const open = await one(env, 'SELECT * FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL', order.id)
+  insist(open, 'no_open_downtime', 409)
+  const endedOn = input.text('endedOn', { max: 16 })
+  insist(isLocalTime(endedOn), 'invalid_endedOn')
+  insist(endedOn >= open.started_on, 'downtime_ends_before_start')
+  insist(endedOn <= localNow(actor.zone), 'downtime_in_future')
+  const minutes = minutesBetween(open.started_on, endedOn)
+  await commit(env, [...touch(env, order), stmt(env, 'UPDATE gk_downtime SET ended_on = ?, minutes = ? WHERE id = ? AND ended_on IS NULL', endedOn, minutes, open.id)],
+    { actor: actor.id, action: 'downtime.end', subject: order.asset_id, detail: { workOrder: order.id, endedOn, minutes } })
+  return { id: order.id, minutes }
+}
+
+/** A corrective finding; one that needs follow-up raises a linked corrective work order. */
+export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
+  const order = await workable(env, actor, input)
+  const severity = input.text('severity', { max: 10 }), text = input.text('text', { max: 2000 })
+  insist(['low', 'medium', 'high'].includes(severity), 'invalid_severity')
+  const followUp = input.flag('followUp')
+  const id = newId(), followUpId = followUp ? newId() : null
+  const statements = [...touch(env, order)]
+  if (followUpId) {
+    const due = input.text('followUpDue', { optional: true, max: 10 }) || addDays(actor.today, severity === 'high' ? 1 : 7)
+    insist(isDate(due), 'invalid_followUpDue')
+    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, follow_up_of, title, description, due_date, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, 'open', ?, ?)`,
+      followUpId, order.asset_id, order.id, `Follow-up: ${text.slice(0, 120)}`, text, due, actor.id, now()))
+  }
+  statements.push(stmt(env, 'INSERT INTO gk_findings (id, work_order_id, asset_id, severity, text, follow_up_id, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, order.asset_id, severity, text, followUpId, actor.id, now()))
+  await commit(env, statements, [{ actor: actor.id, action: 'finding.record', subject: order.id, detail: { finding: id, severity, followUp: followUpId } },
+    ...(followUpId ? [{ actor: actor.id, action: 'workorder.create', subject: followUpId, detail: { followUpOf: order.id } }] : [])])
+  return { id: order.id, finding: id, followUp: followUpId }
+}
+
+export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; mine: boolean; missing: string[] }
+
+/** Everything about one work order, for its page and the JSON door. */
+export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
+  const order = await one(env, `SELECT w.*, a.tag AS asset_tag, a.name AS asset_name, a.serial AS asset_serial, a.location AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
+    m.name AS assignee_name, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number
+    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id
+    LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
+    LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of WHERE w.id = ?`, id)
+  insist(order, 'work_order_not_found', 404)
+  const results = new Map((await all(env, 'SELECT r.item, r.outcome, r.note, m.name AS recorded_by, r.recorded_at FROM gk_results r LEFT JOIN gk_members m ON m.id = r.recorded_by WHERE r.work_order_id = ?', id)).map(row => [row.item, row]))
+  const items = order.items_json ? (JSON.parse(order.items_json) as { text: string }[]).map((item, index) => ({ index, text: item.text, result: results.get(index) ?? null })) : []
+  const meters = await all(env, 'SELECT id, name, unit, kind FROM gk_meters WHERE asset_id = ? ORDER BY name', order.asset_id)
+  const readings = await all(env, 'SELECT r.value, r.taken_on, g.name AS meter, g.unit, g.kind, m.name AS entered_by FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id LEFT JOIN gk_members m ON m.id = r.entered_by WHERE r.work_order_id = ? ORDER BY r.taken_on, g.name', id)
+  const parts = (await all(env, `SELECT p.id, p.number, p.name, p.unit,
+    -SUM(CASE WHEN mv.kind = 'issue' THEN mv.quantity_milli ELSE 0 END) AS issued, SUM(CASE WHEN mv.kind = 'return' THEN mv.quantity_milli ELSE 0 END) AS returned
+    FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
+    .map(row => ({ ...row, issued: fromMilli(row.issued), returned: fromMilli(row.returned), used: fromMilli(row.issued - row.returned) }))
+  const downtime = await all(env, 'SELECT id, started_on, ended_on, minutes, reason FROM gk_downtime WHERE work_order_id = ? ORDER BY started_on', id)
+  const findings = await all(env, 'SELECT f.id, f.severity, f.text, f.follow_up_id, w.number AS follow_up_number, w.status AS follow_up_status, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at', id)
+  const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
+  const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
+  const { items_json: _items, ...rest } = order
+  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime }) }
+}
+
+/** Why a work order cannot be submitted yet, in the person's words. */
+export function submitBlockers({ items, findings, downtime }: { items: { result: { outcome: string } | null }[]; findings: unknown[]; downtime: { ended_on: string | null }[] }) {
+  const blockers: string[] = []
+  const missing = items.filter(item => !item.result).length
+  if (missing) blockers.push(`${missing} checklist item${missing === 1 ? '' : 's'} without a result`)
+  if (items.some(item => item.result && item.result.outcome !== 'pass') && !findings.length) blockers.push('a fail or needs-attention result needs a corrective finding')
+  if (downtime.some(row => !row.ended_on)) blockers.push('downtime is still open')
+  return blockers
+}
+
+/** Work lists: everything open, or one person's own. */
+export async function workList(env: Bindings, actor: Actor, url: URL) {
+  const mine = url.searchParams.get('mine') === '1' || (!can(actor, 'work.assign') && !can(actor, 'work.review') && actor.role !== 'agent')
+  const state = url.searchParams.get('state') ?? 'open'
+  const filter = state === 'closed' ? "w.status IN ('closed', 'cancelled')" : "w.status NOT IN ('closed', 'cancelled')"
+  return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.version, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, a.location AS asset_location, a.category AS asset_category, m.name AS assignee, w.assignee_id
+    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id
+    WHERE ${filter} ${mine ? 'AND w.assignee_id = ?' : ''} ORDER BY ${state === 'closed' ? 'w.closed_at DESC' : 'w.due_date, w.number'} LIMIT 500`, ...(mine ? [actor.id] : []))
+}
+
+export async function evidenceFile(env: Bindings, _actor: Actor, id: string) {
+  const row = await one<{ filename: string; media_type: string; bytes: ArrayBuffer | number[] }>(env, 'SELECT filename, media_type, bytes FROM gk_evidence WHERE id = ?', id)
+  insist(row, 'evidence_not_found', 404)
+  return new Response(new Uint8Array(row.bytes as ArrayBuffer), { headers: { 'content-type': row.media_type, 'content-disposition': `inline; filename="${row.filename.replace(/["\\]/g, '_')}"`, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" } })
+}

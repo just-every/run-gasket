@@ -1,0 +1,164 @@
+{
+  "id": "gasket",
+  "name": "gasket",
+  "version": "0.1.0",
+  "maturity": "first-release-local",
+  "category": "operations",
+  "spine": {
+    "id": "asset",
+    "record": "A physical asset the business owns and keeps in service"
+  },
+  "description": "Gasket keeps a small site's own equipment in service: asset register, preventive schedules, assigned work orders, inspection, readings, parts and downtime evidence, supervisor review and an owner-kept history.",
+  "capabilities": [
+    {
+      "id": "http-dispatch",
+      "clauses": [
+        "HTTP-001"
+      ]
+    },
+    {
+      "id": "site-access",
+      "clauses": [
+        "GAS-01"
+      ]
+    },
+    {
+      "id": "asset-register",
+      "clauses": [
+        "GAS-02"
+      ]
+    },
+    {
+      "id": "parts-counts",
+      "clauses": [
+        "GAS-03"
+      ]
+    },
+    {
+      "id": "checklist-revisions",
+      "clauses": [
+        "GAS-04"
+      ]
+    },
+    {
+      "id": "preventive-schedules",
+      "clauses": [
+        "GAS-05"
+      ]
+    },
+    {
+      "id": "assignment",
+      "clauses": [
+        "GAS-06"
+      ]
+    },
+    {
+      "id": "inspection-readings",
+      "clauses": [
+        "GAS-07"
+      ]
+    },
+    {
+      "id": "parts-downtime-findings",
+      "clauses": [
+        "GAS-08"
+      ]
+    },
+    {
+      "id": "review",
+      "clauses": [
+        "GAS-09"
+      ]
+    },
+    {
+      "id": "overdue-downtime",
+      "clauses": [
+        "GAS-10"
+      ]
+    },
+    {
+      "id": "history-export",
+      "clauses": [
+        "GAS-11"
+      ]
+    },
+    {
+      "id": "maintainx-move-in",
+      "clauses": [
+        "GAS-12"
+      ]
+    },
+    {
+      "id": "agent-proposals",
+      "clauses": [
+        "GAS-13"
+      ]
+    }
+  ],
+  "nonGoals": [
+    "Safety certification, regulatory compliance or safety sign-off",
+    "Sensor or IoT feeds and autonomous equipment control",
+    "More than one site",
+    "Purchasing, costs and depreciation",
+    "Contractor work for customers"
+  ],
+  "externals": [
+    {
+      "id": "cloudflare",
+      "required": true,
+      "why": "Worker hosting",
+      "data": [
+        "HTTP requests"
+      ],
+      "adapters": []
+    }
+  ],
+  "env": [],
+  "deploy": {
+    "healthPath": "/health",
+    "publicPaths": [
+      "/",
+      "/health",
+      "/signin"
+    ],
+    "notes": "Native owner sessions guard /app and /api/gasket; roles are checked in every handler; unknown paths return real 404s; the development outbox is local-only."
+  },
+  "extensionPoints": {
+    "contributions": [],
+    "policies": [],
+    "events": [],
+    "slots": [],
+    "adapters": []
+  },
+  "limits": {
+    "status": "unmeasured"
+  },
+  "accessibility": {
+    "level": "WCAG 2.2 AA",
+    "status": "target; unaudited"
+  },
+  "operatingCost": {
+    "status": "unmeasured"
+  },
+  "composition": {
+    "base": "base",
+    "family": "maintenance",
+    "edition": "gasket",
+    "modules": [
+      "job-queue",
+      "release",
+      "deploy-kit",
+      "container",
+      "demo-host",
+      "integrations",
+      "mail",
+      "ai",
+      "portability",
+      "erasure",
+      "dependencies",
+      "operator-auth",
+      "owner-claim",
+      "import-kit"
+    ]
+  }
+}
