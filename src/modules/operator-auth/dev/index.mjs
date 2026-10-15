@@ -12,7 +12,7 @@ import { isActiveOperator, defaultRolePolicy } from '../accounts/roles.mjs';
 import { devGate, devNotFound } from '../dev-gate.mjs';
 import { registerDevAdmission } from '../dev-admission.mjs';
 import { definePersonas } from './personas.mjs';
-import { decorate } from './badge.mjs';
+import { decorateLabel } from '../../demo/label.mjs';
 
 export const DEV_LAYER_MARKER = 'rer-dev-layer:local-only-never-deploy';
 const headers = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow', 'x-rer-dev-layer': DEV_LAYER_MARKER };
@@ -27,7 +27,7 @@ export function managedInstallation(env) {
 
 /**
  * Wraps a seed's Worker with dev sign-in (`/auth/dev/enter?as=…`), the persona
- * list (`/__dev/personas`) and the dev-only badge. Every surface needs the key
+ * list (`/__dev/personas`) and the Dev/Demo name. Every identity surface needs the key
  * gate and answers 404 without it. `config(env)` is the seed's own AuthConfig
  * and `personas()` its devPersonas() declaration.
  */
@@ -58,9 +58,7 @@ export function withDevIdentity(worker, { bindings = env => env, config: authCon
       }
       const response = await worker.fetch(request, original, execution);
       if (!gate || request.method !== 'GET' || path.startsWith('/__dev/')) return response;
-      const admitted = await gate.admits(request);
-      const badge = admitted && env.RER_DEV_IDENTITY !== 'off' ? await identity(env, authConfig, declared).badge(request) : null;
-      return decorate(response, { exchange: path === '/', badge });
+      return decorateLabel(response, env.RER_DEMO === '1' ? 'Demo' : 'Dev');
     },
   };
 }
@@ -95,7 +93,6 @@ function identity(env, authConfig, declared) {
       return { ...actor, hash: await hash(readCookie(request, config)) };
     },
     list: async () => [...(await everyone()).map(({ as, email, role }) => ({ as, email, ...(role ? { role } : {}) })), { as: 'signed-out' }],
-    async badge(request) { return { session: await current(request), choices: (await everyone()).filter(persona => persona.email) }; },
   };
 }
 

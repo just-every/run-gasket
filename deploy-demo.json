@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "domain": "run-gasket.com",
+  "name": "Gasket",
+  "instanceType": "basic",
+  "settings": {
+    "MAIL_PROVIDER": "development",
+    "MAIL_FROM": "Gasket demo <demo@demo.invalid>"
+  }
+}
