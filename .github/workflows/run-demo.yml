@@ -10,6 +10,10 @@ on:
         description: 'Remove the separate test demo and read back resource absence (requires test_only)'
         type: boolean
         default: false
+      observe_test:
+        description: 'Record a 15-minute admission window before measuring fresh test visitors'
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -87,3 +91,14 @@ jobs:
             sleep 15
           done
           ! curl --silent --show-error --doh-url "$doh" -D - -o /dev/null "https://$domain/" | grep -qi '^set-cookie:'
+      - name: Observe test-host admissions
+        if: inputs.test_only && inputs.observe_test && !inputs.remove_test
+        run: node scripts/demo-admissions.mjs "$RUNNER_TEMP/demo-admissions"
+        env:
+          CLOUDFLARE_ACCOUNT_ID: b20c0ca9cab0c2b70e13d7cf724b89bd
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && inputs.test_only && inputs.observe_test && !inputs.remove_test
+        with:
+          name: demo-admissions
+          path: ${{ runner.temp }}/demo-admissions
