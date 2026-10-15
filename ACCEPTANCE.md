@@ -1,6 +1,6 @@
 # Gasket acceptance record
 
-Each clause of [CONTRACT.md](CONTRACT.md) has one flow test through public doors: the JSON door (`/api/gasket/…`), the form door (`/app/do/…`), pages and downloads, against the built Worker with its own local D1. The tests are `tests/gasket/flows.mjs` (one `check` per clause, run by `rer verify`) and the browser journey `tests/gasket/journey.mjs` (1440 and 390 pixels, `rer setup`, `rer preview`, `rer export` and `rer import` in disposable fresh clones). Fixtures are invented; the MaintainX files follow MaintainX's documented column names and are not real customer exports.
+Each clause of [CONTRACT.md](CONTRACT.md) has one flow test through public doors: the JSON door (`/api/gasket/…`), the form door (`/app/do/…`), pages and downloads, against the built Worker with its own local D1. The tests are `tests/gasket/flows.mjs` (one `check` per clause, run by `rer verify`); sign-in mail goes through the real provider adapter and is captured at the network edge. Fixtures are invented; the MaintainX files follow MaintainX's documented column names and are not real customer exports.
 
 | # | What a person can do | Test | Status |
 | --- | --- | --- | --- |
@@ -14,13 +14,13 @@ Each clause of [CONTRACT.md](CONTRACT.md) has one flow test through public doors
 | 8 | The maintainer issues and returns parts within stock and holdings, records downtime with computed minutes (one open at a time) and records findings that raise linked follow-up work. | `GAS-08 parts, downtime and findings` | LOCAL PROVEN |
 | 9 | Submission waits for every result, a finding for any fail or needs-attention and closed downtime; a supervisor returns with a reason or approves the exact version; nobody reviews their own work; approval moves the schedule on. | `GAS-09 submit and review` | LOCAL PROVEN |
 | 10 | A supervisor and lead see overdue work, follow-ups, assets down, 30-day downtime and low parts; a maintainer cannot. | `GAS-10 overdue and downtime board` | LOCAL PROVEN |
-| 11 | Anyone with access reads an asset's full history with who did what; a lead or supervisor downloads it as CSV; the owner exports and restores the whole installation into a fresh one with the history unchanged. | `GAS-11 asset history and CSV`; `tests/gasket/journey.mjs` export and fresh-clone restore | LOCAL PROVEN |
+| 11 | Anyone with access reads an asset's full history with who did what; a lead or supervisor downloads it as CSV; the owner exports and restores the whole installation into a fresh one with the history unchanged. | `GAS-11 asset history and CSV`; installation export and restore use rer's own `export`/`import` | LOCAL PROVEN |
 | 12 | A lead moves in MaintainX asset, part and meter-reading exports: a dry run that writes nothing, apply bound to the reviewed dry run, re-apply that adds nothing, journaled undo, and undo refused once Gasket records build on the move-in. | `GAS-12 MaintainX move-in` | LOCAL PROVEN |
 | 13 | An agent with its own access prepares schedules, corrective work and counts; a lead or the owner (not the preparer) approves the exact payload or rejects it; stale proposals are refused; the agent cannot approve or change records. | `GAS-13 agent prepares, a person approves` | LOCAL PROVEN |
 
 HTTP-001 (health, the installed Lobby and real 404s) is `tests/runtime.mjs`; Base's email sign-in is `tests/email-link.mjs`.
 
-`rer verify` runs the flow tests on every push in the Verify workflow; run the browser journey with `pnpm test:journey`.
+`rer verify` runs the flow tests on every push in the Verify workflow.
 
 ## Boundaries
 

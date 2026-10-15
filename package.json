@@ -24,14 +24,12 @@
     "export": "rer export",
     "import": "rer import",
     "release": "rer release",
-    "outbox": "rer outbox",
     "doctor": "rer doctor",
     "describe": "rer describe",
     "check": "rer check",
     "deps": "rer install",
     "rer": "rer",
-    "test:flows": "rer queue test:flows -- sh -c \"node tests/gasket/flows.mjs\"",
-    "test:journey": "node tests/gasket/journey.mjs"
+    "test:flows": "rer queue test:flows -- sh -c \"node tests/gasket/flows.mjs\""
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.33",

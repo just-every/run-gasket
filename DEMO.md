@@ -11,9 +11,9 @@ three meters with dated readings, sightings and downtime. Dates follow launch
 time. `src/demo.ts` inserts real records with fixed identities and never fetches.
 
 Base's v2 demo guard is the first import of `src/server.ts`. It adds the Demo
-name without a bar or outbox. Access invitations and sign-in mail use
-`demoEffect` to return successful development delivery without sending or
-storing a message. Public reads remain real; Gasket's equipment workflows have
+name without a bar or outbox. Access invitations and sign-in mail go through
+Base's development sender, which returns success without sending or storing a
+message. Public reads remain real; Gasket's equipment workflows have
 no public internet check. MaintainX move-in reads uploaded CSV files locally.
 Normal installations retain their real mail providers and ordinary auth.
 

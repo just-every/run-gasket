@@ -360,9 +360,6 @@ try {
     assert.ok(audit.some(row => row.action === 'proposal.approve' && row.subject === corrective.id && JSON.parse(row.detail).hash === corrective.hash), 'the approval records the exact payload hash')
   })
   console.log('Gasket flows: 13 clauses passed')
-} catch (error) {
-  console.error(h.output())
-  throw error
 } finally {
   await h.close()
 }
