@@ -1,6 +1,7 @@
 import type { Bindings } from './auth.server'
 import { addDays, localNow } from './gasket/dates'
 import { demoAssets, demoChecks, demoParts, demoPeople, demoWork } from './gasket/demo-data'
+import { demoActivity } from './gasket/demo-activity'
 
 /** Fixed identities make this safe to repeat; every row belongs to this copy. No networking. */
 export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail: string; now: Date }) {
@@ -46,4 +47,5 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
   put('gk_downtime', 'id,asset_id,work_order_id,started_on,ended_on,minutes,reason,recorded_by,recorded_at', id('downtime-mixer'), id('mixer'), id('work-mixer'), `${addDays(day,-8)}T09:00`, `${addDays(day,-8)}T10:30`, 90, 'Worn drive belt replaced.', id('max'), at - 8 * 86400000)
   rows.push(env.DB.prepare('INSERT INTO oa_first_run (singleton,completed_by,completed_at) SELECT 1,id,? FROM oa_operators WHERE email=? AND role=\'owner\' ON CONFLICT DO NOTHING').bind(at, ownerEmail))
   await env.DB.batch(rows)
+  await demoActivity(env, day)
 }

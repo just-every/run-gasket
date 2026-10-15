@@ -5,10 +5,13 @@ The copy lives under `.rer/demo/` and is deleted on stop; the owner's
 `.wrangler/state` is never used. A second launch starts again from sample data.
 
 Harbour Kitchen Co, the invented kitchen in the MaintainX fixtures, has eight
-assets, five people, eight work orders (including overdue, in progress, awaiting
-review and closed work), four preventive schedules and checklists, six parts,
-three meters with dated readings, sightings and downtime. Dates follow launch
-time. `src/demo.ts` inserts real records with fixed identities and never fetches.
+assets, five people and an agent, work orders (including overdue, in progress,
+awaiting review, closed and a follow-up from a finding), four preventive
+schedules and checklists, six parts, three meters with dated readings,
+sightings, downtime and the agent's proposals (one approved, two pending).
+Dates follow launch time. `src/demo.ts` inserts the register with fixed
+identities, then `src/gasket/demo-activity.ts` records recent work through
+Gasket's own commands. Neither fetches.
 
 Base's v2 demo guard is the first import of `src/server.ts`. It adds the Demo
 name without a bar or outbox. Access invitations and sign-in mail go through

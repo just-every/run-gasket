@@ -13,6 +13,7 @@ export const demoAssets = [
 export const demoPeople = [
   ['lead', 'Lena Park', 'lead'], ['max', 'Max Ortiz', 'maintainer'],
   ['mo', 'Mo Haddad', 'maintainer'], ['sam', 'Sam Ito', 'supervisor'],
+  ['agent', 'Upkeep agent', 'agent'],
 ] as const
 
 export const demoParts = [
