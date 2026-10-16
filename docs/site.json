@@ -4,7 +4,7 @@
       "title": "Get started",
       "pages": [
         { "slug": "", "label": "Introduction", "file": "docs/introduction.md", "summary": "What Gasket is, how work moves through it, who does what and what you need to run your own copy." },
-        { "slug": "getting-started", "label": "Getting started", "file": "docs/getting-started.md", "summary": "Install rer, start Gasket on your computer, finish setup, set up your site and register your first equipment." }
+        { "slug": "getting-started", "label": "Getting started", "file": "docs/getting-started.md", "summary": "Start Gasket on your computer with one line, finish setup, set up your site and register your first equipment." }
       ]
     },
     {
