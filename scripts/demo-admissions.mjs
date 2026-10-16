@@ -9,7 +9,7 @@ const out = process.argv[2]
 mkdirSync(out, { recursive: true })
 const endpoint = `https://api.cloudflare.com/client/v4/accounts/${account}/workers/scripts/gasket-demo-test--demo/tails`
 const headers = { authorization: `Bearer ${process.env.CLOUDFLARE_API_TOKEN}`, 'content-type': 'application/json' }
-const response = await fetch(endpoint, { method: 'POST', headers, body: '{}' })
+const response = await fetch(endpoint, { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(15000) })
 const created = await response.json()
 if (!response.ok || !created.success) throw Error(`tail-create-failed-${response.status}`)
 const tail = created.result
@@ -46,6 +46,10 @@ try {
   if (!summary.quiet) process.exitCode = 1
 } finally {
   socket?.close()
-  const removed = await fetch(`${endpoint}/${tail.id}`, { method: 'DELETE', headers })
+  const removed = await fetch(`${endpoint}/${tail.id}`, { method: 'DELETE', headers, signal: AbortSignal.timeout(15000) })
   if (!removed.ok) throw Error(`tail-remove-failed-${removed.status}`)
+  await removed.arrayBuffer()
 }
+// Node's native WebSocket can retain a provider socket after close; the tail
+// has been removed and all evidence is synchronous, so release that handle now.
+process.exit(process.exitCode ?? 0)
