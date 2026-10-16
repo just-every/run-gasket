@@ -20,13 +20,19 @@ message. Public reads remain real; Gasket's equipment workflows have
 no public internet check. MaintainX move-in reads uploaded CSV files locally.
 Normal installations retain their real mail providers and ordinary auth.
 
-`deploy-demo.json` and the Run demo workflow deploy one isolated container per
-visitor to https://demo.run-gasket.com/. The workflow reads the `run-demo`
-environment and can be dispatched with `test_only` for the separate test host.
-Dispatch with `test_only` and `remove_test` to remove that host and read back
-absence. Production uses real Turnstile; test-only uses Cloudflare's test keys.
-The front uses Base's existing signed `/auth/owner-claim` handler.
+`deploy-demo.json` and the Run demo workflow (Base's `run-demo.yml`) publish
+https://demo.run-gasket.com/ on rer 0.2.30's native demo host: each visitor
+gets their own Worker Loader isolate with SQLite Durable Object storage for
+Gasket's D1, and static files are served at the edge. The workflow reads the
+`run-demo` environment (`CLOUDFLARE_ACCOUNT_ID` is a variable there) and can be
+dispatched with `test_only` for the separate test host, which needs the private
+`RER_DEMO_MEASUREMENT_TOKEN`. Dispatch with `test_only` and `remove_test` to
+remove that host and read back absence. Production uses real Turnstile;
+test-only uses Cloudflare's test keys. The front uses Base's existing signed
+`/auth/owner-claim` handler.
 
-The intended lifetime is 60 minutes, or 15 idle minutes. Container cleanup and
-effect policy are supplied by Base. Runtime adoption is documented in
+Each copy ends after 60 minutes, or 15 idle minutes, when its storage is
+erased. Hosting, upgrades and removal are described in Base's
+[DEMO.md at rer-v0.2.30](https://github.com/runeditrun/base/blob/rer-v0.2.30/default-seed/DEMO.md#hosting-the-demo);
+runtime adoption is documented in
 [src/modules/demo/README.md](src/modules/demo/README.md).
