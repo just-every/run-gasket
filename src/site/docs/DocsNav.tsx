@@ -14,6 +14,11 @@ export function DocsNav({ current }: { current: string }) {
           </ul>
         </div>
       ))}
+      <div className="docs-nav-group">
+        <ul>
+          <li><a href="/contract">Contract</a></li>
+        </ul>
+      </div>
     </nav>
   )
 }
