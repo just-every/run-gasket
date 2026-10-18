@@ -34,6 +34,8 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 
 Actions: `site.configure`, `access.give`, `access.role`, `access.end`, `asset.create`, `asset.update`, `asset.retire`, `asset.sighting`, `meter.create`, `part.create`, `part.receive`, `part.count`, `checklist.create`, `checklist.revise`, `schedule.create`, `workorders.generate`, `workorder.create`, `workorder.assign`, `workorder.plan`, `workorder.cancel`, `workorder.results`, `workorder.evidence`, `workorder.readings`, `workorder.issue`, `workorder.return`, `downtime.start`, `downtime.end`, `finding.record`, `workorder.submit`, `workorder.review`, `proposal.prepare`, `proposal.decide`, `import.preview`, `import.apply`, `import.job`.
 
+`finding.record` takes `severity`, `text`, optional `followUp` and `followUpDue`, and optional `item`: the index of the checklist step the finding answers in the work order's pinned revision. Submission needs a finding linked to every failed or needs-attention step.
+
 `workorder.plan` is the decision on an overdue work order (lead, owner): `{"workOrder", "version", "plan"}` where `plan` is `keep` (it stays with the person who holds it), `as_is`, or `to:MEMBER_ID` (an ordinary assignment to someone else). It is recorded in the audit trail and in the work order's `decisions`.
 
 Writes that change a versioned record take the version the caller read (`revision` for an asset, `version` for a work order, `seen` for a part count) and answer `409 {"error":"stale"}` if it moved. Files go as `{"filename": "...", "base64": "..."}`.

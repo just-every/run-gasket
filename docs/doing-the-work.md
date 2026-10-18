@@ -24,11 +24,11 @@ If the asset has to come out of service, press **Record asset down** with the ti
 
 ## Findings
 
-Under **Corrective findings**, record what you found and what you did, with a severity of Low, Medium or High. Tick **Needs follow-up work** to raise a corrective work order linked to this one.
+Under **Corrective findings**, choose the checklist step the finding is about (or the whole work order), then record what you found and what you did, with a severity of Low, Medium or High. Tick **Needs follow-up work** to raise a corrective work order linked to this one.
 
 ## Submit for review
 
-The bar at the bottom of the page says what still blocks submission. You can submit when every item has a result, every fail or needs-attention result has a finding, and no downtime is still open. Then press **Submit for review**.
+The bar at the bottom of the page says what still blocks submission. You can submit when every item has a result, every fail or needs-attention step has its own linked finding, and no downtime is still open. Then press **Submit for review**.
 
 If the supervisor returns the work, their reason appears under **Reviews**; record what is missing and submit again.
 

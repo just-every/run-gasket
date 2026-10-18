@@ -231,6 +231,13 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
   const severity = input.text('severity', { max: 10 }), text = input.text('text', { max: 2000 })
   insist(['low', 'medium', 'high'].includes(severity), 'invalid_severity')
+  // The checklist step this finding answers, by its index in the pinned revision; none means the whole work order.
+  const item = input.integer('item', { optional: true, max: 1000 })
+  if (item !== null) {
+    insist(order.checklist_revision_id, 'no_checklist', 409)
+    const revision = await one(env, 'SELECT items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id)
+    insist(item < (JSON.parse(revision!.items_json) as unknown[]).length, 'invalid_item')
+  }
   const followUp = input.flag('followUp')
   const id = newId(), followUpId = followUp ? newId() : null
   const statements = [...touch(env, order)]
@@ -240,8 +247,8 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
     statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, follow_up_of, title, description, due_date, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, 'open', ?, ?)`,
       followUpId, order.asset_id, order.id, `Follow-up: ${text.slice(0, 120)}`, text, due, actor.id, now()))
   }
-  statements.push(stmt(env, 'INSERT INTO gk_findings (id, work_order_id, asset_id, severity, text, follow_up_id, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, order.asset_id, severity, text, followUpId, actor.id, now()))
-  await commit(env, statements, [{ actor: actor.id, action: 'finding.record', subject: order.id, detail: { finding: id, severity, followUp: followUpId } },
+  statements.push(stmt(env, 'INSERT INTO gk_findings (id, work_order_id, asset_id, item, severity, text, follow_up_id, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, order.asset_id, item, severity, text, followUpId, actor.id, now()))
+  await commit(env, statements, [{ actor: actor.id, action: 'finding.record', subject: order.id, detail: { finding: id, item, severity, followUp: followUpId } },
     ...(followUpId ? [{ actor: actor.id, action: 'workorder.create', subject: followUpId, detail: { followUpOf: order.id } }] : [])])
   return { id: order.id, finding: id, followUp: followUpId }
 }
@@ -265,7 +272,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
     .map(row => ({ ...row, issued: fromMilli(row.issued), returned: fromMilli(row.returned), used: fromMilli(row.issued - row.returned) }))
   const downtime = await all(env, 'SELECT id, started_on, ended_on, minutes, reason FROM gk_downtime WHERE work_order_id = ? ORDER BY started_on', id)
-  const findings = await all(env, 'SELECT f.id, f.severity, f.text, f.follow_up_id, w.number AS follow_up_number, w.status AS follow_up_status, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at', id)
+  const findings = await all(env, 'SELECT f.id, f.item, f.severity, f.text, f.follow_up_id, w.number AS follow_up_number, w.status AS follow_up_status, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at', id)
   const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
@@ -275,12 +282,13 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime }) }
 }
 
-/** Why a work order cannot be submitted yet, in the person's words. */
-export function submitBlockers({ items, findings, downtime }: { items: { result: { outcome: string } | null }[]; findings: unknown[]; downtime: { ended_on: string | null }[] }) {
+/** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */
+export function submitBlockers({ items, findings, downtime }: { items: { index: number; text: string; result: { outcome: string } | null }[]; findings: { item: number | null }[]; downtime: { ended_on: string | null }[] }) {
   const blockers: string[] = []
   const missing = items.filter(item => !item.result).length
   if (missing) blockers.push(`${missing} checklist item${missing === 1 ? '' : 's'} without a result`)
-  if (items.some(item => item.result && item.result.outcome !== 'pass') && !findings.length) blockers.push('a fail or needs-attention result needs a corrective finding')
+  for (const item of items) if (item.result && item.result.outcome !== 'pass' && !findings.some(finding => finding.item === item.index))
+    blockers.push(`step ${item.index + 1} (${item.text}) ${item.result.outcome === 'fail' ? 'failed' : 'needs attention'} and needs a linked corrective finding`)
   if (downtime.some(row => !row.ended_on)) blockers.push('downtime is still open')
   return blockers
 }

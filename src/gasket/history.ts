@@ -42,8 +42,8 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
   for (const row of await all(env, 'SELECT d.work_order_id, d.started_on, d.ended_on, d.minutes, d.reason, d.recorded_at, m.name AS who FROM gk_downtime d LEFT JOIN gk_members m ON m.id = d.recorded_by WHERE d.asset_id = ? ORDER BY d.started_on, d.id', id)) {
     push(row.recorded_at, 'downtime', row.work_order_id, `Down from ${showLocal(row.started_on)}${row.ended_on ? ` to ${showLocal(row.ended_on)} (${row.minutes} min)` : ' (still down)'}: ${row.reason}`, name(row))
   }
-  for (const row of await all(env, 'SELECT f.work_order_id, f.severity, f.text, f.follow_up_id, f.recorded_at, m.name AS who FROM gk_findings f LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.asset_id = ? ORDER BY f.recorded_at, f.id', id)) {
-    push(row.recorded_at, 'finding', row.work_order_id, `Finding (${row.severity}): ${row.text}${row.follow_up_id ? ' — follow-up raised' : ''}`, name(row))
+  for (const row of await all(env, 'SELECT f.work_order_id, f.item, f.severity, f.text, f.follow_up_id, f.recorded_at, m.name AS who FROM gk_findings f LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.asset_id = ? ORDER BY f.recorded_at, f.id', id)) {
+    push(row.recorded_at, 'finding', row.work_order_id, `Finding (${row.severity})${row.item !== null ? ` on checklist item ${row.item + 1}` : ''}: ${row.text}${row.follow_up_id ? ' — follow-up raised' : ''}`, name(row))
   }
   events.sort((a, b) => a.at - b.at)
   const downtimeMinutes = (await one<{ n: number | null }>(env, 'SELECT SUM(minutes) AS n FROM gk_downtime WHERE asset_id = ?', id))!.n ?? 0

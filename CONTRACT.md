@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026).
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09 was re-judged on 19 October 2026 at the commit that changed its row.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Published | 12 | 2 | 0 | 14 |
+| Published | 13 | 1 | 0 | 14 |
 | Target and push further | 0 | 44 | 78 | 122 |
-| All | 12 | 46 | 78 | 136 |
+| All | 13 | 45 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -373,7 +373,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `GAS-06` | Assign work | published | done | `src/gasket/work.ts`; `src/gasket/site.ts`; `tests/gasket/flows.mjs` |  |
 | `GAS-07` | Capture the inspection | published | done | `src/gasket/work.ts`; `tests/gasket/flows.mjs` |  |
 | `GAS-08` | Issue and return parts, record downtime and findings | published | done | `src/gasket/work.ts`; `src/gasket/parts.ts`; `tests/gasket/flows.mjs` |  |
-| `GAS-09` | Submit and review | published | partial | `src/gasket/review.ts`; `src/gasket/work.ts`; `src/gasket/schedules.ts`; `tests/gasket/flows.mjs` | Submission and independent version-bound review exist, but the current guard accepts one work-level finding for multiple failed steps; per-result finding links are missing. |
+| `GAS-09` | Submit and review | published | done | `src/gasket/review.ts`; `src/gasket/work.ts`; `src/gasket/schedules.ts`; `migrations/core/0017_finding_steps.sql`; `tests/gasket/flows.mjs` |  |
 | `GAS-10` | Watch overdue work and downtime | published | done | `src/gasket/board.ts`; `tests/gasket/flows.mjs` |  |
 | `GAS-11` | Read and keep the history | published | partial | `src/gasket/history.ts`; `scripts/installer/local.mjs`; `tests/gasket/flows.mjs` | History and CSV are exercised; the product flow does not prove a populated installation export/restore round trip with attachments. |
 | `GAS-12` | Move in from MaintainX | published | done | `src/gasket/movein/maintainx.ts`; `src/gasket/movein/target.ts`; `tests/gasket/flows.mjs` |  |
