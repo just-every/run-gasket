@@ -1,8 +1,8 @@
 /* 02 timeline, 03 detect, 04 stage and 05 the parts band. */
 
 /* 02 · Eight stops on one line: labels alternate above and below, each tied to its disc by a stem. */
-.tl-card { padding: 44px clamp(24px, 3vw, 44px) 28px; }
-.tl { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: auto 104px auto; }
+.tl-card { padding: 30px clamp(24px, 3vw, 44px) 22px; }
+.tl { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: auto 84px auto; }
 .tl-stop { display: contents; --tone: var(--blue); }
 .tl-copper { --tone: #ec6a2c; }
 .tl-red { --tone: var(--red); }
@@ -24,10 +24,10 @@
 .tl-stop:last-child .tl-label { width: 18.6%; }
 .tl-when { color: var(--muted); font-size: 15px; line-height: 1.4; }
 .tl-verb { margin-top: 4px; font-size: clamp(22px, 1.85vw, 27px); line-height: 1.15; font-weight: 800; letter-spacing: -.025em; }
-.tl-record { margin-top: 8px; color: var(--ink); font-size: 16.5px; line-height: 1.45; }
+.tl-record { margin-top: 6px; color: var(--ink); font-size: 16.5px; line-height: 1.45; }
 .tl-alert { display: inline-flex; align-items: center; gap: 7px; max-width: 100%; margin-top: 8px; padding: 5px 12px 5px 8px; border-radius: 10px; background: var(--red-tint); color: var(--red-ink); font-size: 15px; font-weight: 600; }
 .tl-alert .disc { width: 18px; height: 18px; }
-.tl-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 32px; margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--line); font-size: clamp(18px, 1.5vw, 22px); }
+.tl-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 32px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); font-size: clamp(18px, 1.5vw, 22px); }
 .tl-foot strong { margin-left: 6px; font-weight: 800; }
 
 @media (max-width: 1099px) {
@@ -47,9 +47,9 @@
 
 /* 03 · The velocity chart and the agent's finding, the finding card set just below and to the right. */
 .detect-cards { display: grid; }
-.chart-card { margin-right: 18px; padding: 20px 22px 18px; }
-.finding-card { position: relative; margin: -2px 0 0 34px; padding: 18px 22px 14px; }
-.chart { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: 172px 32px; margin: 28px 8px 0 0; }
+.chart-card { margin-right: 18px; padding: 18px 22px 14px; }
+.finding-card { position: relative; margin: -2px 0 0 34px; padding: 16px 22px 12px; }
+.chart { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr); grid-template-rows: 160px 32px; margin: 22px 8px 0 0; }
 .chart-y { position: relative; grid-row: 1; }
 .chart-y span { position: absolute; left: 0; transform: translateY(-50%); color: var(--muted); font-size: 13px; }
 .chart-plot { position: relative; grid-row: 1; grid-column: 2; }
@@ -67,20 +67,20 @@
 .chart-x { position: relative; grid-row: 2; grid-column: 2; }
 .chart-x span { position: absolute; top: 10px; transform: translateX(-50%); color: var(--muted); font-size: 13.5px; white-space: nowrap; }
 .chart-x span:last-child { transform: translateX(-70%); }
-.chart-card .chips { margin-top: 10px; gap: 8px; }
+.chart-card .chips { margin-top: 8px; gap: 8px; }
 .chart-card .chips li { padding: 5px 11px; font-size: 13.5px; }
 .finding-head { display: flex; align-items: center; gap: 16px; }
 .finding-title { font-size: 22px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; }
-.finding-label { margin-top: 14px; color: var(--muted); font-size: 15px; }
-.finding-history { display: grid; gap: 8px; margin-top: 10px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.finding-label { margin-top: 10px; color: var(--muted); font-size: 15px; }
+.finding-history { display: grid; gap: 6px; margin-top: 8px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
 .finding-history li { position: relative; padding-left: 26px; font-size: 14.5px; line-height: 1.45; }
 .dot-red { position: absolute; left: 4px; top: 6px; width: 9px; height: 9px; border-radius: 999px; background: var(--red); }
-.finding-row { display: flex; align-items: center; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; line-height: 1.4; }
+.finding-row { display: flex; align-items: center; gap: 14px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; line-height: 1.4; }
 .finding-row .icon { color: var(--ink); }
 .finding-muted { color: var(--muted); }
 .finding-muted .icon { color: var(--muted); }
-.finding-proposal { display: flex; align-items: center; gap: 14px; margin-top: 12px; padding: 11px 16px; border: 1px solid var(--blue-line); border-radius: 10px; background: var(--blue-tint); color: var(--blue); font-size: 16px; font-weight: 650; }
-.finding-lead { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 14.5px; }
+.finding-proposal { display: flex; align-items: center; gap: 14px; margin-top: 10px; padding: 9px 16px; border: 1px solid var(--blue-line); border-radius: 10px; background: var(--blue-tint); color: var(--blue); font-size: 16px; font-weight: 650; }
+.finding-lead { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 14.5px; }
 
 @media (max-width: 760px) {
   .chart-card { margin: 0; padding: 20px 16px; }
@@ -91,20 +91,20 @@
 
 /* 04 · The work pack beside Saturday's slot and the approval. */
 .stage-grid { display: grid; grid-template-columns: minmax(0, 7.3fr) minmax(0, 4.5fr); gap: 22px; align-items: start; }
-.pack { overflow: hidden; border-top: 8px solid var(--blue); padding: 22px 22px 14px; }
+.pack { overflow: hidden; border-top: 8px solid var(--blue); padding: 20px 22px 10px; }
 .pack-title { font-size: clamp(24px, 2.05vw, 31px); line-height: 1.2; font-weight: 750; letter-spacing: -.02em; }
-.pack-rows { margin-top: 14px; }
-.pack-rows > div { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 4px 14px; padding: 13px 2px; border-top: 1px dashed #dfe4ee; }
+.pack-rows { margin-top: 10px; }
+.pack-rows > div { display: grid; grid-template-columns: 172px minmax(0, 1fr); gap: 4px 14px; padding: 9px 2px; border-top: 1px dashed #dfe4ee; }
 .pack-rows dt { color: #4b5578; font-size: 13.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding-top: 2px; }
-.pack-rows dd { font-size: 16.5px; line-height: 1.5; }
+.pack-rows dd { font-size: 16.5px; line-height: 1.45; }
 .pack-person { display: flex; align-items: flex-start; gap: 14px; }
 .pack-parts { display: grid; }
 .pack-parts li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
 .pack-parts li + li { border-top: 1px dashed #e7ebf2; }
-.pack-forward { margin: 4px -10px 0; padding: 16px 12px !important; border-radius: 10px; background: var(--copper-tint); border-top: 0 !important; }
+.pack-forward { margin: 4px -10px 0; padding: 12px 12px !important; border-radius: 10px; background: var(--copper-tint); border-top: 0 !important; }
 .slot { padding: 22px 22px 20px; }
 .slot-title { font-size: clamp(21px, 1.7vw, 26px); font-weight: 800; letter-spacing: -.02em; }
-.lanes { display: grid; grid-template-columns: 36px minmax(0, 1fr); height: 330px; margin: 24px 0 8px; }
+.lanes { display: grid; grid-template-columns: 36px minmax(0, 1fr); height: 310px; margin: 20px 0 8px; }
 .lanes-axis { position: relative; border-right: 1px solid #d5dbe6; margin-right: 12px; }
 .lanes-axis span { position: absolute; right: 10px; transform: translateY(-50%); color: var(--muted); font-size: 14px; }
 .lanes-axis .lanes-end { font-size: 12px; }
@@ -128,32 +128,32 @@
 
 /* 05 · The dark band: Dayton empty, the transfer, Mesa with three, then the recovery. */
 .sites { display: grid; grid-template-columns: minmax(0, 1fr) minmax(200px, .6fr) minmax(0, .86fr); align-items: stretch; gap: 0 26px; }
-.site-card { padding: 24px 24px 22px; border: 0; border-radius: 6px; border-top: 8px solid; }
+.site-card { padding: 20px 24px 18px; border: 0; border-radius: 6px; border-top: 8px solid; }
 .site-short { border-top-color: #ec3237; }
 .site-stock { border-top-color: #22b05c; }
 .site-where { color: #4b5578; font-size: 15px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
-.site-bin { margin-top: 22px; font-size: clamp(24px, 2vw, 30px); font-weight: 650; letter-spacing: -.01em; }
+.site-bin { margin-top: 14px; font-size: clamp(24px, 2vw, 30px); font-weight: 650; letter-spacing: -.01em; }
 .site-count { font-size: clamp(42px, 3.6vw, 56px); line-height: 1.2; font-weight: 750; letter-spacing: -.02em; }
 .site-count-red { color: var(--red); }
 .site-count-green { color: #16a34a; }
 .site-note { margin-top: 10px; color: #4b5578; font-size: 14.5px; }
 .site-note-lg { font-size: 18px; color: var(--body); }
-.site-quote { display: flex; gap: 12px; align-items: flex-start; margin-top: 18px; padding: 14px 16px; border: 1px solid var(--red-line); border-radius: 8px; background: #fdf3f3; font-size: 15px; line-height: 1.45; }
+.site-quote { display: flex; gap: 12px; align-items: flex-start; margin-top: 14px; padding: 14px 16px; border: 1px solid var(--red-line); border-radius: 8px; background: #fdf3f3; font-size: 15px; line-height: 1.45; }
 .site-quote .icon { color: var(--red); width: 26px; height: 26px; }
-.site-after { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--line-strong); color: var(--body); font-size: 15px; }
+.site-after { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line-strong); color: var(--body); font-size: 15px; }
 .transit { position: relative; display: grid; align-content: center; }
 .transit-line { position: absolute; left: -22px; right: -22px; top: 50%; border-top: 2.5px dashed #4d74ff; }
 .transit-line::before { content: ''; position: absolute; left: -4px; top: -8px; border: 7px solid transparent; border-right: 10px solid #4d74ff; border-left: 0; }
 .transit-pill { position: relative; display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1.5px solid #b7c6ff; border-radius: 8px; background: #fff; color: var(--ink); font-size: 14.5px; line-height: 1.35; }
 .transit-pill .icon { color: var(--copper); width: 30px; height: 30px; }
-.recovery { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: 22px; margin-top: 64px; position: relative; padding-top: 30px; }
+.recovery { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1.2fr) auto; align-items: start; gap: 22px; margin-top: 40px; position: relative; padding-top: 30px; }
 .recovery-steps { display: contents; }
 .recovery::before { content: ''; position: absolute; left: 70px; right: 170px; top: 4px; height: 1.5px; background: #c9d2f0; }
-.recovery-steps li { position: relative; padding: 18px 18px 22px; border: 0; border-radius: 6px; }
+.recovery-steps li { position: relative; padding: 16px 18px 18px; border: 0; border-radius: 6px; }
 .recovery-steps li::before { content: ''; position: absolute; left: 62px; top: -35px; width: 17px; height: 17px; border-radius: 999px; background: #fff; }
 .recovery-steps li::after { content: ''; position: absolute; left: 70px; top: -20px; width: 1.5px; height: 20px; background: #c9d2f0; }
 .recovery-when { font-size: 16px; font-weight: 700; }
-.recovery-what { margin-top: 10px; color: var(--body); font-size: 15.5px; line-height: 1.5; }
+.recovery-what { margin-top: 8px; color: var(--body); font-size: 15.5px; line-height: 1.5; }
 .recovery-done { align-self: start; margin-top: -60px; padding: 10px 16px; border: 1.5px solid #8fe0ac; border-radius: 6px; background: #1f9d55; color: #fff; font-size: 17px; font-weight: 650; line-height: 1.35; max-width: 168px; }
 @media (max-width: 1279px) {
   .recovery { grid-template-columns: repeat(3, minmax(0, 1fr)); padding-top: 0; margin-top: 48px; }

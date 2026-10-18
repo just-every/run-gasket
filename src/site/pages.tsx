@@ -20,11 +20,20 @@ const ICONS = '<link rel="icon" href="/favicon.ico" sizes="16x16 32x32"><link re
 // Gasket is a US product with its own tab icons.
 // A separator or arrow between words stays on the line before it, so no wrapped line starts with "·", "–" or "→".
 const bindSeparators = (html: string) => html.replace(/>([^<]+)</g, (_, text: string) => `>${text.replace(/ ([·–—→])(?= )/g, '\u00a0$1').replace(/ ([·–—])$/, '\u00a0$1')}<`)
-const usPage = (html: string) => html.replaceAll(`${run.licence} licence<`, `${run.licence} license<`).replace(/<link rel="icon" href="[^"]*">/, ICONS)
+// Base writes long dates the British way ("17 October 2026"); a US page reads "Oct 17, 2026".
+const usDates = (html: string) => html.replace(/\b(\d{1,2}) (January|February|March|April|May|June|July|August|September|October|November|December) (\d{4})\b/g, (_, day: string, month: string, year: string) => `${month.slice(0, 3)} ${day}, ${year}`)
+const usPage = (html: string) => bindIds(usDates(html.replace('<html lang="en"', '<html lang="en-US"').replaceAll(`${run.licence} licence<`, `${run.licence} license<`).replace(/<link rel="icon" href="[^"]*">/, ICONS)))
+// Part numbers, asset tags and the repository never break at a hyphen ("6316-C3", "AC-02", "just-every/run-gasket"):
+// each sits in a no-wrap <g-id>, and the text run around it in one <g-t>, so a flex or grid parent still sees one item.
+// Neither is a span, so no page's span rules reach them. Only text between tags changes (never scripts, styles or
+// the title), so copied text is the same.
+const ID = /(?<![\w-])(?=[A-Za-z0-9-]*\d)[A-Z0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+(?![\w-])|just-every\/run-gasket/g
+const bindIds = (html: string) => html.split(/(<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<title>[\s\S]*?<\/title>|<[^>]+>)/)
+  .map((part, index) => index % 2 || !part.match(ID) ? part : `<g-t>${part.replace(ID, '<g-id style="white-space:nowrap">$&</g-id>')}</g-t>`).join('')
 
 export function sitePages({ styles, contract }: SiteContext): SiteBuild {
   const data: RunData = run
-  const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + bindSeparators(renderToStaticMarkup(
+  const document = (title: string, description: string, body: ReactElement, script = '') => '<!doctype html>' + bindIds(bindSeparators(renderToStaticMarkup(
     <html lang="en-US">
       <head>
         <meta charSet="utf-8" />
@@ -49,7 +58,7 @@ export function sitePages({ styles, contract }: SiteContext): SiteBuild {
       </head>
       <body>{body}{script ? <script dangerouslySetInnerHTML={{ __html: script }} /> : null}</body>
     </html>,
-  ))
+  )))
   return {
     pages: [
       { path: '/', html: document('Gasket · Ready for first shift', identity.tagline, <Landing />, landingScript) },

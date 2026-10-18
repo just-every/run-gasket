@@ -53,14 +53,18 @@ export function Shutdown() {
             <div className="lanes-axis" aria-hidden="true">{[6, 7, 8, 9, 10, 11].map(h => <span key={h} style={{ top: top(h) }}>{h}</span>)}<span className="lanes-end" style={{ top: top(11.5) }}>11:30</span></div>
             <div className="sat-lanes">
               <div className="sat-lane sat-blue"><span className="sat-bar" style={span(6, 9)} /><span className="sat-bar" style={span(10 + 20 / 60, 10 + 50 / 60)} />
-                <p className="sat-note" style={{ top: top(6.1) }}><b>4471</b>Marcus<br />6:00–9:00</p>
-                <p className="sat-note" style={{ top: top(10.3) }}>10:20–10:50 restart and check</p></div>
+                <p className="sat-note" style={{ top: top(6.1) }}><b>4471</b><span>Marcus</span><span>6:00–9:00</span></p>
+                <p className="sat-note sat-note-across" style={{ top: top(10.3) }}><span className="nowrap">10:20–10:50</span> <span className="nowrap">restart and check</span></p></div>
               <div className="sat-lane sat-copper"><span className="sat-bar" style={span(6, 10.25)} />
-                <p className="sat-note" style={{ top: top(6.1) }}><b>4472</b>Keisha<br />6:00–10:15 · 2,000-hr service at 17,958 hrs · signed 11:05</p></div>
+                <p className="sat-note" style={{ top: top(6.1) }}><b>4472</b><span>Keisha</span><span>6:00–10:15</span></p></div>
               <div className="sat-lane sat-slate"><span className="sat-bar" style={span(6, 7 + 40 / 60)} />
-                <p className="sat-note" style={{ top: top(6.1) }}><b>4481</b>Devon<br />6:00–7:40 · Press 3 hose</p></div>
+                <p className="sat-note" style={{ top: top(6.1) }}><b>4481</b><span>Devon</span><span>6:00–7:40</span></p></div>
             </div>
           </div>
+          <ul className="sat-key">
+            <li className="sat-copper"><span><b>4472</b> 2,000-hr service at 17,958 hrs · <span className="nowrap">signed 11:05</span></span></li>
+            <li className="sat-slate"><span><b>4481</b> Press 3 hose</span></li>
+          </ul>
           <p className="sat-closed"><CheckDisc />Window closed 11:30 am, on time</p>
         </article>
       </div>

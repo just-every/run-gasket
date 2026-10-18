@@ -29,7 +29,8 @@
 .site .docs-prose li + li { margin-top: 8px; }
 .docs-prose code { padding: 2px 6px; border-radius: 5px; background: var(--blue-tint); color: #1b2a6b; font-family: var(--rer-font-mono); font-size: .84em; }
 .docs-code { position: relative; margin-top: 18px; border-radius: 12px; background: var(--terminal); }
-.site .docs-prose .docs-code pre { margin: 0; padding: 18px 92px 18px 22px; overflow-x: auto; white-space: pre; }
+/* The command scrolls in its own box left of the Copy button, so a long line never runs under it. */
+.site .docs-prose .docs-code pre { margin: 0 92px 0 0; padding: 18px 8px 18px 22px; overflow-x: auto; white-space: pre; }
 .docs-prose pre code { padding: 0; background: none; color: var(--rer-code-text); font-size: 15px; line-height: 1.7; white-space: pre; }
 .docs-copy { position: absolute; top: 12px; right: 12px; min-height: 34px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 8px; background: transparent; color: #fff; font: 500 14px/1 var(--rer-font-body); cursor: pointer; }
 .docs-copy:hover { background: rgba(255, 255, 255, .1); }
@@ -64,7 +65,7 @@
   .docs-step-section { padding: 18px 16px 20px; }
   .site .docs-prose .docs-step { gap: 12px; min-height: 36px; }
   .docs-num { position: static; flex: none; width: 36px; height: 36px; font-size: 18px; }
-  .site .docs-prose .docs-code pre { padding: 50px 16px 16px; }
+  .site .docs-prose .docs-code pre { margin-right: 0; padding: 50px 16px 16px; }
   .docs-prose pre code { font-size: 13.5px; }
   .docs-prose :not(pre) > code { overflow-wrap: anywhere; }
   .docs-pager { grid-template-columns: minmax(0, 1fr); }

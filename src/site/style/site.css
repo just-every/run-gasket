@@ -45,20 +45,20 @@ body { margin: 0; background: var(--rer-page); color: var(--ink); font: 400 17px
 .btn-white:hover { background: #eef2ff; }
 
 /* Sections: white or pale, one dark band; the stage-and-date eyebrow, the ultramarine heading and the lead. */
-.section { padding-block: clamp(52px, 5.6vw, 80px); }
+.section { padding-block: clamp(40px, 3.2vw, 50px); }
 .section-white { background: var(--rer-surface); }
 .section-pale { background: var(--pale); }
 .section-band { background: var(--band); color: var(--band-ink); }
 .eyebrow { color: var(--copper-text); font-size: 13px; line-height: 1.3; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
 .section-band .eyebrow { color: #f07a43; }
 /* Inter's descenders reach below a tight line box; the padding keeps them inside the heading's own box. */
-.section h2 { margin-top: 18px; padding-bottom: .1em; color: var(--blue); font-size: clamp(40px, 3.6vw, 56px); line-height: 1.08; font-weight: 800; letter-spacing: -.045em; }
+.section h2 { margin-top: 14px; padding-bottom: .1em; color: var(--blue); font-size: clamp(40px, 3.6vw, 56px); line-height: 1.08; font-weight: 800; letter-spacing: -.045em; }
 .section-band h2 { color: #fff; }
-.lead { margin-top: 16px; max-width: 980px; color: var(--body); font-size: clamp(17px, 1.3vw, 20px); line-height: 1.6; }
+.lead { margin-top: 14px; max-width: 980px; color: var(--body); font-size: clamp(17px, 1.3vw, 20px); line-height: 1.6; }
 .section-band .lead { color: var(--band-muted); }
 .copy-center { text-align: center; }
 .copy-center .lead { margin-inline: auto; max-width: 800px; }
-.layout-stack .section-copy { margin-bottom: clamp(32px, 3.4vw, 52px); }
+.layout-stack .section-copy { margin-bottom: clamp(24px, 2.2vw, 36px); }
 .layout-copy-left > .wrap, .layout-copy-right > .wrap { display: grid; align-items: center; gap: clamp(32px, 4.5vw, 72px); }
 .layout-copy-left > .wrap { grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); }
 .layout-copy-right > .wrap { grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); }

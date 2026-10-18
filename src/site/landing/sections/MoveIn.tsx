@@ -11,7 +11,7 @@ const moveInLead = 'Every asset, PM and work order since 2019 comes across, whic
 const terminal = (
   <div className="terminal" role="group" aria-label="Start Gasket on your computer">
     <p className="terminal-dots" aria-hidden="true"><span /><span /><span /></p>
-    <pre><code><span className="terminal-prompt" aria-hidden="true">$ </span>npx -y @runeditrun/rer dev just-every/run-gasket{'\n'}<span className="terminal-comment"># clones, installs and starts Gasket on your computer</span></code></pre>
+    <pre tabIndex={0}><code><span className="terminal-prompt" aria-hidden="true">$ </span>npx -y @runeditrun/rer dev just-every/run-gasket{'\n'}<span className="terminal-comment"># clones, installs and starts Gasket on your computer</span></code></pre>
   </div>
 )
 

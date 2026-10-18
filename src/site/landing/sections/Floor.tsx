@@ -1,5 +1,6 @@
 import { AlertDisc, Battery, Bars, CheckDisc, Clipboard, Clock, Cloud, Cube, Hose, QrCode, SignalOff, Wifi } from '../icons'
 import { Avatar, Section } from '../parts'
+import { ClampPhoto, CompressorPhoto, GaugePhoto, MotorPhoto } from '../photos'
 import type { ReactNode } from 'react'
 
 function Phone({ time, status, className, label, children }: { time: string; status: ReactNode; className: string; label: string; children: ReactNode }) {
@@ -13,46 +14,6 @@ function Phone({ time, status, className, label, children }: { time: string; sta
   )
 }
 
-/** Luis's photo of the leak: the left die clamp on Press 3 with oil at its supply fitting. */
-const ClampPhoto = () => (
-  <svg className="photo" viewBox="0 0 320 190" role="img" aria-label="Photo: the left die clamp on Press 3, oil dripping from its supply fitting">
-    <rect width="320" height="190" fill="#c9d0db" />
-    <path d="M0 132h320v58H0z" fill="#9aa3b2" /><path d="M0 132h320" stroke="#5d6576" strokeWidth="2" />
-    {[24, 88, 152, 216, 280].map(xx => <rect key={xx} x={xx} y="146" width="40" height="30" rx="3" fill="#7d8697" stroke="#5d6576" strokeWidth="1.5" />)}
-    <rect x="18" y="20" width="56" height="112" fill="#aab2c0" stroke="#5d6576" strokeWidth="2" /><rect x="246" y="20" width="56" height="112" fill="#aab2c0" stroke="#5d6576" strokeWidth="2" />
-    <rect x="112" y="34" width="118" height="80" rx="6" fill="#d9632c" stroke="#7a3412" strokeWidth="2.5" />
-    <rect x="128" y="18" width="86" height="22" rx="4" fill="#e07a45" stroke="#7a3412" strokeWidth="2.5" />
-    <circle cx="198" cy="74" r="13" fill="#b9501f" stroke="#7a3412" strokeWidth="2.5" /><circle cx="198" cy="74" r="5" fill="#4a5060" />
-    <path d="M0 64h86M0 94h86" stroke="#2c3140" strokeWidth="13" strokeLinecap="round" />
-    <rect x="80" y="54" width="34" height="20" rx="3" fill="#d6a12f" stroke="#7a5a10" strokeWidth="2" /><rect x="80" y="84" width="34" height="20" rx="3" fill="#d6a12f" stroke="#7a5a10" strokeWidth="2" />
-    <path d="M100 105c0 6-4 11-4 15a4 4 0 0 0 8 0c0-4-4-9-4-15z" fill="#e8a317" stroke="#8a5b06" strokeWidth="1.5" />
-    <path d="M97 132c4 4 12 4 16 0" stroke="#e8a317" strokeWidth="3" fill="none" strokeLinecap="round" />
-  </svg>
-)
-const CompressorPhoto = () => (
-  <svg className="thumb" viewBox="0 0 120 120" role="img" aria-label="Photo: AC-02">
-    <rect width="120" height="120" fill="#d4dae4" /><path d="M0 92h120v28H0z" fill="#aab2c0" />
-    <rect x="14" y="40" width="58" height="50" rx="6" fill="#7f95b3" stroke="#3d4a60" strokeWidth="2" /><path d="M24 40V28h20v12" fill="none" stroke="#3d4a60" strokeWidth="3" />
-    <rect x="70" y="52" width="36" height="34" rx="5" fill="#c8693a" stroke="#6e3215" strokeWidth="2" />{[58, 64, 70, 76].map(yy => <path key={yy} d={`M74 ${yy}h28`} stroke="#6e3215" strokeWidth="1.5" />)}
-    <path d="M10 92h100" stroke="#3d4a60" strokeWidth="3" />
-  </svg>
-)
-const GaugePhoto = () => (
-  <svg className="thumb" viewBox="0 0 120 120" role="img" aria-label="Photo: the discharge gauge at 125 psi">
-    <rect width="120" height="120" fill="#cfd6e1" /><rect x="52" y="96" width="16" height="24" fill="#c99a2e" stroke="#6f5410" strokeWidth="2" />
-    <circle cx="60" cy="56" r="44" fill="#eef1f6" stroke="#3d4a60" strokeWidth="5" />
-    {Array.from({ length: 21 }, (_, i) => { const a = (-225 + i * 13.5) * Math.PI / 180, r1 = i % 5 ? 33 : 29; return <line key={i} x1={60 + Math.cos(a) * r1} y1={56 + Math.sin(a) * r1} x2={60 + Math.cos(a) * 37} y2={56 + Math.sin(a) * 37} stroke="#3d4a60" strokeWidth={i % 5 ? 1.2 : 2.4} /> })}
-    <path d="M60 56 75.5 32.8" stroke="#d9561f" strokeWidth="3.4" strokeLinecap="round" /><circle cx="60" cy="56" r="5" fill="#3d4a60" />
-  </svg>
-)
-const MotorPhoto = () => (
-  <svg className="thumb" viewBox="0 0 120 120" role="img" aria-label="Photo: the motor's outboard end">
-    <rect width="120" height="120" fill="#d4dae4" /><path d="M0 94h120v26H0z" fill="#aab2c0" />
-    <rect x="22" y="34" width="62" height="56" rx="10" fill="#c8693a" stroke="#6e3215" strokeWidth="2.5" />{[44, 52, 60, 68, 76].map(yy => <path key={yy} d={`M26 ${yy}h54`} stroke="#8f421b" strokeWidth="2" />)}
-    <rect x="84" y="50" width="20" height="24" rx="4" fill="#7f95b3" stroke="#3d4a60" strokeWidth="2" /><path d="M104 62h12" stroke="#3d4a60" strokeWidth="5" />
-    <path d="M18 90h72" stroke="#3d4a60" strokeWidth="3" />
-  </svg>
-)
 const Signature = ({ className }: { className?: string }) => (
   <svg className={className ?? 'signature'} viewBox="0 0 220 56" aria-hidden="true"><path d="M8 44c10-6 22-26 30-30 6-3-4 22 0 24 6 2 14-22 20-22 5 0-2 18 4 18 8 0 14-12 22-12 7 0 2 10 10 9 20-2 60-12 118-24" fill="none" stroke="#0e1630" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
 )
