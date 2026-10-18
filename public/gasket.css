@@ -139,11 +139,30 @@ td:first-child .gk-cell > a:hover { text-decoration: underline; }
 .gk-hint { color: var(--rer-muted); font-size: 14px; line-height: 20px; margin: 0; }
 input[type="text"], input[type="email"], input[type="number"], input[type="date"], input[type="datetime-local"], input:not([type]), select, textarea {
   font: inherit; color: var(--rer-text); background: var(--rer-surface); border: 1px solid var(--rer-border); border-radius: 10px; padding: 9px 14px; min-height: 44px; width: 100%; }
+/* Base #247's theme-aware chevron applies only to single-choice controls. */
+select:not([multiple],[size]:not([size="1"])) {
+  --rer-select-ink: var(--rer-muted);
+  -webkit-appearance: none;
+  appearance: none;
+  line-height: normal;
+  text-indent: 4px;
+  padding-inline-end: 40px;
+  text-overflow: ellipsis;
+  background-image:
+    linear-gradient(to top right, transparent calc(50% - 1.1px), var(--rer-select-ink) calc(50% - .55px), var(--rer-select-ink) calc(50% + .55px), transparent calc(50% + 1.1px)),
+    linear-gradient(to top left, transparent calc(50% - 1.1px), var(--rer-select-ink) calc(50% - .55px), var(--rer-select-ink) calc(50% + .55px), transparent calc(50% + 1.1px));
+  background-repeat: no-repeat;
+  background-position: right 20px center, right 14px center;
+  background-size: 6px 6px;
+}
+select:not([multiple],[size]:not([size="1"])):focus-visible { --rer-select-ink: var(--rer-text); }
+select:not([multiple],[size]:not([size="1"])):disabled { --rer-select-ink: color-mix(in srgb, var(--rer-muted) 55%, transparent); }
+
 input[type="file"] { font: inherit; color: var(--rer-text); padding: 6px 0; }
 input[type="file"]::file-selector-button { font: inherit; font-size: 16px; font-weight: 500; line-height: 20px; margin-right: 14px; padding: 11px 24px; min-height: 44px; border-radius: 999px; border: 1px solid var(--rer-text); background: var(--rer-surface); color: var(--rer-text); cursor: pointer; }
 input[type="file"]::file-selector-button:hover { background: var(--gk-accent-soft); }
 textarea { min-height: 104px; resize: vertical; }
-input:disabled, select:disabled, textarea:disabled { background: var(--gk-seg); color: var(--rer-muted); }
+input:disabled, select:disabled, textarea:disabled { background-color: var(--gk-seg); color: var(--rer-muted); }
 input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--gk-bad); }
 .gk-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 16px; }
 .gk-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
@@ -208,6 +227,8 @@ td .gk-split { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: cente
 td .gk-inline { flex-wrap: nowrap; align-items: center; }
 td .gk-inline .gk-field label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 td .gk-inline select, td .gk-role { min-width: 180px; }
+/* Padding must not enlarge the role column's intrinsic width. */
+td .gk-cell:has(> select.gk-role:not([multiple],[size]:not([size="1"]))) { contain: inline-size; min-width: 180px; }
 td .gk-inline .gk-actions { margin: 0; }
 
 /* Empty state: a large white card centred on a fine-line drawing. */
