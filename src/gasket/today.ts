@@ -1,12 +1,13 @@
 // The Work screen's read model. Today holds every work order on today's plate:
 // overdue, due today, in progress and done today; the other three tabs are
-// those parts of it. Also the overdue work order that needs a decision, the
-// agent's pending proposals, the next day with work and the latest changes.
-// Every row is a real work order the person may see.
+// those parts of it. Also the overdue work order that needs a decision with
+// its costed plans (or the decision already taken today), the agent's pending
+// proposals, the next day with work and the latest changes. Every row is a
+// real work order the person may see.
 import type { Bindings } from '../auth.server'
 import { can, type Actor } from './actor'
 import { all, one, type Row } from './core'
-import { today } from './dates'
+import { today, zonedInstant } from './dates'
 import { OPEN } from './work'
 
 export const TABS = ['today', 'overdue', 'progress', 'done'] as const
@@ -46,15 +47,57 @@ export async function workToday(env: Bindings, actor: Actor, url: URL) {
   const { rows, placed } = await plate(env, actor, mine)
   const tabs: Record<Tab, Row[]> = { today: placed, overdue: placed.filter(row => row.part === 'overdue'), progress: placed.filter(row => row.part === 'progress'), done: placed.filter(row => row.part === 'done') }
   const next = await all(env, `${ROWS} WHERE w.status IN ${OPEN} AND w.due_date = (SELECT MIN(due_date) FROM gk_work_orders x WHERE x.status IN ${OPEN} AND x.due_date > ?${mine ? ' AND x.assignee_id = ?' : ''})${scope} ORDER BY w.number LIMIT 4`, actor.today, ...who, ...who)
-  return { tabs, next, exception: tabs.overdue[0] ? await exceptionOf(env, actor, tabs.overdue[0], rows) : null }
+  return { tabs, next, exception: await exceptionOf(env, actor, tabs.overdue, rows) }
 }
 
-/** The overdue work order the manager decides on: who holds it, what else they are on, and who could take it. */
-async function exceptionOf(env: Bindings, actor: Actor, order: Row, rows: Row[]) {
+export type Plan = { value: string; label: string; cost: string }
+export type Decision = { plan: 'keep' | 'as_is' | 'reassign'; at: number; by: string | null; holder: string | null; to: string | null }
+
+/** Today's plan decisions on these work orders, the latest per order. */
+async function decisionsToday(env: Bindings, actor: Actor, ids: string[]) {
+  const since = zonedInstant(actor.zone, `${actor.today}T00:00`)
+  const rows = ids.length ? await all(env, `SELECT a.subject, a.at, a.detail, m.name AS by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
+    LEFT JOIN gk_members h ON h.id = json_extract(a.detail, '$.holder') LEFT JOIN gk_members t ON t.id = json_extract(a.detail, '$.to')
+    WHERE a.action = 'workorder.plan' AND a.at >= ? AND a.subject IN (${ids.map(() => '?').join(', ')}) ORDER BY a.at, a.seq`, since, ...ids) : []
+  return new Map(rows.map(row => [row.subject as string, { plan: JSON.parse(row.detail).plan, at: row.at, by: row.by, holder: row.holder, to: row.too } as Decision]))
+}
+
+const listed = (rows: Row[]) => rows.map(row => `${row.number} ${row.asset_name}`).join(' and ')
+
+/**
+ * The overdue work order the manager decides on: the first one nobody has decided on today, with who holds it, what
+ * else they are on and the plans with what each costs. When every overdue order has today's decision, the latest
+ * decided one shows that decision instead.
+ */
+async function exceptionOf(env: Bindings, actor: Actor, overdue: Row[], rows: Row[]) {
+  if (!overdue.length) return null
+  const decided = await decisionsToday(env, actor, overdue.map(row => row.id))
+  const order = overdue.find(row => !decided.has(row.id)) ?? [...overdue].sort((a, b) => decided.get(b.id)!.at - decided.get(a.id)!.at)[0]
   const busy = rows.filter(row => row.assignee_id && row.assignee_id === order.assignee_id && row.status === 'in_progress' && row.id !== order.id)
-  const load = can(actor, 'work.assign') ? await all<{ id: string; name: string; due: number }>(env, `SELECT m.id, m.name, (SELECT COUNT(*) FROM gk_work_orders w WHERE w.assignee_id = m.id AND w.status IN ${OPEN} AND w.due_date <= ?) AS due
-    FROM gk_members m WHERE m.status = 'active' AND m.role IN ('owner', 'lead', 'maintainer') AND m.id IS NOT ? ORDER BY due, m.name LIMIT 3`, actor.today, order.assignee_id) : []
-  return { order, busy, load }
+  const decision = decided.get(order.id) ?? null
+  return { order, busy, decision, plans: decision || !can(actor, 'work.assign') ? [] : await plansFor(env, actor, order, busy) }
+}
+
+/**
+ * The plans for an overdue order, each with its cost: keep it with the person who holds it (it waits for what they are
+ * on), hand it to one of the three least-loaded maintainers or leads, or keep it as it is. The person deciding is
+ * never offered as the one to take it; the work order page assigns anyone.
+ */
+async function plansFor(env: Bindings, actor: Actor, order: Row, busy: Row[]): Promise<Plan[]> {
+  const load = `(SELECT COUNT(*) FROM gk_work_orders w WHERE w.assignee_id = m.id AND w.status IN ${OPEN} AND w.due_date <= ? AND w.id <> ?)`
+  const doing = `(SELECT GROUP_CONCAT(w.number || ' ' || a.name, ' and ') FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id WHERE w.assignee_id = m.id AND w.status = 'in_progress')`
+  const people = await all<{ id: string; name: string; due: number; doing: string | null }>(env, `SELECT m.id, m.name, ${load} AS due, ${doing} AS doing FROM gk_members m
+    WHERE m.status = 'active' AND m.role IN ('lead', 'maintainer') AND m.id IS NOT ? AND m.id <> ? ORDER BY m.role <> 'maintainer', due, m.name LIMIT 3`, actor.today, order.id, order.assignee_id, actor.id)
+  const due = (count: number, other = '') => count ? `${count}${other} due today or overdue` : `nothing${other ? ' else' : ''} due today`
+  const sentence = (parts: string[]) => { const text = parts.filter(Boolean).join('; '); return text.charAt(0).toUpperCase() + text.slice(1) }
+  const plans: Plan[] = []
+  if (order.assignee_id) {
+    const held = (await one<{ due: number }>(env, `SELECT ${load} AS due FROM gk_members m WHERE m.id = ?`, actor.today, order.id, order.assignee_id))?.due ?? 0
+    plans.push({ value: 'keep', label: `Keep with ${order.assignee}`, cost: sentence(busy.length ? [`after ${listed(busy)}, in progress`, 'overdue until then'] : [due(held, ' more')]) })
+  }
+  for (const person of people) plans.push({ value: `to:${person.id}`, label: `Reassign to ${person.name}`, cost: sentence([person.doing ? `on ${person.doing} now` : '', due(person.due)]) })
+  plans.push({ value: 'as_is', label: 'Keep as is', cost: 'No plan today; it stays overdue' })
+  return plans
 }
 
 /** The agent strip: proposals waiting for a decision, the newest first. */

@@ -148,6 +148,19 @@ try {
     assert.equal((await wo('max', ids.pm)).assignee_id, ids.max)
     ids.corrective = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Replace fryer thermostat', due: addDays(today, -2), assignee: ids.mo })).id
     assert.equal((await wo('mo', ids.corrective)).kind, 'corrective')
+    // The Work panel's decision on overdue work: keeping it with its holder is offered first and chosen, the person
+    // deciding is never offered to take it, and once decided the panel shows the decision instead of the plans.
+    const panel = await (await h.raw('/app', { cookie: cookie.lead })).text()
+    assert.match(panel, /value="keep" checked><span><b>Keep with Mo Haddad/)
+    assert.doesNotMatch(panel, new RegExp(`value="to:${ids.lead}"`))
+    await h.api('workorder.plan', cookie.lead, { workOrder: ids.corrective, plan: `to:${ids.lead}` }, 409)
+    await h.api('workorder.plan', cookie.max, { workOrder: ids.corrective, plan: 'keep' }, 403)
+    await h.submit('workorder.plan', cookie.lead, { workOrder: ids.corrective, plan: 'keep' })
+    assert.match(await (await h.raw('/app', { cookie: cookie.lead })).text(), /Kept with Mo Haddad/)
+    await h.api('workorder.plan', cookie.owner, { workOrder: ids.corrective, plan: `to:${ids.max}` })
+    assert.equal((await wo('max', ids.corrective)).assignee_id, ids.max)
+    await h.api('workorder.plan', cookie.owner, { workOrder: ids.corrective, plan: `to:${ids.mo}` })
+    assert.deepEqual((await wo('mo', ids.corrective)).decisions.map(row => [row.plan, row.to]), [['reassign', 'Mo Haddad'], ['reassign', 'Max Ortiz'], ['keep', null]])
   })
 
   await check('GAS-07 inspection, evidence and readings', async () => {

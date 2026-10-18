@@ -38,7 +38,7 @@ export const ACTIONS: Record<string, string> = {
   'site.configure': 'Changed the site settings', 'access.give': 'Gave access', 'access.role': 'Changed a role', 'access.end': 'Ended access',
   'asset.create': 'Registered an asset', 'asset.update': 'Changed asset details', 'asset.retire': 'Retired an asset', 'asset.sighting': 'Recorded a sighting', 'meter.create': 'Added a meter',
   'checklist.create': 'Wrote a checklist', 'checklist.revise': 'Published a checklist revision', 'schedule.create': 'Scheduled preventive work',
-  'workorder.generate': 'Created a work order from its schedule', 'workorder.create': 'Raised a work order', 'workorder.assign': 'Assigned the work', 'workorder.cancel': 'Cancelled a work order',
+  'workorder.generate': 'Created a work order from its schedule', 'workorder.create': 'Raised a work order', 'workorder.assign': 'Assigned the work', 'workorder.plan': 'Decided on overdue work', 'workorder.cancel': 'Cancelled a work order',
   'workorder.results': 'Recorded checklist results', 'workorder.readings': 'Recorded readings', 'workorder.evidence': 'Attached evidence',
   'workorder.submit': 'Submitted for review', 'workorder.approve': 'Approved and closed', 'workorder.return': 'Returned for more work',
   'part.create': 'Added a part', 'part.receive': 'Received stock', 'part.count': 'Recorded a physical count', 'part.issue': 'Issued a part', 'part.return': 'Returned a part',

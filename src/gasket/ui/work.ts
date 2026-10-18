@@ -50,18 +50,39 @@ function workTable(rows: any[], today: string, alert: string | null) {
       <td data-label="Status">${chip(row, today)}</td></tr>`)}</tbody></table>`
 }
 
-/** The panel beside the table: the overdue work order a manager decides on, or the calm state. */
+type Exception = NonNullable<Awaited<ReturnType<typeof workToday>>['exception']>
+
+/** What was decided, in the panel's words. */
+const outcome = (decision: NonNullable<Exception['decision']>, busy: Exception['busy']) => decision.plan === 'keep'
+  ? `Kept with ${decision.holder ?? 'the assignee'}${busy.length ? `, after ${busy.map(row => `${row.number} ${row.asset_name}`).join(' and ')}` : ''}.`
+  : decision.plan === 'reassign' ? `Reassigned to ${decision.to ?? 'someone else'}${decision.holder ? ` from ${decision.holder}` : ''}.`
+  : `Kept as is${decision.holder ? `, with ${decision.holder}` : ''}: no plan today.`
+
+/**
+ * The panel beside the table: the overdue work order a manager decides on, its plans with what each costs (keeping it
+ * with the person who holds it comes first and is chosen; nothing pre-picks a reassignment), and once decided, the
+ * decision. Or the calm state.
+ */
 function exceptionPanel(actor: Actor, exception: Awaited<ReturnType<typeof workToday>>['exception']) {
   if (!exception) return h`<aside class="gk-panel gk-panel-calm" aria-labelledby="panel-h"><p class="gk-panel-eyebrow">Needs a decision</p><h2 id="panel-h">Nothing is overdue</h2><p class="gk-muted">Work that passes its due date waits here, with who holds it and who could take it.</p></aside>`
-  const { order, busy, load } = exception
+  const { order, busy, plans, decision } = exception
   const holder = order.assignee ? order.assignee.split(' ')[0] : null
-  return h`<aside class="gk-panel" aria-labelledby="panel-h"><header class="gk-panel-head"><span class="gk-num">${woNumber(order.number)}</span><a class="gk-icon-link" href="/app/work/${order.id}" aria-label="Open ${woNumber(order.number)}">${ICON.open}</a></header>
+  const chosen = plans[0]?.value
+  const decide = plans.length ? h`<form method="post" action="/app/do/workorder.plan" class="gk-plan">${hidden('returnTo', '/app')}${hidden('workOrder', order.id)}${hidden('version', order.version)}<fieldset><legend>Choose a plan</legend>
+      ${plans.map(plan => h`<label class="gk-option"><input type="radio" name="plan" value="${plan.value}"${plan.value === chosen ? raw(' checked') : ''}><span><b>${plan.label}</b><span class="gk-option-cost">${plan.cost}</span></span></label>`)}</fieldset>
+      <div class="gk-panel-actions"><button type="submit">Approve plan</button></div></form>
+    <form method="post" action="/app/do/workorder.plan" class="gk-panel-actions gk-panel-keep">${hidden('returnTo', '/app')}${hidden('workOrder', order.id)}${hidden('version', order.version)}${hidden('plan', 'as_is')}<button type="submit" class="gk-secondary">Keep as is</button></form>` : ''
+  const decided = decision ? h`<section class="gk-decided" aria-labelledby="decided-h">${ICON.done}<div><h3 id="decided-h">Decided</h3><p>${outcome(decision, busy)}</p><p class="gk-sub">${decision.by ?? '—'}, ${showTime(decision.at, actor.zone)}</p></div></section>` : ''
+  return h`<aside class="gk-panel" aria-labelledby="panel-h"><header class="gk-panel-head"><span class="gk-wo-id">${woNumber(order.number)}</span><a class="gk-icon-link" href="/app/work/${order.id}" aria-label="Open ${woNumber(order.number)}">${ICON.open}</a></header>
     <div class="gk-equipment">${machine({ name: order.asset_name, category: order.asset_category }, 'band')}<div><h2 id="panel-h">${order.asset_name}</h2><p>${order.asset_tag}${order.asset_category ? h` · ${order.asset_category}` : ''}</p><p>${order.asset_location}</p></div></div>
     <section class="gk-warning" aria-label="Overdue">${ICON.clock}<div><h3>${late(order.due_date, actor.today)}</h3><p>${order.title}, due ${showDay(order.due_date, { short: true })}${order.assignee ? `, assigned to ${order.assignee}` : ', not assigned'}.${busy.length ? ` ${holder} is on ${busy.map(row => `${row.number} ${row.asset_name}`).join(' and ')}, in progress.` : ''}</p></div></section>
-    ${can(actor, 'work.assign') && load.length ? h`<form method="post" action="/app/do/workorder.assign" class="gk-plan">${hidden('returnTo', '/app')}${hidden('workOrder', order.id)}<fieldset><legend>Choose a plan</legend>
-      ${load.map((option, index) => h`<label class="gk-option"><input type="radio" name="assignee" value="${option.id}"${index === 0 ? raw(' checked') : ''}><span>Reassign to <b>${option.name}</b>, ${option.due ? `${option.due} due today or overdue` : 'nothing due today'}</span></label>`)}</fieldset>
-      <div class="gk-panel-actions"><button type="submit">Assign</button><a class="gk-button gk-secondary" href="/app/work/${order.id}">Open work order</a></div></form>`
-    : h`<div class="gk-panel-actions"><a class="gk-button gk-secondary" href="/app/work/${order.id}">Open work order</a></div>`}</aside>`
+    ${decided}${decide}${plans.length ? '' : h`<div class="gk-panel-actions"><a class="gk-button gk-secondary" href="/app/work/${order.id}">Open work order</a></div>`}</aside>`
+}
+
+/** The next day's work by name: "4471 AC-02 Replace motor bearings, 6316-C3 × 2". */
+const shortTask = (title: string) => {
+  const text = title.replace(/^Follow-up: /, '').split(/[;.]/)[0].trim()
+  return text.length <= 48 ? text : `${text.slice(0, 46).replace(/\s+\S*$/, '')}…`
 }
 
 export async function workPage(env: Bindings, actor: Actor, url: URL) {
@@ -89,12 +110,12 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const empty = h`<div class="gk-empty gk-empty-flat"><img src="/brand/assets/clipboard.svg" alt="" width="160" height="128"><h2>${title}</h2><p>${text}</p>${assigner && !filtered && tab === 'today' ? h`<p><a class="gk-button gk-secondary" href="/app/schedules">Go to schedules</a></p>` : ''}</div>`
 
   const more = rows.length > shown.length ? h`<a class="gk-more-rows" href="${here([filtered ? url.searchParams.toString() : tab === 'today' ? '' : `tab=${tab}`, 'all=1'].filter(Boolean).join('&'))}">+ ${rows.length - shown.length} more</a>` : ''
-  const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${row.number} ${row.asset_name}</a>`)}${today.next.length === 1 ? h` ${today.next[0].title.charAt(0).toLowerCase() + today.next[0].title.slice(1)}` : ''}</span><a class="gk-icon-link" href="${here('state=open')}" aria-label="All open work">${ICON.arrow}</a></p>` : ''
+  const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${row.number} ${row.asset_tag}</a> ${shortTask(row.title)}`)}</span><a class="gk-icon-link" href="${here('state=open')}" aria-label="All open work">${ICON.arrow}</a></p>` : ''
 
   let log: Html = h``
   if (activity) {
     const records = await auditRecords(env)
-    log = h`<section class="gk-activity" aria-labelledby="activity-h"><header><h2 id="activity-h">Recent activity</h2><a href="/app/audit">All activity ›</a></header>
+    log = h`<section class="gk-activity gk-work-log" aria-labelledby="activity-h"><header><h2 id="activity-h">Recent activity</h2><a href="/app/audit">All activity ›</a></header>
       ${activity.length ? h`<ol>${activity.map(row => h`<li><time class="gk-num">${showTime(row.at, actor.zone)}</time>${actionIcon(row.action)}<p><b>${row.actor_name ?? '—'}</b> ${ACTIONS[row.action] ?? 'Changed a record'}${records.get(row.subject) ? h` · ${records.get(row.subject)}` : ''}</p></li>`)}</ol>` : h`<p class="gk-muted">Nothing has changed yet.</p>`}</section>`
   }
 
@@ -103,8 +124,8 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const body = h`<div class="gk-work">
     <header class="gk-work-head"><div class="gk-work-title"><h1>Work</h1><p>${place?.name ?? ''}${place ? ', ' : ''}${showDay(actor.today)}</p></div><div class="gk-work-tools">${filters}${generate}</div>
       <p class="gk-site-clock"><strong class="gk-num">${showClock(clock.slice(11))}</strong><span>${showDay(actor.today)} · ${zoneName(actor.zone)}</span><span>${ZONE_LABELS[actor.zone] ?? actor.zone} site clock</span></p></header>
-    <div class="gk-work-main">${tabs}${agent}<section class="gk-work-card" aria-label="${filtered ? 'Work orders' : TAB_LABEL[tab]}">${rows.length ? workTable(shown, actor.today, today.exception?.order.id ?? null) : empty}${more}${next}</section>${log}</div>
-    ${exceptionPanel(actor, today.exception)}</div>`
+    <div class="gk-work-main">${tabs}${agent}<section class="gk-work-card" aria-label="${filtered ? 'Work orders' : TAB_LABEL[tab]}">${rows.length ? workTable(shown, actor.today, today.exception?.order.id ?? null) : empty}${more}${next}</section></div>
+    ${exceptionPanel(actor, today.exception)}${log}</div>`
   return page(env, 'Work', actor, body, { url })
 }
 
@@ -158,6 +179,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const findings = card('Corrective findings', h`${w.findings.length ? h`<ul class="gk-findings">${w.findings.map(row => h`<li>${tag(row.severity === 'high' ? 'High' : row.severity === 'medium' ? 'Medium' : 'Low')} ${row.text}${row.follow_up_id ? h`<span class="gk-sub">Follow-up <a href="/app/work/${row.follow_up_id}">${woNumber(row.follow_up_number)}</a> · ${STATUS[row.follow_up_status]}</span>` : ''}</li>`)}</ul>` : h`<p class="gk-muted">No findings recorded.</p>`}
     ${working ? post('finding.record', h`${area('What was found and what was done', 'text')}${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], 'low')}${checkbox('Needs follow-up work (raises a corrective work order)', 'followUp')}${field('Follow-up due', 'followUpDue', { type: 'date', required: false, hint: 'Leave empty for tomorrow (high) or a week from today.' })}`, 'Record finding', { secondary: true }) : ''}`, { id: 'findings' })
 
+  const decisions = w.decisions.length ? card('Overdue decisions', h`<ul class="gk-findings">${w.decisions.map(row => h`<li>${row.plan === 'keep' ? `Kept with ${row.holder ?? 'the assignee'}` : row.plan === 'reassign' ? `Reassigned to ${row.to ?? 'someone else'}` : `Kept as is${row.holder ? `, with ${row.holder}` : ''}`}<span class="gk-sub">${row.decided_by ?? '—'} · ${showInstant(row.at, actor.zone)}</span></li>`)}</ul>`, { id: 'decisions' }) : ''
   const reviews = w.reviews.length ? card('Reviews', table(['Decision', 'By', 'Reason'], w.reviews.map(row => [tag(row.decision === 'approved' ? 'Approved' : 'Returned'), h`${row.reviewer}<span class="gk-sub">${showInstant(row.at, actor.zone)}</span>`, row.reason ?? '']), 'Reviews', { wrap: [2] }), { id: 'reviews' }) : ''
 
   const assign = can(actor, 'work.assign') && ['open', 'in_progress', 'returned'].includes(w.status)
@@ -173,7 +195,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     <form method="post" action="/app/do/workorder.review" class="gk-inline">${hidden('returnTo', back)}${ids}${hidden('decision', 'approve')}<button type="submit">Approve and close</button></form>`
 
   const body = h`${backLink('/app', 'Work orders')}${band}
-    <div class="gk-columns"><div class="gk-col-main">${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${downtime}${findings}${reviews}${assign}
+    <div class="gk-columns"><div class="gk-col-main">${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${downtime}${findings}${reviews}${assign}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

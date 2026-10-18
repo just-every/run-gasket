@@ -57,23 +57,29 @@ export const demoSchedules = [
   ['round', 'ac01', 'round', 7, 7, 'keisha'],
 ] as const
 
-/** Work: key, number, asset, title, due, assignee, status, checklist (preventive) or null (corrective), minutes ago it was submitted or closed. */
-export const demoWork = [
-  ['lube', 4466, 'press1', 'Weekly lube and air check', -1, 'devon', 'open', 'lube', null],
-  ['diechange', 4474, 'press2', 'Die change support', 0, 'devon', 'in_progress', null, null],
-  ['dieset', 4462, 'press4', 'Die-set check at 1,500,000 strokes', 0, 'keisha', 'open', 'dieset', null],
-  ['forklift', 4468, 'fl07', '250-hr service (Samsara 4,012 hrs)', 0, 'marcus', 'open', 'forklift', null],
-  ['receiver', 4469, 'rt01', 'Receiver drain and check', 0, 'keisha', 'open', 'receiver', null],
-  ['dryer', 4470, 'dr01', 'Dryer dew point check', 0, 'devon', 'open', 'dryer', null],
-  ['coil', 4473, 'press4', 'Coil feed alignment', 0, 'marcus', 'open', 'dieset', null],
-  ['clamp', 4480, 'press3', 'Die clamp fitting leaking (QR fault R-2291)', 0, 'keisha', 'in_progress', null, null],
-  ['bearings', 4471, 'ac02', 'Replace motor bearings, 6316-C3 × 2', 'sat', 'marcus', 'open', null, null],
-  ['compressor', 4472, 'ac02', '2,000-hr service', 'sat', 'keisha', 'open', 'compressor', null],
-  ['hydraulic', 4410, 'press3', 'Hydraulics filter change', 0, 'keisha', 'submitted', 'hydraulic', 16],
-  ['round', 4463, 'ac01', 'Compressor room round', 0, 'keisha', 'submitted', 'round', 263],
-  ['clutch', 4457, 'press2', 'Clutch and brake inspection', -2, 'devon', 'closed', null, 2 * 1440 + 300],
-  ['burner', 4450, 'oven', 'Burner and airflow check', -5, 'marcus', 'closed', null, 5 * 1440 + 200],
-] as const
+/** Story moments: [day offset from launch, site-local "HH:MM"]. */
+export type Moment = readonly [number, string]
+
+/**
+ * Work: key, number, asset, title, due, assignee, status, checklist (preventive) or null (corrective), when Ray
+ * raised it, and when it was submitted (closed work was approved an hour later) or null. Numbers follow the raising order.
+ */
+export const demoWork: readonly (readonly [string, number, string, string, number | 'sat', string, string, string | null, Moment, Moment | null])[] = [
+  ['hydraulic', 4410, 'press3', 'Hydraulics filter change', 0, 'keisha', 'submitted', 'hydraulic', [-21, '06:40'], [0, '11:48']],
+  ['burner', 4450, 'oven', 'Burner and airflow check', -5, 'marcus', 'closed', null, [-9, '06:35'], [-5, '14:20']],
+  ['clutch', 4457, 'press2', 'Clutch and brake inspection', -2, 'devon', 'closed', null, [-6, '06:35'], [-2, '13:05']],
+  ['dieset', 4462, 'press4', 'Die-set check at 1,500,000 strokes', 0, 'keisha', 'open', 'dieset', [-4, '06:30'], null],
+  ['round', 4463, 'ac01', 'Compressor room round', 0, 'keisha', 'submitted', 'round', [-4, '06:31'], [0, '07:58']],
+  ['lube', 4466, 'press1', 'Weekly lube and air check', -1, 'devon', 'open', 'lube', [-4, '06:32'], null],
+  ['forklift', 4468, 'fl07', '250-hr service (Samsara 4,012 hrs)', 0, 'marcus', 'open', 'forklift', [-3, '06:30'], null],
+  ['receiver', 4469, 'rt01', 'Receiver drain and check', 0, 'keisha', 'open', 'receiver', [-3, '06:31'], null],
+  ['dryer', 4470, 'dr01', 'Dryer dew point check', 0, 'devon', 'open', 'dryer', [-3, '06:32'], null],
+  ['bearings', 4471, 'ac02', 'Replace motor bearings, 6316-C3 × 2', 'sat', 'marcus', 'open', null, [-2, '09:40'], null],
+  ['compressor', 4472, 'ac02', '2,000-hr service', 'sat', 'keisha', 'open', 'compressor', [-2, '09:42'], null],
+  ['coil', 4473, 'press4', 'Coil feed alignment', 0, 'marcus', 'open', 'dieset', [-1, '05:40'], null],
+  ['diechange', 4474, 'press2', 'Die change support', 0, 'devon', 'in_progress', null, [-1, '05:50'], null],
+  ['clamp', 4480, 'press3', 'Die clamp fitting leaking (QR fault R-2291)', 0, 'keisha', 'in_progress', null, [-1, '06:14'], null],
+]
 
 export const CORRECTIVE: Record<string, string> = {
   diechange: 'Support the die change on Press 2 from 11:00 am to 2:00 pm; check the clamps before the first hit.',

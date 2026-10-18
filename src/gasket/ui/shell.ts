@@ -4,6 +4,8 @@
 // beside it. Under 900px the rail folds into a top bar with a menu.
 import type { Bindings } from '../../auth.server'
 import branding from '../../branding.json'
+import { bindIds } from '../../bind-ids'
+import { ICONS } from '../../icon-head'
 import { ROLE_LABELS, can, type Actor } from '../actor'
 import { site } from '../site'
 import { railCounts } from '../today'
@@ -62,7 +64,7 @@ async function rail(env: Bindings, actor: Actor, here: string) {
 export async function page(env: Bindings, title: string, actor: Actor | null, body: Html, { url, status = 200, bar }: { url?: URL; status?: number; bar?: Html } = {}): Promise<Response> {
   const notice = url?.searchParams.get('notice'), error = url?.searchParams.get('error')
   const nav = actor ? await rail(env, actor, url ? current(url.pathname) : '') : ''
-  const document = h`<!doctype html><html lang="en-US"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · ${branding.name}</title><link rel="icon" href="/favicon.ico" sizes="16x16 32x32"><link rel="icon" type="image/svg+xml" href="/brand/favicon-32.svg"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><link rel="preload" href="/fonts/inter/inter-variable-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/rer-theme.css"><link rel="stylesheet" href="/gasket.css"></head><body>
+  const document = h`<!doctype html><html lang="en-US"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · ${branding.name}</title>${raw(ICONS)}<link rel="preload" href="/fonts/inter/inter-variable-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/rer-theme.css"><link rel="stylesheet" href="/gasket.css"></head><body>
 <div class="gk-app${actor ? '' : ' gk-app-bare'}">${nav}<main class="gk-main${bar ? ' gk-has-bar' : ''}">${notice ? h`<p class="gk-flash" role="status">${notice}</p>` : ''}${error ? h`<p class="gk-flash gk-error" role="alert">That did not work: ${describeError(error)}</p>` : ''}${body}</main></div>${bar ? h`<div class="gk-bar"><div class="gk-bar-inner">${bar}</div></div>` : ''}</body></html>`
-  return new Response(document.html, { status, headers })
+  return new Response(bindIds(document.html, '<g-id>'), { status, headers })
 }

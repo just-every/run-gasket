@@ -22,7 +22,7 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 | `parts`, `parts/ID` | Parts with on-hand and minimum; one part with every movement. `seen` is the movement sequence a count must name |
 | `checklists`, `checklists/ID` | Checklists and every published revision |
 | `schedules` | Schedules with cadence, next due date or meter value and any open work order |
-| `work` (`?mine=1`, `?state=closed`), `work/ID` | Work lists; one work order with checklist results, readings, parts, downtime, findings, evidence, reviews and what still blocks submission |
+| `work` (`?mine=1`, `?state=closed`), `work/ID` | Work lists; one work order with checklist results, readings, parts, downtime, findings, evidence, reviews, overdue decisions and what still blocks submission |
 | `board` | Overdue work, waiting for review, open follow-ups, assets down, 30-day downtime, low parts (lead, supervisor, owner) |
 | `proposals` | Proposals with payload, reasoning, basis, status and decision |
 | `imports` | The move-in journal (lead, owner) |
@@ -32,7 +32,9 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 
 `POST /api/gasket/ACTION` with a JSON body. Success answers `200` with the result (usually `{"id": ...}`); a refusal answers `4xx {"error": CODE, "detail"?: ...}`. Codes are stable words such as `forbidden`, `stale`, `not_your_work`, `insufficient_stock`, `meter_went_backwards`, `not_ready_for_review`, `own_work`, `proposal_stale` and `undo_blocked`.
 
-Actions: `site.configure`, `access.give`, `access.role`, `access.end`, `asset.create`, `asset.update`, `asset.retire`, `asset.sighting`, `meter.create`, `part.create`, `part.receive`, `part.count`, `checklist.create`, `checklist.revise`, `schedule.create`, `workorders.generate`, `workorder.create`, `workorder.assign`, `workorder.cancel`, `workorder.results`, `workorder.evidence`, `workorder.readings`, `workorder.issue`, `workorder.return`, `downtime.start`, `downtime.end`, `finding.record`, `workorder.submit`, `workorder.review`, `proposal.prepare`, `proposal.decide`, `import.preview`, `import.apply`, `import.job`.
+Actions: `site.configure`, `access.give`, `access.role`, `access.end`, `asset.create`, `asset.update`, `asset.retire`, `asset.sighting`, `meter.create`, `part.create`, `part.receive`, `part.count`, `checklist.create`, `checklist.revise`, `schedule.create`, `workorders.generate`, `workorder.create`, `workorder.assign`, `workorder.plan`, `workorder.cancel`, `workorder.results`, `workorder.evidence`, `workorder.readings`, `workorder.issue`, `workorder.return`, `downtime.start`, `downtime.end`, `finding.record`, `workorder.submit`, `workorder.review`, `proposal.prepare`, `proposal.decide`, `import.preview`, `import.apply`, `import.job`.
+
+`workorder.plan` is the decision on an overdue work order (lead, owner): `{"workOrder", "version", "plan"}` where `plan` is `keep` (it stays with the person who holds it), `as_is`, or `to:MEMBER_ID` (an ordinary assignment to someone else). It is recorded in the audit trail and in the work order's `decisions`.
 
 Writes that change a versioned record take the version the caller read (`revision` for an asset, `version` for a work order, `seen` for a part count) and answer `409 {"error":"stale"}` if it moved. Files go as `{"filename": "...", "base64": "..."}`.
 

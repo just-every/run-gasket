@@ -12,7 +12,7 @@ import { decide, prepare } from './proposals'
 import { review, submit } from './review'
 import { createSchedule, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole } from './site'
-import { addEvidence, assign, cancel, createCorrective, downtimeEnd, downtimeStart, giveBack, issue, recordFinding, recordReadings, recordResults } from './work'
+import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, recordFinding, recordReadings, recordResults } from './work'
 
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
@@ -35,6 +35,7 @@ export const actions: Record<string, Handler> = {
   'workorders.generate': (env, actor) => generateDue(env, actor),
   'workorder.create': (env, actor, input) => createCorrective(env, actor, input),
   'workorder.assign': (env, actor, input) => assign(env, actor, input),
+  'workorder.plan': (env, actor, input) => decidePlan(env, actor, input),
   'workorder.cancel': (env, actor, input) => cancel(env, actor, input),
   'workorder.results': (env, actor, input) => recordResults(env, actor, input),
   'workorder.evidence': (env, actor, input) => addEvidence(env, actor, input),

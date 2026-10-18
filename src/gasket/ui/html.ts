@@ -44,6 +44,9 @@ const ERRORS: Record<string, string> = {
   precondition_failed: 'something changed first. Reload and try again.',
   parts_still_issued: 'return the issued parts first.',
   downtime_open: 'end the open downtime first.',
+  not_overdue: 'this work order is no longer overdue.',
+  not_assigned: 'nobody holds this work order, so there is no one to keep it with.',
+  plan_to_self: 'choose someone other than yourself; the work order page assigns anyone.',
 }
 export const describeError = (code: string) => ERRORS[code] ?? code.replace(/_/g, ' ') + '.'
 

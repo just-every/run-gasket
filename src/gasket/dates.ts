@@ -22,6 +22,15 @@ export function localNow(zone: string, at = Date.now()): string {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`
 }
 
+/** The instant a site-local date-time names in `zone` (the later one when a clock change repeats an hour). */
+export function zonedInstant(zone: string, local: string): number {
+  const wall = (value: string) => Date.UTC(+value.slice(0, 4), +value.slice(5, 7) - 1, +value.slice(8, 10), +value.slice(11, 13), +value.slice(14, 16))
+  const target = wall(local)
+  let instant = target
+  for (let pass = 0; pass < 2; pass++) instant = target - (wall(localNow(zone, instant)) - instant)
+  return instant
+}
+
 export function addDays(date: string, days: number): string {
   const [y, m, d] = date.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)

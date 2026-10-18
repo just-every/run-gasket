@@ -69,6 +69,35 @@ export async function assign(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id }
 }
 
+/**
+ * The decision on an overdue work order (the Work panel's plans): keep it with the person who holds it, keep it as it
+ * is, or hand it to someone ("to:<member>"), which is an ordinary assignment. Each is recorded, so the panel shows
+ * the decision for the rest of the day and the work order keeps it in its history.
+ */
+export async function decidePlan(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'work.assign')
+  const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+  insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  insist(order.due_date < actor.today, 'not_overdue', 409)
+  if (input.has('version')) insist(input.integer('version', { min: 1, max: 1_000_000 }) === order.version, 'stale', 409)
+  const choice = input.text('plan', { max: 120 })
+  const unchanged = guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, order.version)
+  if (choice === 'keep' || choice === 'as_is') {
+    if (choice === 'keep') insist(order.assignee_id, 'not_assigned', 409)
+    await commit(env, [unchanged], { actor: actor.id, action: 'workorder.plan', subject: order.id, detail: { plan: choice, holder: order.assignee_id } })
+    return { id: order.id, plan: choice }
+  }
+  const to = choice.startsWith('to:') ? choice.slice(3) : ''
+  insist(to && to !== order.assignee_id, 'invalid_plan')
+  insist(to !== actor.id, 'plan_to_self', 409)
+  await assignable(env, to)
+  await commit(env, [unchanged, stmt(env, 'UPDATE gk_work_orders SET assignee_id = ?, version = version + 1 WHERE id = ?', to, order.id)], [
+    { actor: actor.id, action: 'workorder.assign', subject: order.id, detail: { from: order.assignee_id, to } },
+    { actor: actor.id, action: 'workorder.plan', subject: order.id, detail: { plan: 'reassign', holder: order.assignee_id, to } },
+  ])
+  return { id: order.id, plan: 'reassign', to }
+}
+
 export async function cancel(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.assign')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
@@ -217,7 +246,7 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; mine: boolean; missing: string[] }
+export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
@@ -239,8 +268,11 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const findings = await all(env, 'SELECT f.id, f.severity, f.text, f.follow_up_id, w.number AS follow_up_number, w.status AS follow_up_status, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at', id)
   const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
+  const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
+    LEFT JOIN gk_members h ON h.id = json_extract(a.detail, '$.holder') LEFT JOIN gk_members t ON t.id = json_extract(a.detail, '$.to') WHERE a.action = 'workorder.plan' AND a.subject = ? ORDER BY a.at DESC, a.seq DESC`, id))
+    .map(({ detail, too, ...row }) => ({ ...row, plan: JSON.parse(detail).plan, to: too }))
   const { items_json: _items, ...rest } = order
-  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime }) }
+  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. */

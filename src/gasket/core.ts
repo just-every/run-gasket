@@ -1,5 +1,6 @@
 // Shared primitives: typed errors, ids, D1 helpers, audited atomic commits and
 // in-batch preconditions (gk_guard rows abort the whole batch when false).
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Bindings } from '../auth.server'
 
 export class GasketError extends Error {
@@ -13,7 +14,11 @@ export function insist(condition: unknown, code: string, status = 400, detail?: 
 }
 
 export const newId = () => crypto.randomUUID()
-export const now = () => Date.now()
+const clock = new AsyncLocalStorage<number>()
+/** The instant a change is stamped with: now, or the story moment `at` sets (the demo seed's morning). */
+export const now = () => clock.getStore() ?? Date.now()
+/** Runs `work` with every stamp it makes set to `instant`. */
+export const at = <T>(instant: number, work: () => Promise<T>) => clock.run(instant, work)
 
 export type Row = Record<string, any>
 

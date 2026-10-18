@@ -19,7 +19,7 @@ type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unkno
 
 export async function audit(env: Bindings, actor: Actor) {
   requireCapability(actor, 'audit.read')
-  return await all(env, 'SELECT a.seq, a.at, a.actor, m.name AS actor_name, a.action, a.subject, a.detail FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor ORDER BY a.seq DESC LIMIT 500')
+  return await all(env, 'SELECT a.seq, a.at, a.actor, m.name AS actor_name, a.action, a.subject, a.detail FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor ORDER BY a.at DESC, a.seq DESC LIMIT 500')
 }
 
 export const views: Record<string, View> = {
