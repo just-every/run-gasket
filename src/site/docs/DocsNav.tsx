@@ -1,6 +1,6 @@
 import { docsPath, docsSections } from './pages'
 
-/** Every docs page by section; the current one is violet with a violet rule. Phones show it above the article. */
+/** Every docs page by section; the current one is ultramarine on a pale tint. Phones show it above the article. */
 export function DocsNav({ current }: { current: string }) {
   return (
     <nav className="docs-nav" aria-label="Docs">

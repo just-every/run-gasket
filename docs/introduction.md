@@ -2,7 +2,7 @@
 
 Gasket keeps the equipment a small team owns in service. It holds one asset register, preventive schedules by calendar or meter, the work orders those schedules become, the maintainer's inspection, readings, parts and downtime, a supervisor's review, and the full history of every asset.
 
-It is free and open source under the MIT licence. You run your own copy, and you keep every record.
+It is free and open source under the MIT license. You run your own copy, and you keep every record.
 
 ## How work moves through Gasket
 

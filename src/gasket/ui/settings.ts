@@ -7,12 +7,14 @@ import { audit } from '../views'
 import { all } from '../core'
 import { MORE, card, field, form, h, hidden, page, raw, select, table, tag, woNumber, type Html } from './html'
 
-const ZONES = ['Australia/Sydney', 'Australia/Melbourne', 'Australia/Brisbane', 'Australia/Adelaide', 'Australia/Darwin', 'Australia/Perth', 'Australia/Hobart', 'Pacific/Auckland', 'UTC']
+// US time zones first; a site saved in another zone keeps it as an option.
+const ZONES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu', 'UTC']
+const ZONE_LABELS: Record<string, string> = { 'America/New_York': 'Eastern (New York)', 'America/Chicago': 'Central (Chicago)', 'America/Denver': 'Mountain (Denver)', 'America/Phoenix': 'Arizona (Phoenix, no daylight saving)', 'America/Los_Angeles': 'Pacific (Los Angeles)', 'America/Anchorage': 'Alaska (Anchorage)', 'Pacific/Honolulu': 'Hawaii (Honolulu)', UTC: 'UTC' }
 
 export async function sitePage(env: Bindings, actor: Actor, url: URL, { first = false } = {}) {
   const current = await site(env)
   const intro = first ? h`<div class="gk-first"><h1>Set up your site</h1><p class="gk-lede">Name the site whose equipment Gasket keeps, and its time zone. Due dates, readings and downtime use this clock.</p></div>` : h`<h1>Site</h1>`
-  const siteCard = card('Site', form('site.configure', first ? '/app/assets' : '/app/site', h`${field('Site name', 'name', { value: current?.name ?? '' })}${select('Time zone', 'timezone', ZONES.map(zone => ({ value: zone, label: zone.replace('_', ' ') })), current?.timezone ?? 'Australia/Sydney')}`, first ? 'Save and register equipment' : 'Save'), { id: 'site' })
+  const siteCard = card('Site', form('site.configure', first ? '/app/assets' : '/app/site', h`${field('Site name', 'name', { value: current?.name ?? '' })}${select('Time zone', 'timezone', [...ZONES, ...(current?.timezone && !ZONES.includes(current.timezone) ? [current.timezone] : [])].map(zone => ({ value: zone, label: ZONE_LABELS[zone] ?? zone.replace('_', ' ') })), current?.timezone ?? 'America/New_York')}`, first ? 'Save and register equipment' : 'Save'), { id: 'site' })
   const steps = h`<ol class="gk-steps" aria-label="First steps">${['Set up the site', 'Register equipment or move in from MaintainX', 'Write a checklist and schedule it', 'Give your team access'].map((step, index) => h`<li${index === 0 ? h` aria-current="step"` : ''}>${step}</li>`)}</ol>`
   return page('Site', actor, first ? h`${intro}<div class="gk-first-run">${siteCard}${steps}</div>` : h`${intro}<div class="gk-narrow">${siteCard}</div>`, { url })
 }

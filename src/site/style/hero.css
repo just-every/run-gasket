@@ -1,0 +1,58 @@
+/* The hero. From 1200px the approved painting fills the width and the copy
+   panel and the six records sit at their painted places, sized in container
+   units so they scale with the map (the painted ones underneath are blanked in
+   the plate). Below 1200px: the copy, a crop of the presses, then the records. */
+.hero { background: var(--rer-surface); }
+.hero-map { position: relative; container-type: inline-size; }
+.hero-art, .hero-art img { display: block; width: 100%; height: auto; }
+
+.hero-panel { position: absolute; left: 26.69%; top: 1.14%; width: 46.61%; min-height: 34.61%; padding: 1cqw 2cqw 1cqw; text-align: center; background: #fff; border: 1px solid #dfe4ec; border-radius: 10px; box-shadow: 0 2px 6px rgba(14, 22, 48, .05), 0 18px 40px -26px rgba(14, 22, 48, .35); }
+.hero h1 { padding-bottom: .08em; color: #1a40e2; font-size: 4.75cqw; line-height: 1.1; font-weight: 800; letter-spacing: -.052em; }
+.hero-sub { margin: .8cqw auto 0; max-width: 40em; color: #1c2333; font-size: max(15px, 1.3cqw); line-height: 1.3; }
+.hero-alt { margin-top: .95cqw; color: #1c2333; font-size: max(14px, 1.22cqw); line-height: 1.35; }
+.hero-alt strong { font-weight: 750; color: #0b1226; }
+.hero .actions { display: flex; flex-direction: column; align-items: center; gap: .95cqw; margin-top: 1.3cqw; }
+.hero .btn { min-width: 15.4cqw; min-height: max(40px, 2.95cqw); padding: 0 2cqw; font-size: max(15px, 1.3cqw); }
+.actions-links { display: flex; justify-content: center; gap: 2.3cqw; }
+.actions-links a { color: var(--blue); font-size: max(14px, 1.06cqw); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.site .actions-links a { color: var(--blue); }
+
+.pins { position: absolute; inset: 0; pointer-events: none; }
+.pin { position: absolute; display: flex; align-items: flex-start; gap: .62cqw; padding: .55cqw .7cqw .55cqw .7cqw; background: #fff; border: 1px solid #d9dfe9; border-radius: 6px; box-shadow: 0 6px 16px -10px rgba(14, 22, 48, .4); pointer-events: auto; }
+.pin-icon { display: grid; place-items: center; flex: none; width: 1.8cqw; height: 1.8cqw; margin-top: .15cqw; color: var(--copper); }
+.pin-icon .icon, .pin-icon .disc { width: 100%; height: 100%; }
+.pin-icon .icon { stroke-width: 2; }
+.pin-title { color: #0b1226; font-size: max(12px, .92cqw); line-height: 1.3; font-weight: 650; letter-spacing: -.015em; }
+.pin-body { color: #283044; font-size: max(11px, .83cqw); line-height: 1.3; letter-spacing: -.005em; }
+.pin-press { left: 54.23%; top: 36.79%; width: 16.41%; min-height: 7.88%; }
+.pin-compressor { left: 3.06%; top: 13.06%; width: 16.21%; min-height: 9.84%; }
+.pin-oven { left: 79.04%; top: 3.11%; width: 13.54%; min-height: 8.08%; }
+.pin-forklift { left: 84.44%; top: 38.96%; width: 14.39%; min-height: 7.77%; }
+.pin-storeroom { left: 1.63%; top: 48.19%; width: 15.63%; min-height: 9.84%; }
+.pin-october { left: .85%; top: 78.76%; width: 13.28%; min-height: 7.56%; }
+.pin-compressor .pin-icon, .pin-october .pin-icon { color: var(--blue); }
+
+@media (max-width: 1199px) {
+  .hero-map { display: flex; flex-direction: column; container-type: normal; }
+  .hero-panel { position: static; order: 1; width: auto; min-height: 0; padding: clamp(36px, 6vw, 64px) var(--gutter) clamp(28px, 4vw, 44px); border: 0; border-radius: 0; box-shadow: none; }
+  .hero h1 { font-size: clamp(46px, 8.4vw, 76px); line-height: 1.08; }
+  .hero-sub { margin-top: 18px; max-width: 640px; font-size: clamp(17px, 2.2vw, 20px); line-height: 1.45; }
+  .hero-alt { margin-top: 14px; font-size: clamp(16px, 2vw, 18px); }
+  .hero .actions { gap: 16px; margin-top: 26px; }
+  .hero .btn { min-height: 52px; min-width: 240px; padding: 0 32px; font-size: 18px; }
+  .actions-links { gap: 28px; }
+  .actions-links a { font-size: 17px; }
+  .hero-art { order: 2; border-block: 1px solid var(--line); }
+  .pins { position: static; order: 3; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; padding: 20px var(--gutter) 8px; background: var(--pale); }
+  .pin { position: static; width: auto; min-height: 0; gap: 12px; padding: 14px 16px; border-radius: 12px; border-color: var(--line); box-shadow: var(--shadow-card); }
+  .pin-icon { width: 26px; height: 26px; margin-top: 1px; }
+  .pin-title { font-size: 16px; }
+  .pin-body { font-size: 15px; line-height: 1.4; }
+  .hero { padding-bottom: 12px; background: var(--pale); }
+  .hero-panel { background: #fff; }
+}
+@media (max-width: 599px) {
+  .hero h1 { font-size: clamp(42px, 12vw, 52px); letter-spacing: -.05em; }
+  .hero .actions { align-items: stretch; }
+  .hero .btn { width: 100%; }
+}

@@ -1,68 +1,72 @@
-/* The docs, to the 12ui docs pick: section
-   names in ink with their pages indented under them, the current page violet
-   with a violet rule, a thin rule before the article, numbered steps on violet
-   discs with their content under them, code on quiet grey panels, and the
-   fine-line compressor in the right margin when there is room. */
-.docs-shell { display: grid; grid-template-columns: 240px minmax(0, 700px) minmax(0, 1fr); gap: 0 48px; width: min(1328px, calc(100% - 2 * var(--site-gutter))); margin: 0 auto; padding: 48px 0 104px; }
-.site .docs-main { width: auto; margin: 0; padding-left: 48px; border-left: 1px solid var(--gk-line); }
-.docs-art { width: 100%; max-width: 380px; height: auto; margin-top: 72px; justify-self: end; }
-.docs-nav { display: grid; align-content: start; gap: 30px; padding-top: 8px; }
-.docs-nav-section { margin: 0 0 10px; font-size: 18px; line-height: 24px; font-weight: 500; }
-.docs-nav ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.docs-nav a { display: block; padding: 6px 0 6px 18px; border-left: 3px solid transparent; color: var(--rer-muted); font-size: 17px; line-height: 24px; text-decoration: none; }
-.site .docs-nav a { color: var(--rer-muted); }
-.site .docs-nav a:hover { color: var(--rer-text); }
-.site .docs-nav a[aria-current=page] { border-left-color: var(--gk-accent); color: var(--gk-accent-strong); }
-
-.docs-article h1 { margin: 0 0 20px; font-size: 64px; line-height: 68px; letter-spacing: -.035em; }
-.docs-prose { font-size: 18px; line-height: 29px; overflow-wrap: break-word; }
-.site .docs-prose > p:first-child { font-size: 22px; line-height: 32px; }
+/* The docs in the homepage's look: the pale page, copper section labels, the
+   current page ultramarine on a tint, ultramarine headings, numbered steps on
+   ultramarine discs, commands on navy code cards with Copy. */
+.docs-shell { display: grid; grid-template-columns: 250px minmax(0, 760px); justify-content: center; gap: 0 clamp(32px, 4vw, 72px); width: min(var(--wrap), calc(100% - 2 * var(--gutter))); margin: 0 auto; padding: 48px 0 104px; }
+.site .docs-main { min-width: 0; }
+.docs-nav { position: sticky; top: 24px; align-self: start; display: grid; gap: 26px; padding: 22px 18px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--pale); }
+.docs-nav-section { margin: 0 0 8px; color: var(--copper-text); font-size: 12.5px; line-height: 1.3; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.docs-nav ul { display: grid; gap: 2px; }
+.docs-nav a { display: block; padding: 7px 10px; border-radius: 8px; color: var(--body); font-size: 16px; line-height: 1.35; text-decoration: none; }
+.site .docs-nav a { color: var(--body); }
+.site .docs-nav a:hover { background: #fff; color: var(--ink); }
+.site .docs-nav a[aria-current=page] { background: var(--blue-tint); color: var(--blue); font-weight: 650; box-shadow: inset 3px 0 0 var(--blue); }
+.docs-article h1 { margin: 12px 0 18px; padding-bottom: .1em; color: var(--blue); font-size: clamp(40px, 4vw, 58px); line-height: 1.06; font-weight: 800; letter-spacing: -.045em; }
+.docs-prose { color: var(--body); font-size: 18px; line-height: 1.65; overflow-wrap: break-word; }
+.site .docs-prose > p:first-child { color: var(--ink); font-size: 21px; line-height: 1.55; }
 .site .docs-prose > * + *, .site .docs-step-section > * + * { margin-top: 16px; }
-.site .docs-prose h2 { margin-top: 48px; font-size: 32px; line-height: 38px; letter-spacing: -.02em; }
-.site .docs-prose h3 { margin-top: 32px; font-size: 22px; line-height: 28px; letter-spacing: -.01em; }
+.site .docs-prose h2 { margin-top: 52px; color: var(--ink); font-size: 30px; line-height: 1.2; font-weight: 750; letter-spacing: -.025em; }
+.site .docs-prose h3 { margin-top: 32px; color: var(--ink); font-size: 21px; line-height: 1.3; font-weight: 700; letter-spacing: -.01em; }
 .site .docs-prose h2 + *, .site .docs-prose h3 + * { margin-top: 12px; }
-.docs-step-section { padding-left: 70px; }
-.site .docs-prose .docs-step { position: relative; display: flex; align-items: center; min-height: 52px; }
-.docs-num { position: absolute; left: -70px; display: inline-grid; place-items: center; width: 52px; height: 52px; border-radius: 999px; background: var(--gk-accent); color: #fff; font-size: 26px; font-weight: 600; letter-spacing: 0; }
-.site .docs-prose a { color: var(--rer-link); text-underline-offset: 3px; }
+.site .docs-prose strong { color: var(--ink); }
+.docs-step-section { position: relative; margin-top: 40px; padding: 24px 26px 26px 92px; border: 1px solid var(--line); border-radius: var(--radius-card); background: #fff; box-shadow: var(--shadow-card); }
+.site .docs-prose .docs-step { position: relative; display: flex; align-items: center; min-height: 48px; margin-top: 0; }
+.docs-num { position: absolute; left: -68px; display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 999px; background: var(--blue); color: #fff; font-size: 22px; font-weight: 700; letter-spacing: 0; }
+.site .docs-prose a { color: var(--blue); text-underline-offset: 3px; }
 .docs-prose ul, .docs-prose ol { padding-left: 24px; }
+.docs-prose ul { list-style: disc; }
+.docs-prose ol { list-style: decimal; }
+.docs-prose li::marker { color: var(--copper); }
 .site .docs-prose li + li { margin-top: 8px; }
-.docs-prose code { padding: 1px 6px; border-radius: 4px; background: var(--gk-seg); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .85em; white-space: nowrap; }
-.site .docs-prose pre { margin-top: 20px; margin-bottom: 4px; padding: 22px 26px; border-radius: 10px; background: var(--gk-seg); white-space: pre; overflow-x: auto; overflow-wrap: normal; }
-.docs-prose pre code { padding: 0; background: none; font-size: 15px; line-height: 25px; white-space: pre; overflow-wrap: normal; }
-.docs-prose blockquote { margin: 16px 0 0; padding-left: 20px; border-left: 3px solid var(--gk-accent); color: var(--rer-muted); }
-.docs-table { overflow-x: auto; margin-top: 20px; border: 1px solid var(--gk-line); border-radius: 10px; background: var(--rer-surface); }
-.docs-table table { width: 100%; border-collapse: collapse; font-size: 16px; line-height: 24px; }
-.docs-table th, .docs-table td { padding: 12px 16px; border-top: 1px solid var(--gk-line); text-align: left; vertical-align: top; }
-.docs-table th { border-top: 0; color: var(--rer-muted); font-weight: 500; }
+.docs-prose code { padding: 2px 6px; border-radius: 5px; background: var(--blue-tint); color: #1b2a6b; font-family: var(--rer-font-mono); font-size: .84em; }
+.docs-code { position: relative; margin-top: 18px; border-radius: 12px; background: var(--terminal); }
+.site .docs-prose .docs-code pre { margin: 0; padding: 18px 92px 18px 22px; overflow-x: auto; white-space: pre; }
+.docs-prose pre code { padding: 0; background: none; color: var(--rer-code-text); font-size: 15px; line-height: 1.7; white-space: pre; }
+.docs-copy { position: absolute; top: 12px; right: 12px; min-height: 34px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 8px; background: transparent; color: #fff; font: 500 14px/1 var(--rer-font-body); cursor: pointer; }
+.docs-copy:hover { background: rgba(255, 255, 255, .1); }
+.docs-copy[hidden] { display: none; }
+.docs-prose blockquote { margin: 18px 0 0; padding: 14px 18px; border-left: 4px solid var(--copper); border-radius: 0 10px 10px 0; background: var(--copper-tint); color: var(--ink); }
+.docs-table { overflow-x: auto; margin-top: 20px; border: 1px solid var(--line); border-radius: 12px; background: #fff; box-shadow: var(--shadow-card); }
+.docs-table table { width: 100%; border-collapse: collapse; font-size: 15.5px; line-height: 1.5; }
+.docs-table th, .docs-table td { padding: 11px 16px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+.docs-table th { border-top: 0; background: var(--pale); color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.docs-pager { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 64px; }
+.docs-pager a { display: grid; gap: 4px; padding: 18px 20px; color: var(--blue); font-size: 18px; font-weight: 650; text-decoration: none; }
+.site .docs-pager a { color: var(--blue); }
+.docs-pager a span { color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.docs-pager .docs-next { grid-column: 2; text-align: right; }
+.docs-pager a:hover { border-color: var(--blue-line); }
 
-@media (max-width: 1240px) {
-  .docs-shell { grid-template-columns: 240px minmax(0, 1fr); }
-  .docs-art { display: none; }
-}
 @media (max-width: 1000px) {
-  .docs-shell { grid-template-columns: minmax(0, 1fr); gap: 32px; padding-top: 28px; }
-  .site .docs-main { padding-left: 0; border-left: 0; }
-  .docs-nav { padding-bottom: 28px; border-bottom: 1px solid var(--gk-line); }
+  .docs-shell { grid-template-columns: minmax(0, 1fr); gap: 28px; padding-top: 24px; }
+  .docs-nav { position: static; }
 }
 @media (max-width: 760px) {
   .docs-shell { padding-bottom: 64px; }
-  /* Phones: the sections run in two columns with their names, so the article starts on the first screen. */
-  .docs-nav { display: block; columns: 2; column-gap: 16px; padding: 0 0 20px; }
+  /* Phones: the sections run in two columns with their names, so the article starts near the top. */
+  .docs-nav { display: block; columns: 2; column-gap: 14px; padding: 16px 12px 6px; }
   .docs-nav-group { break-inside: avoid; margin-bottom: 14px; }
-  .docs-nav-section { margin-bottom: 4px; color: var(--rer-muted); font-size: 13px; line-height: 18px; font-weight: 400; }
-  .docs-nav a { padding: 3px 0 3px 8px; border-left-width: 2px; font-size: 15px; line-height: 21px; }
-  .docs-article h1 { font-size: 40px; line-height: 44px; }
-  .docs-prose { font-size: 16px; line-height: 26px; }
-  .site .docs-prose > p:first-child { font-size: 18px; line-height: 27px; }
-  .site .docs-prose h2 { margin-top: 36px; font-size: 24px; line-height: 30px; }
-  /* The step number sits in the heading, so code panels get the column's full width. */
-  .docs-step-section { padding-left: 0; }
-  .site .docs-prose .docs-step { min-height: 32px; gap: 12px; }
-  .docs-num { position: static; flex: none; width: 32px; height: 32px; font-size: 17px; }
-  /* Long commands scroll; the right edge fades to show there is more. */
-  .site .docs-prose pre { padding: 16px; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); }
-  .docs-prose pre code { font-size: 13px; line-height: 22px; }
-  .docs-prose pre code::after { content: ''; display: inline-block; width: 28px; }
-  .docs-prose :not(pre) > code { white-space: normal; overflow-wrap: anywhere; }
+  .docs-nav-section { margin-bottom: 4px; font-size: 11.5px; }
+  .docs-nav a { padding: 4px 8px; font-size: 15px; }
+  .docs-article h1 { font-size: 40px; }
+  .docs-prose { font-size: 16.5px; }
+  .site .docs-prose > p:first-child { font-size: 18.5px; }
+  .site .docs-prose h2 { margin-top: 36px; font-size: 24px; }
+  .docs-step-section { padding: 18px 16px 20px; }
+  .site .docs-prose .docs-step { gap: 12px; min-height: 36px; }
+  .docs-num { position: static; flex: none; width: 36px; height: 36px; font-size: 18px; }
+  .site .docs-prose .docs-code pre { padding: 50px 16px 16px; }
+  .docs-prose pre code { font-size: 13.5px; }
+  .docs-prose :not(pre) > code { overflow-wrap: anywhere; }
+  .docs-pager { grid-template-columns: minmax(0, 1fr); }
+  .docs-pager .docs-next { grid-column: 1; }
 }

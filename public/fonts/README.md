@@ -1,16 +1,18 @@
 # Fonts
 
-Geist is self-hosted under the SIL Open Font License 1.1 in
-`geist/LICENSE.txt`. The Latin and Latin Extended variable WOFF2 subsets come
-from Fontsource's Geist distribution; upstream: https://github.com/vercel/geist-font.
+Self-hosted under the SIL Open Font License 1.1; each folder keeps its licence.
 
-`/rer-theme.css` declares Geist once, because Base's sign-in and setup frames
-read only the theme. `/fonts/fonts.css` holds its size-matched `Geist Fallback`
-and the `--font-body` stack; the app and the root document link it before the
-theme and preload only the primary Latin file. Do not import either from a component.
+- `inter/inter-variable-latin.woff2`: Inter 4.1 variable (weight and optical
+  size axes) from the `inter-ui` 4.1.0 distribution (upstream
+  https://github.com/rsms/inter), subset with fontTools to Latin-1, general
+  punctuation, arrows (U+2190–2199), ✓, ×, ÷, °, ≈, ≤, ≥ and − so the page's
+  arrows and ticks render in Inter. Licence: `inter/LICENSE.txt`.
+- `jetbrains-mono/`: JetBrains Mono, Latin variable WOFF2 from Fontsource
+  (upstream https://github.com/JetBrains/JetBrainsMono), for commands.
+  Licence: `jetbrains-mono/LICENSE.txt`.
 
-Fallback scales use Geist/Arial advance-width ratios over A-Z, a-z and 0-9
-at weights 400, 500 and 700. Ascent, descent and line gap match Geist's
-1005, -295 and 0 per 1000 units, divided by each scale. Matching metrics reduces
-layout movement; different glyph designs cannot have identical widths in every
-piece of text. Recalculate the fallback and preload when changing the brand font.
+`/fonts/fonts.css` declares both faces and the size-matched `Inter Fallback`
+(Arial scaled to Inter's advance widths; ascent and descent from Inter's
+1984/-494 per 2048 units, divided by the scale). `/rer-theme.css` names the
+stacks; the app, Base's frames, the run site and /run read them from there.
+Do not import either file from a component.

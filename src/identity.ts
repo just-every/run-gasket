@@ -7,8 +7,8 @@ import site from '../deploy-site.json'
 export const identity: EditionIdentity = {
   product: branding.name,
   deployment: branding.name,
-  purpose: '{deployment} keeps this site\'s equipment in service: the asset register, preventive schedules, work orders, inspections, parts and downtime history.',
-  tagline: 'Maintenance for the equipment a small team owns: schedules, work orders, inspections, parts and downtime, kept by the owner.',
+  purpose: '{deployment} keeps this plant\'s equipment in service: the asset register, preventive schedules, work orders, inspections, parts and downtime history.',
+  tagline: 'Gasket turns operator requests, PM schedules and sensor readings into work with parts and people. 100% free, open source alternative to MaintainX, UpKeep and Fiix.',
   signInPath: '/signin',
   // The run site `rer deploy --site` publishes (deploy-site.json).
   runSite: `https://${site.domain}`,
@@ -16,8 +16,6 @@ export const identity: EditionIdentity = {
   installedHome: 'lobby',
   theme: '/rer-theme.css',
   mark: '/brand/mark.svg',
-  // The run site's ground strip (/run, the 404): the floor line with the equipment row small at the right.
-  band: '/brand/ground.svg',
   fonts: '/fonts/fonts.css',
   accentColor: branding.primaryColor,
 }

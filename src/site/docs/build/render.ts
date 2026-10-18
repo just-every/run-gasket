@@ -43,7 +43,7 @@ export function renderMarkdown(markdown: string, link: (href: string) => string)
         return `<h${depth} id="${id}">${this.parser.parseInline(tokens)}</h${depth}>\n`
       },
       code({ text }) {
-        return `<pre><code>${escapeHtml(text.replace(/\n$/, ''))}</code></pre>\n`
+        return `<div class="docs-code"><pre><code>${escapeHtml(text.replace(/\n$/, ''))}</code></pre><button class="docs-copy" type="button" hidden>Copy</button></div>\n`
       },
       html({ text }) {
         return escapeHtml(text)

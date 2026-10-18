@@ -1,8 +1,8 @@
-/** The mark (a hexagonal gasket ring) and the name, linking home. */
-export function Brand() {
+/** The mark (a copper gasket squeezed between two cobalt flanges) and the Gasket wordmark, linking home. */
+export function Brand({ size = 38 }: { size?: number }) {
   return (
     <a className="site-brand" href="/">
-      <img src="/brand/mark.svg" alt="" width={24} height={24} />
+      <img src="/brand/mark.svg" alt="" width={size} height={size} />
       Gasket
     </a>
   )

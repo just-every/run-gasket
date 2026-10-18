@@ -4,11 +4,19 @@ This guide runs Gasket on your computer, signs you in as its owner and sets up y
 
 ## 1. Get Gasket and start it
 
+Install `rer`, the Run Edit Run command that installs, runs and keeps Gasket. It installs for you alone, with its own Node if you have no Node 22 or later, and changes no shell settings: if its last line puts `rer` on your PATH, run that line before the next step.
+
 ```sh
-npx -y @runeditrun/rer dev just-every/run-gasket
+curl -fsSL https://runeditrun.com/install.sh | sh
 ```
 
-That one line installs `rer`, the Run Edit Run command that installs, runs and keeps Gasket, then clones Gasket and starts it. To start it again later, run `cd run-gasket && rer dev`. The first `rer dev` installs the pinned dependencies, asks for the owner's email address, sets up a local owner on a free port and starts the app. When it is ready it prints `RER_READY` and a line starting `RER_OPEN`. Open that address in your browser on this computer: you arrive signed in as the owner. Treat that line as a password.
+Then clone Gasket and start it:
+
+```sh
+rer dev just-every/run-gasket
+```
+
+Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-gasket` does both in one line. To start it again later, run `cd run-gasket && rer dev`. The first `rer dev` installs the pinned dependencies, asks for the owner's email address, sets up a local owner on a free port and starts the app. When it is ready it prints `RER_READY` and a line starting `RER_OPEN`. Open that address in your browser on this computer: you arrive signed in as the owner. Treat that line as a password.
 
 To stop Gasket, press Ctrl-C or run `rer dev --stop`. Run `rer dev` again to start it with your data as you left it.
 
@@ -22,7 +30,7 @@ Name the site whose equipment Gasket keeps and choose its time zone, then press 
 
 ## 4. Register your equipment
 
-On **Assets**, fill in **Register an asset**: the asset tag (the label on the equipment), its name, serial, location, the person responsible for it day to day, a category and how critical it is. On the asset's page, add its meters: a counter (run hours, kilometres), a gauge (a temperature, a pressure) or a condition (good, fair or poor).
+On **Assets**, fill in **Register an asset**: the asset tag (the label on the equipment), its name, serial, location, the person responsible for it day to day, a category and how critical it is. On the asset's page, add its meters: a counter (run hours, miles), a gauge (a temperature, a pressure) or a condition (good, fair or poor).
 
 Already on MaintainX? [Move in from MaintainX](move-in.md) brings your assets, parts and meter readings across instead.
 

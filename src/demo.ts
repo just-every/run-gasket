@@ -5,13 +5,13 @@ import { demoActivity } from './gasket/demo-activity'
 
 /** Fixed identities make this safe to repeat; every row belongs to this copy. No networking. */
 export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail: string; now: Date }) {
-  const at = now.getTime(), day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Brisbane', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now), ago = at - 28 * 86400000
+  const at = now.getTime(), day = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now), ago = at - 28 * 86400000
   const id = (value: string) => `demo-${value}`
   const rows: D1PreparedStatement[] = []
   const put = (table: string, columns: string, ...values: (string | number | null)[]) => rows.push(env.DB.prepare(
     `INSERT INTO ${table} (${columns}) VALUES (${values.map(() => '?').join(',')}) ON CONFLICT DO NOTHING`,
   ).bind(...values))
-  put('gk_site', 'singleton,name,timezone,created_at,updated_at', 1, 'Harbour Kitchen Co', 'Australia/Brisbane', ago, at)
+  put('gk_site', 'singleton,name,timezone,created_at,updated_at', 1, 'Harbour Kitchen Co', 'America/New_York', ago, at)
   put('gk_members', 'id,email,name,role,created_at', id('owner'), ownerEmail, 'Dana Reyes', 'owner', ago)
   for (const [key, name, role] of demoPeople) put('gk_members', 'id,email,name,role,created_at', id(key), `${key}@demo.invalid`, name, role, ago)
   for (const [key, tag, name, serial, location, category, criticality] of demoAssets) {
@@ -43,7 +43,7 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
     put('gk_meters', 'id,asset_id,name,unit,kind,created_at', id(`meter-${key}`), id(asset), name, unit, kind, ago)
     for (const offset of [7, 1]) put('gk_readings', 'id,meter_id,asset_id,value,taken_on,entered_by,entered_at', id(`reading-${key}-${offset}`), id(`meter-${key}`), id(asset), key === 'hours' && offset === 7 ? '8510' : value, `${addDays(day,-offset)}T08:15`, id('max'), at - offset * 86400000)
   }
-  put('gk_downtime', 'id,asset_id,work_order_id,started_on,reason,recorded_by,recorded_at', id('downtime-wash'), id('dishwasher'), id('work-wash'), localNow('Australia/Brisbane', at - 90 * 60000), 'Rinse hose leaking; isolated pending replacement.', id('mo'), at)
+  put('gk_downtime', 'id,asset_id,work_order_id,started_on,reason,recorded_by,recorded_at', id('downtime-wash'), id('dishwasher'), id('work-wash'), localNow('America/New_York', at - 90 * 60000), 'Rinse hose leaking; isolated pending replacement.', id('mo'), at)
   put('gk_downtime', 'id,asset_id,work_order_id,started_on,ended_on,minutes,reason,recorded_by,recorded_at', id('downtime-mixer'), id('mixer'), id('work-mixer'), `${addDays(day,-8)}T09:00`, `${addDays(day,-8)}T10:30`, 90, 'Worn drive belt replaced.', id('max'), at - 8 * 86400000)
   rows.push(env.DB.prepare('INSERT INTO oa_first_run (singleton,completed_by,completed_at) SELECT 1,id,? FROM oa_operators WHERE email=? AND role=\'owner\' ON CONFLICT DO NOTHING').bind(at, ownerEmail))
   await env.DB.batch(rows)

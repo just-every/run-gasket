@@ -1,6 +1,8 @@
-// The run site's styles: the page frame, the homepage and its drawings, and the
-// docs. Every colour and face is a token from public/rer-theme.css.
+// The run site's styles: the frame and shared pieces, the hero, the story
+// sections and the docs. Every colour and face is a token from public/rer-theme.css.
 import './site.css'
-import './drawing.css'
-import './landing.css'
+import './hero.css'
+import './story.css'
+import './floor.css'
+import './close.css'
 import './docs.css'

@@ -34,6 +34,9 @@ export function minutesBetween(start: string, end: string): number {
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-export const showDate = (date: string | null | undefined) => date && isDate(date) ? `${Number(date.slice(8, 10))} ${MONTHS[Number(date.slice(5, 7)) - 1]} ${date.slice(0, 4)}` : '—'
-export const showLocal = (value: string | null | undefined) => value && isLocalTime(value) ? `${showDate(value.slice(0, 10))}, ${value.slice(11)}` : '—'
+/** US reading order: "Oct 15, 2026". */
+export const showDate = (date: string | null | undefined) => date && isDate(date) ? `${MONTHS[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}, ${date.slice(0, 4)}` : '—'
+/** A 24-hour "14:05" as US 12-hour "2:05 pm"; the stored value stays 24-hour. */
+const showClock = (time: string) => { const hour = Number(time.slice(0, 2)); return `${hour % 12 || 12}:${time.slice(3, 5)} ${hour < 12 ? 'am' : 'pm'}` }
+export const showLocal = (value: string | null | undefined) => value && isLocalTime(value) ? `${showDate(value.slice(0, 10))}, ${showClock(value.slice(11))}` : '—'
 export const showInstant = (instant: number | null | undefined, zone: string) => instant ? showLocal(localNow(zone, instant)) : '—'

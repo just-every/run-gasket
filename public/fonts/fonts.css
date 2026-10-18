@@ -1,40 +1,31 @@
-/* Geist's Arial fallback, size-matched so text barely moves when Geist
-   arrives. Geist itself is declared once, in /rer-theme.css. */
-/* Match Geist's advance widths over A-Z, a-z and 0-9 and its 1005/-295/0
-   vertical metrics. Divide each vertical override by size-adjust. */
+/* Gasket's faces, self-hosted (licences in each folder, public/fonts/README.md):
+   Inter (variable weight and optical size, so large headings take its Display
+   cut) for everything, JetBrains Mono for commands. Each has a size-matched
+   Arial fallback so text barely moves when the face arrives. */
 @font-face {
-  font-family: 'Geist Fallback';
+  font-family: Inter;
   font-style: normal;
-  font-weight: 100 450;
-  src: local('Arial'), local('ArialMT'), local('Liberation Sans'), local('LiberationSans');
-  size-adjust: 102.4585%;
-  ascent-override: 98.0885%;
-  descent-override: 28.7921%;
-  line-gap-override: 0%;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter/inter-variable-latin.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Geist Fallback';
+  font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 451 549;
-  src: local('Arial'), local('ArialMT'), local('Liberation Sans'), local('LiberationSans');
-  size-adjust: 104.7731%;
-  ascent-override: 95.9215%;
-  descent-override: 28.1561%;
-  line-gap-override: 0%;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Geist Fallback';
-  font-style: normal;
-  font-weight: 550 900;
-  src: local('Arial Bold'), local('Arial-BoldMT'), local('Liberation Sans Bold'), local('LiberationSans-Bold');
-  size-adjust: 104.8804%;
-  ascent-override: 95.8234%;
-  descent-override: 28.1273%;
+  font-family: 'Inter Fallback';
+  src: local('Arial'), local('ArialMT'), local('Liberation Sans');
+  size-adjust: 104.71%;
+  ascent-override: 92.52%;
+  descent-override: 23.04%;
   line-gap-override: 0%;
 }
-
 :root {
-  --font-body: Geist, 'Geist Fallback', Arial, sans-serif;
+  --font-body: Inter, 'Inter Fallback', Arial, sans-serif;
   font-family: var(--font-body);
 }
 button, input, select, textarea { font-family: inherit; }

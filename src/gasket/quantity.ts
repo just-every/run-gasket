@@ -46,6 +46,6 @@ export function addMeter(a: string, b: string): string {
   return meterNumber(`${negative ? '-' : ''}${text.slice(0, -6)}.${text.slice(-6)}`)
 }
 
-const NUMBER = new Intl.NumberFormat('en-AU', { maximumFractionDigits: 6 })
+const NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 })
 /** A quantity or meter value as people read it: thousands grouped ("12,408"), decimals kept exactly. */
 export const showNumber = (value: unknown) => value === null || value === undefined || value === '' || Number.isNaN(Number(value)) ? String(value ?? '') : NUMBER.format(Number(value))

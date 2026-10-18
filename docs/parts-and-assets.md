@@ -18,7 +18,7 @@ A lead registers each asset on **Assets** and keeps its details up to date under
 
 ### Meters
 
-Each asset can have meters: a **counter** that never goes down (run hours, kilometres, cycles), a **gauge** for a measured value (a temperature, a pressure), or a **condition** of good, fair or poor. Maintainers record readings on work orders, and counter meters can drive schedules.
+Each asset can have meters: a **counter** that never goes down (run hours, miles, cycles), a **gauge** for a measured value (a temperature, a pressure), or a **condition** of good, fair or poor. Maintainers record readings on work orders, and counter meters can drive schedules.
 
 ### Sightings
 

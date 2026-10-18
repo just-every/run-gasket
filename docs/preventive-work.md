@@ -13,7 +13,7 @@ To change a checklist, open it and **Publish a new revision** with a note of wha
 Under **Schedule preventive work**, choose the asset and the checklist, give the work a title (for example "Monthly compressor check") and a default maintainer, then set its cadence:
 
 - **Every (days)** with a **First due** date, for calendar work;
-- **Or by counter meter** with **Every (meter units)**, for work by run hours, kilometres or cycles;
+- **Or by counter meter** with **Every (meter units)**, for work by run hours, miles or cycles;
 - or both: the work falls due at whichever comes first.
 
 Calendar schedules keep a fixed cadence. The next due date is the previous due date plus the interval, not the day the work was done: a check due on 15 Oct every 30 days is next due on 14 Nov.

@@ -12,7 +12,7 @@ import { recordFinding, recordResults } from './work'
 export async function demoActivity(env: Bindings, day: string) {
   // Rows from an earlier run mean this already happened.
   if (await one(env, 'SELECT 1 FROM gk_proposals LIMIT 1')) return
-  const as = (key: string, name: string, role: Role): Actor => ({ id: `demo-${key}`, sessionId: 'demo-seed', email: `${key}@demo.invalid`, name, role, zone: 'Australia/Brisbane', today: day })
+  const as = (key: string, name: string, role: Role): Actor => ({ id: `demo-${key}`, sessionId: 'demo-seed', email: `${key}@demo.invalid`, name, role, zone: 'America/New_York', today: day })
   const max = as('max', 'Max Ortiz', 'maintainer'), lead = as('lead', 'Lena Park', 'lead'), agent = as('agent', 'Upkeep agent', 'agent')
 
   await recordResults(env, max, Input.of({ workOrder: 'demo-work-oven', outcome: ['pass', 'attention', ''], note: ['Hinges tight; seal intact.', 'Descale cycle slow to drain; spray arm cleaned.', ''] }))

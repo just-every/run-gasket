@@ -1,8 +1,10 @@
 # Gasket
 
-Gasket keeps the equipment a small team owns in service: one asset register, preventive schedules by calendar or meter, assigned work orders, the maintainer's inspection, readings, parts and downtime, a supervisor's review, and the overdue and downtime picture that follows. It runs on one Cloudflare Worker with D1, and the owner keeps every record.
+<img src="public/brand/mark.svg" alt="" width="72" height="72">
 
-- [CONTRACT.md](CONTRACT.md): the first release, its rules, decided defaults and what is out.
+Gasket is free, open source maintenance management (CMMS) for US maintenance teams: an asset register, preventive schedules by calendar or meter, assigned work orders, the technician's inspection, readings, parts and downtime, a supervisor's review, and the overdue and downtime picture that follows. It runs on one Cloudflare Worker with D1, and the owner keeps every record. [CONTRACT.md](CONTRACT.md) sets out the full product it is being built toward (QR requests, automatic PMs, an offline technician app, multi-site parts and purchasing, cost and downtime reporting).
+
+- [CONTRACT.md](CONTRACT.md): the product contract, what is built today and what is next.
 - [ACCEPTANCE.md](ACCEPTANCE.md): the test that proves each clause.
 - [API.md](API.md): the JSON API people's screens and agents share.
 - [IMPORT.md](IMPORT.md): moving in from MaintainX.
@@ -15,13 +17,19 @@ MIT licensed. Built on [Run Edit Run](https://runeditrun.com) Base.
 
 ## Run it locally
 
-Run one line to clone Gasket, install the `rer` command and start it:
+Two lines, the same as [run-gasket.com/run](https://run-gasket.com/run). Install `rer` (it brings its own Node when you have no Node 22 or later and changes no shell settings; if its last line puts `rer` on your PATH, run that line first):
 
 ```sh
-npx -y @runeditrun/rer dev just-every/run-gasket
+curl -fsSL https://runeditrun.com/install.sh | sh
 ```
 
-To start it again later, run `cd run-gasket && rer dev`.
+Then start Gasket: `rer` clones it, installs everything, makes you the owner and prints a link that opens Gasket signed in.
+
+```sh
+rer dev just-every/run-gasket
+```
+
+Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-gasket` does both steps in one line. To start it again later, run `cd run-gasket && rer dev`.
 This edition is runnable after composition. From the composed edition's
 checkout root, `rer dev` alone launches it for review: it installs pinned
 dependencies, sets up a local owner on a free port, starts the real app and

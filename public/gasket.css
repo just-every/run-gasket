@@ -1,7 +1,8 @@
 /* Gasket's app screens. Tokens (--rer-*, --gk-*) live in rer-theme.css; this
    file is the components. Visual authority: the 12ui style picks (work order
-   at 1440 and 390, and one pick per screen): paper, ink, Geist and one
-   layout-dye violet for the current place and the one primary action. */
+   at 1440 and 390, and one pick per screen): the pale page, navy ink, Inter and
+   ultramarine for the current place and the one primary action (tokens from
+   rer-theme.css; the app restyle to the desk look follows in its own round). */
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; scroll-padding-top: 88px; scroll-padding-bottom: 96px; }
 body { margin: 0; font-family: var(--font-body, var(--rer-font-body)); font-size: 16px; line-height: 24px; color: var(--rer-text); background: var(--rer-page); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
