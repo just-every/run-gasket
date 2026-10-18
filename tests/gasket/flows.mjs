@@ -153,6 +153,8 @@ try {
     const panel = await (await h.raw('/app', { cookie: cookie.lead })).text()
     assert.match(panel, /value="keep" checked><span><b>Keep with Mo Haddad/)
     assert.doesNotMatch(panel, new RegExp(`value="to:${ids.lead}"`))
+    // "Assigned to me" narrows the table, not the site's overdue decision.
+    assert.match(await (await h.raw('/app?mine=1', { cookie: cookie.lead })).text(), /value="keep" checked><span><b>Keep with Mo Haddad/)
     await h.api('workorder.plan', cookie.lead, { workOrder: ids.corrective, plan: `to:${ids.lead}` }, 409)
     await h.api('workorder.plan', cookie.max, { workOrder: ids.corrective, plan: 'keep' }, 403)
     await h.submit('workorder.plan', cookie.lead, { workOrder: ids.corrective, plan: 'keep' })

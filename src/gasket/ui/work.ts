@@ -11,6 +11,7 @@ import { daysBetween, localNow, showClock, showDate, showDay, showInstant, showL
 import { partList } from '../parts'
 import { assignable, site } from '../site'
 import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../today'
+import { woDigits } from '../quantity'
 import { workList, workOrderDetail } from '../work'
 import { OUTCOME, STATUS, amount, area, backLink, band as headerBand, card, checkbox, details, field, fileField, form, h, hidden, initials, raw, select, table, tag, woNumber, type Html } from './html'
 import { ICON, actionIcon, machine } from './icons'
@@ -42,7 +43,7 @@ const person = (name: string | null) => name ? h`<span class="gk-person-cell"><s
 function workTable(rows: any[], today: string, alert: string | null) {
   return h`<table class="gk-work-table"><caption class="gk-visually-hidden">Work orders</caption><thead><tr><th scope="col">WO</th><th scope="col">Asset</th><th scope="col">Task</th><th scope="col">Assigned</th><th scope="col">Due</th><th scope="col">Status</th></tr></thead>
     <tbody>${rows.map(row => h`<tr${row.id === alert ? raw(' class="gk-row-alert"') : ''}>
-      <td data-label="WO" class="gk-num"><a class="gk-wo" href="/app/work/${row.id}">${row.number}</a></td>
+      <td data-label="WO" class="gk-num"><a class="gk-wo" href="/app/work/${row.id}">${woDigits(row.number)}</a></td>
       <td data-label="Asset"><a class="gk-asset-cell" href="/app/assets/${row.asset_id}">${machine({ name: row.asset_name, category: row.asset_category })}<span>${row.asset_name}</span></a></td>
       <td data-label="Task" class="gk-task"><a href="/app/work/${row.id}">${row.title}</a></td>
       <td data-label="Assigned">${person(row.assignee)}</td>
@@ -54,7 +55,7 @@ type Exception = NonNullable<Awaited<ReturnType<typeof workToday>>['exception']>
 
 /** What was decided, in the panel's words. */
 const outcome = (decision: NonNullable<Exception['decision']>, busy: Exception['busy']) => decision.plan === 'keep'
-  ? `Kept with ${decision.holder ?? 'the assignee'}${busy.length ? `, after ${busy.map(row => `${row.number} ${row.asset_name}`).join(' and ')}` : ''}.`
+  ? `Kept with ${decision.holder ?? 'the assignee'}${busy.length ? `, after ${busy.map(row => `${woDigits(row.number)} ${row.asset_name}`).join(' and ')}` : ''}.`
   : decision.plan === 'reassign' ? `Reassigned to ${decision.to ?? 'someone else'}${decision.holder ? ` from ${decision.holder}` : ''}.`
   : `Kept as is${decision.holder ? `, with ${decision.holder}` : ''}: no plan today.`
 
@@ -63,8 +64,8 @@ const outcome = (decision: NonNullable<Exception['decision']>, busy: Exception['
  * with the person who holds it comes first and is chosen; nothing pre-picks a reassignment), and once decided, the
  * decision. Or the calm state.
  */
-function exceptionPanel(actor: Actor, exception: Awaited<ReturnType<typeof workToday>>['exception']) {
-  if (!exception) return h`<aside class="gk-panel gk-panel-calm" aria-labelledby="panel-h"><p class="gk-panel-eyebrow">Needs a decision</p><h2 id="panel-h">Nothing is overdue</h2><p class="gk-muted">Work that passes its due date waits here, with who holds it and who could take it.</p></aside>`
+function exceptionPanel(actor: Actor, exception: Awaited<ReturnType<typeof workToday>>['exception'], own: boolean) {
+  if (!exception) return h`<aside class="gk-panel gk-panel-calm" aria-labelledby="panel-h"><p class="gk-panel-eyebrow">Needs a decision</p><h2 id="panel-h">${own ? 'Nothing overdue is assigned to you' : 'Nothing is overdue'}</h2><p class="gk-muted">Work that passes its due date waits here, with who holds it and who could take it.</p></aside>`
   const { order, busy, plans, decision } = exception
   const holder = order.assignee ? order.assignee.split(' ')[0] : null
   const chosen = plans[0]?.value
@@ -75,7 +76,7 @@ function exceptionPanel(actor: Actor, exception: Awaited<ReturnType<typeof workT
   const decided = decision ? h`<section class="gk-decided" aria-labelledby="decided-h">${ICON.done}<div><h3 id="decided-h">Decided</h3><p>${outcome(decision, busy)}</p><p class="gk-sub">${decision.by ?? '—'}, ${showTime(decision.at, actor.zone)}</p></div></section>` : ''
   return h`<aside class="gk-panel" aria-labelledby="panel-h"><header class="gk-panel-head"><span class="gk-wo-id">${woNumber(order.number)}</span><a class="gk-icon-link" href="/app/work/${order.id}" aria-label="Open ${woNumber(order.number)}">${ICON.open}</a></header>
     <div class="gk-equipment">${machine({ name: order.asset_name, category: order.asset_category }, 'band')}<div><h2 id="panel-h">${order.asset_name}</h2><p>${order.asset_tag}${order.asset_category ? h` · ${order.asset_category}` : ''}</p><p>${order.asset_location}</p></div></div>
-    <section class="gk-warning" aria-label="Overdue">${ICON.clock}<div><h3>${late(order.due_date, actor.today)}</h3><p>${order.title}, due ${showDay(order.due_date, { short: true })}${order.assignee ? `, assigned to ${order.assignee}` : ', not assigned'}.${busy.length ? ` ${holder} is on ${busy.map(row => `${row.number} ${row.asset_name}`).join(' and ')}, in progress.` : ''}</p></div></section>
+    <section class="gk-warning" aria-label="Overdue">${ICON.clock}<div><h3>${late(order.due_date, actor.today)}</h3><p>${order.title}, due ${showDay(order.due_date, { short: true })}${order.assignee ? `, assigned to ${order.assignee}` : ', not assigned'}.${busy.length ? ` ${holder} is on ${busy.map(row => `${woDigits(row.number)} ${row.asset_name}`).join(' and ')}, in progress.` : ''}</p></div></section>
     ${decided}${decide}${plans.length ? '' : h`<div class="gk-panel-actions"><a class="gk-button gk-secondary" href="/app/work/${order.id}">Open work order</a></div>`}</aside>`
 }
 
@@ -110,7 +111,7 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const empty = h`<div class="gk-empty gk-empty-flat"><img src="/brand/assets/clipboard.svg" alt="" width="160" height="128"><h2>${title}</h2><p>${text}</p>${assigner && !filtered && tab === 'today' ? h`<p><a class="gk-button gk-secondary" href="/app/schedules">Go to schedules</a></p>` : ''}</div>`
 
   const more = rows.length > shown.length ? h`<a class="gk-more-rows" href="${here([filtered ? url.searchParams.toString() : tab === 'today' ? '' : `tab=${tab}`, 'all=1'].filter(Boolean).join('&'))}">+ ${rows.length - shown.length} more</a>` : ''
-  const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${row.number} ${row.asset_tag}</a> ${shortTask(row.title)}`)}</span><a class="gk-icon-link" href="${here('state=open')}" aria-label="All open work">${ICON.arrow}</a></p>` : ''
+  const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${woDigits(row.number)} ${row.asset_tag}</a> ${shortTask(row.title)}`)}</span><a class="gk-icon-link" href="${here('state=open')}" aria-label="All open work">${ICON.arrow}</a></p>` : ''
 
   let log: Html = h``
   if (activity) {
@@ -125,7 +126,7 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
     <header class="gk-work-head"><div class="gk-work-title"><h1>Work</h1><p>${place?.name ?? ''}${place ? ', ' : ''}${showDay(actor.today)}</p></div><div class="gk-work-tools">${filters}${generate}</div>
       <p class="gk-site-clock"><strong class="gk-num">${showClock(clock.slice(11))}</strong><span>${showDay(actor.today)} · ${zoneName(actor.zone)}</span><span>${ZONE_LABELS[actor.zone] ?? actor.zone} site clock</span></p></header>
     <div class="gk-work-main">${tabs}${agent}<section class="gk-work-card" aria-label="${filtered ? 'Work orders' : TAB_LABEL[tab]}">${rows.length ? workTable(shown, actor.today, today.exception?.order.id ?? null) : empty}${more}${next}</section></div>
-    ${exceptionPanel(actor, today.exception)}${log}</div>`
+    ${exceptionPanel(actor, today.exception, today.own)}${log}</div>`
   return page(env, 'Work', actor, body, { url })
 }
 

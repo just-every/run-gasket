@@ -8,6 +8,7 @@ import type { Bindings } from '../auth.server'
 import { can, type Actor } from './actor'
 import { all, one, type Row } from './core'
 import { today, zonedInstant } from './dates'
+import { woDigits } from './quantity'
 import { OPEN } from './work'
 
 export const TABS = ['today', 'overdue', 'progress', 'done'] as const
@@ -41,13 +42,21 @@ async function plate(env: Bindings, actor: Actor, mine: boolean) {
   return { rows, placed }
 }
 
+/** Whether this person only ever sees their own work, whatever the page asks for. */
+const ownAlways = (actor: Actor) => ownOnly(actor, new URL('http://gasket.invalid/app'))
+
+/**
+ * Today's tabs and next day follow the page's filter. The decision panel follows the site for anyone who reads the
+ * site's work: "Assigned to me" narrows the table, not the manager's overdue decision.
+ */
 export async function workToday(env: Bindings, actor: Actor, url: URL) {
-  const mine = ownOnly(actor, url)
+  const mine = ownOnly(actor, url), own = ownAlways(actor)
   const scope = mine ? ' AND w.assignee_id = ?' : '', who = mine ? [actor.id] : []
   const { rows, placed } = await plate(env, actor, mine)
   const tabs: Record<Tab, Row[]> = { today: placed, overdue: placed.filter(row => row.part === 'overdue'), progress: placed.filter(row => row.part === 'progress'), done: placed.filter(row => row.part === 'done') }
   const next = await all(env, `${ROWS} WHERE w.status IN ${OPEN} AND w.due_date = (SELECT MIN(due_date) FROM gk_work_orders x WHERE x.status IN ${OPEN} AND x.due_date > ?${mine ? ' AND x.assignee_id = ?' : ''})${scope} ORDER BY w.number LIMIT 4`, actor.today, ...who, ...who)
-  return { tabs, next, exception: await exceptionOf(env, actor, tabs.overdue, rows) }
+  const site = mine && !own ? await plate(env, actor, false) : { rows, placed }
+  return { tabs, next, own, exception: await exceptionOf(env, actor, site.placed.filter(row => row.part === 'overdue'), site.rows) }
 }
 
 export type Plan = { value: string; label: string; cost: string }
@@ -62,7 +71,7 @@ async function decisionsToday(env: Bindings, actor: Actor, ids: string[]) {
   return new Map(rows.map(row => [row.subject as string, { plan: JSON.parse(row.detail).plan, at: row.at, by: row.by, holder: row.holder, to: row.too } as Decision]))
 }
 
-const listed = (rows: Row[]) => rows.map(row => `${row.number} ${row.asset_name}`).join(' and ')
+const listed = (rows: Row[]) => rows.map(row => `${woDigits(row.number)} ${row.asset_name}`).join(' and ')
 
 /**
  * The overdue work order the manager decides on: the first one nobody has decided on today, with who holds it, what
@@ -85,7 +94,7 @@ async function exceptionOf(env: Bindings, actor: Actor, overdue: Row[], rows: Ro
  */
 async function plansFor(env: Bindings, actor: Actor, order: Row, busy: Row[]): Promise<Plan[]> {
   const load = `(SELECT COUNT(*) FROM gk_work_orders w WHERE w.assignee_id = m.id AND w.status IN ${OPEN} AND w.due_date <= ? AND w.id <> ?)`
-  const doing = `(SELECT GROUP_CONCAT(w.number || ' ' || a.name, ' and ') FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id WHERE w.assignee_id = m.id AND w.status = 'in_progress')`
+  const doing = `(SELECT GROUP_CONCAT(printf('%04d', w.number) || ' ' || a.name, ' and ') FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id WHERE w.assignee_id = m.id AND w.status = 'in_progress')`
   const people = await all<{ id: string; name: string; due: number; doing: string | null }>(env, `SELECT m.id, m.name, ${load} AS due, ${doing} AS doing FROM gk_members m
     WHERE m.status = 'active' AND m.role IN ('lead', 'maintainer') AND m.id IS NOT ? AND m.id <> ? ORDER BY m.role <> 'maintainer', due, m.name LIMIT 3`, actor.today, order.id, order.assignee_id, actor.id)
   const due = (count: number, other = '') => count ? `${count}${other} due today or overdue` : `nothing${other ? ' else' : ''} due today`
@@ -109,7 +118,7 @@ export async function pendingProposals(env: Bindings) {
 
 /** The rail's counts: today's plate for this person (the Today tab) and proposals waiting for a decision. */
 export async function railCounts(env: Bindings, actor: Actor) {
-  const [{ placed }, pending] = await Promise.all([plate(env, actor, ownOnly(actor, new URL('http://gasket.invalid/app'))), pendingProposals(env)])
+  const [{ placed }, pending] = await Promise.all([plate(env, actor, ownAlways(actor)), pendingProposals(env)])
   return { work: placed.length, proposals: pending.count }
 }
 

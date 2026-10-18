@@ -1,6 +1,6 @@
 // Escaped markup and the small form, table and card helpers every screen uses.
 // Every value is escaped; pages need no script. The page shell is shell.ts.
-import { showNumber } from '../quantity'
+import { showNumber, woDigits } from '../quantity'
 import { ICON, machine } from './icons'
 
 export const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))
@@ -119,4 +119,4 @@ export function band({ id, eyebrow, title, facts, status, meta, art }: { id: str
   return h`<section class="gk-band" aria-labelledby="${id}">${art ? h`<div class="gk-band-art">${art}</div>` : ''}<div class="gk-band-text"><p class="gk-eyebrow">${eyebrow}</p><h1 id="${id}">${title}</h1><p class="gk-facts">${facts.map(fact => h`<span>${fact}</span>`)}</p></div>
     <div class="gk-band-meta">${status}<dl>${meta.map(item => h`<div><dt>${item.label}</dt><dd>${item.icon ?? ''}${item.value}</dd></div>`)}</dl></div></section>`
 }
-export const woNumber = (number: number) => `WO-${String(number).padStart(4, '0')}`
+export const woNumber = (number: number) => `WO-${woDigits(number)}`

@@ -116,8 +116,8 @@ strong, b { font-weight: 650; }
 .gk-work-card { background: var(--rer-surface); border: 1px solid var(--gk-hairline); border-radius: 12px; box-shadow: var(--gk-shadow); overflow: hidden; }
 .gk-work-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .gk-work-table th { text-align: left; color: #56617b; font-size: 14px; line-height: 18px; font-weight: 650; height: 46px; padding: 0 10px; }
-.gk-work-table th:nth-child(1) { width: 8%; } .gk-work-table th:nth-child(2) { width: 17%; } .gk-work-table th:nth-child(3) { width: 24%; }
-.gk-work-table th:nth-child(4) { width: 20%; } .gk-work-table th:nth-child(5) { width: 11%; } .gk-work-table th:nth-child(6) { width: 20%; }
+.gk-work-table th:nth-child(1) { width: 70px; } .gk-work-table th:nth-child(2) { width: 23%; }
+.gk-work-table th:nth-child(4) { width: 17%; } .gk-work-table th:nth-child(5) { width: 96px; } .gk-work-table th:nth-child(6) { width: 18%; }
 .gk-work-table td[data-label="WO"], .gk-work-table td[data-label="Due"] { overflow-wrap: normal; white-space: nowrap; }
 .gk-work-table td { border-top: 1px solid var(--gk-hairline); padding: 8px; height: 56px; vertical-align: middle; font-size: 15px; line-height: 20px; overflow-wrap: break-word; white-space: normal; }
 .gk-work-table th:first-child, .gk-work-table td:first-child { padding-left: 18px; }
@@ -128,6 +128,8 @@ strong, b { font-weight: 650; }
 .gk-wo { color: var(--rer-text); font-weight: 400; text-decoration: none; }
 .gk-wo:hover { color: var(--gk-accent); text-decoration: underline; }
 .gk-asset-cell { display: flex; align-items: center; gap: 10px; color: var(--rer-text); font-weight: 650; text-decoration: none; }
+/* Names wrap inside their cell: at a space, or inside a word only when one word is wider than the column. */
+.gk-asset-cell > span, .gk-person-cell > span:last-child { min-width: 0; overflow-wrap: anywhere; }
 .gk-asset-cell:hover span { text-decoration: underline; }
 .gk-task a { color: var(--rer-text); text-decoration: none; }
 .gk-task a:hover { color: var(--gk-accent); text-decoration: underline; }
@@ -408,14 +410,13 @@ td .gk-inline .gk-actions { margin: 0; }
 @media (max-width: 1360px) {
   :root { --gk-panel: 336px; }
   .gk-person-cell .gk-avatar { display: none; }
+  /* Without initials the names need less room; the task takes it. */
+  .gk-work-table th:nth-child(4) { width: 14%; }
   .gk-agent { flex-wrap: wrap; }
   .gk-agent-text { flex-basis: 70%; }
 }
-@media (max-width: 1180px) {
-  .gk-item { grid-template-columns: minmax(0, 1fr) auto; }
-  .gk-item .gk-field { grid-column: 1 / -1; }
-  .gk-band { grid-template-columns: auto minmax(0, 1fr); }
-  .gk-band-meta { grid-column: 1 / -1; }
+/* Under 1280px the table beside the panel is too narrow for its six columns. */
+@media (max-width: 1279px) {
   /* The decision panel moves below the work; the site clock follows the title. */
   .gk-work { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
   .gk-work > .gk-panel, .gk-work > .gk-work-log { grid-column: auto; grid-row: auto; }
@@ -423,6 +424,29 @@ td .gk-inline .gk-actions { margin: 0; }
   .gk-site-clock { grid-column: 1 / -1; grid-row: 2; border-left: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
   .gk-site-clock strong { font-size: 20px; line-height: 26px; margin: 0; }
   .gk-panel { position: static; }
+}
+@media (max-width: 1180px) {
+  .gk-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .gk-item .gk-field { grid-column: 1 / -1; }
+  .gk-band { grid-template-columns: auto minmax(0, 1fr); }
+  .gk-band-meta { grid-column: 1 / -1; }
+}
+/* Under 960px the table's rows become cards: number and status, asset and due, the task, then who. */
+@media (max-width: 960px) {
+  .gk-work-table, .gk-work-table tbody { display: block; }
+  .gk-work-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .gk-work-table thead th:nth-child(n) { width: 0; padding: 0; }
+  .gk-work-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'wo status' 'asset due' 'task task' 'who who'; gap: 8px 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--gk-hairline); }
+  .gk-work-table tbody tr:first-child { border-top: 0; }
+  .gk-work-table td, .gk-work-table td:first-child { display: block; border: 0; padding: 0; height: auto; font-size: 15px; min-width: 0; }
+  .gk-work-table td[data-label="WO"] { grid-area: wo; } .gk-work-table td[data-label="Status"] { grid-area: status; }
+  .gk-work-table td[data-label="Asset"] { grid-area: asset; } .gk-work-table td[data-label="Due"] { grid-area: due; text-align: right; color: var(--rer-muted); }
+  .gk-work-table td[data-label="Due"]::before { content: 'Due '; }
+  .gk-work-table td[data-label="Task"] { grid-area: task; } .gk-work-table td[data-label="Assigned"] { grid-area: who; }
+  .gk-work-table tr.gk-row-alert td:first-child { box-shadow: none; }
+  .gk-work-table tr.gk-row-alert { box-shadow: inset 3px 0 var(--gk-late-edge); }
+  .gk-work-table .gk-wo::before { content: 'WO '; color: var(--rer-muted); font-weight: 500; }
+  .gk-person-cell .gk-avatar { display: inline-grid; width: 26px; height: 26px; font-size: 11px; }
 }
 /* Under 900px the rail folds into a top bar with a menu. */
 @media (max-width: 900px) {
@@ -460,20 +484,6 @@ td .gk-inline .gk-actions { margin: 0; }
   .gk-agent-text { flex-basis: calc(100% - 40px); }
   .gk-approval { white-space: normal; }
   .gk-agent-link { margin-left: auto; }
-  /* Rows become cards: number and status, asset and due, the task, then who. */
-  .gk-work-table, .gk-work-table tbody { display: block; }
-  .gk-work-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-  .gk-work-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'wo status' 'asset due' 'task task' 'who who'; gap: 8px 12px; align-items: center; padding: 12px 14px; border-top: 1px solid var(--gk-hairline); }
-  .gk-work-table tbody tr:first-child { border-top: 0; }
-  .gk-work-table td, .gk-work-table td:first-child { display: block; border: 0; padding: 0; height: auto; font-size: 15px; min-width: 0; }
-  .gk-work-table td[data-label="WO"] { grid-area: wo; } .gk-work-table td[data-label="Status"] { grid-area: status; }
-  .gk-work-table td[data-label="Asset"] { grid-area: asset; } .gk-work-table td[data-label="Due"] { grid-area: due; text-align: right; color: var(--rer-muted); }
-  .gk-work-table td[data-label="Due"]::before { content: 'Due '; }
-  .gk-work-table td[data-label="Task"] { grid-area: task; } .gk-work-table td[data-label="Assigned"] { grid-area: who; }
-  .gk-work-table tr.gk-row-alert td:first-child { box-shadow: none; }
-  .gk-work-table tr.gk-row-alert { box-shadow: inset 3px 0 var(--gk-late-edge); }
-  .gk-work-table .gk-wo::before { content: 'WO '; color: var(--rer-muted); font-weight: 500; }
-  .gk-person-cell .gk-avatar { display: inline-grid; width: 26px; height: 26px; font-size: 11px; }
   .gk-next { align-items: flex-start; }
   .gk-activity li { grid-template-columns: 66px 20px minmax(0, 1fr); gap: 10px; }
   .gk-equipment { padding-inline: 0; }

@@ -48,4 +48,6 @@ export function addMeter(a: string, b: string): string {
 
 const NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 6 })
 /** A quantity or meter value as people read it: thousands grouped ("12,408"), decimals kept exactly. */
+/** A work order's number as the app shows it: four digits at least (4466, 0001). */
+export const woDigits = (number: number) => String(number).padStart(4, '0')
 export const showNumber = (value: unknown) => value === null || value === undefined || value === '' || Number.isNaN(Number(value)) ? String(value ?? '') : NUMBER.format(Number(value))
