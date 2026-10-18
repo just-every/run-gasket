@@ -4,14 +4,19 @@
 The copy lives under `.rer/demo/` and is deleted on stop; the owner's
 `.wrangler/state` is never used. A second launch starts again from sample data.
 
-Harbour Kitchen Co, the invented kitchen in the MaintainX fixtures, has eight
-assets, five people and an agent, work orders (including overdue, in progress,
-awaiting review, closed and a follow-up from a finding), four preventive
-schedules and checklists, six parts, three meters with dated readings,
-sightings, downtime and the agent's proposals (one approved, two pending).
-Dates follow launch time. `src/demo.ts` inserts the register with fixed
-identities, then `src/gasket/demo-activity.ts` records recent work through
-Gasket's own commands. Neither fetches.
+Hollis Stamping & Coating's Dayton plant, the invented buyer of the homepage,
+is the demo: Ellen Brandt (the owner, maintenance manager), Ray Kowalski
+(lead), Dana Ortiz (supervisor), four technicians, the Gasket agent, ten
+assets (Presses 1 to 4, compressors AC-01 and AC-02, receiver RT-01, dryer
+DR-01, cure oven CO-1 and forklift FL-07), eight preventive schedules,
+fourteen work orders (an overdue press lube, today's work, one in progress,
+two done today, Saturday's AC-02 bearing change and closed history), six
+parts with the two 6316-C3 bearings received this morning, six meters in
+°F, psi, hrs, in/s and strokes, Press 3's downtime and the agent's proposals
+(one approved, one pending). Dates follow launch time in Dayton's clock and
+the shutdown is the coming Saturday. `src/demo.ts` inserts the register with
+fixed identities, then `src/gasket/demo-activity.ts` records recent work
+through Gasket's own commands. Neither fetches.
 
 Base's v2 demo guard is the first import of `src/server.ts`. It adds the Demo
 name without a bar or outbox. Access invitations and sign-in mail go through

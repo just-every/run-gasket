@@ -8,7 +8,8 @@ import { showDate, showInstant } from '../dates'
 import { showNumber } from '../quantity'
 import { HORIZON_DAYS, scheduleList } from '../schedules'
 import { assignable } from '../site'
-import { amount, area, backLink, card, field, form, h, hidden, page, select, table, tag } from './html'
+import { amount, area, backLink, card, field, form, h, hidden, select, table, tag } from './html'
+import { page } from './shell'
 
 export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
   const [schedules, checklists] = await Promise.all([scheduleList(env, actor), checklistList(env, actor)])
@@ -36,7 +37,7 @@ export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
   }
   const checklistCard = card('Checklists', h`${checklists.length ? table(['Checklist', 'Revision', 'Items'], checklists.map(item => [h`<a href="/app/checklists/${item.id}">${item.name}</a>`, `Revision ${item.revision.number}`, String(item.revision.items.length)]), 'Checklists', { wrap: [0] }) : h`<p class="gk-muted">No checklists yet.</p>`}
     ${manage ? form('checklist.create', '/app/checklists/{id}', h`${field('Checklist name', 'name')}${area('Items, one per line', 'items', { hint: 'Each line is one check the maintainer marks pass, needs attention or fail.' })}`, 'Write checklist', { secondary: true }) : ''}`, { id: 'checklists' })
-  return page('Schedules', actor, h`<div class="gk-head"><div><h1>Schedules</h1><p class="gk-lede">Preventive work by calendar or meter, and the checklists it follows.</p></div>${generate}</div>${list}<div class="gk-columns"><div class="gk-col-main">${create}</div><div class="gk-col-side">${checklistCard}</div></div>`, { url })
+  return page(env, 'Schedules', actor, h`<div class="gk-head"><div><h1>Schedules</h1><p class="gk-lede">Preventive work by calendar or meter, and the checklists it follows.</p></div>${generate}</div>${list}<div class="gk-columns"><div class="gk-col-main">${create}</div><div class="gk-col-side">${checklistCard}</div></div>`, { url })
 }
 
 export async function checklistPage(env: Bindings, actor: Actor, id: string, url: URL) {
@@ -44,5 +45,5 @@ export async function checklistPage(env: Bindings, actor: Actor, id: string, url
   const latest = checklist.revisions[0]
   const revise = can(actor, 'register.manage') ? card('Publish a new revision', form('checklist.revise', `/app/checklists/${checklist.id}`, h`${hidden('checklist', checklist.id)}${area('Items, one per line', 'items', { value: latest.items.map(item => item.text).join('\n') })}${field('What changed', 'note')}`, 'Publish revision', { secondary: true }), { id: 'revise' }) : ''
   const revisions = checklist.revisions.map(revision => card(`Revision ${revision.number}`, h`<ol class="gk-plain-list">${revision.items.map(item => h`<li>${item.text}</li>`)}</ol><p class="gk-sub">${revision.note ?? ''} · ${revision.publishedBy ?? ''} · ${showInstant(revision.publishedAt, actor.zone)}</p>`, { extra: revision === latest ? tag('Current') : '' }))
-  return page(checklist.name, actor, h`${backLink('/app/schedules', 'Schedules')}<h1>${checklist.name}</h1><p class="gk-lede">Work orders keep the revision they were created with.</p><div class="gk-columns"><div class="gk-col-main">${revisions}</div><div class="gk-col-side">${revise}</div></div>`, { url })
+  return page(env, checklist.name, actor, h`${backLink('/app/schedules', 'Schedules')}<h1>${checklist.name}</h1><p class="gk-lede">Work orders keep the revision they were created with.</p><div class="gk-columns"><div class="gk-col-main">${revisions}</div><div class="gk-col-side">${revise}</div></div>`, { url })
 }

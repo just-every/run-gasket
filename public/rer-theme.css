@@ -92,42 +92,51 @@
   --gk-bad: var(--red-ink); --gk-bad-bg: var(--red-tint);
   --gk-info: var(--blue-strong); --gk-info-bg: var(--blue-tint);
   --gk-shadow: 0 1px 2px rgb(14 22 48 / 5%);
+  /* The app pick's own values: the cool ground, the hairline, the warm red-orange of an overdue row. */
+  --gk-ground: #f3f5fa;
+  --gk-hairline: #e1e6f2;
+  --gk-field-line: #c6cfdf;
+  --gk-late: #c8410f; --gk-late-bg: #ffe2d6; --gk-late-row: #fff2ec; --gk-late-edge: #f0602e;
+  --gk-pending: #8a5a00; --gk-pending-bg: #fff1bf; --gk-pending-dot: var(--yellow);
+  --gk-done: #127046; --gk-done-bg: #dff4e9;
+  --gk-rail: 240px;
+  --gk-panel: 388px;
 }
 
-/* Base's frames (sign in, its confirmation, Finish setup): a centred 440px
-   white card on the pale page with the mark and name at its head, a centred
-   32px heading, 48px inputs and one full-width ultramarine button. The
-   sign-in frame shows the fine-line compressor above the card. html.rer-themed
-   outranks each frame's own hashed style, which follows this file. */
-html.rer-themed body { font-family: var(--rer-font-body); background: var(--pale); }
-html.rer-themed main { max-width: 440px; width: 100%; margin-inline: auto; padding: 28px 28px 32px; background: var(--rer-surface); border: 1px solid var(--gk-line); border-radius: var(--rer-radius); box-shadow: var(--shadow-card); }
-html.rer-themed .brand, html.rer-themed .rer-brand { display: flex; align-items: center; gap: 10px; margin: 0 0 24px; font-size: 20px; font-weight: 800; letter-spacing: -.03em; color: var(--rer-text); }
-html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 28px; height: 28px; }
-html.rer-themed h1 { margin: 0 0 12px; font-size: 32px; line-height: 1.2; font-weight: 800; letter-spacing: -.03em; text-align: center; }
-html.rer-themed h1 + p { text-align: center; }
+/* Base's frames (sign in, its confirmation, Finish setup) in the app pick's
+   look: a centred 440px white card with a hairline on the cool pale ground,
+   the mark beside the heavy wordmark at its head, a heavy tight heading, quiet
+   1px fields with an ultramarine focus ring and one full-width ultramarine
+   button. html.rer-themed outranks each frame's own hashed style, which follows
+   this file. */
+html.rer-themed body { font-family: var(--rer-font-body); background: var(--gk-ground); }
+html.rer-themed main { max-width: 440px; width: 100%; margin-inline: auto; padding: 30px 30px 32px; background: var(--rer-surface); border: 1px solid var(--gk-hairline); border-radius: var(--rer-radius); box-shadow: 0 1px 2px rgb(14 22 48 / 5%), 0 18px 40px -28px rgb(14 22 48 / 35%); }
+html.rer-themed .brand, html.rer-themed .rer-brand { display: flex; align-items: center; gap: 10px; margin: 0 0 26px; font-size: 26px; line-height: 30px; font-weight: 800; letter-spacing: -.045em; color: var(--rer-text); }
+html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 36px; height: 36px; }
+html.rer-themed h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.15; font-weight: 800; letter-spacing: -.045em; text-align: left; }
 html.rer-themed p { color: var(--rer-muted); }
-html.rer-themed label { font-weight: 500; font-size: 15px; }
-html.rer-themed input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { min-height: 48px; padding: 10px 14px; border: 1px solid var(--rer-border); border-radius: 10px; background: var(--rer-surface); }
+html.rer-themed label { font-weight: 600; font-size: 14px; color: #2b3754; }
+html.rer-themed input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { min-height: 46px; padding: 10px 14px; border: 1px solid var(--gk-field-line); border-radius: 10px; background: var(--rer-surface); font-size: 16px; }
+html.rer-themed input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):focus-visible { border-color: var(--rer-accent); outline: 3px solid color-mix(in srgb, var(--rer-focus) 30%, transparent); outline-offset: 0; }
 html.rer-themed input[type="checkbox"] { accent-color: var(--rer-accent); }
-html.rer-themed button, html.rer-themed .action { display: block; width: 100%; min-height: 48px; border: 0; border-radius: var(--rer-button-radius); background: var(--rer-accent); color: var(--rer-accent-text); font-weight: 600; }
-html.rer-themed button.secondary { background: transparent; color: var(--rer-text); border: 1px solid var(--rer-text); }
+html.rer-themed button, html.rer-themed .action { display: block; width: 100%; min-height: 48px; border: 0; border-radius: var(--rer-button-radius); background: var(--rer-accent); color: var(--rer-accent-text); font-weight: 700; }
+html.rer-themed button.secondary { background: transparent; color: var(--rer-text); border: 1px solid #6c7995; }
 html.rer-themed button:hover, html.rer-themed .action:hover { background: var(--gk-accent-strong); box-shadow: none; }
 html.rer-themed button.secondary:hover { background: var(--gk-accent-soft); }
+html.rer-themed :focus-visible { outline: 3px solid var(--rer-focus); outline-offset: 2px; }
 /* Finish setup shows the owner as two read-only pairs: plain text, not inputs. */
-html.rer-themed dl { display: block; margin: 20px 0 24px; padding-top: 16px; border-top: 1px solid var(--gk-line); }
-html.rer-themed dt { margin: 0; font-size: 14px; color: var(--rer-muted); }
-html.rer-themed dd { margin: 4px 0 16px; font-size: 18px; line-height: 26px; color: var(--rer-text); }
+html.rer-themed dl { display: block; margin: 20px 0 24px; padding-top: 16px; border-top: 1px solid var(--gk-hairline); }
+html.rer-themed dt { margin: 0; font-size: 13px; color: var(--rer-muted); }
+html.rer-themed dd { margin: 4px 0 16px; font-size: 17px; line-height: 24px; color: var(--rer-text); }
 html.rer-themed body:has(main > .brand), html.rer-themed body:has(main > .rer-brand) { align-content: center; }
-html.rer-themed body:has(main > .brand)::before, html.rer-themed body:has(main > .rer-brand)::before { content: ''; display: block; width: 220px; height: 200px; margin: 0 auto -1px; background: url('/brand/hero-compressor.svg') center bottom / contain no-repeat; }
 @media (max-width: 480px) {
-  html.rer-themed main { padding: 24px 20px 28px; }
+  html.rer-themed main { padding: 24px 20px 26px; }
   html.rer-themed h1 { font-size: 28px; }
-  html.rer-themed body:has(main > .brand)::before, html.rer-themed body:has(main > .rer-brand)::before { width: 180px; height: 164px; }
 }
 
 /* The Lobby (installed /): the same card on the pale page as sign in, with the
    equipment row standing along the floor. */
-html[data-state] body { background: var(--pale); }
+html[data-state] body { background: var(--gk-ground); }
 html[data-state] .door { padding-top: 16vh; }
 html[data-state] .door-card { max-width: 560px; padding: 40px 44px 36px; background: var(--rer-surface); border: 1px solid var(--gk-line); border-radius: var(--rer-radius); box-shadow: var(--shadow-card); }
 html[data-state] h1 { font-size: 44px; font-weight: 800; letter-spacing: -.035em; }

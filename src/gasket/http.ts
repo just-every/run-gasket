@@ -14,7 +14,8 @@ import { evidenceFile } from './work'
 import { route } from './views'
 import { assetPage, assetsPage } from './ui/assets'
 import { boardPage } from './ui/board'
-import { h, page } from './ui/html'
+import { h } from './ui/html'
+import { page } from './ui/shell'
 import { moveInPage, previewPage } from './ui/movein'
 import { partPage, partsPage } from './ui/parts'
 import { proposalsPage } from './ui/proposals'
@@ -49,8 +50,8 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
   } catch (error) {
     const { code, status, detail } = failure(error)
     if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
-    if (status === 404) return page('Not found', actor, h`<h1>Not found</h1><p>There is nothing here you can open.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status: 404 })
-    return page('That did not work', actor, h`<h1>That did not work</h1><p>${code.replace(/_/g, ' ')}.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status })
+    if (status === 404) return page(env, 'Not found', actor, h`<h1>Not found</h1><p>There is nothing here you can open.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status: 404 })
+    return page(env, 'That did not work', actor, h`<h1>That did not work</h1><p>${code.replace(/_/g, ' ')}.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status })
   }
 }
 
@@ -86,7 +87,7 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
   // The owner names the site before anything else.
   if (!await site(env)) {
     if (actor.role === 'owner') return path === '/app/site' ? await sitePage(env, actor, url, { first: true }) : redirect('/app/site')
-    return page('Not ready', actor, h`<div class="gk-first"><h1>Gasket is not set up yet</h1><p>The owner needs to name the site first.</p></div>`)
+    return page(env, 'Not ready', actor, h`<div class="gk-first"><h1>Gasket is not set up yet</h1><p>The owner needs to name the site first.</p></div>`)
   }
   const found = match(PAGE_DOORS, path)
   if (!found) throw new GasketError('not_found', 404)

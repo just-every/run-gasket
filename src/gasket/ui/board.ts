@@ -4,7 +4,8 @@ import type { Actor } from '../actor'
 import { board } from '../board'
 import { showDate, showLocal } from '../dates'
 import { showNumber } from '../quantity'
-import { STATUS, amount, card, h, page, table, tag, woNumber } from './html'
+import { STATUS, amount, card, h, table, tag, woNumber } from './html'
+import { page } from './shell'
 
 const orderRows = (rows: any[], today: string) => rows.map(row => [h`<a href="/app/work/${row.id}"><span class="gk-nowrap">${woNumber(row.number)}</span> · ${row.title}</a>`, h`<a href="/app/assets/${row.asset_id}">${row.asset_name}</a><span class="gk-sub">${row.asset_tag}</span>`, h`${showDate(row.due_date)}${row.due_date < today && row.status !== 'submitted' ? h` ${tag('Overdue')}` : ''}`, row.assignee ?? 'Not assigned', tag(STATUS[row.status])])
 
@@ -13,7 +14,7 @@ export async function boardPage(env: Bindings, actor: Actor, url: URL) {
   const none = (text: string) => h`<p class="gk-muted">${text}</p>`
   const tiles = h`<ul class="gk-tiles" aria-label="Summary">${[['Overdue', b.overdue.length], ['Waiting for review', b.awaitingReview.length], ['Open follow-ups', b.followUps.length], ['Down now', b.down.length], ['Parts below minimum', b.lowParts.length]].map(([label, count]) => h`<li${label === 'Overdue' && count ? h` class="gk-tile-alert"` : ''}><span class="gk-tile-n">${count}</span><span>${label}</span></li>`)}</ul>`
   const headings = ['Work order', 'Asset', 'Due', 'Assigned to', 'Status']
-  return page('Overdue and downtime', actor, h`<h1>Overdue and downtime</h1><p class="gk-lede">As of ${showDate(b.today)}. Downtime covers ${showDate(b.since)} to today.</p>${tiles}
+  return page(env, 'Overdue and downtime', actor, h`<h1>Overdue and downtime</h1><p class="gk-lede">As of ${showDate(b.today)}. Downtime covers ${showDate(b.since)} to today.</p>${tiles}
     <div class="gk-columns"><div class="gk-col-main">
     ${card('Overdue work', b.overdue.length ? table(headings, orderRows(b.overdue, b.today), 'Overdue work', { wrap: [0] }) : none('Nothing is overdue.'), { id: 'overdue' })}
     ${card('Waiting for review', b.awaitingReview.length ? table(headings, orderRows(b.awaitingReview, b.today), 'Waiting for review', { wrap: [0] }) : none('Nothing is waiting for review.'), { id: 'review' })}

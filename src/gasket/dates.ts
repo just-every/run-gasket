@@ -36,7 +36,18 @@ export function minutesBetween(start: string, end: string): number {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 /** US reading order: "Oct 15, 2026". */
 export const showDate = (date: string | null | undefined) => date && isDate(date) ? `${MONTHS[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}, ${date.slice(0, 4)}` : '—'
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+/** With its weekday: "Wed Oct 21, 2026"; the year is left off with `short`: "Wed Oct 21". */
+export const showDay = (date: string | null | undefined, { short = false } = {}) => {
+  if (!date || !isDate(date)) return '—'
+  const label = `${DAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]} ${showDate(date)}`
+  return short ? label.replace(/, \d{4}$/, '') : label
+}
+/** Whole days from one date to a later one. */
+export const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000)
 /** A 24-hour "14:05" as US 12-hour "2:05 pm"; the stored value stays 24-hour. */
-const showClock = (time: string) => { const hour = Number(time.slice(0, 2)); return `${hour % 12 || 12}:${time.slice(3, 5)} ${hour < 12 ? 'am' : 'pm'}` }
+export const showClock = (time: string) => { const hour = Number(time.slice(0, 2)); return `${hour % 12 || 12}:${time.slice(3, 5)} ${hour < 12 ? 'am' : 'pm'}` }
 export const showLocal = (value: string | null | undefined) => value && isLocalTime(value) ? `${showDate(value.slice(0, 10))}, ${showClock(value.slice(11))}` : '—'
 export const showInstant = (instant: number | null | undefined, zone: string) => instant ? showLocal(localNow(zone, instant)) : '—'
+/** The site's wall-clock time of an instant: "11:48 am". */
+export const showTime = (instant: number, zone: string) => showClock(localNow(zone, instant).slice(11))

@@ -1,33 +1,111 @@
-// The work list (/app) and the work-order page, built from the picked 12ui
-// design: asset header band, checklist, readings and parts in the main column,
-// downtime and findings beside them, one primary action in the bottom bar.
+// The Work screen (/app), rebuilt from the owner's pick (desk app look H):
+// title and site clock, count tabs, the agent strip, a dense table of today's
+// work with copper asset drawings, the next day's work, recent activity, and
+// the overdue work order that needs a decision in the panel beside it. Then
+// the work-order page: its asset header, checklist, readings, parts and
+// evidence in the main column, downtime and findings beside them, one primary
+// action in the bottom bar.
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
-import { localNow, showDate, showInstant, showLocal } from '../dates'
+import { daysBetween, localNow, showClock, showDate, showDay, showInstant, showLocal, showTime } from '../dates'
 import { partList } from '../parts'
-import { assignable } from '../site'
+import { assignable, site } from '../site'
+import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../today'
 import { workList, workOrderDetail } from '../work'
-import { ICON, OUTCOME, STATUS, amount, assetMark, area, backLink, band as headerBand, card, checkbox, details, drawingFor, field, fileField, form, h, hidden, page, raw, select, table, tag, woNumber } from './html'
+import { OUTCOME, STATUS, amount, area, backLink, band as headerBand, card, checkbox, details, field, fileField, form, h, hidden, initials, raw, select, table, tag, woNumber, type Html } from './html'
+import { ICON, actionIcon, machine } from './icons'
+import { ACTIONS, ZONE_LABELS, auditRecords } from './settings'
+import { page, zoneName } from './shell'
 
 const condition = (value: string) => value.charAt(0).toUpperCase() + value.slice(1)
 const dueTag = (due: string, status: string, today: string) => !['closed', 'cancelled', 'submitted'].includes(status) && due < today ? tag('Overdue') : ''
+const TAB_LABEL: Record<Tab, string> = { today: 'Today', overdue: 'Overdue', progress: 'In progress', done: 'Done today' }
+const SHOWN = 6
+
+const isOpen = (status: string) => ['open', 'in_progress', 'returned'].includes(status)
+const late = (due: string, today: string) => { const days = daysBetween(due, today); return `Overdue ${days} day${days === 1 ? '' : 's'}` }
+
+/** The status chip: red-orange overdue, ultramarine in progress, hi-vis yellow pending, green done. */
+function chip(row: { status: string; due_date: string }, today: string): Html {
+  const make = (tone: string, icon: Html, text: string) => h`<span class="gk-chip gk-chip-${tone}">${icon}${text}</span>`
+  if (isOpen(row.status) && row.due_date < today) return make('late', ICON.clock, late(row.due_date, today))
+  if (row.status === 'in_progress') return make('progress', ICON.progress, STATUS.in_progress)
+  if (row.status === 'returned') return make('pending', ICON.clock, STATUS.returned)
+  if (row.status === 'open') return make('pending', ICON.clock, row.due_date === today ? 'Due today' : STATUS.open)
+  if (row.status === 'submitted' || row.status === 'closed') return make('done', ICON.done, STATUS[row.status])
+  return make('quiet', ICON.close, STATUS[row.status] ?? row.status)
+}
+
+const dueText = (due: string, today: string) => due === today ? 'Today' : daysBetween(due, today) === 1 ? 'Yesterday' : daysBetween(today, due) === 1 ? 'Tomorrow' : showDay(due, { short: true })
+const person = (name: string | null) => name ? h`<span class="gk-person-cell"><span class="gk-avatar" aria-hidden="true">${initials(name)}</span><span>${name}</span></span>` : h`<span class="gk-muted">Not assigned</span>`
+
+function workTable(rows: any[], today: string, alert: string | null) {
+  return h`<table class="gk-work-table"><caption class="gk-visually-hidden">Work orders</caption><thead><tr><th scope="col">WO</th><th scope="col">Asset</th><th scope="col">Task</th><th scope="col">Assigned</th><th scope="col">Due</th><th scope="col">Status</th></tr></thead>
+    <tbody>${rows.map(row => h`<tr${row.id === alert ? raw(' class="gk-row-alert"') : ''}>
+      <td data-label="WO" class="gk-num"><a class="gk-wo" href="/app/work/${row.id}">${row.number}</a></td>
+      <td data-label="Asset"><a class="gk-asset-cell" href="/app/assets/${row.asset_id}">${machine({ name: row.asset_name, category: row.asset_category })}<span>${row.asset_name}</span></a></td>
+      <td data-label="Task" class="gk-task"><a href="/app/work/${row.id}">${row.title}</a></td>
+      <td data-label="Assigned">${person(row.assignee)}</td>
+      <td data-label="Due" class="gk-num">${dueText(row.due_date, today)}</td>
+      <td data-label="Status">${chip(row, today)}</td></tr>`)}</tbody></table>`
+}
+
+/** The panel beside the table: the overdue work order a manager decides on, or the calm state. */
+function exceptionPanel(actor: Actor, exception: Awaited<ReturnType<typeof workToday>>['exception']) {
+  if (!exception) return h`<aside class="gk-panel gk-panel-calm" aria-labelledby="panel-h"><p class="gk-panel-eyebrow">Needs a decision</p><h2 id="panel-h">Nothing is overdue</h2><p class="gk-muted">Work that passes its due date waits here, with who holds it and who could take it.</p></aside>`
+  const { order, busy, load } = exception
+  const holder = order.assignee ? order.assignee.split(' ')[0] : null
+  return h`<aside class="gk-panel" aria-labelledby="panel-h"><header class="gk-panel-head"><span class="gk-num">${woNumber(order.number)}</span><a class="gk-icon-link" href="/app/work/${order.id}" aria-label="Open ${woNumber(order.number)}">${ICON.open}</a></header>
+    <div class="gk-equipment">${machine({ name: order.asset_name, category: order.asset_category }, 'band')}<div><h2 id="panel-h">${order.asset_name}</h2><p>${order.asset_tag}${order.asset_category ? h` · ${order.asset_category}` : ''}</p><p>${order.asset_location}</p></div></div>
+    <section class="gk-warning" aria-label="Overdue">${ICON.clock}<div><h3>${late(order.due_date, actor.today)}</h3><p>${order.title}, due ${showDay(order.due_date, { short: true })}${order.assignee ? `, assigned to ${order.assignee}` : ', not assigned'}.${busy.length ? ` ${holder} is on ${busy.map(row => `${row.number} ${row.asset_name}`).join(' and ')}, in progress.` : ''}</p></div></section>
+    ${can(actor, 'work.assign') && load.length ? h`<form method="post" action="/app/do/workorder.assign" class="gk-plan">${hidden('returnTo', '/app')}${hidden('workOrder', order.id)}<fieldset><legend>Choose a plan</legend>
+      ${load.map((option, index) => h`<label class="gk-option"><input type="radio" name="assignee" value="${option.id}"${index === 0 ? raw(' checked') : ''}><span>Reassign to <b>${option.name}</b>, ${option.due ? `${option.due} due today or overdue` : 'nothing due today'}</span></label>`)}</fieldset>
+      <div class="gk-panel-actions"><button type="submit">Assign</button><a class="gk-button gk-secondary" href="/app/work/${order.id}">Open work order</a></div></form>`
+    : h`<div class="gk-panel-actions"><a class="gk-button gk-secondary" href="/app/work/${order.id}">Open work order</a></div>`}</aside>`
+}
 
 export async function workPage(env: Bindings, actor: Actor, url: URL) {
-  const mine = url.searchParams.get('mine') === '1', state = url.searchParams.get('state') ?? 'open'
-  const rows = await workList(env, actor, url)
+  const mine = url.searchParams.get('mine') === '1', state = url.searchParams.get('state')
+  const filtered = mine || state === 'closed' || state === 'open'
+  const tab = (TABS as readonly string[]).includes(url.searchParams.get('tab') ?? '') ? url.searchParams.get('tab') as Tab : 'today'
+  const [today, place, pending, activity] = await Promise.all([workToday(env, actor, url), site(env), pendingProposals(env), recentActivity(env, actor)])
+  const rows = filtered ? await workList(env, actor, url) : today.tabs[tab]
+  const all = url.searchParams.get('all') === '1', shown = all ? rows : rows.slice(0, SHOWN)
   const assigner = can(actor, 'work.assign')
-  const tabs: [string, string, boolean][] = [['/app', 'All open', !mine && state === 'open'], ['/app?mine=1', 'Assigned to me', mine], ['/app?state=closed', 'Closed', state === 'closed']]
-  const filters = h`<nav class="gk-tabs" aria-label="Work filters">${tabs.map(([href, label, on]) => h`<a href="${href}"${on ? raw(' aria-current="page"') : ''}>${label}</a>`)}</nav>`
-  const empty = h`<div class="gk-empty"><img src="/brand/assets/clipboard.svg" alt="" width="200" height="160"><h2>${state === 'closed' ? 'No closed work orders yet' : mine ? 'Nothing is assigned to you' : 'No open work orders'}</h2><p>${assigner ? 'Work orders appear here when a schedule falls due or when you raise corrective work on an asset.' : 'Work assigned to you appears here.'}</p>${assigner && state !== 'closed' ? h`<p><a class="gk-button gk-secondary" href="/app/schedules">Go to schedules</a></p>` : ''}</div>`
-  const list = rows.length ? table(['Work order', 'Asset', 'Due', 'Assigned to', 'Status'], rows.map(row => [
-    h`<a class="gk-wo-link" href="/app/work/${row.id}">${woNumber(row.number)}<span class="gk-title">${row.title}</span></a>`,
-    h`<span class="gk-with-art">${assetMark({ name: row.asset_name, category: row.asset_category })}<span>${row.asset_name}<span class="gk-sub">${row.asset_tag} · ${row.asset_location}</span></span></span>`,
-    h`<span class="gk-with-icon">${ICON.calendar}<span>${showDate(row.due_date)}${dueTag(row.due_date, row.status, actor.today)}</span></span>`,
-    row.assignee ? h`<span class="gk-with-icon">${ICON.person}<span>${row.assignee}</span></span>` : h`<span class="gk-muted">Not assigned</span>`,
-    tag(STATUS[row.status]),
-  ]), 'Work orders') : empty
-  const generate = assigner && state === 'open' ? form('workorders.generate', '/app', '', 'Create due work orders', { secondary: true, layout: 'gk-inline' }) : ''
-  return page('Work', actor, h`<div class="gk-head"><div><h1>Work</h1><p class="gk-lede">Preventive and corrective work on the site's equipment.</p></div>${generate}</div>${filters}${list}`, { url })
+  const here = (params: string) => `/app${params ? `?${params}` : ''}`
+
+  const tabs = h`<nav class="gk-count-tabs" aria-label="Today's work">${TABS.map((key, index) => h`${index === 1 ? raw('<span class="gk-tab-rule" aria-hidden="true"></span>') : ''}<a href="${here(key === 'today' ? '' : `tab=${key}`)}" class="gk-count-tab gk-count-${key}"${!filtered && key === tab ? raw(' aria-current="page"') : ''}>${TAB_LABEL[key]} <b class="gk-num">${today.tabs[key].length}</b></a>`)}</nav>`
+
+  const filters = h`<nav class="gk-tab-filters" aria-label="Other work lists">${[['state=open', 'All open', state === 'open' && !mine], ['mine=1', 'Assigned to me', mine], ['state=closed', 'Closed', state === 'closed']].map(([params, label, on]) => h`<a href="${here(params as string)}"${on ? raw(' aria-current="page"') : ''}>${label}</a>`)}</nav>`
+  const agent = pending.count && pending.latest && (can(actor, 'proposal.decide') || can(actor, 'proposal.prepare')) ? h`<p class="gk-agent">${ICON.proposals}<span class="gk-agent-text"><b>${pending.latest.prepared_by}:</b> ${pending.latest.reasoning.split(/(?<=\.)\s/)[0]}</span><span class="gk-approval"><i class="gk-dot" aria-hidden="true"></i>${pending.count} proposal${pending.count === 1 ? '' : 's'} waiting for a decision</span><a class="gk-agent-link" href="/app/proposals">Review</a></p>` : ''
+
+  const emptyText: Record<Tab, [string, string]> = {
+    today: ['Nothing on today\'s plate', assigner ? 'Work orders appear here when a schedule falls due or when you raise corrective work on an asset.' : 'Work assigned to you for today appears here.'],
+    overdue: ['Nothing is overdue', 'Work that passes its due date shows here until it is done.'],
+    progress: ['Nothing in progress', 'Work moves here once someone records a result, reading, part or finding on it.'],
+    done: ['Nothing done yet today', 'Work submitted for review or closed today shows here.'],
+  }
+  const [title, text] = filtered ? [state === 'closed' ? 'No closed work orders yet' : mine ? 'Nothing is assigned to you' : 'No open work orders', 'Work orders appear here when a schedule falls due or when you raise corrective work on an asset.'] : emptyText[tab]
+  const empty = h`<div class="gk-empty gk-empty-flat"><img src="/brand/assets/clipboard.svg" alt="" width="160" height="128"><h2>${title}</h2><p>${text}</p>${assigner && !filtered && tab === 'today' ? h`<p><a class="gk-button gk-secondary" href="/app/schedules">Go to schedules</a></p>` : ''}</div>`
+
+  const more = rows.length > shown.length ? h`<a class="gk-more-rows" href="${here([filtered ? url.searchParams.toString() : tab === 'today' ? '' : `tab=${tab}`, 'all=1'].filter(Boolean).join('&'))}">+ ${rows.length - shown.length} more</a>` : ''
+  const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${row.number} ${row.asset_name}</a>`)}${today.next.length === 1 ? h` ${today.next[0].title.charAt(0).toLowerCase() + today.next[0].title.slice(1)}` : ''}</span><a class="gk-icon-link" href="${here('state=open')}" aria-label="All open work">${ICON.arrow}</a></p>` : ''
+
+  let log: Html = h``
+  if (activity) {
+    const records = await auditRecords(env)
+    log = h`<section class="gk-activity" aria-labelledby="activity-h"><header><h2 id="activity-h">Recent activity</h2><a href="/app/audit">All activity ›</a></header>
+      ${activity.length ? h`<ol>${activity.map(row => h`<li><time class="gk-num">${showTime(row.at, actor.zone)}</time>${actionIcon(row.action)}<p><b>${row.actor_name ?? '—'}</b> ${ACTIONS[row.action] ?? 'Changed a record'}${records.get(row.subject) ? h` · ${records.get(row.subject)}` : ''}</p></li>`)}</ol>` : h`<p class="gk-muted">Nothing has changed yet.</p>`}</section>`
+  }
+
+  const generate = assigner ? form('workorders.generate', '/app', '', 'Create due work orders', { secondary: true, layout: 'gk-inline' }) : ''
+  const clock = localNow(actor.zone)
+  const body = h`<div class="gk-work">
+    <header class="gk-work-head"><div class="gk-work-title"><h1>Work</h1><p>${place?.name ?? ''}${place ? ', ' : ''}${showDay(actor.today)}</p></div><div class="gk-work-tools">${filters}${generate}</div>
+      <p class="gk-site-clock"><strong class="gk-num">${showClock(clock.slice(11))}</strong><span>${showDay(actor.today)} · ${zoneName(actor.zone)}</span><span>${ZONE_LABELS[actor.zone] ?? actor.zone} site clock</span></p></header>
+    <div class="gk-work-main">${tabs}${agent}<section class="gk-work-card" aria-label="${filtered ? 'Work orders' : TAB_LABEL[tab]}">${rows.length ? workTable(shown, actor.today, today.exception?.order.id ?? null) : empty}${more}${next}</section>${log}</div>
+    ${exceptionPanel(actor, today.exception)}</div>`
+  return page(env, 'Work', actor, body, { url })
 }
 
 export async function workOrderPage(env: Bindings, actor: Actor, id: string, url: URL) {
@@ -44,7 +122,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     facts: [`Serial ${w.asset_serial ?? '—'}`, w.asset_location, `Custodian: ${w.asset_custodian ?? '—'}`],
     status: tag(STATUS[w.status]),
     meta: [{ label: 'Due date', icon: ICON.calendar, value: h`${showDate(w.due_date)} ${dueTag(w.due_date, w.status, actor.today)}` }, { label: 'Assigned maintainer', icon: ICON.person, value: w.assignee_name ?? 'Not assigned' }],
-    art: drawingFor({ name: w.asset_name, category: w.asset_category }) ?? 'pump' })}`
+    art: machine({ name: w.asset_name, category: w.asset_category }, 'band') })}`
   // The checklist card names preventive work; other work says what needs doing in its own card.
   const task = w.items.length && w.title === w.checklist_name && !w.description ? '' : card('What needs doing', h`<p>${w.title}</p>${w.description ? h`<p class="gk-muted">${w.description}</p>` : ''}`, { id: 'task' })
 
@@ -97,5 +175,5 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const body = h`${backLink('/app', 'Work orders')}${band}
     <div class="gk-columns"><div class="gk-col-main">${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${downtime}${findings}${reviews}${assign}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
-  return page(`${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
+  return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

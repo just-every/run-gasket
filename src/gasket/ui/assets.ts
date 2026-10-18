@@ -6,7 +6,9 @@ import { assetList } from '../assets'
 import { addDays, showDate, showInstant, showLocal } from '../dates'
 import { assetHistory } from '../history'
 import { assignable } from '../site'
-import { STATUS, amount, area, assetMark, backLink, band as headerBand, card, details, drawingFor, field, form, h, hidden, page, select, table, tag, woNumber } from './html'
+import { STATUS, amount, area, assetMark, backLink, band as headerBand, card, details, field, form, h, hidden, select, table, tag, woNumber } from './html'
+import { machine } from './icons'
+import { page } from './shell'
 
 const CRITICALITY = [{ value: 'normal', label: 'Normal' }, { value: 'important', label: 'Important' }, { value: 'critical', label: 'Critical' }]
 const identityFields = (asset: Record<string, any> = {}) => h`<div class="gk-grid">
@@ -25,7 +27,7 @@ export async function assetsPage(env: Bindings, actor: Actor, url: URL) {
       outcome ? h`${tag(outcome === 'found' ? 'Found' : outcome === 'elsewhere' ? 'Found elsewhere' : 'Missing')}<span class="gk-sub">${showInstant(Number(at), actor.zone)}</span>` : h`<span class="gk-muted">Never</span>`]
   }), 'Assets', { wrap: [1, 2] }) : h`<div class="gk-empty"><img src="/brand/assets/plinth.svg" alt="" width="360" height="244"><h2>No assets yet</h2><p>${manage ? 'Register the equipment you maintain below, or move in your MaintainX asset export.' : 'A maintenance lead registers the site\'s equipment.'}</p>${manage ? h`<p><a class="gk-button gk-secondary" href="/app/move-in">Move in from MaintainX</a></p>` : ''}</div>`
   const create = manage ? card('Register an asset', form('asset.create', '/app/assets/{id}', identityFields(), 'Register asset'), { id: 'register' }) : ''
-  return page('Assets', actor, h`<div class="gk-head"><div><h1>Assets</h1><p class="gk-lede">The equipment this site owns and keeps in service.</p></div></div>${rows.length ? h`${list}${create}` : h`<div class="gk-columns gk-columns-even"><div class="gk-col-main">${list}</div><div class="gk-col-side">${create}</div></div>`}`, { url })
+  return page(env, 'Assets', actor, h`<div class="gk-head"><div><h1>Assets</h1><p class="gk-lede">The equipment this site owns and keeps in service.</p></div></div>${rows.length ? h`${list}${create}` : h`<div class="gk-columns gk-columns-even"><div class="gk-col-main">${list}</div><div class="gk-col-side">${create}</div></div>`}`, { url })
 }
 
 export async function assetPage(env: Bindings, actor: Actor, id: string, url: URL) {
@@ -35,7 +37,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const band = headerBand({ id: 'asset-name', eyebrow: `${asset.tag}${asset.category ? ` · ${asset.category}` : ''}`, title: asset.name,
     facts: [`Serial ${asset.serial ?? '—'}`, asset.location, `Custodian: ${asset.custodian ?? '—'}`], status: tag(STATUS[asset.status]),
     meta: [{ label: 'Criticality', value: asset.criticality === 'normal' ? 'Normal' : asset.criticality === 'important' ? 'Important' : 'Critical' }, { label: 'Downtime recorded', value: `${downtimeMinutes} minutes` }],
-    art: drawingFor(asset) ?? 'pump' })
+    art: machine(asset, 'band') })
   const meters = card('Meters', h`${asset.meters.length ? table(['Meter', 'Latest'], asset.meters.map((meter: any) => [h`${meter.name}<span class="gk-sub">${meter.kind === 'counter' ? 'Counter' : meter.kind === 'gauge' ? 'Gauge' : 'Condition'}</span>`,
       meter.latest ? h`${meter.kind === 'condition' ? meter.latest.charAt(0).toUpperCase() + meter.latest.slice(1) : amount(meter.latest, meter.unit)}<span class="gk-sub">Taken ${showLocal(meter.latest_on)}</span>` : '—']), 'Meters', { wrap: [0] }) : h`<p class="gk-muted">No meters yet.</p>`}
     ${manage ? form('meter.create', back, h`${hidden('asset', asset.id)}<div class="gk-grid">${field('Meter name', 'name', { hint: 'For example Run hours or Oil condition.' })}${field('Unit', 'unit', { hint: 'hrs, °F, psi, mi… use "condition" for good/fair/poor.' })}${select('Kind', 'kind', [{ value: 'counter', label: 'Counter (never goes down)' }, { value: 'gauge', label: 'Gauge (a measured value)' }, { value: 'condition', label: 'Condition (good, fair or poor)' }], 'counter')}</div>`, 'Add meter', { secondary: true }) : ''}`, { id: 'meters' })
@@ -49,5 +51,5 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
   const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${history}</div><div class="gk-col-side">${meters}${sightings}${corrective}${edit}${earlier}</div></div>`
-  return page(asset.name, actor, body, { url })
+  return page(env, asset.name, actor, body, { url })
 }

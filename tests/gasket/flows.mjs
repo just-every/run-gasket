@@ -36,7 +36,7 @@ try {
     assert.equal((await h.raw('/app', { cookie: cookie.owner })).headers.get('location'), '/app/site')
     await h.api('site.configure', cookie.owner, { name: 'Harbour Kitchen Co', timezone: 'Mars/Olympus' }, 400)
     assert.equal((await h.submit('site.configure', cookie.owner, { name: 'Harbour Kitchen Co', timezone: zone }, '/app/assets')).searchParams.get('notice'), 'Saved.')
-    for (const [key, name, role] of [['lead', 'Lena Park', 'lead'], ['max', 'Max Ortiz', 'maintainer'], ['mo', 'Mo Haddad', 'maintainer'], ['sam', 'Sam Ito', 'supervisor'], ['agent', 'Upkeep agent', 'agent'], ['temp', 'Tia Brooks', 'maintainer']]) {
+    for (const [key, name, role] of [['lead', 'Lena Park', 'lead'], ['max', 'Max Ortiz', 'maintainer'], ['mo', 'Mo Haddad', 'maintainer'], ['sam', 'Sam Ito', 'supervisor'], ['agent', 'Gasket agent', 'agent'], ['temp', 'Tia Brooks', 'maintainer']]) {
       ids[key] = (await h.api('access.give', cookie.owner, { name, email: `${key}@example.test`, role })).id
       cookie[key] = await h.signIn(`${key}@example.test`)
       assert.equal((await h.api('me', cookie[key])).role, role)

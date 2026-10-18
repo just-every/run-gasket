@@ -4,7 +4,8 @@ import { can, type Actor } from '../actor'
 import { all } from '../core'
 import { showDate, showInstant } from '../dates'
 import { proposalList } from '../proposals'
-import { card, field, form, h, hidden, page, tag } from './html'
+import { card, field, form, h, hidden, tag } from './html'
+import { page } from './shell'
 
 const KIND: Record<string, string> = { schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
 const LABELS: Record<string, string> = { asset: 'Asset', checklist: 'Checklist', title: 'Title', everyDays: 'Every (days)', meter: 'Meter', everyUnits: 'Every (units)', firstDue: 'First due', firstDueMeter: 'First due at', assignee: 'Maintainer', description: 'Details', due: 'Due', part: 'Part', counted: 'Counted', note: 'Note' }
@@ -28,6 +29,6 @@ export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
       ${form('proposal.decide', '/app/proposals', h`${hidden('proposal', row.id)}${hidden('decision', 'reject')}${field('Reason to reject', 'note')}`, 'Reject', { secondary: true })}</div>` : ''}
     ${result(row)}`,
   { extra: tag(row.status === 'pending' ? 'Pending' : row.status === 'approved' ? 'Approved' : 'Rejected') }))
-  return page('Proposals', actor, h`<h1>Proposals</h1><p class="gk-lede">An agent prepares; a maintenance lead approves or rejects. Approving runs the normal command as you, and refuses if the records it relied on have changed.</p>
+  return page(env, 'Proposals', actor, h`<h1>Proposals</h1><p class="gk-lede">An agent prepares; a maintenance lead approves or rejects. Approving runs the normal command as you, and refuses if the records it relied on have changed.</p>
     ${rows.length ? items : h`<div class="gk-empty"><h2>No proposals yet</h2><p>An agent with its own access prepares proposals through Gasket's API.</p></div>`}`, { url })
 }
