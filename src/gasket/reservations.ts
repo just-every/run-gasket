@@ -99,7 +99,7 @@ export async function reserve(env: Bindings, actor: Actor, input: Input) {
   const swaps = new Map<string, string>()
   if (kitId) {
     insist(await one(env, 'SELECT 1 FROM gk_kits WHERE id = ?', kitId), 'kit_not_found', 404)
-    lines = (await all(env, 'SELECT part_id, quantity_milli FROM gk_kit_lines WHERE kit_id = ?', kitId)).map(row => ({ requested: row.part_id, quantity: row.quantity_milli }))
+    lines = (await all(env, 'SELECT part_id, quantity_milli FROM gk_kit_lines WHERE kit_id = ? ORDER BY rowid', kitId)).map(row => ({ requested: row.part_id, quantity: row.quantity_milli }))
     for (const swap of input.has('swap') ? input.list('swap') : []) {
       const [from, to] = swap.split(':')
       insist(from && to && lines.some(line => line.requested === from), 'invalid_swap')
@@ -147,7 +147,7 @@ export async function reservations(env: Bindings, where: string, ...params: unkn
   const rows = await all(env, `SELECT r.*, ${ISSUED} AS issued_milli, p.number AS part_number, p.name AS part_name, p.unit, q.number AS requested_number, q.name AS requested_name, k.name AS kit,
     w.number AS work_number, w.title AS work_title, w.status AS work_status, rb.name AS reserved_by_name, lb.name AS released_by_name
     FROM gk_reservations r JOIN gk_parts p ON p.id = r.part_id JOIN gk_parts q ON q.id = r.requested_part_id LEFT JOIN gk_kits k ON k.id = r.kit_id JOIN gk_work_orders w ON w.id = r.work_order_id
-    LEFT JOIN gk_members rb ON rb.id = r.reserved_by LEFT JOIN gk_members lb ON lb.id = r.released_by WHERE ${where} ORDER BY r.reserved_at, r.id`, ...params)
+    LEFT JOIN gk_members rb ON rb.id = r.reserved_by LEFT JOIN gk_members lb ON lb.id = r.released_by WHERE ${where} ORDER BY r.reserved_at, r.rowid`, ...params)
   return rows.map(row => {
     const needed = row.released_at ? 0 : Math.max(0, row.quantity_milli - row.issued_milli)
     return { id: row.id, workOrder: { id: row.work_order_id, number: row.work_number, title: row.work_title, status: row.work_status }, part: { id: row.part_id, number: row.part_number, name: row.part_name, unit: row.unit },
