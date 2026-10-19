@@ -408,6 +408,20 @@ try {
     assert.equal((await h.api('closures', cookie.max)).map(item => item.label).join(), 'Easter Monday')
     const page = await (await h.raw('/app/schedules', { cookie: cookie.lead })).text()
     for (const text of ['Easter Monday', 'Skips and deferrals', 'from completion', 'Deep clean moved to this week']) assert.ok(page.includes(text), text)
+    // A site with one owner and no supervisor: the owner approves their own skip only with a second, labelled confirmation.
+    const solo = await harness()
+    try {
+      const owner = await solo.owner()
+      await solo.api('site.configure', owner, { name: 'Corner Cafe', timezone: zone })
+      const grill = (await solo.api('asset.create', owner, { tag: 'CC-1', name: 'Flat grill', location: 'Kitchen' })).id
+      const list = (await solo.api('checklist.create', owner, { name: 'Grill check', items: ['Burners light evenly'] })).id
+      const lone = (await solo.api('schedule.create', owner, { asset: grill, checklist: list, title: 'Weekly grill check', everyDays: 7, firstDue: addDays(today, -2) })).id
+      const ask = await solo.api('schedule.skip', owner, { schedule: lone, reason: 'Grill out for repair' })
+      assert.equal((await solo.api('schedule.exception', owner, { exception: ask.id, decision: 'approve' }, 409)).error, 'confirm_single_approver')
+      await solo.api('schedule.exception', owner, { exception: ask.id, decision: 'approve', singleApprover: 'yes' })
+      const decided = (await solo.api('schedules', owner)).find(row => row.id === lone)
+      assert.deepEqual([decided.overdue, decided.exceptions[0].decision, decided.exceptions[0].single_approver], [false, 'approved', 1])
+    } finally { await solo.close() }
   })
 
   await check('MIG-002 MaintainX completed work history across date ranges', async () => {

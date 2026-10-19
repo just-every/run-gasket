@@ -30,7 +30,9 @@ export function pending(row: any, actor: Actor) {
   const ask = row.exceptions.find((item: any) => !item.decision)
   if (!ask) return ''
   const what = ask.kind === 'skip' ? `Skip of ${showDate(ask.occurrence)}` : `Deferral of ${showDate(ask.occurrence)} to ${showDate(ask.until)}`
-  const decide = can(actor, 'work.review') && ask.requested_by !== actor.id ? h`${form('schedule.exception', '/app/schedules', h`${hidden('exception', ask.id)}${hidden('decision', 'approve')}`, 'Approve', { secondary: true, layout: 'gk-inline' })}${form('schedule.exception', '/app/schedules', h`${hidden('exception', ask.id)}${hidden('decision', 'reject')}`, 'Reject', { secondary: true, layout: 'gk-inline' })}` : ''
+  const own = ask.requested_by === actor.id
+  // The lone owner of a site with no supervisor approves their own request with a second confirmation (single-approver).
+  const decide = can(actor, 'work.review') && (!own || actor.role === 'owner') ? h`${form('schedule.exception', '/app/schedules', h`${hidden('exception', ask.id)}${hidden('decision', 'approve')}${own ? h`<label class="gk-check"><input type="checkbox" name="singleApprover" value="yes" required> I am the only approver on this site and approve my own request (single-approver)</label>` : ''}`, 'Approve', { secondary: true, layout: 'gk-inline' })}${form('schedule.exception', '/app/schedules', h`${hidden('exception', ask.id)}${hidden('decision', 'reject')}`, 'Reject', { secondary: true, layout: 'gk-inline' })}` : ''
   return h`<span class="gk-sub">${tag('Waiting for approval')} ${what}: ${ask.reason} (${ask.requested_by_name ?? '—'})</span>${decide}`
 }
 
@@ -46,7 +48,7 @@ export function exceptionsCard(schedules: any[]) {
   if (!rows.length) return ''
   return card('Skips and deferrals', table(['Schedule', 'Occurrence', 'Asked', 'Decision'], rows.map(({ row, item }) => [row.title,
     h`${item.kind === 'skip' ? 'Skip' : `Defer to ${showDate(item.until)}`}<span class="gk-sub">Due ${showDate(item.occurrence)}</span>`, h`${item.reason}<span class="gk-sub">${item.requested_by_name ?? '—'}</span>`,
-    item.decision ? h`${tag(item.decision === 'approved' ? 'Approved' : 'Rejected')}<span class="gk-sub">${item.decided_by_name ?? '—'}${item.note ? `: ${item.note}` : ''}</span>` : tag('Waiting for approval')]), 'Skips and deferrals', { wrap: [0, 2, 3] }), { id: 'exceptions' })
+    item.decision ? h`${tag(item.decision === 'approved' ? 'Approved' : 'Rejected')}${item.single_approver ? h` ${tag('Single-approver')}` : ''}<span class="gk-sub">${item.decided_by_name ?? '—'}${item.note ? `: ${item.note}` : ''}</span>` : tag('Waiting for approval')]), 'Skips and deferrals', { wrap: [0, 2, 3] }), { id: 'exceptions' })
 }
 
 export function changesCard(schedules: any[], closures: any[], actor: Actor) {

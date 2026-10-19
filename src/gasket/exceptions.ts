@@ -1,7 +1,9 @@
 // PM-003: exceptions to a schedule and changes to its cadence. A lead asks to
 // skip a missed occurrence or defer the current one (at most the schedule's
 // max_defer_days after it), always with a reason; nothing moves until a
-// different person who reviews work (an owner or supervisor) approves it.
+// different person who reviews work (an owner or supervisor) approves it; on a
+// site with one owner and no supervisor, that owner may approve their own after
+// an explicit second confirmation, and the decision is labelled single-approver.
 // Every request and decision is kept, so a skipped occurrence stays on record
 // as missed. Editing a schedule previews its issued work (which keeps its due
 // date and checklist revision) and its next dates before and after the change.
@@ -58,11 +60,16 @@ export async function decideException(env: Bindings, actor: Actor, input: Input)
   const exception = await one(env, 'SELECT * FROM gk_schedule_exceptions WHERE id = ?', input.text('exception', { max: 100 }))
   insist(exception, 'exception_not_found', 404)
   insist(!exception.decision, 'already_decided', 409)
-  insist(exception.requested_by !== actor.id, 'not_independent', 403)
   const decision = input.text('decision', { max: 10 }), note = input.text('note', { optional: true, max: 500 }) || null
   insist(decision === 'approve' || decision === 'reject', 'invalid_decision')
+  const own = exception.requested_by === actor.id
+  if (own) {
+    const people = await one<{ owners: number; supervisors: number }>(env, "SELECT SUM(role = 'owner') AS owners, SUM(role = 'supervisor') AS supervisors FROM gk_members WHERE status = 'active'")
+    insist(actor.role === 'owner' && people!.owners === 1 && !people!.supervisors, 'not_independent', 403)
+    insist(input.flag('singleApprover'), 'confirm_single_approver', 409)
+  }
   const schedule = await one(env, 'SELECT * FROM gk_schedules WHERE id = ?', exception.schedule_id)
-  const statements = [stmt(env, 'UPDATE gk_schedule_exceptions SET decision = ?, decided_by = ?, decided_at = ?, note = ? WHERE id = ? AND decision IS NULL', decision === 'approve' ? 'approved' : 'rejected', actor.id, now(), note, exception.id)]
+  const statements = [stmt(env, 'UPDATE gk_schedule_exceptions SET decision = ?, decided_by = ?, decided_at = ?, note = ?, single_approver = ? WHERE id = ? AND decision IS NULL', decision === 'approve' ? 'approved' : 'rejected', actor.id, now(), note, own ? 1 : 0, exception.id)]
   if (decision === 'approve') {
     // The occurrence asked about must still be the schedule's current one.
     insist(schedule!.next_due_date === exception.occurrence, 'occurrence_moved', 409)
@@ -75,7 +82,7 @@ export async function decideException(env: Bindings, actor: Actor, input: Input)
         stmt(env, "UPDATE gk_work_orders SET due_date = ?, version = version + 1 WHERE schedule_id = ? AND status NOT IN ('closed', 'cancelled')", exception.until, schedule!.id))
     }
   }
-  await commit(env, statements, { actor: actor.id, action: 'schedule.exception', subject: exception.schedule_id, detail: { exception: exception.id, kind: exception.kind, occurrence: exception.occurrence, until: exception.until, decision, note } })
+  await commit(env, statements, { actor: actor.id, action: 'schedule.exception', subject: exception.schedule_id, detail: { exception: exception.id, kind: exception.kind, occurrence: exception.occurrence, until: exception.until, decision, note, ...(own ? { singleApprover: true } : {}) } })
   return { id: exception.id, decision: decision === 'approve' ? 'approved' : 'rejected' }
 }
 
