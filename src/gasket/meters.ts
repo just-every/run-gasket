@@ -116,9 +116,13 @@ export async function feedReading(env: Bindings, actor: Actor, input: Input) {
   const declared = input.text('quality', { optional: true, max: 20 }) || 'good'
   insist(declared === 'good' || declared === 'suspect', 'invalid_quality')
   const takenOn = takenOnFrom(input, actor, 'takenOn')
-  const kept = await readingStatements(env, actor, meter, input.text('value', { max: 30 }), { takenOn, workOrder: null, provenance: 'feed', source, quality: declared })
+  // PM-002: a repeated delivery (same feed, source time and value) is the reading already kept, not a second one.
+  const value = valueFor(meter, input.text('value', { max: 30 }))
+  const repeat = await one(env, "SELECT id, quality FROM gk_readings WHERE meter_id = ? AND provenance = 'feed' AND source = ? AND taken_on = ? AND value = ?", meter.id, source, takenOn, value)
+  if (repeat) return { id: repeat.id, meter: meter.id, quality: repeat.quality, normalized: (await meterState(env, meter.id)).readings.find(row => row.id === repeat.id)!.normalized, duplicate: true }
+  const kept = await readingStatements(env, actor, meter, value, { takenOn, workOrder: null, provenance: 'feed', source, quality: declared })
   await commit(env, kept.statements, { actor: actor.id, action: 'meter.feed', subject: meter.asset_id, detail: { meter: meter.id, reading: kept.id, value: kept.value, takenOn, source, quality: kept.quality } })
-  return { id: kept.id, quality: kept.quality, normalized: kept.normalized }
+  return { id: kept.id, meter: meter.id, quality: kept.quality, normalized: kept.normalized, duplicate: false }
 }
 
 /** Declares how late this meter's feed readings may arrive before they are kept as stale; readings already kept keep their quality. */

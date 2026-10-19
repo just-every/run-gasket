@@ -219,6 +219,6 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
 
   const body = h`${backLink('/app', 'Work orders')}${band}
     <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${downtime}${findings}${reviews}${assign}${control}
-    ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
+    ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ...(w.trigger ? [['Raised by reading', `${w.trigger.meter} ${w.trigger.value}${w.trigger.unit === 'condition' ? '' : ` ${w.trigger.unit}`}, taken ${showLocal(w.trigger.taken_on)}${w.trigger.provenance === 'feed' ? ` (feed: ${w.trigger.source})` : ''}`] as [string, unknown]] : []), ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

@@ -17,7 +17,7 @@ import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
 import { decide, prepare } from './proposals'
 import { review, submit } from './review'
-import { createSchedule, generateDue } from './schedules'
+import { createSchedule, evaluateMeter, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole } from './site'
 import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, recordFinding, recordReadings, recordResults } from './work'
 
@@ -34,7 +34,8 @@ export const actions: Record<string, Handler> = {
   'asset.sighting': (env, actor, input) => recordSighting(env, actor, input),
   'asset.state': (env, actor, input) => declareState(env, actor, input),
   'meter.create': (env, actor, input) => addMeter(env, actor, input),
-  'meter.feed': (env, actor, input) => feedReading(env, actor, input),
+  // PM-002: a kept reading evaluates its meter's schedules at once.
+  'meter.feed': async (env, actor, input) => { const kept = await feedReading(env, actor, input); return { ...kept, created: await evaluateMeter(env, actor, kept.meter) } },
   'meter.adjust': (env, actor, input) => adjustMeter(env, actor, input),
   'meter.window': (env, actor, input) => setFeedWindow(env, actor, input),
   'code.set': (env, actor, input) => setCode(env, actor, input),
@@ -64,7 +65,7 @@ export const actions: Record<string, Handler> = {
   'workorder.merge': (env, actor, input) => merge(env, actor, input),
   'workorder.results': (env, actor, input) => recordResults(env, actor, input),
   'workorder.evidence': (env, actor, input) => addEvidence(env, actor, input),
-  'workorder.readings': (env, actor, input) => recordReadings(env, actor, input),
+  'workorder.readings': async (env, actor, input) => { const kept = await recordReadings(env, actor, input); const created = []; for (const meter of kept.meters) created.push(...await evaluateMeter(env, actor, meter)); return { id: kept.id, created } },
   'workorder.issue': (env, actor, input) => issue(env, actor, input),
   'workorder.return': (env, actor, input) => giveBack(env, actor, input),
   'downtime.start': (env, actor, input) => downtimeStart(env, actor, input),

@@ -700,6 +700,51 @@ try {
     assert.equal((await h.api(`assets/${ids.compressor}`, cookie.max)).meters.find(row => row.id === ids.runHours).feed_window_hours, 24)
   })
 
+  await check('PM-002 automatic meter and condition triggers', async () => {
+    // A blast freezer: a sustained-temperature trigger with hysteresis, a condition trigger and a counter that must meet its calendar.
+    const freezer = (await h.api('asset.create', cookie.lead, { tag: 'HK-040', name: 'Blast freezer', location: 'Cold prep', criticality: 'critical' })).id
+    const cabinet = (await h.api('meter.create', cookie.lead, { asset: freezer, name: 'Cabinet temperature', unit: '°C', kind: 'gauge' })).id
+    const warm = { asset: freezer, checklist: ids.checklist, title: 'Warm cabinet: check door and evaporator', meter: cabinet, when: 'above', threshold: '-15', sustainMinutes: '30', assignee: ids.max }
+    await h.api('schedule.create', cookie.lead, { ...warm, resetAt: '-10' }, 400)
+    const warmSchedule = (await h.api('schedule.create', cookie.lead, { ...warm, resetAt: '-17' })).id
+    const feed = { meter: cabinet, source: 'Cold room logger', unit: '°C' }
+    const send = async (value, minutes, extra = {}) => await h.api('meter.feed', cookie.lead, { ...feed, value, takenOn: ago(minutes), ...extra })
+    assert.deepEqual((await send('-16', 300)).created, [])
+    assert.deepEqual((await send('-14', 290)).created, [], 'above, but not yet for 30 minutes')
+    const repeated = await send('-14', 290)
+    assert.deepEqual([repeated.duplicate, repeated.created], [true, []], 'a repeated delivery is the reading already kept')
+    assert.deepEqual((await send('-10', 280, { quality: 'suspect' })).created, [])
+    assert.equal((await send('-12', 26 * 60)).quality, 'stale')
+    const fired = await send('-13', 260)
+    assert.equal(fired.created.length, 1, 'thirty minutes above the threshold raises one work order')
+    const warmOrder = await wo('max', fired.created[0].id)
+    assert.deepEqual([warmOrder.schedule_id, warmOrder.trigger.id, warmOrder.trigger.value, warmOrder.trigger.source], [warmSchedule, fired.id, '-13', 'Cold room logger'])
+    assert.deepEqual((await send('-12', 250)).created, [], 'one open order per trigger')
+    await h.api('workorder.cancel', cookie.lead, { workOrder: warmOrder.id, reason: 'Door was propped open during a delivery' })
+    assert.deepEqual((await send('-12', 240)).created, [], 'not re-armed until it is back at -17')
+    assert.deepEqual((await send('-18', 200)).created, [])
+    assert.deepEqual((await send('-14', 190)).created, [])
+    assert.deepEqual((await send('-13', 170)).created, [])
+    assert.equal((await send('-13', 150)).created.length, 1, 'recovered, then warm again for 40 minutes: a second order')
+    // A condition trigger fires from a reading taken on a work order, whoever takes it.
+    const seal = (await h.api('meter.create', cookie.lead, { asset: freezer, name: 'Door seal condition', unit: 'condition', kind: 'condition' })).id
+    await h.api('schedule.create', cookie.lead, { asset: freezer, checklist: ids.checklist, title: 'Replace door seal', meter: seal, conditions: ['good', 'fair', 'poor'] }, 400)
+    const sealSchedule = (await h.api('schedule.create', cookie.lead, { asset: freezer, checklist: ids.checklist, title: 'Replace door seal', meter: seal, conditions: ['poor'], assignee: ids.max })).id
+    const visit = (await h.api('workorder.create', cookie.lead, { asset: freezer, title: 'Weekly walk-round', due: addDays(today, 1), assignee: ids.max })).id
+    assert.deepEqual((await h.api('workorder.readings', cookie.max, { workOrder: visit, takenOn: ago(30), meter: [seal], value: ['fair'] })).created, [])
+    assert.deepEqual((await h.api('workorder.readings', cookie.max, { workOrder: visit, takenOn: ago(20), meter: [seal], value: ['poor'] })).created.map(row => row.schedule), [sealSchedule])
+    // A calendar and counter schedule that waits for both.
+    const hours = (await h.api('meter.create', cookie.lead, { asset: freezer, name: 'Compressor hours', unit: 'h', kind: 'counter' })).id
+    const both = (await h.api('schedule.create', cookie.lead, { asset: freezer, checklist: ids.checklist, title: 'Compressor service', everyDays: 30, firstDue: today, meter: hours, everyUnits: '500', firstDueMeter: '500', combine: 'both', assignee: ids.max })).id
+    assert.ok(!(await h.api('workorders.generate', cookie.lead, {})).created.some(row => row.schedule === both), 'the date alone is not enough')
+    const counter = { meter: hours, source: 'Cold room logger', unit: 'h' }
+    assert.deepEqual((await h.api('meter.feed', cookie.lead, { ...counter, value: '400', takenOn: ago(60) })).created, [])
+    assert.deepEqual((await h.api('meter.feed', cookie.lead, { ...counter, value: '510', takenOn: ago(30) })).created.map(row => [row.schedule, row.reason]), [[both, 'both']])
+    assert.ok((await h.api('schedules', cookie.lead)).some(row => row.id === warmSchedule && row.trigger_when === 'above' && row.sustain_minutes === 30))
+    const page = await (await h.raw(`/app/work/${warmOrder.id}`, { cookie: cookie.max })).text()
+    assert.ok(page.includes('Raised by reading'), 'the work order shows the reading that raised it')
+  })
+
   await check('ASSET-004 status, criticality and failure taxonomy', async () => {
     // A critical pump is degraded, then down; the outage is reclassified without rewriting the original entry.
     const pump = (await h.api('asset.create', cookie.lead, { tag: 'HK-030', name: 'Glycol pump', location: 'Plant room A', criticality: 'critical' })).id

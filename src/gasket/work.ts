@@ -162,7 +162,7 @@ export async function recordReadings(env: Bindings, actor: Actor, input: Input) 
   insist(takenOn <= localNow(actor.zone), 'reading_in_future')
   const meters = input.list('meter', { keepEmpty: true }), values = input.list('value', { keepEmpty: true })
   insist(meters.length === values.length && meters.length > 0, 'invalid_value')
-  const statements: D1PreparedStatement[] = [], recorded: { meter: string; value: string }[] = []
+  const statements: D1PreparedStatement[] = [], recorded: { meter: string; value: string }[] = [], read: string[] = []
   for (const [index, meterId] of meters.entries()) {
     const raw = values[index]
     if (!raw) continue
@@ -171,10 +171,11 @@ export async function recordReadings(env: Bindings, actor: Actor, input: Input) 
     const kept = await readingStatements(env, actor, meter, raw, { takenOn, workOrder: order.id, provenance: 'manual', source: null, quality: 'good' })
     statements.push(...kept.statements)
     recorded.push({ meter: meter.name, value: kept.value })
+    read.push(meter.id)
   }
   insist(recorded.length, 'invalid_value')
   await commit(env, [...touch(env, order), ...statements], { actor: actor.id, action: 'workorder.readings', subject: order.id, detail: { takenOn, recorded } })
-  return { id: order.id }
+  return { id: order.id, meters: read }
 }
 
 export async function issue(env: Bindings, actor: Actor, input: Input) {
@@ -284,8 +285,10 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     .map(({ detail, ...row }) => ({ ...row, ...JSON.parse(detail) }))
   const merged = await all(env, 'SELECT id, number, title FROM gk_work_orders WHERE merged_into = ? ORDER BY number', id)
   const origin = await correctionOrigin(env, id)
+  // PM-002: the reading that raised this preventive work, as evidence.
+  const trigger = order.trigger_reading_id ? await one(env, 'SELECT r.id, r.value, r.taken_on, r.provenance, r.source, r.quality, g.name AS meter, g.unit FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id WHERE r.id = ?', order.trigger_reading_id) : null
   const { items_json: _items, ...rest } = order
-  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
+  return { ...rest, trigger, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */
