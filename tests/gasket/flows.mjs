@@ -10,16 +10,16 @@ import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
 import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, workCsv } from './fixtures.mjs'
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
+import { now, zone } from './clock.mjs'
 
 const h = await harness()
 const check = async (id, run) => { await run(); console.log(`${id} passed`) }
-const zone = 'Australia/Sydney'
-const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(Date.now()).map(part => [part.type, part.value]))
+const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now()).map(part => [part.type, part.value]))
 const today = `${parts.year}-${parts.month}-${parts.day}`
 const addDays = (date, days) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10) }
 /** The site's wall clock N minutes ago, as a person would type it. */
 const localAt = instant => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(instant).map(part => [part.type, part.value])); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}` }
-const ago = minutes => localAt(Date.now() - minutes * 60_000)
+const ago = minutes => localAt(now() - minutes * 60_000)
 const ids = {}, cookie = {}
 const wo = async (who, id) => await h.api(`work/${id}`, cookie[who])
 
@@ -719,7 +719,7 @@ try {
     // A monthly PM saved through the schedule door; nobody presses Create due work orders.
     const monthly = (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: ids.checklist, title: 'Monthly fryer gas check', everyDays: 30, firstDue: addDays(today, 5), assignee: ids.max })).id
     const missed = (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: ids.checklist, title: 'Fryer thermostat calibration', everyDays: 90, firstDue: addDays(today, -2), assignee: ids.max })).id
-    const cron = '*/15 * * * *', minutes = n => Date.now() - n * 60_000
+    const cron = '*/15 * * * *', minutes = n => now() - n * 60_000
     const before = (await h.api('work', cookie.lead)).length
     // The site's lead time decides how far ahead calendar work is issued: three days leaves the monthly PM five days out.
     const place = { name: 'Harbour Kitchen Co', timezone: zone }
@@ -876,7 +876,7 @@ try {
   })
 
   await check('PM-006 overdue escalation and blocker chasing', async () => {
-    const cron = '*/15 * * * *', days = n => Date.now() + n * 86_400_000
+    const cron = '*/15 * * * *', days = n => now() + n * 86_400_000
     await h.api('chase.rule', cookie.max, { remindBeforeDays: 1, responseWithinDays: 1, leadAfterDays: 3, supervisorAfterDays: 3 }, 403)
     await h.api('chase.rule', cookie.lead, { remindBeforeDays: 1, responseWithinDays: 1, leadAfterDays: 3, supervisorAfterDays: 2 }, 400)
     await h.api('chase.rule', cookie.lead, { remindBeforeDays: 1, responseWithinDays: 1, leadAfterDays: 3, supervisorAfterDays: 3 })
@@ -1014,7 +1014,7 @@ try {
     const pump = (await h.api('asset.create', cookie.lead, { tag: 'HK-050', name: 'Brine chiller pump', location: 'Plant room B', criticality: 'critical' })).id
     const meter = (await h.api('meter.create', cookie.lead, { asset: pump, name: 'Run hours', unit: 'h', kind: 'counter', feedWindowHours: '168' })).id
     await h.api('code.set', cookie.lead, { kind: 'failure_mode', key: 'bearing', label: 'Bearing failure' })
-    const moment = minutes => { const instant = Math.floor((Date.now() - minutes * 60_000) / 60_000) * 60_000; return { local: localAt(instant), instant } }
+    const moment = minutes => { const instant = Math.floor((now() - minutes * 60_000) / 60_000) * 60_000; return { local: localAt(instant), instant } }
     const at = Object.fromEntries(Object.entries({ f1: 2700, f1End: 2640, r0: 2400, r1: 1500, f2: 1400, f2End: 1310, p: 1200, pEnd: 1080, f3: 600, f3End: 570, r2: 300 }).map(([key, minutes]) => [key, moment(minutes)]))
     for (const [key, value] of [['r0', '1000'], ['r1', '1020'], ['r2', '1045.5']]) await h.api('meter.feed', cookie.lead, { meter, source: 'Pump VFD', unit: 'h', value, takenOn: at[key].local })
     const repair = async title => (await h.api('workorder.create', cookie.lead, { asset: pump, title, due: today, assignee: ids.max })).id
@@ -1263,7 +1263,7 @@ try {
     const compressor = (await h.submit('asset.create', cookie.lead, { tag: 'CMP-7', name: 'Line A air compressor', location: 'Plant 2', criticality: 'normal', level: 'machine', parent: lineA }, '/app/assets/{id}')).pathname.split('/').pop()
     const motor = await add('CMP-7-M', 'Compressor motor', 'component', compressor), bearing = await add('CMP-7-MB', 'Motor bearing', 'component', motor)
     // The compressor and its motor were down at once for 30 of their 60 minutes each.
-    const base = Date.now(), at = minutes => localAt(base - minutes * 60_000)
+    const base = now(), at = minutes => localAt(base - minutes * 60_000)
     for (const [asset, from, to] of [[compressor, 300, 240], [motor, 270, 210]]) {
       const job = (await h.api('workorder.create', cookie.lead, { asset, title: 'Trip investigation', due: today, assignee: ids.max })).id
       await h.api('downtime.start', cookie.max, { workOrder: job, startedOn: at(from), reason: 'Tripped' })
@@ -1885,9 +1885,10 @@ try {
     const job = (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title: 'Cracked mounting bracket', due: today, assignee: ids.max })).id
     const sha = bytes => createHash('sha256').update(bytes).digest('hex')
     // Two timestamped photos, before and after the work, through the JSON door; a capture time ahead of now is refused.
-    await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'before', takenOn: localAt(Date.now() + 120 * 60_000) }, 400)
+    await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'before', takenOn: localAt(now() + 120 * 60_000) }, 400)
     await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'during' }, 400)
-    const before = (await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'before', takenOn: ago(40) })).evidence
+    const taken = ago(40)
+    const before = (await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'before', takenOn: taken })).evidence
     const after = (await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('after.png', png, 'image/png'), phase: 'after' })).evidence
     const report = (await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('weld-report.pdf', '%PDF-1.4 weld', 'application/pdf') })).evidence
     // Annotate the damage on both photos; a document, a reversed box and another maintainer are refused.
@@ -1899,7 +1900,7 @@ try {
     let order = await wo('max', job)
     const photo = id => order.evidence.find(row => row.id === id)
     assert.deepEqual([photo(before).phase, photo(before).taken_on, photo(before).door, photo(before).width, photo(after).phase, photo(after).taken_on, photo(report).phase],
-      ['before', ago(40), 'api', 1, 'after', null, null])
+      ['before', taken, 'api', 1, 'after', null, null])
     assert.deepEqual(photo(before).annotations.map(note => [note.shape, note.x1, note.y1, note.x2, note.y2, note.note, note.created_by]), [['box', 10, 20.5, 40, 60, 'Crack along the weld', 'Max Ortiz']])
     assert.deepEqual(photo(after).annotations.map(note => [note.shape, note.x2, note.note]), [['arrow', 55.25, 'New bracket, weld ground flush']])
     // A named customer and the technician sign version N; a signature for an earlier version is refused as stale.

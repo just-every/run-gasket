@@ -22,18 +22,26 @@ async function freePort() {
   return port
 }
 
-/** With `installation`, the Worker runs on that local installation's D1 (already migrated) and leaves it in place. */
-export async function emittedWorker(vars, { installation } = {}) {
+/**
+ * With `installation`, the Worker runs on that local installation's D1 (already migrated) and leaves it in place.
+ * With `offset` (ms), the Worker's clock runs that far from the machine's: an entry module replaces Date before the
+ * built Worker loads, so the test, not the hour it happens to run at, decides what day it is.
+ */
+export async function emittedWorker(vars, { installation, offset } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort(), origin = `https://127.0.0.1:${port}`
   const mails = []
   const bindings = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'false', MAIL_PROVIDER: 'resend', MAIL_FROM: 'Gasket <auth@example.test>', MAIL_API_KEY: 'test-only-key', ...vars }
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter(file => file.endsWith('.js')).map(file => `assets/${file}`)]
+    .map(file => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
+  if (offset !== undefined) modules.unshift(
+    { type: 'ESModule', path: join(root, 'dist/server/pinned-entry.mjs'), contents: `import './pinned-clock.mjs'\nexport * from './${config.main}'\nexport { default } from './${config.main}'\n` },
+    { type: 'ESModule', path: join(root, 'dist/server/pinned-clock.mjs'), contents: `const Real = Date, offset = ${offset}\nclass PinnedDate extends Real { constructor(...args) { super(...(args.length ? args : [Real.now() + offset])) } static now() { return Real.now() + offset } }\nglobalThis.Date = PinnedDate\n` })
   const mf = new Miniflare({
     ...convertV4MiniflareOptions({
       host: '127.0.0.1', port, https: true, modulesRoot: join(root, 'dist/server'),
-      modules: modules.map(file => ({ type: 'ESModule', path: join(root, 'dist/server', file) })),
+      modules,
       compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
       assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
       d1Databases: { DB: installation ? config.d1_databases[0].database_id : 'gasket-test' },
@@ -60,8 +68,8 @@ export async function emittedWorker(vars, { installation } = {}) {
 
   function worker() { return { origin, mails, request, scheduled, signInToken, close } }
 
-  /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms). */
-  async function scheduled(cron, at = Date.now()) {
+  /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
+  async function scheduled(cron, at = Date.now() + (offset ?? 0)) {
     return await (await mf.getWorker()).scheduled({ cron, scheduledTime: new Date(at) })
   }
 
