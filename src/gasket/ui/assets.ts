@@ -24,7 +24,7 @@ export async function assetsPage(env: Bindings, actor: Actor, url: URL) {
   const list = rows.length ? table(['Asset', 'Location', 'Custodian', 'Criticality', 'Status', 'Next due', 'Last sighting'], rows.map(row => {
     const [outcome, at] = (row.last_sighting ?? '').split('|')
     return [h`<span class="gk-with-art">${assetMark(row)}<span><a href="/app/assets/${row.id}">${row.name}</a><span class="gk-sub">${row.tag}${row.serial ? ` · ${row.serial}` : ''}${row.origin === 'import' ? ' · moved in' : ''}</span></span></span>`, row.location, row.custodian ?? '—',
-      row.criticality === 'normal' ? 'Normal' : row.criticality === 'important' ? 'Important' : 'Critical', tag(STATUS[row.status]), showDate(row.next_due),
+      row.criticality === 'normal' ? 'Normal' : row.criticality === 'important' ? 'Important' : 'Critical', h`${tag(STATUS[row.status])}${row.conflicts ? h`<span class="gk-sub">${tag('Evidence disagrees')}</span>` : ''}`, showDate(row.next_due),
       outcome ? h`${tag(outcome === 'found' ? 'Found' : outcome === 'elsewhere' ? 'Found elsewhere' : 'Missing')}<span class="gk-sub">${showInstant(Number(at), actor.zone)}</span>` : h`<span class="gk-muted">Never</span>`]
   }), 'Assets', { wrap: [1, 2] }) : h`<div class="gk-empty"><img src="/brand/assets/plinth.svg" alt="" width="360" height="244"><h2>No assets yet</h2><p>${manage ? 'Register the equipment you maintain below, or move in your MaintainX asset export.' : 'A maintenance lead registers the site\'s equipment.'}</p>${manage ? h`<p><a class="gk-button gk-secondary" href="/app/move-in">Move in from MaintainX</a></p>` : ''}</div>`
   const create = manage ? card('Register an asset', form('asset.create', '/app/assets/{id}', identityFields(), 'Register asset'), { id: 'register' }) : ''
@@ -43,6 +43,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
       meter.latest ? h`${meter.kind === 'condition' ? meter.latest.charAt(0).toUpperCase() + meter.latest.slice(1) : amount(meter.latest, meter.unit)}<span class="gk-sub">Taken ${showLocal(meter.latest_on)}</span>${meter.kind === 'counter' && meter.normalized !== meter.latest ? h`<span class="gk-sub">Total across counter changes ${amount(meter.normalized, meter.unit)}</span>` : ''}${meter.held ? h`<span class="gk-sub">${tag('Suspect')} ${meter.held} flagged reading${meter.held === 1 ? '' : 's'} held back</span>` : ''}` : '—']), 'Meters', { wrap: [0] }) : h`<p class="gk-muted">No meters yet.</p>`}
     ${manage ? form('meter.create', back, h`${hidden('asset', asset.id)}<div class="gk-grid">${field('Meter name', 'name', { hint: 'For example Run hours or Oil condition.' })}${field('Unit', 'unit', { hint: 'hrs, °F, psi, mi… use "condition" for good/fair/poor.' })}${select('Kind', 'kind', [{ value: 'counter', label: 'Counter (never goes down)' }, { value: 'gauge', label: 'Gauge (a measured value)' }, { value: 'condition', label: 'Condition (good, fair or poor)' }], 'counter')}</div>`, 'Add meter', { secondary: true }) : ''}`, { id: 'meters' })
   const readings = meterReadings(asset, manage, back)
+  const status = assetStates(asset, manage, back)
   const work = card('Work orders', orders.length ? table(['Work order', 'Due', 'Status'], orders.map(order => [h`<a href="/app/work/${order.id}"><span class="gk-nowrap">${woNumber(order.number)}</span> · ${order.title}</a>${order.checklist ? h`<span class="gk-sub">${order.checklist}, revision ${order.revision}</span>` : ''}`, showDate(order.due_date), tag(STATUS[order.status])]), 'Work orders', { wrap: [0] }) : h`<p class="gk-muted">No work orders yet.</p>`, { id: 'work' })
   const corrective = can(actor, 'work.assign') && !asset.retired_at ? card('Raise corrective work', form('workorder.create', '/app/work/{id}', h`${hidden('asset', asset.id)}${field('What needs doing', 'title')}${area('Details', 'description', { required: false })}<div class="gk-grid">${field('Due', 'due', { type: 'date', value: addDays(actor.today, 7) })}${select('Assign to', 'assignee', (await assignable(env)).map(person => ({ value: person.id, label: person.name })), '', { required: false, blank: 'Not yet' })}</div>`, 'Raise work order', { secondary: true }), { id: 'corrective' }) : ''
   const sightings = card('Sightings', h`${asset.sightings.length ? table(['Outcome', 'Seen at', 'Note'], asset.sightings.map((row: any) => [h`${tag(row.outcome === 'found' ? 'Found' : row.outcome === 'elsewhere' ? 'Found elsewhere' : 'Missing')}<span class="gk-sub">${showInstant(row.recorded_at, actor.zone)}</span>`, row.seen_location ?? '—', row.note ?? '']), 'Sightings', { wrap: [1, 2] }) : h`<p class="gk-muted">Not physically checked yet.</p>`}
@@ -52,7 +53,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(asset)}`, 'Save changes', { secondary: true })}
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
-  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${history}</div><div class="gk-col-side">${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
+  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${history}</div><div class="gk-col-side">${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
   return page(env, asset.name, actor, body, { url })
 }
 
@@ -77,4 +78,20 @@ function meterReadings(asset: any, manage: boolean, back: string) {
       ${field('When', 'effectiveOn', { type: 'datetime-local' })}${field('Last value on the old count', 'lastValue', { attrs: 'inputmode="decimal"' })}${field('New counter starts at', 'startValue', { value: '0', attrs: 'inputmode="decimal"' })}</div>${field('Reason', 'reason', { hint: 'Kept with the change; readings already kept are never rewritten.' })}`, 'Record counter change', { secondary: true }) : ''}
     ${rows.length ? form('meter.adjust', back, h`${hidden('kind', 'correction')}<div class="gk-grid">${select('Reading to correct', 'reading', rows.map(({ meter, row }: any) => ({ value: row.id, label: `${meter.name} ${row.value}, taken ${showLocal(row.taken_on)}` })))}${field('Correct value', 'value', { attrs: 'inputmode="decimal"' })}</div>${field('Reason', 'reason')}`, 'Correct reading', { secondary: true }) : ''}` : ''
   return card('Meter readings', h`${list}${history}${forms}`, { id: 'readings' })
+}
+
+const STATE_OPTIONS = [{ value: 'in_service', label: 'In service' }, { value: 'degraded', label: 'Degraded (running with a fault)' }, { value: 'down', label: 'Down (stopped by a failure)' }, { value: 'out_of_service', label: 'Out of service (taken out on purpose)' }]
+
+/** ASSET-004: the declared state's history with reasons and reclassifications, and where the evidence disagrees with it. */
+function assetStates(asset: any, manage: boolean, back: string) {
+  if (!asset.states.length && !manage) return ''
+  const conflicts = asset.conflicts.map((row: any) => row.kind === 'open_downtime'
+    ? h`<p>${tag('Evidence disagrees')} Declared ${STATUS[row.declared]}, but downtime has been open since ${showLocal(row.since)}: ${row.reason}.</p>`
+    : h`<p>${tag('Evidence disagrees')} Declared ${STATUS[row.declared]}, but ${row.source} shows ${row.meter} rising from ${amount(row.from, row.unit)} to ${amount(row.to, row.unit)} by ${showLocal(row.at)}.</p>`)
+  const list = asset.states.length ? table(['State', 'Effective', 'Reason'], asset.states.map((row: any) => [
+    h`${tag(STATUS[row.state])}${row.corrected_by ? h`<span class="gk-sub">Reclassified later</span>` : ''}${row.corrects ? h`<span class="gk-sub">Reclassifies an earlier entry</span>` : ''}`,
+    showLocal(row.effective_on), h`${row.reason}<span class="gk-sub">${row.recorded_by ?? ''}</span>`]), 'State history', { wrap: [2] }) : h`<p class="gk-muted">No state declared; it reads as in service unless downtime is open.</p>`
+  const change = manage ? form('asset.state', back, h`${hidden('asset', asset.id)}<div class="gk-grid">${select('State', 'state', STATE_OPTIONS)}${field('Effective from', 'effectiveOn', { type: 'datetime-local', required: false })}</div>
+    ${asset.states.length ? select('Reclassify an earlier entry', 'corrects', asset.states.map((row: any) => ({ value: row.id, label: `${STATUS[row.state]} from ${showLocal(row.effective_on)}` })), '', { required: false, blank: 'No, this is a new change' }) : ''}${field('Reason', 'reason')}`, 'Record state', { secondary: true }) : ''
+  return card('State', h`${conflicts}${list}${change}`, { id: 'state' })
 }

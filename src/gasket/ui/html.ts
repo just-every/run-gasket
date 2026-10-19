@@ -32,6 +32,7 @@ const ERRORS: Record<string, string> = {
   meter_went_backwards: 'a counter reading cannot be lower than an earlier one. Record the reset, replacement or rollover first.',
   readings_after_change: 'readings are already kept at or after that time. A counter change only follows the latest reading.',
   unit_mismatch: 'the reading is in a different unit from the meter.',
+  state_in_future: 'a state change cannot take effect in the future.',
   downtime_already_open: 'this asset already has open downtime.',
   downtime_overlaps: 'the asset was already down then. Start the downtime after the earlier one ended.',
   open_work_exists: 'this asset still has open work orders.',
@@ -95,8 +96,8 @@ export const amount = (value: unknown, unit: string) => `${showNumber(value)}\u0
 const TONES: Record<string, 'ok' | 'warn' | 'bad' | 'info'> = {
   pass: 'ok', 'in service': 'ok', closed: 'ok', approved: 'ok', found: 'ok', completed: 'ok', 'reviewed and closed': 'ok', active: 'ok',
   'in progress': 'info', submitted: 'info', 'waiting for review': 'info', medium: 'info', current: 'info',
-  open: 'warn', pending: 'warn', 'due today': 'warn', 'needs attention': 'warn', returned: 'warn', 'found elsewhere': 'warn', 'below minimum': 'warn', due: 'warn', suspect: 'warn', 'stale (late)': 'warn',
-  fail: 'bad', down: 'bad', overdue: 'bad', missing: 'bad', high: 'bad', cancelled: 'bad', rejected: 'bad', retired: 'bad', ended: 'bad',
+  open: 'warn', pending: 'warn', 'due today': 'warn', 'needs attention': 'warn', returned: 'warn', 'found elsewhere': 'warn', 'below minimum': 'warn', due: 'warn', suspect: 'warn', 'stale (late)': 'warn', degraded: 'warn', 'evidence disagrees': 'warn',
+  fail: 'bad', down: 'bad', overdue: 'bad', missing: 'bad', high: 'bad', cancelled: 'bad', rejected: 'bad', retired: 'bad', ended: 'bad', 'out of service': 'bad',
 }
 export const tag = (text: unknown) => { const tone = TONES[String(text ?? '').toLowerCase()]; return h`<span class="gk-tag${tone ? ` gk-tone-${tone}` : ''}">${text}</span>` }
 
@@ -108,7 +109,7 @@ export function card(heading: string, body: unknown, { id = '', extra = '' as un
 /** Exact machine facts kept out of the work view, in a keyboard-operable disclosure. */
 export const details = (facts: [string, unknown][]) => h`<details class="gk-details"><summary>Details</summary><dl>${facts.map(([key, value]) => h`<dt>${key}</dt><dd>${value}</dd>`)}</dl></details>`
 
-export const STATUS: Record<string, string> = { open: 'Open', in_progress: 'In progress', submitted: 'Waiting for review', returned: 'Returned', closed: 'Reviewed and closed', cancelled: 'Cancelled', in_service: 'In service', down: 'Down', retired: 'Retired' }
+export const STATUS: Record<string, string> = { open: 'Open', in_progress: 'In progress', submitted: 'Waiting for review', returned: 'Returned', closed: 'Reviewed and closed', cancelled: 'Cancelled', in_service: 'In service', degraded: 'Degraded', down: 'Down', out_of_service: 'Out of service', retired: 'Retired' }
 export const OUTCOME: Record<string, string> = { pass: 'Pass', fail: 'Fail', attention: 'Needs attention' }
 /** The asset beside its name in a list: its copper line drawing (decorative; the name is the label). */
 export const assetMark = (asset: { name: string; category?: string | null }) => machine(asset)

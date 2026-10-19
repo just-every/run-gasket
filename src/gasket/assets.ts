@@ -6,6 +6,7 @@ import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import type { Input } from './input'
 import { meterView } from './meters'
+import { DECLARED_STATE, stateConflicts, stateHistory } from './states'
 
 const CRITICALITY = ['normal', 'important', 'critical']
 export const METER_KINDS = ['counter', 'gauge', 'condition']
@@ -26,8 +27,8 @@ function identity(input: Input) {
   return value
 }
 
-/** Status is derived: retired, down (an open downtime) or in service. */
-export const ASSET_STATUS = `CASE WHEN a.retired_at IS NOT NULL THEN 'retired' WHEN EXISTS(SELECT 1 FROM gk_downtime d WHERE d.asset_id = a.id AND d.ended_on IS NULL) THEN 'down' ELSE 'in_service' END`
+/** Status: retired, down while downtime is open, otherwise the declared state (ASSET-004), in service by default. */
+export const ASSET_STATUS = `CASE WHEN a.retired_at IS NOT NULL THEN 'retired' WHEN EXISTS(SELECT 1 FROM gk_downtime d WHERE d.asset_id = a.id AND d.ended_on IS NULL) THEN 'down' ELSE COALESCE(${DECLARED_STATE}, 'in_service') END`
 
 export async function createAsset(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'register.manage')
@@ -96,10 +97,13 @@ export async function recordSighting(env: Bindings, actor: Actor, input: Input) 
 }
 
 export async function assetList(env: Bindings, _actor: Actor) {
-  return await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, a.origin, ${ASSET_STATUS} AS status,
+  const rows = await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, a.origin, ${ASSET_STATUS} AS status,
     (SELECT s.outcome || '|' || s.recorded_at FROM gk_sightings s WHERE s.asset_id = a.id ORDER BY s.recorded_at DESC LIMIT 1) AS last_sighting,
     (SELECT MIN(w.due_date) FROM gk_work_orders w WHERE w.asset_id = a.id AND w.status NOT IN ('closed', 'cancelled')) AS next_due
     FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)
+  // Where a declared state disagrees with open downtime or a feed counter, the register says so.
+  const declared = new Set((await all(env, 'SELECT DISTINCT asset_id FROM gk_asset_states')).map(row => row.asset_id))
+  return await Promise.all(rows.map(async row => ({ ...row, conflicts: declared.has(row.id) ? (await stateConflicts(env, { id: row.id, retired_at: row.status === 'retired' ? 1 : null }, await stateHistory(env, row.id))).length : 0 })))
 }
 
 export async function assetDetail(env: Bindings, actor: Actor, id: string) {
@@ -110,5 +114,6 @@ export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const versions = await all(env, 'SELECT revision, value_json, changed_by, changed_at FROM gk_asset_versions WHERE asset_id = ? ORDER BY revision DESC', id)
   const sightings = await all(env, 'SELECT outcome, seen_location, note, recorded_by, recorded_at FROM gk_sightings WHERE asset_id = ? ORDER BY recorded_at DESC', id)
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
-  return { ...asset, meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
+  const states = await stateHistory(env, id)
+  return { ...asset, states, conflicts: await stateConflicts(env, asset, states), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
 }

@@ -9,6 +9,7 @@ import { bulk, merge, reopen, skipOccurrence } from './control'
 import { acknowledge, setRule } from './corrections'
 import type { Input } from './input'
 import { adjustMeter, feedReading } from './meters'
+import { declareState } from './states'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
 import { decide, prepare } from './proposals'
@@ -28,6 +29,7 @@ export const actions: Record<string, Handler> = {
   'asset.update': (env, actor, input) => updateAsset(env, actor, input),
   'asset.retire': (env, actor, input) => retireAsset(env, actor, input),
   'asset.sighting': (env, actor, input) => recordSighting(env, actor, input),
+  'asset.state': (env, actor, input) => declareState(env, actor, input),
   'meter.create': (env, actor, input) => addMeter(env, actor, input),
   'meter.feed': (env, actor, input) => feedReading(env, actor, input),
   'meter.adjust': (env, actor, input) => adjustMeter(env, actor, input),

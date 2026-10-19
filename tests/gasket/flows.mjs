@@ -598,6 +598,45 @@ try {
     assert.ok(history.some(what => /counter replacement/.test(what)) && history.some(what => /corrected to 72/.test(what)) && history.some(what => /feed: Bakery PLC gateway, stale/.test(what)), 'the history explains each change')
   })
 
+  await check('ASSET-004 effective status history and disagreeing evidence', async () => {
+    // A critical pump is degraded, then down; the outage is reclassified without rewriting the original entry.
+    const pump = (await h.api('asset.create', cookie.lead, { tag: 'HK-030', name: 'Glycol pump', location: 'Plant room A', criticality: 'critical' })).id
+    const hours = (await h.api('meter.create', cookie.lead, { asset: pump, name: 'Pump hours', unit: 'h', kind: 'counter' })).id
+    const feed = { meter: hours, source: 'Plant room BMS', unit: 'h' }
+    await h.api('meter.feed', cookie.lead, { ...feed, value: '100', takenOn: ago(150) })
+    const state = { asset: pump, state: 'degraded', effectiveOn: ago(180), reason: 'Seal weeping glycol' }
+    await h.api('asset.state', cookie.lead, { ...state, reason: '' }, 400)
+    await h.api('asset.state', cookie.max, state, 403)
+    await h.api('asset.state', cookie.lead, { ...state, state: 'broken' }, 400)
+    await h.api('asset.state', cookie.lead, { ...state, effectiveOn: `${addDays(today, 1)}T08:00` }, 400)
+    await h.api('asset.state', cookie.lead, state)
+    const down = (await h.api('asset.state', cookie.lead, { asset: pump, state: 'down', effectiveOn: ago(120), reason: 'Pump stopped: seal failed' })).id
+    assert.equal((await h.api('assets', cookie.max)).find(row => row.id === pump).status, 'down')
+    await h.api('asset.state', cookie.lead, { asset: ids.compressor, state: 'in_service', corrects: down, reason: 'Wrong asset' }, 404)
+    await h.api('asset.state', cookie.lead, { asset: pump, state: 'out_of_service', corrects: down, reason: 'Locked out for a planned seal swap, not a breakdown' })
+    let asset = await h.api(`assets/${pump}`, cookie.sam)
+    assert.equal(asset.status, 'out_of_service')
+    assert.deepEqual(asset.states.map(row => [row.state, row.effective_on === (row.state === 'degraded' ? state.effectiveOn : asset.states[0].effective_on), Boolean(row.corrected_by), Boolean(row.corrects)]),
+      [['out_of_service', true, false, true], ['down', true, true, false], ['degraded', true, false, false]], 'the original outage stays, reclassified at its own effective time')
+    assert.deepEqual(asset.conflicts, [])
+    // The building feed shows the pump still running while it is declared out of service: the disagreement is visible.
+    await h.api('meter.feed', cookie.lead, { ...feed, value: '112', takenOn: ago(30) })
+    asset = await h.api(`assets/${pump}`, cookie.sam)
+    assert.deepEqual(asset.conflicts.map(row => [row.kind, row.declared, row.from, row.to, row.source]), [['telemetry_running', 'out_of_service', '100', '112', 'Plant room BMS']])
+    // Declared back in service while a work order's downtime is still open: open downtime wins, and the disagreement shows.
+    const repair = (await h.api('workorder.create', cookie.lead, { asset: pump, title: 'Replace pump seal', due: addDays(today, 2), assignee: ids.max })).id
+    await h.api('downtime.start', cookie.max, { workOrder: repair, startedOn: ago(25), reason: 'Seal replacement' })
+    await h.api('asset.state', cookie.lead, { asset: pump, state: 'in_service', effectiveOn: ago(10), reason: 'Seal replaced' })
+    const listed = (await h.api('assets', cookie.sam)).find(row => row.id === pump)
+    assert.deepEqual([listed.status, listed.conflicts], ['down', 1])
+    assert.deepEqual((await h.api(`assets/${pump}`, cookie.sam)).conflicts.map(row => [row.kind, row.declared]), [['open_downtime', 'in_service']])
+    const page = await (await h.raw(`/app/assets/${pump}`, { cookie: cookie.lead })).text()
+    for (const text of ['Evidence disagrees', 'Reclassified later', 'Locked out for a planned seal swap, not a breakdown', 'Pump stopped: seal failed']) assert.ok(page.includes(text), text)
+    assert.ok((await h.api(`assets/${pump}/history`, cookie.sam)).events.some(event => /Reclassified down as out of service/.test(event.what)))
+    await h.api('downtime.end', cookie.max, { workOrder: repair, endedOn: ago(5) })
+    assert.deepEqual((await h.api(`assets/${pump}`, cookie.sam)).conflicts, [])
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
