@@ -27,6 +27,8 @@ import { importJobs } from './movein/maintainx'
 import { partDetail, partList } from './parts'
 import { reconciliation } from './valuation'
 import { countDetail, countList } from './counts'
+import { purchasing, requisitionDetail } from './requisitions'
+import { supplierDetail } from './suppliers'
 import { storesReport } from './stores'
 import { proposalList } from './proposals'
 import { scheduleList } from './schedules'
@@ -37,6 +39,9 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  purchasing: env => purchasing(env),
+  supplier: (env, _actor, id) => supplierDetail(env, id),
+  requisition: (env, _actor, id) => requisitionDetail(env, id),
   me: async (_env, actor) => ({ id: actor.id, email: actor.email, name: actor.name, role: actor.role, today: actor.today, zone: actor.zone }),
   site: env => site(env),
   members: async (env, actor) => { requireCapability(actor, 'site.manage'); return await members(env) },

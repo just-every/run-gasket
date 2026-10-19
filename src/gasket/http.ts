@@ -26,6 +26,7 @@ import { page } from './ui/shell'
 import { moveInPage, previewPage } from './ui/movein'
 import { partPage, partsPage } from './ui/parts'
 import { countPage } from './ui/counts'
+import { purchasingPage, supplierPage, requisitionPage } from './ui/purchasing'
 import { storesPage } from './ui/stores'
 import { storesMovementsCsv } from './stores'
 import { proposalsPage } from './ui/proposals'
@@ -125,6 +126,9 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  purchasing: (env, actor, url) => purchasingPage(env, actor, url),
+  supplier: (env, actor, url, id) => supplierPage(env, actor, id, url),
+  requisition: (env, actor, url, id) => requisitionPage(env, actor, id, url),
   work: (env, actor, url) => workPage(env, actor, url),
   workOrder: (env, actor, url, id) => workOrderPage(env, actor, id, url),
   evidence: (env, actor, _url, id) => evidenceFile(env, actor, id),

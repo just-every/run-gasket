@@ -202,7 +202,7 @@ The scheduler's existing fixed-calendar and approval-reading meter cadence remai
 
 ### Maintenance purchasing and external work
 
-- **BUY-001 — Vendor records and maintenance requisitions.** Buyers manage US supplier contacts, ship-to addresses, tax treatment, payment terms, lead times, catalogs and active status. Technicians/planners request parts, services or repairs linked to work/asset/cost center, with an accountable purchaser and visible approval state. **Acceptance evidence:** Create a supplier and a technician requisition for bearings plus contractor labor, link the asset and cost center, and inspect the buyer queue. Disable the supplier and try to place new work against it.
+- **BUY-001 — Vendor records and maintenance requisitions.** Buyers manage US supplier contacts, ship-to addresses, tax treatment, payment terms, lead times, catalogs and active status. Technicians/planners request parts, services or repairs linked to work/asset/cost center, with an accountable purchaser and visible approval state. Exactly: until ADMIN-003 supplies the buyer role, the owner acts as buyer and manages suppliers, catalog entries and cost centers; the owner, leads and maintainers submit requisitions, and existing internal members read the purchasing queue and supplier records. A supplier keeps its named contact, email and phone, US ship-to street/city/state/ZIP, recorded sales-tax, buyer use-tax or exemption treatment (an exemption needs its basis), payment terms, lead time in whole calendar days and active status. Catalog SKUs name a part, service or external repair, its unit and an optional quoted USD price in whole cents; an unknown price stays unknown. Supplier edits use numbered revisions and keep attributed before/after facts in audit. A requisition names an active supplier, active cost center and active owner as accountable purchaser, has part/service/repair lines with positive quantities exact to three decimals, and may link work, an asset, or both (then the work must belong to that asset); work supplies its asset when no asset is given. It keeps the supplier facts it requested against and shows Pending approval: it neither authorizes spend, sends an order nor receives stock. Disabling a supplier refuses new requisitions while retaining earlier ones. Done covers the current single site, roles and requisition door: ADMIN-002 adds site scope, ADMIN-003 buyer and purchasing rights, BUY-002 orders, BUY-003 independent spend approval and BUY-007 new external repair work, each inheriting active-supplier refusal for new purchasing before it ships. **Acceptance evidence:** Create a supplier and a technician requisition for bearings plus contractor labor, link the asset and cost center, and inspect the buyer queue. Disable the supplier and try to place new work against it.
 
 - **BUY-002 — Quotes and numbered purchase orders.** Buyers compare vendor quotations and draft sequentially numbered POs with quantities, units, USD prices, freight, US sales/use-tax fields, delivery dates, work/asset links and attachments. Sending records the exact approved revision and vendor acknowledgment separately. **Acceptance evidence:** Compare two quotes, draft a mixed parts/service PO, approve and send through vendor email, then revise quantity. Inspect numbered versions, totals, linked work and the requirement to reapprove changed spend.
 
@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001, PM-006, PLAN-002, REPORT-004, REPORT-003, PART-002, ASSET-006, PLAN-006, ASSET-001, REPORT-002, REPORT-005, PLAN-001, FIELD-009, FIELD-007, ASSET-007, FIELD-004, ASSET-008, FIELD-005, ASSET-003, PART-007, PART-004 and PART-009 were re-judged on 19 and 20 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001, PM-006, PLAN-002, REPORT-004, REPORT-003, PART-002, ASSET-006, PLAN-006, ASSET-001, REPORT-002, REPORT-005, PLAN-001, FIELD-009, FIELD-007, ASSET-007, FIELD-004, ASSET-008, FIELD-005, ASSET-003, PART-007, PART-004, PART-009 and BUY-001 were re-judged on 19 and 20 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 28 | 25 | 69 | 122 |
-| All | 42 | 25 | 69 | 136 |
+| Target and push further | 29 | 25 | 68 | 122 |
+| All | 43 | 25 | 68 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -446,7 +446,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `PART-007` | Inventory valuation and transaction history | target | done | `src/gasket/valuation.ts`; `src/gasket/parts.ts`; `src/gasket/work.ts`; `src/gasket/history.ts`; `src/gasket/ui/parts.ts`; `src/gasket/ui/work.ts`; `migrations/core/0053_part_valuation.sql`; `tests/gasket/flows.mjs` |  |
 | `PART-008` | Supplier catalogs and duplicate part control | target | missing |  | No supplier catalogs, pack conversions, aliases or duplicate-merge workflow. |
 | `PART-009` | Stock performance and inventory history | target | done | `src/gasket/stores.ts`; `src/gasket/ui/stores.ts`; `src/gasket/valuation.ts`; `src/gasket/counts.ts`; `tests/gasket/flows.mjs` |  |
-| `BUY-001` | Vendor records and maintenance requisitions | target | missing |  | No vendor master, requisitions, cost centers or purchasing queue. |
+| `BUY-001` | Vendor records and maintenance requisitions | target | done | `src/gasket/suppliers.ts`; `src/gasket/requisitions.ts`; `src/gasket/ui/purchasing.ts`; `tests/gasket/purchasing.mjs`; `tests/gasket/flows.mjs` |  |
 | `BUY-002` | Quotes and numbered purchase orders | target | missing |  | No quote comparison, PO records, numbering or vendor-send lifecycle. |
 | `BUY-003` | Spend approval and purchasing separation | target | missing |  | No purchase approval matrix, budgets, delegation or approved-spend guard. |
 | `BUY-004` | Partial receiving, inspection and returns | target | missing |  | No PO receiving, backorder, inspection or return-to-vendor workflow. |

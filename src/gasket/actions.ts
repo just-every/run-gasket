@@ -33,6 +33,8 @@ import { decideCountLine, planCount, setCountApproval, submitCount } from './cou
 import { decide, prepare } from './proposals'
 import { exceptStep, review, submit } from './review'
 import { createRoute, issueRoute, missStop, signRun } from './routes'
+import { saveSupplier, saveCatalogItem, saveCostCenter } from './suppliers'
+import { requestPurchase } from './requisitions'
 import { createCalibration } from './calibration'
 import { recordTool } from './tools'
 import { annotate } from './annotations'
@@ -45,6 +47,10 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'supplier.save': (env, actor, input) => saveSupplier(env, actor, input),
+  'supplier.catalog': (env, actor, input) => saveCatalogItem(env, actor, input),
+  'costcenter.save': (env, actor, input) => saveCostCenter(env, actor, input),
+  'requisition.request': (env, actor, input) => requestPurchase(env, actor, input),
   'site.configure': (env, actor, input) => configureSite(env, actor, input),
   'site.technicianWork': (env, actor, input) => setTechnicianWork(env, actor, input),
   'access.give': (env, actor, input, request) => giveAccess(env, actor, input, request),
