@@ -4,7 +4,17 @@ The person a work order is assigned to records the work on its page. Every chang
 
 ## Checklist results
 
-For each item, choose **Pass**, **Needs attention** or **Fail** and add a note, then press **Save results**. You can save part of the list and come back.
+For each step, give the answer it asks for and add a note, then press **Save results**. You can save part of the list and come back.
+
+- A check: choose **Pass**, **Needs attention** or **Fail**.
+- A reading: enter the number in the unit shown. Inside its limits (the limits count as inside) it passes; outside them it fails. When the step names a meter, the number is also kept as that meter's reading.
+- A choice: pick one of the options; some options count as a fail.
+- Text: write the answer.
+- A photo: attach an image under **Inspection evidence**, choosing the step.
+
+Some steps appear only after an earlier step has a given answer, such as a photo when a temperature is outside its limits. A step that does not apply says so and needs nothing.
+
+A reading outside its limits needs a finding on that step with **Needs follow-up work** ticked before you can submit; a failed check or choice needs a finding on its step. A supervisor who did none of the work can grant an exception on a step with a reason, and that step then holds nothing up.
 
 ## Photos and documents
 

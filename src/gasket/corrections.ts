@@ -9,6 +9,7 @@ import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { NEXT_NUMBER, all, commit, guard, insist, newId, now, one, stmt, type Audit, type Row } from './core'
 import { addDays } from './dates'
+import { stepSummary, type ChecklistItem } from './steps'
 import type { Input } from './input'
 
 const OUTCOMES = ['fail', 'attention']
@@ -37,19 +38,21 @@ export async function rules(env: Bindings, checklistId: string): Promise<(Row & 
 }
 
 /** Statements and audit entries raising a correction for each recorded result the checklist's rule covers and no finding answers yet. */
-export async function correctionStatements(env: Bindings, actor: Actor, order: Row, recorded: { item: number; outcome: string; note: string | null }[]) {
+export async function correctionStatements(env: Bindings, actor: Actor, order: Row, recorded: { item: number; outcome: string; value?: string; note: string | null }[]) {
   const statements: D1PreparedStatement[] = [], audits: Audit[] = []
   const revision = await one(env, 'SELECT checklist_id, items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id)
   const rule = await one(env, 'SELECT * FROM gk_failure_rules WHERE checklist_id = ? ORDER BY number DESC LIMIT 1', revision!.checklist_id)
   if (!rule?.active) return { statements, audits }
-  const items = JSON.parse(revision!.items_json) as { text: string }[]
+  const items = JSON.parse(revision!.items_json) as ChecklistItem[]
   const answered = new Set((await all(env, 'SELECT item FROM gk_findings WHERE work_order_id = ? AND item IS NOT NULL', order.id)).map(row => row.item))
   const covered = recorded.filter(row => rule.outcomes.split(',').includes(row.outcome) && !answered.has(row.item))
   if (!covered.length) return { statements, audits }
   const readings = await all(env, 'SELECT g.name, g.unit, r.value, r.taken_on FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id WHERE r.work_order_id = ? ORDER BY r.taken_on, g.name', order.id)
   const evidence = await all(env, 'SELECT filename, sha256 FROM gk_evidence WHERE work_order_id = ? ORDER BY uploaded_at', order.id)
   for (const row of covered) {
-    const what = `Step ${row.item + 1} (${items[row.item].text}) ${row.outcome === 'fail' ? 'failed' : 'needs attention'}${row.note ? `: ${row.note}` : ''}`
+    // FIELD-004: a number outside its limits says the value it read and the limits it missed.
+    const step = items[row.item], read = step.kind === 'number' ? ` at ${row.value} ${step.unit}, outside its limits (${stepSummary(step, items).split('; ')[0]})` : step.kind === 'option' ? `: ${row.value}` : ''
+    const what = `Step ${row.item + 1} (${step.text}) ${row.outcome === 'fail' ? 'failed' : 'needs attention'}${read}${row.note ? `: ${row.note}` : ''}`
     const description = [what, ...readings.map(reading => `Reading: ${reading.name} ${reading.value}${reading.unit && reading.unit !== 'condition' ? ` ${reading.unit}` : ''}, taken ${reading.taken_on.replace('T', ' ')}`),
       ...evidence.map(file => `Evidence: ${file.filename} (SHA-256 ${file.sha256})`)].join('\n')
     const finding = newId(), correction = newId(), due = addDays(actor.today, rule.due_days)

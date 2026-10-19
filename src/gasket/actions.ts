@@ -28,7 +28,7 @@ import { reviseBom } from './bom'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
 import { decide, prepare } from './proposals'
-import { review, submit } from './review'
+import { exceptStep, review, submit } from './review'
 import { createSchedule, evaluateMeter, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole, setTechnicianWork } from './site'
 import { retireField, saveField, saveStatus, setFieldValue, setWaiting } from './work-fields'
@@ -120,6 +120,7 @@ export const actions: Record<string, Handler> = {
   'finding.record': (env, actor, input) => recordFinding(env, actor, input),
   'workorder.submit': (env, actor, input) => submit(env, actor, input),
   'workorder.review': (env, actor, input) => review(env, actor, input),
+  'step.except': (env, actor, input) => exceptStep(env, actor, input),
   'proposal.prepare': (env, actor, input) => prepare(env, actor, input),
   'proposal.decide': (env, actor, input) => decide(env, actor, input),
   'import.preview': (env, actor, input) => previewImport(env, actor, input),

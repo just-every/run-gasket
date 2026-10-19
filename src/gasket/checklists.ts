@@ -5,14 +5,15 @@ import { requireCapability, type Actor } from './actor'
 import { all, commit, insist, newId, now, one, stmt } from './core'
 import { rules } from './corrections'
 import type { Input } from './input'
+import { parseSteps, type ChecklistItem } from './steps'
 
-export interface ChecklistItem { text: string }
+export type { ChecklistItem }
 
-function items(input: Input): ChecklistItem[] {
+/** FIELD-004: one typed step per line (steps.ts), keeping the identities of the revision it replaces. */
+function items(input: Input, previous: ChecklistItem[] = []): ChecklistItem[] {
   const lines = input.list('items').flatMap(item => item.split(/\r?\n/)).map(item => item.trim()).filter(Boolean)
-  insist(lines.length >= 1 && lines.length <= 60, 'invalid_items')
-  insist(lines.every(line => line.length <= 300), 'invalid_items')
-  return lines.map(text => ({ text }))
+  insist(lines.every(line => line.length <= 600), 'invalid_items')
+  return parseSteps(lines, previous)
 }
 
 export async function createChecklist(env: Bindings, actor: Actor, input: Input) {
@@ -29,8 +30,9 @@ export async function reviseChecklist(env: Bindings, actor: Actor, input: Input)
   requireCapability(actor, 'register.manage')
   const checklist = await one(env, 'SELECT id FROM gk_checklists WHERE id = ?', input.text('checklist', { max: 100 }))
   insist(checklist, 'checklist_not_found', 404)
-  const list = items(input), note = input.text('note', { max: 300 }), revision = newId()
-  const number = (await one<{ n: number }>(env, 'SELECT MAX(number) AS n FROM gk_checklist_revisions WHERE checklist_id = ?', checklist.id))!.n + 1
+  const latest = (await one<{ number: number; items_json: string }>(env, 'SELECT number, items_json FROM gk_checklist_revisions WHERE checklist_id = ? ORDER BY number DESC LIMIT 1', checklist.id))!
+  const list = items(input, JSON.parse(latest.items_json)), note = input.text('note', { max: 300 }), revision = newId()
+  const number = latest.number + 1
   await commit(env, [stmt(env, 'INSERT INTO gk_checklist_revisions (id, checklist_id, number, items_json, note, published_by, published_at) VALUES (?, ?, ?, ?, ?, ?, ?)', revision, checklist.id, number, JSON.stringify(list), note, actor.id, now())],
     { actor: actor.id, action: 'checklist.revise', subject: checklist.id, detail: { number, items: list.length, note } })
   return { id: checklist.id, revision, number }

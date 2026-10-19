@@ -1715,6 +1715,75 @@ try {
     for (const text of ['HK-101', '2021-03-01', '18500.00', 'Coastal Catering Supply', '24000.00', 'Polar Service Co PSC-118', '1800.00/yr', '3180.00', '270', 'yes', 'sold', '1200.00']) assert.ok(row.includes(text), text)
   })
 
+  await check('FIELD-004 typed checklists and required evidence', async () => {
+    // A lead publishes a typed checklist through the form door: a check, a temperature with limits that applies only
+    // when the check passes and is kept as the meter reading, a photo that applies only when the temperature fails,
+    // an option that fails on one answer, and text.
+    const freezer = (await h.api('asset.create', cookie.lead, { tag: 'HK-070', name: 'Reach-in freezer', location: 'Cold prep' })).id
+    await h.api('meter.create', cookie.lead, { asset: freezer, name: 'Cabinet temperature', unit: '°C', kind: 'gauge' })
+    for (const bad of ['Temperature | number', 'Seal | when step 9 is pass', 'Frost | options none, heavy | fail on thick', 'Seal | photo | text'])
+      assert.equal((await h.api('checklist.create', cookie.lead, { name: 'Bad steps', items: ['Door closes', bad] }, 400)).error, 'invalid_step', bad)
+    const lines = ['Unit running and door seals intact', 'Cabinet temperature | number °C -25..-18 | when step 1 is pass | meter Cabinet temperature', 'Photo of the controller display | photo | when step 2 is fail',
+      'Frost on the evaporator | options none, light, heavy | fail on heavy', 'Anything else to report | text']
+    const list = (await h.submit('checklist.create', cookie.lead, { name: 'Freezer temperature check', items: lines.join('\n') }, '/app/checklists/{id}')).pathname.split('/').pop()
+    await h.submit('template.save', cookie.lead, { name: 'Freezer check', title: 'Check the reach-in freezer', priority: 'normal', checklist: list }, '/app/templates')
+    const template = (await h.api('templates', cookie.lead)).find(row => row.name === 'Freezer check')
+    const job = (await h.api('workorder.create', cookie.lead, { asset: freezer, template: template.id, due: today, assignee: ids.max })).id
+    const issued = await wo('max', job)
+    assert.deepEqual(issued.items.map(item => [item.kind, item.applies]), [['check', true], ['number', false], ['photo', false], ['option', true], ['text', true]])
+    assert.deepEqual([issued.items[1].unit, issued.items[1].min, issued.items[1].max], ['°C', '-25', '-18'])
+    const keys = issued.items.map(item => item.key)
+    // A conditional step is refused until the step it names has its answer; a number's outcome comes from its value.
+    const only = (index, value) => Array.from({ length: 5 }, (_, item) => item === index ? value : '')
+    assert.equal((await h.api('workorder.results', cookie.max, { workOrder: job, value: only(1, '-20') }, 409)).error, 'step_not_applicable')
+    assert.equal((await h.api('workorder.results', cookie.max, { workOrder: job, outcome: only(0, 'pass'), value: only(0, '1') }, 400)).error, 'invalid_outcome')
+    assert.equal((await h.api('workorder.results', cookie.max, { workOrder: job, value: only(3, 'thick') }, 400)).error, 'invalid_value')
+    // On the phone's web workspace: the temperature field appears once the check passes, and a reading of -12 °C fails its limit.
+    await h.submit('workorder.results', cookie.max, { workOrder: job, version: issued.version, 'outcome-0': 'pass' }, `/app/work/${job}`)
+    const phone = (await (await h.raw(`/app/work/${job}`, { cookie: cookie.max })).text())
+    for (const text of ['Reading (°C)', 'name="value-1"', 'Number in °C, -25 to -18', 'Not needed now: only when step 2 is outside its limits']) assert.ok(phone.includes(text), text)
+    assert.equal((await h.submit('workorder.results', cookie.max, { workOrder: job, version: (await wo('max', job)).version, 'value-1': '-12', 'note-1': 'Door found ajar', 'value-3': 'light' }, `/app/work/${job}`)).searchParams.get('error'), null)
+    const failed = await wo('max', job)
+    assert.deepEqual([failed.items[1].result.outcome, failed.items[1].result.value, failed.items[2].applies, failed.items[3].result.outcome], ['fail', '-12', true, 'pass'])
+    assert.ok(failed.readings.some(row => row.meter === 'Cabinet temperature' && row.value === '-12'), 'the step kept the meter reading')
+    // Submission is blocked through both doors: the photo is missing, the failed limit has no follow-up and the text has no answer.
+    const blocked = await h.api('workorder.submit', cookie.max, { workOrder: job, version: failed.version }, 409)
+    assert.equal(blocked.error, 'not_ready_for_review')
+    assert.deepEqual(failed.missing, ['1 checklist item without a result', 'step 2 (Cabinet temperature) is outside its limits and needs a linked finding with follow-up work', 'step 3 (Photo of the controller display) needs a photo'])
+    assert.equal((await h.submit('workorder.submit', cookie.max, { workOrder: job, version: failed.version }, `/app/work/${job}`)).searchParams.get('error'), 'not_ready_for_review')
+    // The photo step takes an image attached to it; a document is refused.
+    assert.equal((await h.api('workorder.evidence', cookie.max, { workOrder: job, item: 2, file: file('display.pdf', '%PDF-1.4', 'application/pdf') }, 400)).error, 'photo_required')
+    await h.api('workorder.evidence', cookie.max, { workOrder: job, item: 2, file: file('display.png', png, 'image/png') })
+    // A finding without follow-up does not answer a failed limit; one with follow-up work does, and links it.
+    await h.api('finding.record', cookie.max, { workOrder: job, item: 1, severity: 'medium', text: 'Cabinet at -12 °C after the door was left ajar' })
+    assert.match((await wo('max', job)).missing.join('\n'), /step 2 .*outside its limits/)
+    const linked = await h.api('finding.record', cookie.max, { workOrder: job, item: 1, severity: 'high', text: 'Check the door closer and the defrost cycle', followUp: true })
+    assert.deepEqual((await wo('max', job)).missing, ['1 checklist item without a result'])
+    // A supervisor who did none of the work excepts the text step, with a reason; the assignee cannot.
+    assert.equal((await h.api('step.except', cookie.max, { workOrder: job, item: 4, reason: 'x' }, 403)).error, 'forbidden')
+    assert.equal((await h.api('step.except', cookie.sam, { workOrder: job, item: 4 }, 400)).error, 'missing_reason')
+    await h.api('step.except', cookie.sam, { workOrder: job, item: 4, reason: 'Nothing else to report on a sealed unit' })
+    assert.equal((await h.api('step.except', cookie.sam, { workOrder: job, item: 4, reason: 'Again' }, 409)).error, 'already_excepted')
+    const ready = await wo('max', job)
+    assert.deepEqual([ready.missing, ready.items[4].exception.reason, ready.items[4].exception.granted_by], [[], 'Nothing else to report on a sealed unit', 'Sam Ito'])
+    await h.api('workorder.submit', cookie.max, { workOrder: job, version: ready.version })
+    // The procedure changes: the renamed check keeps its key, the temperature (same label) keeps its own with new limits, a new step gets a new one.
+    await h.api('checklist.revise', cookie.lead, { checklist: list, note: 'Tighter limit', items: [`Unit running, seals intact | key ${keys[0]}`, 'Cabinet temperature | number °C -24..-18 | when step 1 is pass | meter Cabinet temperature', ...lines.slice(2), 'Door closer works'] })
+    const revised = (await h.api(`checklists/${list}`, cookie.max)).revisions
+    assert.deepEqual(revised[0].items.slice(0, 5).map(item => item.key), keys, 'steps keep their identities across revisions')
+    assert.ok(!keys.includes(revised[0].items[5].key))
+    assert.equal((await h.api('checklist.revise', cookie.lead, { checklist: list, note: 'x', items: ['Step | key s-nothere'] }, 400)).error, 'invalid_step')
+    // The submitted work keeps revision 1 with its limits, its linked finding and follow-up, and the photo on its step.
+    const kept = await wo('sam', job)
+    assert.deepEqual([kept.checklist_revision, kept.items[1].min, kept.items[0].text, kept.items[2].photos], [1, '-25', 'Unit running and door seals intact', 1])
+    const finding = kept.findings.find(row => row.id === linked.finding)
+    assert.deepEqual([finding.item, finding.follow_up_id], [1, linked.followUp])
+    assert.equal((await wo('lead', linked.followUp)).follow_up_of, job)
+    const page = (await (await h.raw(`/app/checklists/${list}`, { cookie: cookie.lead })).text())
+    for (const text of [`key ${keys[1]}`, 'Number in °C, -24 to -18, kept as the Cabinet temperature reading', 'Photo required; only when step 2 is outside its limits', 'One of none, light, heavy; heavy fails']) assert.ok(page.includes(text), text)
+    await h.api('workorder.review', cookie.sam, { workOrder: job, version: kept.version, decision: 'approve' })
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

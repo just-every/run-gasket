@@ -45,7 +45,7 @@ export const ACTIONS: Record<string, string> = {
   'workorder.results': 'Recorded checklist results', 'workorder.readings': 'Recorded readings', 'workorder.evidence': 'Attached evidence', 'comment.post': 'Posted a comment', 'comment.edit': 'Edited a comment',
   'workorder.submit': 'Submitted for review', 'workorder.approve': 'Approved and closed', 'workorder.return': 'Returned for more work',
   'part.create': 'Added a part', 'part.receive': 'Received stock', 'part.substitute': 'Approved a substitute part', 'part.substitute.withdraw': 'Withdrew a substitute approval', 'kit.create': 'Made a repair kit', 'bom.revise': 'Saved a bill of materials revision', 'workorder.reserve': 'Reserved parts to work', 'reservation.release': 'Released a parts reservation', 'part.count': 'Recorded a physical count', 'part.issue': 'Issued a part', 'part.return': 'Returned a part',
-  'downtime.start': 'Took the asset down', 'downtime.end': 'Put the asset back in service', 'downtime.classify': 'Corrected a stop\'s classification', 'finding.record': 'Recorded a finding',
+  'downtime.start': 'Took the asset down', 'downtime.end': 'Put the asset back in service', 'downtime.classify': 'Corrected a stop\'s classification', 'finding.record': 'Recorded a finding', 'step.except': 'Excepted a checklist step',
   'proposal.prepare': 'Prepared a proposal', 'proposal.approve': 'Approved a proposal', 'proposal.reject': 'Rejected a proposal',
   'import.apply': 'Moved in from MaintainX', 'import.undo': 'Undid a move-in',
 }

@@ -168,14 +168,28 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   // The checklist card names preventive work; other work says what needs doing in its own card.
   const task = w.items.length && w.title === w.checklist_name && !w.description ? '' : card('What needs doing', h`<p>${w.title}</p>${w.description ? h`<p class="gk-muted">${w.description}</p>` : ''}${raisedBy(w)}`, { id: 'task' })
 
-  const done = w.items.filter(item => item.result).length
-  const checklist = !w.items.length ? '' : card(`${w.checklist_name}, revision ${w.checklist_revision}`, recording
-    ? h`<form method="post" action="/app/do/workorder.results" class="gk-form">${hidden('returnTo', back)}${ids}<ol class="gk-checklist">${w.items.map(item => h`<li>
-        <fieldset class="gk-item"><legend>${item.text}</legend>${item.result?.recorded_by ? h`<p class="gk-sub">Signed off by ${item.result.recorded_by}</p>` : ''}<div class="gk-segmented">${['pass', 'attention', 'fail'].map(outcome => h`<label><input type="radio" name="outcome-${item.index}" value="${outcome}"${item.result?.outcome === outcome ? raw(' checked') : ''}><span>${OUTCOME[outcome]}</span></label>`)}</div>
-        ${field('Note', `note-${item.index}`, { value: item.result?.note ?? '', required: false })}</fieldset></li>`)}</ol>
+  // FIELD-004: each step takes the answer its kind asks for; a step that does not apply yet says why, a photo step takes its photo under evidence.
+  const owed = w.items.filter(item => item.applies)
+  const done = owed.filter(item => item.result || item.exception || (item.kind === 'photo' && item.photos)).length
+  const stepNote = (item: (typeof w.items)[number]) => h`<p class="gk-sub">${item.summary}</p>${item.exception ? h`<p class="gk-sub">Exception by ${item.exception.granted_by ?? '—'}: ${item.exception.reason}</p>` : ''}`
+  const answerField = (item: (typeof w.items)[number]) => item.kind === 'check'
+    ? h`<div class="gk-segmented">${['pass', 'attention', 'fail'].map(outcome => h`<label><input type="radio" name="outcome-${item.index}" value="${outcome}"${item.result?.outcome === outcome ? raw(' checked') : ''}><span>${OUTCOME[outcome]}</span></label>`)}</div>`
+    : item.kind === 'number' ? field(`Reading (${item.unit})`, `value-${item.index}`, { value: item.result?.value ?? '', required: false, attrs: 'inputmode="decimal"' })
+    : item.kind === 'option' ? select('Answer', `value-${item.index}`, item.options!.map(option => ({ value: option, label: option })), item.result?.value ?? '', { required: false, blank: 'Not answered' })
+    : field('Answer', `value-${item.index}`, { value: item.result?.value ?? '', required: false })
+  const stepRecord = (item: (typeof w.items)[number]) => !item.applies ? h`<li class="gk-muted"><fieldset class="gk-item"><legend>${item.text}</legend><p class="gk-sub">Not needed now: ${item.summary.split('; ').pop()}</p></fieldset></li>`
+    : item.kind === 'photo' ? h`<li><fieldset class="gk-item"><legend>${item.text}</legend>${stepNote(item)}<p>${item.photos ? `${item.photos} photo${item.photos === 1 ? '' : 's'} attached` : 'Attach the photo under Inspection evidence, choosing this step.'}</p></fieldset></li>`
+    : h`<li><fieldset class="gk-item"><legend>${item.text}</legend>${stepNote(item)}${item.result?.recorded_by ? h`<p class="gk-sub">Signed off by ${item.result.recorded_by}</p>` : ''}${answerField(item)}
+        ${field('Note', `note-${item.index}`, { value: item.result?.note ?? '', required: false })}</fieldset></li>`
+  const shown = (item: (typeof w.items)[number]) => !item.applies ? h`<span class="gk-muted">Not needed</span>` : item.kind === 'photo' ? (item.photos ? tag('Photo attached') : h`<span class="gk-muted">No photo yet</span>`) : item.result ? tag(OUTCOME[item.result.outcome]) : h`<span class="gk-muted">No result yet</span>`
+  // A supervisor who did none of the work may except a step, with a reason; it then blocks nothing at submission.
+  const excepting = can(actor, 'work.review') && !w.mine && !w.collaborating && ['open', 'in_progress', 'returned'].includes(w.status) && w.items.some(item => item.applies && !item.exception)
+  const exceptForm = excepting ? post('step.except', h`${select('Step', 'item', w.items.filter(item => item.applies && !item.exception).map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}` })), '', { blank: 'Choose a step' })}${area('Reason for the exception', 'reason')}`, 'Grant exception', { secondary: true }) : ''
+  const checklist = !w.items.length ? '' : card(`${w.checklist_name}, revision ${w.checklist_revision}`, h`${recording
+    ? h`<form method="post" action="/app/do/workorder.results" class="gk-form">${hidden('returnTo', back)}${ids}<ol class="gk-checklist">${w.items.map(stepRecord)}</ol>
       <div class="gk-actions"><button type="submit" class="gk-secondary">Save results</button></div></form>`
-    : table(['Item', 'Result', 'Note', 'Signed off by'], w.items.map(item => [item.text, item.result ? tag(OUTCOME[item.result.outcome]) : h`<span class="gk-muted">No result yet</span>`, item.result?.note ?? '', item.result?.recorded_by ?? '']), 'Checklist results', { wrap: [0, 2] }),
-  { id: 'checklist', extra: h`<span class="gk-count">${done} of ${w.items.length} complete</span>` })
+    : table(['Item', 'Result', 'Reading or answer', 'Note', 'Signed off by'], w.items.map(item => [h`${item.text}${stepNote(item)}`, shown(item), item.result?.value ? (item.kind === 'number' ? amount(item.result.value, item.unit!) : item.result.value) : '', item.result?.note ?? '', item.result?.recorded_by ?? '']), 'Checklist results', { wrap: [0, 3] })}${exceptForm}`,
+  { id: 'checklist', extra: h`<span class="gk-count">${done} of ${owed.length} complete</span>` })
 
   const meters = w.meters
   const readings = card('Meter and condition readings', h`${w.readings.length ? h`<dl class="gk-readings">${w.readings.map(row => h`<div><dt>${row.meter}</dt><dd>${row.kind === 'condition' ? condition(row.value) : amount(row.value, row.unit)}<span class="gk-sub">Taken ${showLocal(row.taken_on)}</span></dd></div>`)}</dl>` : h`<p class="gk-muted">No readings recorded on this work order.</p>`}
@@ -200,8 +214,8 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     ${recording && stock.length ? h`<div class="gk-split">${post('workorder.issue', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.onHand, part.unit)} on hand)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Issue part', { secondary: true })}
       ${w.parts.length ? post('workorder.return', h`${select('Part', 'part', w.parts.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.used, part.unit)} held)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Return unused', { secondary: true }) : ''}</div>` : ''}${reserveForms}`, { id: 'parts' })
 
-  const evidence = card('Inspection evidence', h`${w.evidence.length ? h`<ul class="gk-files">${w.evidence.map(file => h`<li><a href="/app/evidence/${file.id}">${file.filename}</a><span class="gk-sub">${Math.ceil(file.size / 1024)} KB · ${file.uploaded_by} · ${showInstant(file.uploaded_at, actor.zone)}</span>${details([['SHA-256', file.sha256], ['Type', file.media_type]])}</li>`)}</ul>` : h`<p class="gk-muted">No photos or documents attached.</p>`}
-    ${recording ? post('workorder.evidence', fileField('Photo or document', 'file', { required: true, accept: '.png,.jpg,.jpeg,.webp,.heic,.pdf', hint: 'PNG, JPEG, WebP, HEIC or PDF, up to 1.5 MB.' }), 'Attach evidence', { multipart: true, secondary: true }) : ''}`, { id: 'evidence' })
+  const evidence = card('Inspection evidence', h`${w.evidence.length ? h`<ul class="gk-files">${w.evidence.map(file => h`<li><a href="/app/evidence/${file.id}">${file.filename}</a><span class="gk-sub">${file.item !== null ? `Step ${file.item + 1} · ` : ''}${Math.ceil(file.size / 1024)} KB · ${file.uploaded_by} · ${showInstant(file.uploaded_at, actor.zone)}</span>${details([['SHA-256', file.sha256], ['Type', file.media_type]])}</li>`)}</ul>` : h`<p class="gk-muted">No photos or documents attached.</p>`}
+    ${recording ? post('workorder.evidence', h`${fileField('Photo or document', 'file', { required: true, accept: '.png,.jpg,.jpeg,.webp,.heic,.pdf', hint: 'PNG, JPEG, WebP, HEIC or PDF, up to 1.5 MB. A photo step takes an image.' })}${w.items.length ? select('For checklist step', 'item', w.items.map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}${item.kind === 'photo' ? ' (photo required)' : ''}` })), w.items.find(item => item.kind === 'photo' && item.applies && !item.photos)?.index.toString() ?? '', { required: false, blank: 'The whole work order' }) : ''}`, 'Attach evidence', { multipart: true, secondary: true }) : ''}`, { id: 'evidence' })
 
   // ASSET-004: the catalog's active codes, offered on a finding (and a stop's failure mode) when the catalog has any.
   const catalog = (await codeList(env)).filter(code => !code.retired)

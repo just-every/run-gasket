@@ -4,7 +4,9 @@ Preventive work starts from a checklist and a schedule. Gasket turns schedules t
 
 ## Write a checklist
 
-On **Schedules**, under **Checklists**, give the checklist a name and write its items, one per line. Each line is one check the maintainer marks **Pass**, **Needs attention** or **Fail**.
+On **Schedules**, under **Checklists**, give the checklist a name and write its steps, one per line. A plain line is a check the maintainer marks **Pass**, **Needs attention** or **Fail**. Add parts after a `|` to type a step: `number °C -25..-18` (a unit, then inclusive limits; leave either side empty), `text`, `options none, light, heavy | fail on heavy`, or `photo`. `when step 1 is fail` makes a step apply only after that answer, and `meter Cabinet temperature` keeps a number as that meter's reading (same unit).
+
+A step keeps its identity in a new revision when its label stays the same; to rename one, add `key` and the key shown on the checklist page.
 
 To change a checklist, open it and **Publish a new revision** with a note of what changed. Work orders keep the revision they were created with, so a new revision never changes work already issued.
 

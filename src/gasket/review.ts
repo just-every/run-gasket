@@ -3,12 +3,13 @@
 // moves its schedule on. Nobody approves work they did.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
-import { commit, guard, insist, newId, now, one, stmt } from './core'
+import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import { RECORDERS } from './crew'
 import type { Input } from './input'
 import { releaseWithWork } from './reservations'
 import { advanceStatements } from './schedules'
 import { OPEN, workOrder, workOrderDetail } from './work'
+import { applies, type Answer, type ChecklistItem } from './steps'
 
 export async function submit(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.do')
@@ -50,6 +51,32 @@ export async function review(env: Bindings, actor: Actor, input: Input) {
   if (decision === 'approve' && order.schedule_id) statements.push(...await advanceStatements(env, order.schedule_id, actor.today))
   await commit(env, statements, { actor: actor.id, action: decision === 'approve' ? 'workorder.approve' : 'workorder.return', subject: order.id, detail: { review: id, version, reason } })
   return { id: order.id, status: decision === 'approve' ? 'closed' : 'returned' }
+}
+
+/**
+ * FIELD-004: a supervisor's exception on one step of open work: the step then blocks nothing at submission (a missing
+ * answer or photo, or a failure's follow-up). It needs a reason, and nobody excepts a step of work they did.
+ */
+export async function exceptStep(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'work.review')
+  const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+  insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  insist(order.assignee_id !== actor.id && !await didWork(env, order.id, actor.id), 'own_work', 403)
+  if (input.has('version')) insist(input.integer('version', { min: 1, max: 1_000_000 }) === order.version, 'stale', 409)
+  insist(order.checklist_revision_id, 'no_checklist', 409)
+  const steps = JSON.parse((await one(env, 'SELECT items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id))!.items_json) as ChecklistItem[]
+  const item = input.integer('item', { max: 1000 })!
+  insist(item < steps.length, 'invalid_item')
+  const answers = new Map<number, Answer>((await all(env, 'SELECT item, outcome, value FROM gk_results WHERE work_order_id = ?', order.id)).map(row => [row.item, row as unknown as Answer]))
+  insist(applies(steps, item, answers), 'step_not_applicable', 409, { step: item + 1 })
+  insist(!await one(env, 'SELECT 1 FROM gk_step_exceptions WHERE work_order_id = ? AND item = ?', order.id, item), 'already_excepted', 409)
+  const reason = input.text('reason', { max: 1000 }), id = newId()
+  await commit(env, [
+    guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, order.version),
+    stmt(env, 'INSERT INTO gk_step_exceptions (id, work_order_id, item, reason, granted_by, granted_at) VALUES (?, ?, ?, ?, ?, ?)', id, order.id, item, reason, actor.id, now()),
+    stmt(env, 'UPDATE gk_work_orders SET version = version + 1 WHERE id = ?', order.id),
+  ], { actor: actor.id, action: 'step.except', subject: order.id, detail: { item, step: steps[item].key ?? null, reason } })
+  return { id: order.id, exception: id }
 }
 
 /** Whether this person recorded anything on the work order, whoever it is assigned to now.

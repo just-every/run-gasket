@@ -24,6 +24,7 @@ import { workCosts } from './bad-actors'
 import { chosenTemplate, priorityOf } from './templates'
 import { fieldsOf } from './work-fields'
 import { createsWork } from './site'
+import { answer, applies, kindOf, stepSummary, type Answer, type ChecklistItem, type StepKind } from './steps'
 
 /** FIELD-009: the door a work order was created through: the web workspace's form door or the JSON API. */
 export type Door = 'web' | 'api'
@@ -157,27 +158,40 @@ export async function cancel(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id }
 }
 
-/** Clause 7: a result for each checklist item of the pinned revision, with a note. */
+/** Clause 7 and FIELD-004: an answer for each step of the pinned revision that applies, with a note; a number step naming a meter also keeps the value as that meter's reading. */
 export async function recordResults(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
   insist(order.checklist_revision_id, 'no_checklist', 409)
   const revision = await one(env, 'SELECT items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id)
-  const count = (JSON.parse(revision!.items_json) as unknown[]).length
-  // JSON callers send parallel `outcome` and `note` lists; the form sends outcome-N and note-N per item.
-  const keyed = !input.has('outcome')
-  const outcomes = keyed ? Array.from({ length: count }, (_, item) => input.text(`outcome-${item}`, { optional: true, max: 20 })) : input.list('outcome', { keepEmpty: true })
-  const notes = keyed ? Array.from({ length: count }, (_, item) => input.text(`note-${item}`, { optional: true, max: 1000 })) : input.list('note', { keepEmpty: true })
-  insist(outcomes.length === count, 'invalid_outcome')
-  const statements: D1PreparedStatement[] = [], recorded: { item: number; outcome: string; note: string | null }[] = []
-  outcomes.forEach((outcome, item) => {
-    if (!outcome) return
-    insist(['pass', 'fail', 'attention'].includes(outcome), 'invalid_outcome')
-    const note = (notes[item] ?? '').slice(0, 1000) || null
+  const steps = JSON.parse(revision!.items_json) as ChecklistItem[], count = steps.length
+  // JSON callers send parallel `outcome`, `value` and `note` lists (any may be left out); the form sends outcome-N, value-N and note-N per step.
+  const keyed = !input.has('outcome') && !input.has('value') && !input.has('note')
+  const column = (name: string) => {
+    const list = keyed ? Array.from({ length: count }, (_, item) => input.text(`${name}-${item}`, { optional: true, max: 1000 })) : input.list(name, { keepEmpty: true })
+    return keyed || input.has(name) ? list : Array<string>(count).fill('')
+  }
+  const outcomes = column('outcome'), values = column('value'), notes = column('note')
+  insist(outcomes.length === count && values.length === count && notes.length === count, 'invalid_outcome')
+  const answers = new Map<number, Answer>((await all(env, 'SELECT item, outcome, value FROM gk_results WHERE work_order_id = ?', order.id)).map(row => [row.item, { outcome: row.outcome, value: row.value }]))
+  const statements: D1PreparedStatement[] = [], recorded: { item: number; outcome: string; value?: string; note: string | null }[] = []
+  for (const [item, step] of steps.entries()) {
+    if (!outcomes[item] && !values[item]) continue
+    insist(applies(steps, item, answers), 'step_not_applicable', 409, { step: item + 1 })
+    const given = answer(step, outcomes[item], values[item])
+    answers.set(item, given)
+    const note = notes[item].slice(0, 1000) || null
     statements.push(
-      stmt(env, 'INSERT INTO gk_results (work_order_id, item, outcome, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(work_order_id, item) DO UPDATE SET outcome = excluded.outcome, note = excluded.note, recorded_by = excluded.recorded_by, recorded_at = excluded.recorded_at', order.id, item, outcome, note, actor.id, now()),
-      stmt(env, 'INSERT INTO gk_result_log (work_order_id, item, outcome, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?)', order.id, item, outcome, note, actor.id, now()))
-    recorded.push({ item, outcome, note })
-  })
+      stmt(env, 'INSERT INTO gk_results (work_order_id, item, outcome, value, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(work_order_id, item) DO UPDATE SET outcome = excluded.outcome, value = excluded.value, note = excluded.note, recorded_by = excluded.recorded_by, recorded_at = excluded.recorded_at', order.id, item, given.outcome, given.value, note, actor.id, now()),
+      stmt(env, 'INSERT INTO gk_result_log (work_order_id, item, outcome, value, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)', order.id, item, given.outcome, given.value, note, actor.id, now()))
+    if (step.meter) {
+      insist(order.asset_id, 'no_asset', 409)
+      const meter = await one(env, 'SELECT * FROM gk_meters WHERE asset_id = ? AND name = ? COLLATE NOCASE', order.asset_id, step.meter)
+      insist(meter, 'step_meter_not_found', 409, { step: item + 1, meter: step.meter })
+      insist(meter.unit === step.unit, 'step_meter_unit_differs', 409, { step: item + 1, meter: meter.unit, step_unit: step.unit })
+      statements.push(...(await readingStatements(env, actor, meter, given.value!, { takenOn: localNow(actor.zone), workOrder: order.id, provenance: 'manual', source: null, quality: 'good' })).statements)
+    }
+    recorded.push({ item, outcome: given.outcome, ...(given.value !== null ? { value: given.value } : {}), note })
+  }
   insist(recorded.length, 'invalid_outcome')
   // PM-004: results the checklist's failure rule covers raise their correction in the same batch.
   const correction = await correctionStatements(env, actor, order, recorded)
@@ -191,9 +205,17 @@ export async function addEvidence(env: Bindings, actor: Actor, input: Input) {
   const extension = file.filename.split('.').pop()?.toLowerCase() ?? ''
   const mediaType = EVIDENCE_TYPES[extension]
   insist(mediaType, 'unsupported_file_type')
+  // FIELD-004: evidence may answer one step of the pinned revision; a photo step takes an image, not a document.
+  const item = input.integer('item', { optional: true, max: 1000 })
+  if (item !== null) {
+    insist(order.checklist_revision_id, 'no_checklist', 409)
+    const steps = JSON.parse((await one(env, 'SELECT items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id))!.items_json) as ChecklistItem[]
+    insist(item < steps.length, 'invalid_item')
+    if (kindOf(steps[item]) === 'photo') insist(mediaType.startsWith('image/'), 'photo_required')
+  }
   const id = newId(), sha256 = await sha256Hex(file.bytes)
-  await commit(env, [...touch(env, order), stmt(env, 'INSERT INTO gk_evidence (id, work_order_id, filename, media_type, size, sha256, bytes, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, file.filename, mediaType, file.bytes.length, sha256, file.bytes, actor.id, now())],
-    { actor: actor.id, action: 'workorder.evidence', subject: order.id, detail: { evidence: id, filename: file.filename, size: file.bytes.length, sha256 } })
+  await commit(env, [...touch(env, order), stmt(env, 'INSERT INTO gk_evidence (id, work_order_id, item, filename, media_type, size, sha256, bytes, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, item, file.filename, mediaType, file.bytes.length, sha256, file.bytes, actor.id, now())],
+    { actor: actor.id, action: 'workorder.evidence', subject: order.id, detail: { evidence: id, filename: file.filename, size: file.bytes.length, sha256, ...(item !== null ? { item } : {}) } })
   return { id: order.id, evidence: id }
 }
 
@@ -304,7 +326,9 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
+/** FIELD-004: a step of the pinned revision with its answer, whether it applies, its photos and a supervisor's exception. */
+export type Step = ChecklistItem & { index: number; kind: StepKind; summary: string; result: Row | null; applies: boolean; photos: number; exception: Row | null }
+export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: Step[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
@@ -315,8 +339,12 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
     LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
   insist(order, 'work_order_not_found', 404)
-  const results = new Map((await all(env, 'SELECT r.item, r.outcome, r.note, m.name AS recorded_by, r.recorded_at FROM gk_results r LEFT JOIN gk_members m ON m.id = r.recorded_by WHERE r.work_order_id = ?', id)).map(row => [row.item, row]))
-  const items = order.items_json ? (JSON.parse(order.items_json) as { text: string }[]).map((item, index) => ({ index, text: item.text, result: results.get(index) ?? null })) : []
+  const results = new Map((await all(env, 'SELECT r.item, r.outcome, r.value, r.note, m.name AS recorded_by, r.recorded_at FROM gk_results r LEFT JOIN gk_members m ON m.id = r.recorded_by WHERE r.work_order_id = ?', id)).map(row => [row.item as number, row]))
+  const evidence = await all(env, 'SELECT e.id, e.item, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
+  const exceptions = new Map((await all(env, 'SELECT x.item, x.reason, m.name AS granted_by, x.granted_at FROM gk_step_exceptions x LEFT JOIN gk_members m ON m.id = x.granted_by WHERE x.work_order_id = ?', id)).map(row => [row.item as number, row]))
+  const steps = order.items_json ? JSON.parse(order.items_json) as ChecklistItem[] : []
+  const items: Step[] = steps.map((step, index) => ({ ...step, index, kind: kindOf(step), summary: stepSummary(step, steps), result: results.get(index) ?? null, applies: applies(steps, index, results as Map<number, Answer>),
+    photos: evidence.filter(file => file.item === index && String(file.media_type).startsWith('image/')).length, exception: exceptions.get(index) ?? null }))
   const meters = await all(env, 'SELECT id, name, unit, kind FROM gk_meters WHERE asset_id = ? ORDER BY name', order.asset_id)
   const readings = await all(env, 'SELECT r.value, r.taken_on, g.name AS meter, g.unit, g.kind, m.name AS entered_by FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id LEFT JOIN gk_members m ON m.id = r.entered_by WHERE r.work_order_id = ? ORDER BY r.taken_on, g.name', id)
   const parts = (await all(env, `SELECT p.id, p.number, p.name, p.unit,
@@ -329,7 +357,6 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const reserved = await reservations(env, 'r.work_order_id = ?', id)
   // ASSET-006: the asset's current bill of materials, with stock and fit, for planning.
   const bom = order.asset_id ? await bomOf(env, { id: order.asset_id, serial: order.asset_serial }, await partList(env, actor)) : null
-  const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
     LEFT JOIN gk_members h ON h.id = json_extract(a.detail, '$.holder') LEFT JOIN gk_members t ON t.id = json_extract(a.detail, '$.to') WHERE a.action = 'workorder.plan' AND a.subject = ? ORDER BY a.at DESC, a.seq DESC`, id))
@@ -352,14 +379,25 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   return { ...rest, trigger, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length }) }
 }
 
-/** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */
-export function submitBlockers({ items, findings, downtime, unacknowledged = false, fields = [], evidenceRequired = false }: { items: { index: number; text: string; result: { outcome: string } | null }[]; findings: { item: number | null }[]; downtime: { ended_on: string | null }[]; unacknowledged?: boolean; fields?: { label: string; value: string | null; required: boolean }[]; evidenceRequired?: boolean }) {
+/**
+ * Why a work order cannot be submitted yet, in the person's words. Steps that do not apply, and steps a supervisor
+ * excepted, block nothing; a photo step needs a photo; a failed or needs-attention step needs its own linked finding,
+ * and a number outside its limits a linked finding with follow-up work (FIELD-004).
+ */
+export function submitBlockers({ items, findings, downtime, unacknowledged = false, fields = [], evidenceRequired = false }: { items: Pick<Step, 'index' | 'text' | 'kind' | 'result' | 'applies' | 'photos' | 'exception'>[]; findings: { item: number | null; follow_up_id?: string | null }[]; downtime: { ended_on: string | null }[]; unacknowledged?: boolean; fields?: { label: string; value: string | null; required: boolean }[]; evidenceRequired?: boolean }) {
   const blockers: string[] = []
   if (unacknowledged) blockers.push('the assignee has not acknowledged this correction')
-  const missing = items.filter(item => !item.result).length
+  const owed = items.filter(item => item.applies && !item.exception)
+  const missing = owed.filter(item => item.kind !== 'photo' && !item.result).length
   if (missing) blockers.push(`${missing} checklist item${missing === 1 ? '' : 's'} without a result`)
-  for (const item of items) if (item.result && item.result.outcome !== 'pass' && !findings.some(finding => finding.item === item.index))
-    blockers.push(`step ${item.index + 1} (${item.text}) ${item.result.outcome === 'fail' ? 'failed' : 'needs attention'} and needs a linked corrective finding`)
+  for (const item of owed) {
+    const linked = findings.filter(finding => finding.item === item.index)
+    if (item.kind === 'photo' && !item.photos) blockers.push(`step ${item.index + 1} (${item.text}) needs a photo`)
+    else if (item.kind === 'number' && item.result?.outcome === 'fail' && !linked.some(finding => finding.follow_up_id))
+      blockers.push(`step ${item.index + 1} (${item.text}) is outside its limits and needs a linked finding with follow-up work`)
+    else if (item.kind !== 'number' && item.result && item.result.outcome !== 'pass' && !linked.length)
+      blockers.push(`step ${item.index + 1} (${item.text}) ${item.result.outcome === 'fail' ? 'failed' : 'needs attention'} and needs a linked corrective finding`)
+  }
   if (downtime.some(row => !row.ended_on)) blockers.push('downtime is still open')
   for (const field of fields) if (field.required && field.value === null) blockers.push(`the required field ${field.label} has no value`)
   if (evidenceRequired) blockers.push('the template requires a photo or document as evidence')
