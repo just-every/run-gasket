@@ -8,7 +8,7 @@ import { createChecklist, reviseChecklist } from './checklists'
 import { bulk, merge, reopen, skipOccurrence } from './control'
 import { acknowledge, setRule } from './corrections'
 import type { Input } from './input'
-import { adjustMeter, feedReading } from './meters'
+import { adjustMeter, feedReading, setFeedWindow } from './meters'
 import { declareState } from './states'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
@@ -33,6 +33,7 @@ export const actions: Record<string, Handler> = {
   'meter.create': (env, actor, input) => addMeter(env, actor, input),
   'meter.feed': (env, actor, input) => feedReading(env, actor, input),
   'meter.adjust': (env, actor, input) => adjustMeter(env, actor, input),
+  'meter.window': (env, actor, input) => setFeedWindow(env, actor, input),
   'part.create': (env, actor, input) => createPart(env, actor, input),
   'part.receive': (env, actor, input) => receivePart(env, actor, input),
   'part.count': (env, actor, input) => countPart(env, actor, input),

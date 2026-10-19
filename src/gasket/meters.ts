@@ -11,8 +11,9 @@ import { isLocalTime, localNow, minutesBetween } from './dates'
 import type { Input } from './input'
 import { addMeter, compareMeter, meterNumber } from './quantity'
 
-/** A feed reading that arrives more than a day after its source time is stale. */
-export const STALE_AFTER_MINUTES = 24 * 60
+/** A feed reading that arrives more than its meter's feed window (whole hours, 24 unless declared) after its source time is stale. */
+export const DEFAULT_FEED_WINDOW_HOURS = 24
+export const FEED_WINDOW_HOURS = { min: 1, max: 168 }
 export const COUNTER_CHANGES = ['reset', 'replacement', 'rollover']
 const CONDITIONS = ['good', 'fair', 'poor']
 
@@ -76,7 +77,7 @@ export interface Taken { takenOn: string; workOrder: string | null; provenance: 
 /** Checks one reading against its meter and returns the statements that keep it, with its quality as received. */
 export async function readingStatements(env: Bindings, actor: Actor, meter: Row, raw: string, taken: Taken) {
   const value = valueFor(meter, raw)
-  const late = taken.provenance === 'feed' && minutesBetween(taken.takenOn, localNow(actor.zone)) > STALE_AFTER_MINUTES
+  const late = taken.provenance === 'feed' && minutesBetween(taken.takenOn, localNow(actor.zone)) > meter.feed_window_hours * 60
   const quality = taken.quality === 'good' && late ? 'stale' : taken.quality
   const statements: D1PreparedStatement[] = []
   let normalized = value
@@ -118,6 +119,16 @@ export async function feedReading(env: Bindings, actor: Actor, input: Input) {
   const kept = await readingStatements(env, actor, meter, input.text('value', { max: 30 }), { takenOn, workOrder: null, provenance: 'feed', source, quality: declared })
   await commit(env, kept.statements, { actor: actor.id, action: 'meter.feed', subject: meter.asset_id, detail: { meter: meter.id, reading: kept.id, value: kept.value, takenOn, source, quality: kept.quality } })
   return { id: kept.id, quality: kept.quality, normalized: kept.normalized }
+}
+
+/** Declares how late this meter's feed readings may arrive before they are kept as stale; readings already kept keep their quality. */
+export async function setFeedWindow(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'register.manage')
+  const meter = await liveMeter(env, input.text('meter', { max: 100 }))
+  const hours = input.integer('feedWindowHours', FEED_WINDOW_HOURS)!
+  await commit(env, [...holdMeter(env, meter), stmt(env, 'UPDATE gk_meters SET feed_window_hours = ? WHERE id = ?', hours, meter.id)],
+    { actor: actor.id, action: 'meter.window', subject: meter.asset_id, detail: { meter: meter.id, from: meter.feed_window_hours, to: hours } })
+  return { id: meter.id, feedWindowHours: hours }
 }
 
 /** A counter reset, replacement or rollover, or a corrected reading: always with a reason, never rewriting a kept reading. */

@@ -5,7 +5,7 @@ import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import type { Input } from './input'
-import { meterView } from './meters'
+import { DEFAULT_FEED_WINDOW_HOURS, FEED_WINDOW_HOURS, meterView } from './meters'
 import { DECLARED_STATE, stateConflicts, stateHistory } from './states'
 
 const CRITICALITY = ['normal', 'important', 'critical']
@@ -76,9 +76,10 @@ export async function addMeter(env: Bindings, actor: Actor, input: Input) {
   insist(!asset.retired_at, 'asset_retired', 409)
   const name = input.text('name', { max: 80 }), unit = input.text('unit', { max: 30 }), kind = input.text('kind', { max: 20 })
   insist(METER_KINDS.includes(kind), 'invalid_kind')
+  const feedWindowHours = input.integer('feedWindowHours', { ...FEED_WINDOW_HOURS, optional: true }) ?? DEFAULT_FEED_WINDOW_HOURS
   const id = newId()
-  await commit(env, [stmt(env, 'INSERT INTO gk_meters (id, asset_id, name, unit, kind, created_at) VALUES (?, ?, ?, ?, ?, ?)', id, asset.id, name, unit, kind, now())],
-    { actor: actor.id, action: 'meter.create', subject: id, detail: { asset: asset.id, name, unit, kind } })
+  await commit(env, [stmt(env, 'INSERT INTO gk_meters (id, asset_id, name, unit, kind, feed_window_hours, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', id, asset.id, name, unit, kind, feedWindowHours, now())],
+    { actor: actor.id, action: 'meter.create', subject: id, detail: { asset: asset.id, name, unit, kind, feedWindowHours } })
   return { id }
 }
 
@@ -109,7 +110,7 @@ export async function assetList(env: Bindings, _actor: Actor) {
 export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const asset = await one(env, `SELECT a.*, ${ASSET_STATUS} AS status FROM gk_assets a WHERE a.id = ?`, id)
   insist(asset, 'asset_not_found', 404)
-  const meters = await Promise.all((await all(env, 'SELECT m.id, m.name, m.unit, m.kind, m.revision FROM gk_meters m WHERE m.asset_id = ? ORDER BY m.name', id))
+  const meters = await Promise.all((await all(env, 'SELECT m.id, m.name, m.unit, m.kind, m.feed_window_hours, m.revision FROM gk_meters m WHERE m.asset_id = ? ORDER BY m.name', id))
     .map(async meter => ({ ...meter, ...await meterView(env, actor, meter.id) })))
   const versions = await all(env, 'SELECT revision, value_json, changed_by, changed_at FROM gk_asset_versions WHERE asset_id = ? ORDER BY revision DESC', id)
   const sightings = await all(env, 'SELECT outcome, seen_location, note, recorded_by, recorded_at FROM gk_sightings WHERE asset_id = ? ORDER BY recorded_at DESC', id)

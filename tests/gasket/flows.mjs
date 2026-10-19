@@ -596,6 +596,23 @@ try {
     for (const text of ['Stale (late)', 'Corrected', 'Replacement', 'Rollover', 'Feed: Bakery PLC gateway', 'Display failed; new hour meter fitted at zero']) assert.ok(page.includes(text), text)
     const history = (await h.api(`assets/${sheeter}/history`, cookie.sam)).events.map(event => event.what)
     assert.ok(history.some(what => /counter replacement/.test(what)) && history.some(what => /corrected to 72/.test(what)) && history.some(what => /feed: Bakery PLC gateway, stale/.test(what)), 'the history explains each change')
+    // Staleness is per meter feed: a daily export declares 36 hours; a reading taken on a work order is attested and never aged.
+    const bowl = { asset: sheeter, name: 'Mixer bowl temperature', unit: '°C', kind: 'gauge' }
+    await h.api('meter.create', cookie.lead, { ...bowl, feedWindowHours: '200' }, 400)
+    const temperature = (await h.api('meter.create', cookie.lead, { ...bowl, feedWindowHours: '36' })).id
+    const daily = { meter: temperature, source: 'Nightly bakery export', unit: '°C' }
+    assert.equal((await h.api('meter.feed', cookie.lead, { ...daily, value: '4', takenOn: ago(30 * 60) })).quality, 'good')
+    assert.equal((await h.api('meter.feed', cookie.lead, { ...daily, value: '5', takenOn: ago(37 * 60) })).quality, 'stale')
+    await h.api('workorder.readings', cookie.max, { workOrder: visit, takenOn: ago(40 * 60), meter: [temperature], value: ['6'] })
+    await h.api('meter.window', cookie.max, { meter: temperature, feedWindowHours: '12' }, 403)
+    await h.api('meter.window', cookie.lead, { meter: temperature, feedWindowHours: '0' }, 400)
+    await h.api('meter.window', cookie.lead, { meter: temperature, feedWindowHours: '12' })
+    assert.equal((await h.api('meter.feed', cookie.lead, { ...daily, value: '7', takenOn: ago(13 * 60) })).quality, 'stale')
+    const gauge = (await h.api(`assets/${sheeter}`, cookie.max)).meters.find(row => row.id === temperature)
+    assert.deepEqual(Object.fromEntries(gauge.readings.map(row => [row.value, [row.provenance, row.quality]])),
+      { 4: ['feed', 'good'], 5: ['feed', 'stale'], 6: ['manual', 'good'], 7: ['feed', 'stale'] }, 'kept readings keep the quality they were received with')
+    assert.deepEqual([gauge.feed_window_hours, (await h.api('audit?action=meter.window', cookie.sam)).rows.length], [12, 1])
+    assert.equal((await h.api(`assets/${ids.compressor}`, cookie.max)).meters.find(row => row.id === ids.runHours).feed_window_hours, 24)
   })
 
   await check('ASSET-004 effective status history and disagreeing evidence', async () => {
