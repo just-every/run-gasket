@@ -2,13 +2,33 @@
 // Base operator-auth operators (all 'member' except the owner); the Gasket role
 // lives in gk_members and is checked by every handler.
 import { operatorAuth, type Bindings } from '../auth.server'
-import { ROLES, requireCapability, type Actor, type Role } from './actor'
+import { ROLES, can, requireCapability, type Actor, type Role } from './actor'
 import { all, commit, insist, newId, now, one, stmt } from './core'
 import { isTimeZone } from './dates'
 import type { Input } from './input'
 
 export async function site(env: Bindings) {
-  return await one<{ name: string; timezone: string; lead_days: number }>(env, 'SELECT name, timezone, lead_days FROM gk_site WHERE singleton = 1')
+  return await one<{ name: string; timezone: string; lead_days: number; technician_create_work: number }>(env, 'SELECT name, timezone, lead_days, technician_create_work FROM gk_site WHERE singleton = 1')
+}
+
+/**
+ * FIELD-009: creating work is a default right of the technician (maintainer) role that the owner turns off, and back on,
+ * for the site; while it is off every create door refuses a technician. Leads and the owner always create work.
+ */
+export async function createsWork(env: Bindings, actor: Actor) {
+  if (!can(actor, 'work.create')) return false
+  return actor.role !== 'maintainer' || (await site(env))?.technician_create_work !== 0
+}
+
+export async function setTechnicianWork(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'site.manage')
+  const current = await site(env)
+  insist(current, 'site_not_set_up', 409)
+  const allowed = input.flag('allowed')
+  insist(Boolean(current.technician_create_work) !== allowed, 'unchanged', 409)
+  await commit(env, [stmt(env, 'UPDATE gk_site SET technician_create_work = ?, updated_at = ? WHERE singleton = 1', allowed ? 1 : 0, now())],
+    { actor: actor.id, action: 'site.technicianwork', subject: 'site', detail: { site: current.name, allowed } })
+  return { allowed }
 }
 
 /** PM-001: the site's lead time, the whole days ahead of its due date that calendar PM work is issued. */

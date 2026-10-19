@@ -1571,6 +1571,71 @@ try {
     assert.ok((await (await h.raw('/app/schedules', { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '').includes('Restroom 2 doorLocation, no asset'))
   })
 
+  await check('FIELD-009 technician-created and after-the-fact work', async () => {
+    // A template naming a checklist: work made from it pins the checklist's current revision.
+    assert.equal((await h.api('template.save', cookie.lead, { name: 'Seal job', title: 'Replace the seal', checklist: 'nope' }, 404)).error, 'checklist_not_found')
+    await h.submit('template.save', cookie.lead, { name: 'Pump seal repair', title: 'Replace the pump seal', priority: 'high', checklist: ids.checklist }, '/app/templates')
+    const sealed = (await h.api('templates', cookie.max)).find(row => row.name === 'Pump seal repair')
+    assert.equal(sealed.checklist_id, ids.checklist)
+    const pump = (await h.api('asset.create', cookie.lead, { tag: 'PMP-9', name: 'Wash pump', location: 'Wash bay' })).id
+    await h.api('part.receive', cookie.lead, { part: ids.drier, quantity: '2' })
+    // (2) Work already done: past start and end, both or neither, start before end, never in the future.
+    const day = addDays(today, -1), at = time => `${day}T${time}`
+    const base = { asset: pump, template: sealed.id, title: '', due: today }
+    assert.equal((await h.api('workorder.create', cookie.max, { ...base, startedOn: at('07:45') }, 400)).error, 'started_and_ended')
+    assert.equal((await h.api('workorder.create', cookie.max, { ...base, startedOn: at('10:00'), endedOn: at('07:45') }, 400)).error, 'work_ends_before_start')
+    assert.equal((await h.api('workorder.create', cookie.max, { ...base, startedOn: at('07:45'), endedOn: `${addDays(today, 1)}T10:00` }, 400)).error, 'work_in_future')
+    const pageForm = (await (await h.raw(`/app/assets/${pump}`, { cookie: cookie.max })).text())
+    assert.ok(pageForm.includes('Already done? Record when') && pageForm.includes('Leave unassigned for a lead'), 'the technician\'s form offers past times and leaving it unassigned')
+    const done = (await h.submit('workorder.create', cookie.max, { ...base, priority: 'emergency', description: 'Seal blew during the wash cycle', startedOn: at('07:45'), endedOn: at('10:00') }, '/app/work/{id}')).pathname.split('/').pop()
+    const made = await wo('max', done)
+    assert.deepEqual([made.assignee_id, made.created_by, made.created_via, made.work_started_on, made.work_ended_on, made.priority, made.items.length > 0, made.number > 0], [ids.max, ids.max, 'web', at('07:45'), at('10:00'), 'emergency', true, true])
+    // Parts issued, a closed downtime and the template's checklist, then independent review: the creator cannot approve.
+    await h.api('workorder.issue', cookie.max, { workOrder: done, part: ids.drier, quantity: '1' })
+    await h.api('downtime.start', cookie.max, { workOrder: done, startedOn: at('08:00'), reason: 'Seal blown' })
+    await h.api('downtime.end', cookie.max, { workOrder: done, endedOn: at('09:30') })
+    await h.api('workorder.results', cookie.max, { workOrder: done, outcome: made.items.map(() => 'pass'), note: made.items.map(() => '') })
+    const page = (await (await h.raw(`/app/work/${done}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    assert.ok(page.includes('Raised by Max Ortiz through the web workspace') && page.includes('recorded afterwards'), 'the work page shows who raised it, how, and when it ran')
+    await h.api('workorder.submit', cookie.max, { workOrder: done, version: (await wo('max', done)).version })
+    await h.api('workorder.review', cookie.max, { workOrder: done, version: (await wo('max', done)).version, decision: 'approve' }, 403)
+    await h.api('workorder.review', cookie.sam, { workOrder: done, version: (await wo('sam', done)).version, decision: 'approve' })
+    const closed = await wo('sam', done)
+    assert.deepEqual([closed.status, closed.parts.map(row => row.used), closed.downtime.map(row => row.minutes)], ['closed', ['1'], [90]])
+    // (1) Through the JSON API a technician leaves new work unassigned: it waits on the lead's board, and they cannot name someone else.
+    assert.equal((await h.api('workorder.create', cookie.max, { location: 'Wash bay drain', title: 'Drain slow', due: today, unassigned: true, assignee: ids.max }, 400)).error, 'assignee_or_unassigned')
+    const open = (await h.api('workorder.create', cookie.max, { location: 'Wash bay drain', title: 'Drain slow', priority: 'high', due: today, unassigned: true })).id
+    assert.deepEqual([(await wo('lead', open)).assignee_id, (await wo('lead', open)).created_via], [null, 'api'])
+    assert.ok((await h.api('board', cookie.lead)).unassigned.some(row => row.id === open))
+    assert.ok((await (await h.raw('/app/board', { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '').includes('Not yet assigned'))
+    // (6) Reports count it like other work, each naming its creator and door; the audit download attributes creator, role and door.
+    const backlog = (await h.api('performance', cookie.lead)).backlog
+    assert.deepEqual(backlog.unestimated.filter(row => row.id === open).map(row => [row.created_by, row.door]), [['Max Ortiz', 'api']])
+    const mttr = await h.api(`reliability?asset=${pump}`, cookie.sam)
+    assert.deepEqual([mttr.mttr.sample, mttr.failures.map(row => [row.work.id, row.minutes, row.work.createdBy, row.work.door])], [1, [[done, 90, 'Max Ortiz', 'web']]])
+    const pareto = await h.api(`bad-actors?from=${day}&to=${day}&asset=${pump}`, cookie.sam)
+    assert.deepEqual(pareto.failures.map(row => [row.work.id, row.minutes, row.work.createdBy, row.work.door]), [[done, 90, 'Max Ortiz', 'web']])
+    const csv = await (await h.raw('/app/audit.csv?action=workorder.create', { cookie: cookie.owner })).text()
+    for (const [id, door] of [[done, 'web'], [open, 'api']]) assert.ok(csv.split('\r\n').some(line => line.includes(id) && line.includes('Max Ortiz,Maintainer') && line.includes(`""door"":""${door}""`)), `audit attributes ${door}`)
+    // (4) The owner turns the technician create-work right off for the site: every door refuses technicians; leads still create.
+    await h.api('site.technicianWork', cookie.lead, { allowed: false }, 403)
+    await h.api('site.technicianWork', cookie.owner, { allowed: true }, 409)
+    assert.equal((await h.submit('site.technicianWork', cookie.owner, {}, '/app/site')).searchParams.get('notice'), 'Saved.')
+    assert.equal((await h.api('workorder.create', cookie.max, { location: 'Wash bay', title: 'Hose split', due: today }, 403)).error, 'create_work_right_revoked')
+    assert.equal((await h.submit('workorder.create', cookie.nia, { asset: pump, title: 'Hose split', due: today }, '/app/work/{id}')).searchParams.get('error'), 'create_work_right_revoked')
+    assert.ok(!(await (await h.raw(`/app/assets/${pump}`, { cookie: cookie.max })).text()).includes('Raise corrective work'), 'the form is gone for technicians')
+    await h.api('workorder.create', cookie.lead, { asset: pump, title: 'Hose split', due: today, assignee: ids.max })
+    assert.ok((await (await h.raw('/app/site', { cookie: cookie.owner })).text()).includes('cannot raise work themselves'))
+    assert.ok((await h.api('audit?action=site.technicianwork', cookie.owner)).rows.some(row => JSON.parse(row.detail).allowed === false))
+    await h.api('site.technicianWork', cookie.owner, { allowed: true })
+    await h.api('workorder.create', cookie.max, { location: 'Wash bay', title: 'Hose split again', due: today })
+    // (5) Roles without the right are refused at the API and the form door.
+    for (const who of ['sam', 'agent']) {
+      await h.api('workorder.create', cookie[who], { asset: pump, title: 'Not mine', due: today }, 403)
+      assert.equal((await h.submit('workorder.create', cookie[who], { asset: pump, title: 'Not mine', due: today }, '/app/work/{id}')).searchParams.get('error'), 'forbidden')
+    }
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

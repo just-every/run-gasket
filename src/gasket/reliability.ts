@@ -52,9 +52,12 @@ export async function stopClass(env: Bindings, input: Input) {
 }
 
 /** Stops matching `where` (on gk_downtime d) with their asset and work, every classification in order and the one that counts. */
+/** A stop's work order, with who created it and through which door (FIELD-009). */
+export const workRef = (stop: Row) => stop.work_order_id ? { id: stop.work_order_id as string, number: stop.number as number, title: stop.title as string, createdBy: (stop.created_by_name ?? null) as string | null, door: (stop.created_via ?? null) as string | null } : null
+
 export async function classifiedStops(env: Bindings, where: string, ...params: unknown[]) {
-  const stops = await all(env, `SELECT d.*, a.tag AS asset_tag, a.name AS asset_name, w.number, w.title, m.name AS recorded_by_name FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id
-    LEFT JOIN gk_work_orders w ON w.id = d.work_order_id LEFT JOIN gk_members m ON m.id = d.recorded_by WHERE ${where} ORDER BY d.started_on, d.id`, ...params)
+  const stops = await all(env, `SELECT d.*, a.tag AS asset_tag, a.name AS asset_name, w.number, w.title, w.created_via, cm.name AS created_by_name, m.name AS recorded_by_name FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id
+    LEFT JOIN gk_work_orders w ON w.id = d.work_order_id LEFT JOIN gk_members cm ON cm.id = w.created_by LEFT JOIN gk_members m ON m.id = d.recorded_by WHERE ${where} ORDER BY d.started_on, d.id`, ...params)
   const corrections = await all(env, `SELECT c.*, m.name AS by FROM gk_downtime_classes c JOIN gk_downtime d ON d.id = c.downtime_id LEFT JOIN gk_members m ON m.id = c.recorded_by WHERE ${where} ORDER BY c.recorded_at, c.id`, ...params)
   const codes = new Map((await all(env, "SELECT id, key, label FROM gk_codes WHERE kind = 'failure_mode'")).map(code => [code.id, { key: code.key as string, label: code.label as string }]))
   const mode = (id: string | null) => id ? codes.get(id) ?? null : null
@@ -122,12 +125,12 @@ export async function reliability(env: Bindings, actor: Actor, url: URL) {
     const stoppedAt = zonedInstant(actor.zone, stop.started_on)
     const ack = acknowledgements.find(row => row.subject === stop.work_order_id && row.at >= stoppedAt)
     return {
-      id: stop.id, asset: { id: stop.asset_id, tag: stop.asset_tag, name: stop.asset_name }, work: stop.work_order_id ? { id: stop.work_order_id, number: stop.number, title: stop.title } : null,
+      id: stop.id, asset: { id: stop.asset_id, tag: stop.asset_tag, name: stop.asset_name }, work: workRef(stop),
       started_on: stop.started_on, ended_on: stop.ended_on, minutes: stop.minutes, reason: stop.reason, failureMode: stop.failureMode, reclassified: stop.reclassified, classifications: stop.classifications,
       covered: Boolean(span.from && stop.started_on >= span.from && stop.started_on <= span.to!), acknowledgedAt: ack?.at ?? null, ackMinutes: ack ? (ack.at - stoppedAt) / 60_000 : null,
     }
   })
-  const plannedStops = stops.filter(stop => stop.planned).map(stop => ({ id: stop.id, asset: { id: stop.asset_id, tag: stop.asset_tag, name: stop.asset_name }, work: stop.work_order_id ? { id: stop.work_order_id, number: stop.number, title: stop.title } : null, started_on: stop.started_on, ended_on: stop.ended_on, minutes: stop.minutes, reason: stop.reason, reclassified: stop.reclassified, classifications: stop.classifications }))
+  const plannedStops = stops.filter(stop => stop.planned).map(stop => ({ id: stop.id, asset: { id: stop.asset_id, tag: stop.asset_tag, name: stop.asset_name }, work: workRef(stop), started_on: stop.started_on, ended_on: stop.ended_on, minutes: stop.minutes, reason: stop.reason, reclassified: stop.reclassified, classifications: stop.classifications }))
 
   const assets = assetIds.map(id => {
     const span = covered.get(id)!, mine = failures.filter(row => row.asset.id === id), inside = mine.filter(row => row.covered).length

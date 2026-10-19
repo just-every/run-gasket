@@ -29,14 +29,15 @@ import { countPart, createPart, receivePart } from './parts'
 import { decide, prepare } from './proposals'
 import { review, submit } from './review'
 import { createSchedule, evaluateMeter, generateDue } from './schedules'
-import { configureSite, endAccess, giveAccess, setRole } from './site'
+import { configureSite, endAccess, giveAccess, setRole, setTechnicianWork } from './site'
 import { retireField, saveField, saveStatus, setFieldValue, setWaiting } from './work-fields'
-import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, recordFinding, recordReadings, recordResults } from './work'
+import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, doorOf, recordFinding, recordReadings, recordResults } from './work'
 
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
   'site.configure': (env, actor, input) => configureSite(env, actor, input),
+  'site.technicianWork': (env, actor, input) => setTechnicianWork(env, actor, input),
   'access.give': (env, actor, input, request) => giveAccess(env, actor, input, request),
   'access.role': (env, actor, input) => setRole(env, actor, input),
   'access.end': (env, actor, input, request) => endAccess(env, actor, input, request),
@@ -83,7 +84,7 @@ export const actions: Record<string, Handler> = {
   'blocker.raise': (env, actor, input) => raiseBlocker(env, actor, input),
   'blocker.resolve': (env, actor, input) => resolveBlocker(env, actor, input),
   'closure.remove': (env, actor, input) => removeClosure(env, actor, input),
-  'workorder.create': (env, actor, input) => createCorrective(env, actor, input),
+  'workorder.create': (env, actor, input, request) => createCorrective(env, actor, input, { door: doorOf(request) }),
   'workorder.assign': (env, actor, input) => assign(env, actor, input),
   'workorder.plan': (env, actor, input) => decidePlan(env, actor, input),
   'workorder.cancel': (env, actor, input) => cancel(env, actor, input),

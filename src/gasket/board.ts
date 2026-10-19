@@ -1,5 +1,5 @@
 // Clause 10: the supervisor's view of overdue work, work waiting for review,
-// open follow-ups, assets down now, recent downtime and low parts.
+// unassigned work, open follow-ups, assets down now, recent downtime and low parts.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { all } from './core'
@@ -14,6 +14,8 @@ export async function board(env: Bindings, actor: Actor) {
   const since = addDays(actor.today, -30), clock = localNow(actor.zone)
   const overdue = await all(env, `${ORDER} WHERE w.status NOT IN ('closed', 'cancelled', 'submitted') AND w.due_date < ? ORDER BY w.due_date, w.number`, actor.today)
   const awaitingReview = await all(env, `${ORDER} WHERE w.status = 'submitted' ORDER BY w.submitted_at`)
+  // FIELD-009: open work nobody holds yet (a technician may leave their own work for a lead to assign).
+  const unassigned = await all(env, `${ORDER} WHERE w.assignee_id IS NULL AND w.status NOT IN ('closed', 'cancelled', 'submitted') ORDER BY w.due_date, w.number`)
   const followUps = await all(env, `${ORDER} WHERE w.follow_up_of IS NOT NULL AND w.status NOT IN ('closed', 'cancelled') ORDER BY w.due_date`)
   const down = (await all(env, 'SELECT d.started_on, d.reason, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, w.number FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id LEFT JOIN gk_work_orders w ON w.id = d.work_order_id WHERE d.ended_on IS NULL AND d.degraded = 0 ORDER BY d.started_on'))
     .map(row => ({ ...row, minutesSoFar: Math.max(0, minutesBetween(row.started_on, clock)) }))
@@ -29,5 +31,5 @@ export async function board(env: Bindings, actor: Actor) {
     perAsset.set(row.asset_id, entry)
   }
   const lowParts = (await partList(env, actor)).filter(part => part.below)
-  return { today: actor.today, since, overdue, awaitingReview, followUps, down, downtime: [...perAsset.values()].sort((a, b) => b.minutes - a.minutes), lowParts }
+  return { today: actor.today, since, overdue, awaitingReview, unassigned, followUps, down, downtime: [...perAsset.values()].sort((a, b) => b.minutes - a.minutes), lowParts }
 }

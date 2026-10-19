@@ -9,7 +9,7 @@ import { type Actor } from './actor'
 import { all, insist, type Row } from './core'
 import { addDays, daysBetween, isDate, localNow, minutesBetween } from './dates'
 import { meterState } from './meters'
-import { HOUR_UNITS, classifiedStops } from './reliability'
+import { HOUR_UNITS, classifiedStops, workRef } from './reliability'
 import { site } from './site'
 import { intersect, minutes, productionSpans, union, type Span } from './spans'
 
@@ -50,7 +50,7 @@ export async function outagePeriod(env: Bindings, actor: Actor, url: URL) {
     const kind: Kind = stop.planned ? 'planned' : stop.degraded ? 'degraded' : 'failure'
     return {
       id: stop.id as string, asset: brief(entries.get(stop.asset_id))!, line: lineOf(stop.asset_id), depth: ancestry(stop.asset_id).length,
-      work: stop.work_order_id ? { id: stop.work_order_id as string, number: stop.number as number, title: stop.title as string } : null,
+      work: workRef(stop),
       kind, failureMode: stop.failureMode, reason: stop.reason as string, started_on: stop.started_on as string, ended_on: (stop.ended_on ?? null) as string | null, open: !stop.ended_on,
       span, startsBefore: stop.started_on < start, endsAfter: !stop.ended_on || stop.ended_on > end,
       production: inProduction, productionMinutes: minutes(inProduction), outsideProductionMinutes: minutesBetween(span.from, span.to) - minutes(inProduction),

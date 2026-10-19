@@ -40,7 +40,7 @@ export function estimate(input: Input) {
 const hours = (minutes: number) => Math.round(minutes / 6) / 10
 const percent = (part: number, whole: number) => whole ? Math.round(part / whole * 1000) / 10 : null
 const tally = (rows: Row[]) => ({ count: rows.length, hours: hours(rows.reduce((sum, row) => sum + (row.estimate_minutes ?? 0), 0)), unestimated: rows.filter(row => !row.estimate_minutes).length })
-const brief = (row: Row) => ({ id: row.id, number: row.number, title: row.title, kind: row.kind, status: row.status, due_date: row.due_date, assignee: row.assignee ?? null, team: row.team ?? null, estimate_hours: row.estimate_minutes ? hours(row.estimate_minutes) : null })
+const brief = (row: Row) => ({ id: row.id, number: row.number, title: row.title, kind: row.kind, status: row.status, due_date: row.due_date, assignee: row.assignee ?? null, created_by: row.creator ?? null, door: row.created_via ?? null, team: row.team ?? null, estimate_hours: row.estimate_minutes ? hours(row.estimate_minutes) : null })
 
 export async function performance(env: Bindings, actor: Actor, url: URL) {
   requireCapability(actor, 'board.read')
@@ -56,7 +56,7 @@ export async function performance(env: Bindings, actor: Actor, url: URL) {
   const byTeam = (column: string) => teamId ? `AND ${column} = ?` : ''
   const teamArgs = teamId ? [teamId] : []
 
-  const orders = (await all(env, `SELECT w.*, m.name AS assignee, t.name AS team FROM gk_work_orders w LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_teams t ON t.id = w.team_id WHERE w.merged_into IS NULL ${byTeam('w.team_id')}`, ...teamArgs))
+  const orders = (await all(env, `SELECT w.*, m.name AS assignee, cm.name AS creator, t.name AS team FROM gk_work_orders w LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_members cm ON cm.id = w.created_by LEFT JOIN gk_teams t ON t.id = w.team_id WHERE w.merged_into IS NULL ${byTeam('w.team_id')}`, ...teamArgs))
     .map(row => ({ ...row, done_on: row.submitted_at && DONE.includes(row.status) ? localDate(actor.zone, row.submitted_at) : null, closed_on: row.closed_at ? localDate(actor.zone, row.closed_at) : null, raised_on: localDate(actor.zone, row.created_at) }))
 
   // Backlog now.

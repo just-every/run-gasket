@@ -162,8 +162,11 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     status: tag(STATUS[w.status]),
     meta: [{ label: 'Due date', icon: ICON.calendar, value: h`${showDate(w.due_date)} ${dueTag(w.due_date, w.status, actor.today)}` }, { label: 'Assigned maintainer', icon: ICON.person, value: w.assignee_name ?? 'Not assigned' }],
     art: machine({ name: w.asset_name, category: w.asset_category }, 'band') })}`
+  // FIELD-009: who raised the work, through which door, and when work already done ran.
+  const DOOR: Record<string, string> = { web: 'the web workspace', api: 'the JSON API' }
+  const raisedBy = (w: any) => h`${w.created_via ? h`<p class="gk-sub">Raised by ${w.created_by_name ?? 'a former member'} through ${DOOR[w.created_via] ?? w.created_via}</p>` : ''}${w.work_started_on ? h`<p class="gk-sub">Done ${showLocal(w.work_started_on)} to ${showLocal(w.work_ended_on)}, recorded afterwards</p>` : ''}`
   // The checklist card names preventive work; other work says what needs doing in its own card.
-  const task = w.items.length && w.title === w.checklist_name && !w.description ? '' : card('What needs doing', h`<p>${w.title}</p>${w.description ? h`<p class="gk-muted">${w.description}</p>` : ''}`, { id: 'task' })
+  const task = w.items.length && w.title === w.checklist_name && !w.description ? '' : card('What needs doing', h`<p>${w.title}</p>${w.description ? h`<p class="gk-muted">${w.description}</p>` : ''}${raisedBy(w)}`, { id: 'task' })
 
   const done = w.items.filter(item => item.result).length
   const checklist = !w.items.length ? '' : card(`${w.checklist_name}, revision ${w.checklist_revision}`, recording

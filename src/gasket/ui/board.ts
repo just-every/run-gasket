@@ -18,6 +18,7 @@ export async function boardPage(env: Bindings, actor: Actor, url: URL) {
     <div class="gk-columns"><div class="gk-col-main">
     ${card('Overdue work', b.overdue.length ? table(headings, orderRows(b.overdue, b.today), 'Overdue work', { wrap: [0] }) : none('Nothing is overdue.'), { id: 'overdue' })}
     ${card('Waiting for review', b.awaitingReview.length ? table(headings, orderRows(b.awaitingReview, b.today), 'Waiting for review', { wrap: [0] }) : none('Nothing is waiting for review.'), { id: 'review' })}
+    ${card('Not yet assigned', b.unassigned.length ? table(headings, orderRows(b.unassigned, b.today), 'Not yet assigned', { wrap: [0] }) : none('Every open work order has someone on it.'), { id: 'unassigned' })}
     ${card('Open follow-ups', b.followUps.length ? table(headings, orderRows(b.followUps, b.today), 'Open follow-ups', { wrap: [0] }) : none('No open follow-up work.'), { id: 'follow-ups' })}
     </div><div class="gk-col-side">
     ${card('Down now', b.down.length ? table(['Asset', 'Since', 'Reason'], b.down.map(row => [h`<a href="/app/assets/${row.asset_id}">${row.asset_name}</a><span class="gk-sub">${row.asset_tag}${row.number ? ` · ${woNumber(row.number)}` : ''}</span>`, h`${showLocal(row.started_on)}<span class="gk-sub">${showNumber(row.minutesSoFar)} minutes so far</span>`, row.reason]), 'Down now', { wrap: [0, 2] }) : none('Every asset is in service.'), { id: 'down' })}

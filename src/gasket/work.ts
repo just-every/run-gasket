@@ -23,6 +23,11 @@ import { partList } from './parts'
 import { workCosts } from './bad-actors'
 import { chosenTemplate, priorityOf } from './templates'
 import { fieldsOf } from './work-fields'
+import { createsWork } from './site'
+
+/** FIELD-009: the door a work order was created through: the web workspace's form door or the JSON API. */
+export type Door = 'web' | 'api'
+export const doorOf = (request: Request): Door => new URL(request.url).pathname.startsWith('/api/') ? 'api' : 'web'
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
@@ -50,8 +55,9 @@ const touch = (env: Bindings, order: { id: string; version: number }) => [
   stmt(env, "UPDATE gk_work_orders SET version = version + 1, status = 'in_progress' WHERE id = ?", order.id),
 ]
 
-export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
+export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also, door }: FromProposal & { door?: Door } = {}) {
   requireCapability(actor, proposal ? 'proposal.decide' : 'work.create')
+  if (!proposal) insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
   // PLAN-001: work names an asset or, with no asset, a location (the text given, trimmed); never both.
   const assetId = input.text('asset', { optional: true, max: 100 }) || null, location = input.text('location', { optional: true, max: 160 }) || null
   insist(Boolean(assetId) !== Boolean(location), 'asset_or_location')
@@ -67,16 +73,29 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   const priority = priorityOf(input) ?? (template?.priority as string | undefined) ?? 'normal'
   const due = input.text('due', { max: 10 })
   insist(isDate(due), 'invalid_due')
-  // FIELD-009 (slice): a technician's own work is assigned to them; only a lead or the owner assigns it to someone else.
+  // FIELD-009: a technician's own work is assigned to them unless they leave it unassigned for a lead; only a lead or the owner assigns someone else.
   const planner = Boolean(proposal) || can(actor, 'work.assign')
-  const assignee = input.text('assignee', { optional: true, max: 100 }) || (planner ? null : actor.id)
-  insist(planner || assignee === actor.id, 'assign_to_self', 403)
+  const unassigned = input.flag('unassigned'), named = input.text('assignee', { optional: true, max: 100 }) || null
+  insist(!(unassigned && named), 'assignee_or_unassigned')
+  const assignee = unassigned ? null : named ?? (planner ? null : actor.id)
+  insist(planner || assignee === null || assignee === actor.id, 'assign_to_self', 403)
+  // FIELD-009: work already done carries its past start and end, site-local minutes, start <= end <= now; both or neither.
+  const startedOn = input.text('startedOn', { optional: true, max: 16 }) || null, endedOn = input.text('endedOn', { optional: true, max: 16 }) || null
+  insist(Boolean(startedOn) === Boolean(endedOn), 'started_and_ended')
+  if (startedOn && endedOn) {
+    insist(isLocalTime(startedOn), 'invalid_startedOn')
+    insist(isLocalTime(endedOn), 'invalid_endedOn')
+    insist(startedOn <= endedOn, 'work_ends_before_start')
+    insist(endedOn <= localNow(actor.zone), 'work_in_future')
+  }
+  // A template's checklist pins its current revision on the new work.
+  const checklistRevision = template?.checklist_id ? (await one(env, 'SELECT id FROM gk_checklist_revisions WHERE checklist_id = ? ORDER BY number DESC LIMIT 1', template.checklist_id))?.id as string : null
   const crew = await crewChoice(env, input, null)
   if (assignee) await assigneeFits(env, assignee, crew.team)
   const estimateMinutes = estimate(input) ?? (template?.estimate_minutes as number | null) ?? null
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, required_fields, requires_evidence, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, template?.required_fields ?? null, template?.requires_evidence ?? 0, actor.id, now()), ...(also?.(id) ?? [])],
-    { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, required_fields, requires_evidence, checklist_revision_id, work_started_on, work_ended_on, created_via, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, template?.required_fields ?? null, template?.requires_evidence ?? 0, checklistRevision, startedOn, endedOn, door ?? null, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(checklistRevision ? { checklistRevision } : {}), ...(startedOn ? { startedOn, endedOn } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}), ...(door ? { door } : {}) } })
   return { id }
 }
 
@@ -291,8 +310,8 @@ export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collabo
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
   // Work at a location with no asset (PLAN-001) shows the location where an asset's name and place would be.
   const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
-    m.name AS assignee_name, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
-    FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_work_templates t ON t.id = w.template_id LEFT JOIN gk_work_statuses ws ON ws.id = w.waiting_status
+    m.name AS assignee_name, cr.name AS created_by_name, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
+    FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_members cr ON cr.id = w.created_by LEFT JOIN gk_work_templates t ON t.id = w.template_id LEFT JOIN gk_work_statuses ws ON ws.id = w.waiting_status
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
     LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
   insist(order, 'work_order_not_found', 404)
