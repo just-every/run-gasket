@@ -92,7 +92,7 @@ The scheduler's existing fixed-calendar and approval-reading meter cadence remai
 
 - **ASSET-003 — Manuals, documents and warranties.** Assets hold versioned OEM manuals, diagrams, warranties, supplier contacts, commissioning dates and authorized documents with expiry reminders. Technicians see the version linked to issued work; offline packs include approved files and retain original attribution. **Acceptance evidence:** Attach two manual revisions, link one to work, set a warranty expiration and download the job pack. Change the master and inspect issued/offline documents plus the named owner's expiry reminder.
 
-- **ASSET-004 — Status, criticality and failure taxonomy.** Asset states distinguish available, degraded, down, out of service and retired; criticality, risk, failure mode, cause and remedy codes are maintained centrally and mapped on imports. A status change keeps its effective time and reason; manual and telemetry disagreement is visible. **Acceptance evidence:** Take a critical pump down, correct its outage classification and map an imported failure code. Inspect effective status history and unclassified/contradictory evidence in reports without rewriting the original event.
+- **ASSET-004 — Status, criticality and failure taxonomy.** Asset states distinguish available, degraded, down, out of service and retired; criticality, risk, failure mode, cause and remedy codes are maintained centrally and mapped on imports. A status change keeps its effective time and reason; manual and telemetry disagreement is visible. The catalog is one site-wide list per kind: criticality is an ordered list of levels (seeded Normal, Important, Critical) that leads add to, reorder, relabel and retire, and risk, failure mode, cause and remedy codes are maintained the same way. A code's key never changes; every record keeps the code it was given, a retired code stays readable on it and is no longer given to new records or matched by imports. An imported value maps onto the active code whose key, label or one of its import names equals it, ignoring case; a value that matches none is refused for criticality and moves in unclassified, with an attention item, for a failure code. Findings carry optional failure mode, cause, remedy and risk codes, and the failure report counts findings and moved-in work by code, lists what is unclassified and names the assets whose evidence disagrees with their declared state. Done covers every importer that exists today (MaintainX criticality and work categories); each later importer (MIG-001 through MIG-008) maps the codes its source carries this way before it ships. **Acceptance evidence:** Take a critical pump down, correct its outage classification and map an imported failure code. Inspect effective status history and unclassified/contradictory evidence in reports without rewriting the original event.
 
 - **ASSET-005 — Meters, units and counter corrections.** Meters record source time, receipt time, unit, quality and provenance for counter/gauge/condition readings. Reset, replacement, rollover and corrected readings require an explained append-only adjustment; stale or suspect readings cannot silently fire PMs or reverse counters. Staleness is per meter feed: each meter declares a feed window in whole hours (1 to 168, 24 by default; a daily-cadence feed can declare 36), and a feed reading received more than that window after its source time is stale. Manual readings, attested by the person who took them on a work order, are not aged. A reading keeps the quality it was received with when the window later changes, and creating due work lists the schedules that stale or suspect readings hold back. **Acceptance evidence:** Enter manual readings then a replacement counter and late/corrected feed through public doors. Compare normalized run hours, quality flags and due work, and attempt an unexplained backwards reading.
 
@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004 and ASSET-005 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002 and ASSET-004 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 3 | 41 | 78 | 122 |
-| All | 17 | 41 | 78 | 136 |
+| Target and push further | 4 | 40 | 78 | 122 |
+| All | 18 | 40 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -397,7 +397,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `ASSET-001` | Asset and location hierarchy | target | partial | `src/gasket/assets.ts` | Flat asset locations exist; no parent-child assets, location hierarchy or rollups. |
 | `ASSET-002` | QR and barcode identification | target | missing |  | No label generation, scan workflow or scoped QR routes. |
 | `ASSET-003` | Manuals, documents and warranties | target | missing |  | Evidence uploads attach to work only; no asset manuals, warranties, document revisions or expiry workflow. |
-| `ASSET-004` | Status, criticality and failure taxonomy | target | partial | `src/gasket/states.ts`; `src/gasket/assets.ts`; `src/gasket/work.ts`; `tests/gasket/flows.mjs` | In service, degraded, down, out of service and retired states with effective time, reason and append-only reclassification, and visible disagreement with open downtime or a rising feed counter, exist (`asset.state`); a central criticality, risk, failure mode, cause and remedy code catalog, its use on findings and reports, and code mapping on imports do not. |
+| `ASSET-004` | Status, criticality and failure taxonomy | target | done | `src/gasket/states.ts`; `src/gasket/codes.ts`; `src/gasket/assets.ts`; `src/gasket/work.ts`; `src/gasket/movein/maintainx.ts`; `migrations/core/0025_codes.sql`; `tests/gasket/flows.mjs` |  |
 | `ASSET-005` | Meters, units and counter corrections | target | done | `src/gasket/meters.ts`; `src/gasket/schedules.ts`; `src/gasket/work.ts`; `migrations/core/0021_meter_quality.sql`; `tests/gasket/flows.mjs` |  |
 | `ASSET-006` | Bill of materials and interchangeable spares | target | missing |  | No equipment BOM, substitute compatibility or tool list. |
 | `ASSET-007` | Asset lifecycle and replacement decision | target | partial | `src/gasket/assets.ts` | Register identity and retirement exist; acquisition, warranty/service agreements, replacement economics and disposal details do not. |

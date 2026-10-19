@@ -18,8 +18,8 @@ In Gasket, open **More → Move in from MaintainX**, choose the files and how da
 The dry run writes nothing. It shows:
 
 - how many assets, meters, readings, parts and completed work orders would be created;
-- every rejected row and why, for example a row with no location, a duplicate MaintainX ID, a criticality other than Normal, Important or Critical, a counter reading lower than an earlier one, or a work order that is not Done;
-- what needs your attention, such as an asset that was Offline in MaintainX;
+- every rejected row and why, for example a row with no location, a duplicate MaintainX ID, a criticality that is not one of your levels under **More → Codes and failures**, a counter reading lower than an earlier one, or a work order that is not Done;
+- what needs your attention, such as an asset that was Offline in MaintainX, or a work order whose categories match no failure mode code (it moves in unclassified);
 - what is not carried across.
 
 Fix rows in MaintainX and export again, or carry on without them. A dry run of files you already applied shows those rows as already moved in, unchanged.

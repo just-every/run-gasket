@@ -7,12 +7,14 @@
 // action in the bottom bar.
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
+import { codeList } from '../codes'
 import { daysBetween, localNow, showClock, showDate, showDay, showInstant, showLocal, showTime } from '../dates'
 import { partList } from '../parts'
 import { assignable, site } from '../site'
 import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../today'
 import { woDigits } from '../quantity'
 import { workList, workOrderDetail } from '../work'
+import { CODE_KIND } from './codes'
 import { OUTCOME, STATUS, amount, area, backLink, band as headerBand, card, checkbox, details, field, fileField, form, h, hidden, initials, raw, select, table, tag, woNumber, type Html } from './html'
 import { ICON, actionIcon, machine } from './icons'
 import { ACTIONS, ZONE_LABELS, auditRecords } from './settings'
@@ -178,8 +180,11 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     ${working && !open ? post('downtime.start', h`${field('Went down at', 'startedOn', { type: 'datetime-local', value: localNow(actor.zone) })}${field('Reason', 'reason')}`, 'Record asset down', { secondary: true }) : ''}
     ${working && open ? post('downtime.end', field('Back in service at', 'endedOn', { type: 'datetime-local', value: localNow(actor.zone) }), 'Record back in service', { secondary: true }) : ''}`, { id: 'downtime' })
 
-  const findings = card('Corrective findings', h`${w.findings.length ? h`<ul class="gk-findings">${w.findings.map(row => h`<li>${tag(row.severity === 'high' ? 'High' : row.severity === 'medium' ? 'Medium' : 'Low')} ${row.item !== null ? h`<b>Step ${row.item + 1}:</b> ` : ''}${row.text}${row.follow_up_id ? h`<span class="gk-sub">${row.rule_id ? 'Correction' : 'Follow-up'} <a href="/app/work/${row.follow_up_id}">${woNumber(row.follow_up_number)}</a> · ${STATUS[row.follow_up_status]}${row.obligation ? ` · ${OBLIGATION[row.obligation]}` : ''}</span>` : ''}</li>`)}</ul>` : h`<p class="gk-muted">No findings recorded.</p>`}
-    ${working ? post('finding.record', h`${w.items.length ? select('Checklist step', 'item', w.items.map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}${item.result && item.result.outcome !== 'pass' ? ` (${OUTCOME[item.result.outcome]})` : ''}` })), w.items.find(item => item.result && item.result.outcome !== 'pass' && !w.findings.some(row => row.item === item.index))?.index.toString() ?? '', { required: false, blank: 'The whole work order' }) : ''}${area('What was found and what was done', 'text')}${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], 'low')}${checkbox('Needs follow-up work (raises a corrective work order)', 'followUp')}${field('Follow-up due', 'followUpDue', { type: 'date', required: false, hint: 'Leave empty for tomorrow (high) or a week from today.' })}`, 'Record finding', { secondary: true }) : ''}`, { id: 'findings' })
+  // ASSET-004: the catalog's active codes, offered on a finding when the catalog has any.
+  const catalog = (await codeList(env)).filter(code => !code.retired)
+  const codeFields = h`<div class="gk-grid">${(['failure_mode', 'cause', 'remedy', 'risk'] as const).map(kind => ({ kind, options: catalog.filter(code => code.kind === kind) })).filter(({ options }) => options.length).map(({ kind, options }) => select(CODE_KIND[kind], kind === 'failure_mode' ? 'failureMode' : kind, options.map(code => ({ value: code.key, label: code.label })), '', { required: false, blank: 'Not classified' }))}</div>`
+  const findings = card('Corrective findings', h`${w.findings.length ? h`<ul class="gk-findings">${w.findings.map(row => h`<li>${tag(row.severity === 'high' ? 'High' : row.severity === 'medium' ? 'Medium' : 'Low')} ${row.item !== null ? h`<b>Step ${row.item + 1}:</b> ` : ''}${row.text}${row.codes ? h`<span class="gk-sub">${row.codes}</span>` : ''}${row.follow_up_id ? h`<span class="gk-sub">${row.rule_id ? 'Correction' : 'Follow-up'} <a href="/app/work/${row.follow_up_id}">${woNumber(row.follow_up_number)}</a> · ${STATUS[row.follow_up_status]}${row.obligation ? ` · ${OBLIGATION[row.obligation]}` : ''}</span>` : ''}</li>`)}</ul>` : h`<p class="gk-muted">No findings recorded.</p>`}
+    ${working ? post('finding.record', h`${w.items.length ? select('Checklist step', 'item', w.items.map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}${item.result && item.result.outcome !== 'pass' ? ` (${OUTCOME[item.result.outcome]})` : ''}` })), w.items.find(item => item.result && item.result.outcome !== 'pass' && !w.findings.some(row => row.item === item.index))?.index.toString() ?? '', { required: false, blank: 'The whole work order' }) : ''}${area('What was found and what was done', 'text')}${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], 'low')}${codeFields}${checkbox('Needs follow-up work (raises a corrective work order)', 'followUp')}${field('Follow-up due', 'followUpDue', { type: 'date', required: false, hint: 'Leave empty for tomorrow (high) or a week from today.' })}`, 'Record finding', { secondary: true }) : ''}`, { id: 'findings' })
 
   // PM-004: the failure this correction answers, and its assignee's acknowledgement.
   const origin = w.origin ? card('Failed step to correct', h`<p>${w.origin.text}</p><p class="gk-sub">From <a href="/app/work/${w.origin.work_order_id}">${woNumber(w.origin.number)}</a> · ${w.origin.severity} severity · rule ${w.origin.rule}</p>

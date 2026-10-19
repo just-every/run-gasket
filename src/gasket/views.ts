@@ -6,6 +6,7 @@ import { assetDetail, assetList } from './assets'
 import { audit } from './audit'
 import { board } from './board'
 import { checklistDetail, checklistList } from './checklists'
+import { codeList, failureReport } from './codes'
 import { GasketError } from './core'
 import { API_DOORS, match } from './doors'
 import { assetHistory } from './history'
@@ -36,6 +37,8 @@ export const views: Record<string, View> = {
   proposals: (env, actor) => proposalList(env, actor),
   imports: (env, actor) => importJobs(env, actor),
   audit: (env, actor, _id, url) => audit(env, actor, url),
+  codes: env => codeList(env),
+  failures: (env, actor) => failureReport(env, actor),
 }
 
 export function route(path: string): { view: View; id: string } {

@@ -3,6 +3,7 @@
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
 import { assetList } from '../assets'
+import { codeList } from '../codes'
 import { addDays, showDate, showInstant, showLocal } from '../dates'
 import { assetHistory } from '../history'
 import { COUNTER_CHANGES } from '../meters'
@@ -11,23 +12,26 @@ import { STATUS, amount, area, assetMark, backLink, band as headerBand, card, de
 import { machine } from './icons'
 import { page } from './shell'
 
-const CRITICALITY = [{ value: 'normal', label: 'Normal' }, { value: 'important', label: 'Important' }, { value: 'critical', label: 'Critical' }]
-const identityFields = (asset: Record<string, any> = {}) => h`<div class="gk-grid">
+type Level = { key: string; label: string; retired: boolean }
+/** Active criticality levels in catalog order, plus the asset's own level if it was retired since. */
+const levels = (catalog: Level[], kept?: string) => catalog.filter(level => !level.retired || level.key === kept).map(level => ({ value: level.key, label: level.retired ? `${level.label} (retired)` : level.label }))
+const identityFields = (catalog: Level[], asset: Record<string, any> = {}) => h`<div class="gk-grid">
   ${field('Asset tag', 'tag', { value: asset.tag ?? '', hint: 'The label on the equipment.' })}${field('Name', 'name', { value: asset.name ?? '' })}
   ${field('Serial', 'serial', { value: asset.serial ?? '', required: false })}${field('Location', 'location', { value: asset.location ?? '' })}
   ${field('Custodian', 'custodian', { value: asset.custodian ?? '', required: false, hint: 'The person responsible for it day to day.' })}${field('Category', 'category', { value: asset.category ?? '', required: false })}
-  ${select('Criticality', 'criticality', CRITICALITY, asset.criticality ?? 'normal')}</div>${area('Notes', 'notes', { value: asset.notes ?? '', required: false })}`
+  ${select('Criticality', 'criticality', levels(catalog, asset.criticality), asset.criticality ?? 'normal')}</div>${area('Notes', 'notes', { value: asset.notes ?? '', required: false })}`
 
 export async function assetsPage(env: Bindings, actor: Actor, url: URL) {
   const rows = await assetList(env, actor)
   const manage = can(actor, 'register.manage')
+  const catalog = await codeList(env, 'criticality')
   const list = rows.length ? table(['Asset', 'Location', 'Custodian', 'Criticality', 'Status', 'Next due', 'Last sighting'], rows.map(row => {
     const [outcome, at] = (row.last_sighting ?? '').split('|')
     return [h`<span class="gk-with-art">${assetMark(row)}<span><a href="/app/assets/${row.id}">${row.name}</a><span class="gk-sub">${row.tag}${row.serial ? ` · ${row.serial}` : ''}${row.origin === 'import' ? ' · moved in' : ''}</span></span></span>`, row.location, row.custodian ?? '—',
-      row.criticality === 'normal' ? 'Normal' : row.criticality === 'important' ? 'Important' : 'Critical', h`${tag(STATUS[row.status])}${row.conflicts ? h`<span class="gk-sub">${tag('Evidence disagrees')}</span>` : ''}`, showDate(row.next_due),
+      row.criticality_label ?? row.criticality, h`${tag(STATUS[row.status])}${row.conflicts ? h`<span class="gk-sub">${tag('Evidence disagrees')}</span>` : ''}`, showDate(row.next_due),
       outcome ? h`${tag(outcome === 'found' ? 'Found' : outcome === 'elsewhere' ? 'Found elsewhere' : 'Missing')}<span class="gk-sub">${showInstant(Number(at), actor.zone)}</span>` : h`<span class="gk-muted">Never</span>`]
   }), 'Assets', { wrap: [1, 2] }) : h`<div class="gk-empty"><img src="/brand/assets/plinth.svg" alt="" width="360" height="244"><h2>No assets yet</h2><p>${manage ? 'Register the equipment you maintain below, or move in your MaintainX asset export.' : 'A maintenance lead registers the site\'s equipment.'}</p>${manage ? h`<p><a class="gk-button gk-secondary" href="/app/move-in">Move in from MaintainX</a></p>` : ''}</div>`
-  const create = manage ? card('Register an asset', form('asset.create', '/app/assets/{id}', identityFields(), 'Register asset'), { id: 'register' }) : ''
+  const create = manage ? card('Register an asset', form('asset.create', '/app/assets/{id}', identityFields(catalog), 'Register asset'), { id: 'register' }) : ''
   return page(env, 'Assets', actor, h`<div class="gk-head"><div><h1>Assets</h1><p class="gk-lede">The equipment this site owns and keeps in service.</p></div></div>${rows.length ? h`${list}${create}` : h`<div class="gk-columns gk-columns-even"><div class="gk-col-main">${list}</div><div class="gk-col-side">${create}</div></div>`}`, { url })
 }
 
@@ -37,7 +41,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const back = `/app/assets/${asset.id}`
   const band = headerBand({ id: 'asset-name', eyebrow: `${asset.tag}${asset.category ? ` · ${asset.category}` : ''}`, title: asset.name,
     facts: [`Serial ${asset.serial ?? '—'}`, asset.location, `Custodian: ${asset.custodian ?? '—'}`], status: tag(STATUS[asset.status]),
-    meta: [{ label: 'Criticality', value: asset.criticality === 'normal' ? 'Normal' : asset.criticality === 'important' ? 'Important' : 'Critical' }, { label: 'Downtime recorded', value: `${downtimeMinutes} minutes` }],
+    meta: [{ label: 'Criticality', value: asset.criticality_label ?? asset.criticality }, { label: 'Downtime recorded', value: `${downtimeMinutes} minutes` }],
     art: machine(asset, 'band') })
   const meters = card('Meters', h`${asset.meters.length ? table(['Meter', 'Latest'], asset.meters.map((meter: any) => [h`${meter.name}<span class="gk-sub">${meter.kind === 'counter' ? 'Counter' : meter.kind === 'gauge' ? 'Gauge' : 'Condition'}</span>`,
       meter.latest ? h`${meter.kind === 'condition' ? meter.latest.charAt(0).toUpperCase() + meter.latest.slice(1) : amount(meter.latest, meter.unit)}<span class="gk-sub">Taken ${showLocal(meter.latest_on)}</span>${meter.kind === 'counter' && meter.normalized !== meter.latest ? h`<span class="gk-sub">Total across counter changes ${amount(meter.normalized, meter.unit)}</span>` : ''}${meter.held ? h`<span class="gk-sub">${tag('Suspect')} ${meter.held} flagged reading${meter.held === 1 ? '' : 's'} held back</span>` : ''}` : '—']), 'Meters', { wrap: [0] }) : h`<p class="gk-muted">No meters yet.</p>`}
@@ -52,7 +56,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
     ${can(actor, 'register.manage') ? form('asset.sighting', back, h`${hidden('asset', asset.id)}<div class="gk-grid">${select('What you found', 'outcome', [{ value: 'found', label: `Found at ${asset.location}` }, { value: 'elsewhere', label: 'Found somewhere else' }, { value: 'missing', label: 'Not found' }], 'found')}${field('Where it was (if elsewhere)', 'seenLocation', { required: false })}</div>${field('Note', 'note', { required: false })}`, 'Record sighting', { secondary: true }) : ''}`, { id: 'sightings' })
   const history = card('History', h`${events.length ? table(['When', 'Work order', 'What', 'Who'], events.map(event => [event.when, event.workOrder ?? '—', event.what, event.who ?? '—']), 'History', { wrap: [2] }) : h`<p class="gk-muted">No history yet.</p>`}
     ${can(actor, 'history.export') ? h`<p><a class="gk-button gk-secondary" href="/app/assets/${asset.id}/history.csv">Download history (CSV)</a></p>` : ''}`, { id: 'history' })
-  const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(asset)}`, 'Save changes', { secondary: true })}
+  const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(await codeList(env, 'criticality'), asset)}`, 'Save changes', { secondary: true })}
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
   const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${history}</div><div class="gk-col-side">${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`

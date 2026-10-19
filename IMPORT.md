@@ -18,7 +18,7 @@ From **Reporting → Export Data**, export as **CSV (Excel)** with all columns:
 | Asset `QR/Barcode` (else `MX-` + `ID`) | Asset tag | A tag already used by an asset entered in Gasket, or by another row, is rejected. |
 | `Name`, `Location`, `Serial Number`, `Types` (first) | Name, location, serial, category | A row without a name or location is rejected. |
 | `Teams Assigned to` (first team) | Custodian | Listed as a gap: change it to the responsible person. |
-| `Criticality` | Criticality | Normal, Important or Critical; anything else is rejected. |
+| `Criticality` | Criticality level | The active level whose key, label or import name (under Codes) equals it, ignoring case; blank is Normal; anything else is rejected. |
 | `Parent`, `Description`, `Manufacturer`/`Model`/`Year` | Notes | Gasket has no hierarchy; the parent is kept as a note and listed for attention. |
 | `Status` Offline | — | Listed for attention: record downtime in Gasket if it is still down. |
 | Part `Part Numbers` (first, else `MX-` + `ID`), `Name`, `Location` | Part | Unit is `each` (MaintainX has no unit column). |
@@ -28,6 +28,7 @@ From **Reporting → Export Data**, export as **CSV (Excel)** with all columns:
 
 | Work order with `Status` Done | Asset history entry, at `Completed on` | Any other status is rejected (raise open work in Gasket). The asset is matched by `Asset ID` (a MaintainX asset in this move-in or already moved in), else by exact `Asset` name; a row with neither is rejected. History never raises work, moves a schedule or enters review. |
 | `Work Type` | Preventive, corrective or other | Preventive stays preventive; Reactive or Corrective is corrective; anything else is other. |
+| `Categories` | Failure mode code | The first category that equals an active failure mode's key, label or import name, ignoring case; otherwise the work moves in unclassified and the dry run lists it for attention. |
 | `Completed by`, `Assigned to`, `Categories`, `Recurrence` | "MaintainX: name", kept as text | Source people never get Gasket access. |
 | `Total Parts Cost`, `Total Time Cost`, `Additional Costs` | Parts, labor and other cost in whole cents | Dollars with at most two decimals (`$` and thousands commas allowed); blank is not recorded; anything else is rejected. |
 

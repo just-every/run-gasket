@@ -645,7 +645,7 @@ try {
     assert.equal((await h.api(`assets/${ids.compressor}`, cookie.max)).meters.find(row => row.id === ids.runHours).feed_window_hours, 24)
   })
 
-  await check('ASSET-004 effective status history and disagreeing evidence', async () => {
+  await check('ASSET-004 status, criticality and failure taxonomy', async () => {
     // A critical pump is degraded, then down; the outage is reclassified without rewriting the original entry.
     const pump = (await h.api('asset.create', cookie.lead, { tag: 'HK-030', name: 'Glycol pump', location: 'Plant room A', criticality: 'critical' })).id
     const hours = (await h.api('meter.create', cookie.lead, { asset: pump, name: 'Pump hours', unit: 'h', kind: 'counter' })).id
@@ -677,11 +677,46 @@ try {
     const listed = (await h.api('assets', cookie.sam)).find(row => row.id === pump)
     assert.deepEqual([listed.status, listed.conflicts], ['down', 1])
     assert.deepEqual((await h.api(`assets/${pump}`, cookie.sam)).conflicts.map(row => [row.kind, row.declared]), [['open_downtime', 'in_service']])
+    assert.deepEqual((await h.api('failures', cookie.sam)).conflicts.find(row => row.asset === pump)?.kinds, ['open_downtime'], 'the report shows the disagreement')
     const page = await (await h.raw(`/app/assets/${pump}`, { cookie: cookie.lead })).text()
     for (const text of ['Evidence disagrees', 'Reclassified later', 'Locked out for a planned seal swap, not a breakdown', 'Pump stopped: seal failed']) assert.ok(page.includes(text), text)
     assert.ok((await h.api(`assets/${pump}/history`, cookie.sam)).events.some(event => /Reclassified down as out of service/.test(event.what)))
+    // One central catalog: leads add criticality levels, reorder, relabel and retire them; records keep their level.
+    await h.api('code.set', cookie.max, { kind: 'criticality', key: 'life_safety', label: 'Life safety' }, 403)
+    await h.api('code.set', cookie.lead, { kind: 'criticality', key: 'Life safety!', label: 'Life safety' }, 400)
+    await h.api('code.set', cookie.lead, { kind: 'criticality', key: 'life_safety', label: 'Life safety', importNames: 'Safety critical' })
+    await h.api('code.move', cookie.lead, { kind: 'criticality', key: 'life_safety', position: '1' })
+    await h.api('code.set', cookie.lead, { kind: 'criticality', key: 'important', label: 'High' })
+    assert.deepEqual((await h.api('codes', cookie.max)).filter(code => code.kind === 'criticality').map(code => [code.key, code.label, code.position]),
+      [['life_safety', 'Life safety', 1], ['normal', 'Normal', 2], ['important', 'High', 3], ['critical', 'Critical', 4]])
+    const valve = (await h.api('asset.create', cookie.lead, { tag: 'HK-031', name: 'Gas safety valve', location: 'Plant room A', criticality: 'life_safety' })).id
+    await h.api('code.retire', cookie.lead, { kind: 'criticality', key: 'life_safety', reason: 'Folded into Critical' })
+    await h.api('asset.create', cookie.lead, { tag: 'HK-032', name: 'Second valve', location: 'Plant room A', criticality: 'life_safety' }, 400)
+    const kept = await h.api(`assets/${valve}`, cookie.lead)
+    await h.api('asset.update', cookie.lead, { asset: valve, revision: kept.revision, tag: kept.tag, name: 'Main gas safety valve', location: kept.location, criticality: 'life_safety' })
+    const updated = await h.api(`assets/${valve}`, cookie.max)
+    assert.deepEqual([updated.name, updated.criticality, updated.criticality_label], ['Main gas safety valve', 'life_safety', 'Life safety'], 'a retired level stays on the asset and readable')
+    assert.equal((await h.api('assets', cookie.max)).find(row => row.id === pump).criticality_label, 'Critical')
+    // Failure mode, cause and remedy codes on a finding; an unknown code is refused.
+    for (const [kind, key, label, importNames] of [['failure_mode', 'seal_leak', 'Seal leak', 'Leak'], ['failure_mode', 'electrical', 'Electrical fault', 'Electrical'], ['cause', 'wear', 'Wear', ''], ['remedy', 'replace', 'Replaced part', '']]) await h.api('code.set', cookie.lead, { kind, key, label, importNames })
+    await h.api('finding.record', cookie.max, { workOrder: repair, severity: 'medium', text: 'Seal worn through', failureMode: 'corrosion' }, 400)
+    await h.api('finding.record', cookie.max, { workOrder: repair, severity: 'medium', text: 'Seal worn through', failureMode: 'seal_leak', cause: 'wear', remedy: 'replace' })
+    assert.equal((await wo('max', repair)).findings[0].codes.split(' · ').toSorted().join(', '), 'Replaced part, Seal leak, Wear')
     await h.api('downtime.end', cookie.max, { workOrder: repair, endedOn: ago(5) })
     assert.deepEqual((await h.api(`assets/${pump}`, cookie.sam)).conflicts, [])
+    // An imported failure code: MaintainX work categories map onto failure modes by import name; the rest move in unclassified.
+    const movein = { assets: file('maintainx-assets-2.csv', historyAssetsCsv), work: file('maintainx-work-orders-q1.csv', workCsv) }
+    const preview = await h.api('import.preview', cookie.lead, movein)
+    assert.ok(preview.attention.some(row => /#7001 Quarterly freezer service: no failure mode code matches its categories \(Refrigeration\)/.test(row.reason)), JSON.stringify(preview.attention))
+    await h.api('import.apply', cookie.lead, { ...movein, fingerprint: preview.fingerprint })
+    assert.equal((await h.api('assets', cookie.max)).find(row => row.tag === 'HK-202').criticality_label, 'High', 'MaintainX Important maps onto the relabelled level')
+    const report = await h.api('failures', cookie.sam)
+    const count = key => report.codes.find(code => code.key === key)
+    assert.deepEqual([[count('seal_leak').findings, count('wear').findings, count('electrical').history], report.unclassified.history.map(row => row.sourceRef)], [[1, 1, 1], ['7001']])
+    await h.api('failures', cookie.max, undefined, 403)
+    const catalog = await (await h.raw('/app/codes', { cookie: cookie.lead })).text()
+    for (const text of ['Life safety', 'Retired', 'Seal leak', 'Quarterly freezer service']) assert.ok(catalog.includes(text), text)
+    assert.equal((await h.raw('/app/codes', { cookie: cookie.max })).status, 200)
   })
 
   await check('GAS-11 rer export and rer import keep every record', async () => {

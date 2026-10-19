@@ -7,6 +7,7 @@ import type { Bindings } from '../../auth.server'
 import { applyD1ImportBatches, canonicalJson, createD1ImportJob, planD1Import, resumeD1Import, sha256, undoD1Import, type D1ImportContext, type Json, type SourceBundle, type SourceRecord, type TargetEffect } from '../../modules/import-kit/src/d1/index'
 import { sourceIdentity } from '../../modules/import-kit/src/provenance/identity'
 import { capabilitySql, requireCapability, type Actor } from '../actor'
+import { codeList, matchCode } from '../codes'
 import { GasketError, all, commit, insist, one, sha256Hex } from '../core'
 import { isDate, localNow } from '../dates'
 import type { Input } from '../input'
@@ -175,6 +176,8 @@ async function build(env: Bindings, actor: Actor, input: Input) {
   const nativeNumbers = new Set((await all<{ number: string }>(env, "SELECT number FROM gk_parts WHERE origin = 'native'")).map(row => row.number.toLowerCase()))
   const existingAssets = await all<{ id: string; name: string }>(env, 'SELECT id, name FROM gk_assets WHERE retired_at IS NULL')
   const nativeReadings = await all<{ meter_id: string; value: string; takenOn: string }>(env, "SELECT meter_id, value, taken_on AS takenOn FROM gk_readings WHERE origin = 'native' ORDER BY taken_on")
+  // ASSET-004: imported criticality and work categories map onto the central catalog.
+  const catalog = await codeList(env)
   const claimed = new Map((await all(env, 'SELECT target_kind, target_id, record_json FROM ik_provenance WHERE destination = ? AND reversed = 0', destination)).map(row => [`${row.target_kind}:${row.target_id}`, JSON.parse(row.record_json).sourceIdentity as string]))
 
   const rejected: Preview['rejected'] = [], attention: Preview['attention'] = []
@@ -225,8 +228,8 @@ async function build(env: Bindings, actor: Actor, input: Input) {
         const tag = get('QR/Barcode') || `MX-${id}`
         if (nativeTags.has(tag.toLowerCase())) return reject(source, `asset tag ${tag} is already used by an asset registered in Gasket`)
         if (tagsSeen.has(tag.toLowerCase())) return reject(source, `asset tag ${tag} is also used by row ${tagsSeen.get(tag.toLowerCase())}`)
-        const criticalityText = get('Criticality').toLowerCase() || 'normal'
-        if (!['normal', 'important', 'critical'].includes(criticalityText)) return reject(source, `criticality "${get('Criticality')}" is not Normal, Important or Critical`)
+        const criticality = matchCode(catalog, 'criticality', get('Criticality') || 'normal')
+        if (!criticality) return reject(source, `criticality "${get('Criticality')}" is not a criticality level in Gasket: add it, or an import name for a level, under Codes`)
         const targetId = targetIds.asset(id)
         if (conflict('asset', targetId, source)) return reject(source, 'already moved in earlier with different values; edit the asset in Gasket instead')
         tagsSeen.set(tag.toLowerCase(), payload.row)
@@ -236,7 +239,7 @@ async function build(env: Bindings, actor: Actor, input: Input) {
         if (/offline/i.test(get('Status'))) attention.push({ location: at(source), reason: `${name} was Offline in MaintainX: record its downtime in Gasket if it is still down` })
         const custodian = get('Teams Assigned to').split(',')[0]?.trim() || null
         counted('asset', targetId)
-        return { effects: [effect('asset', targetId, { tag, name, serial: get('Serial Number') || null, location, custodian, category: get('Types').split(',')[0]?.trim() || null, criticality: criticalityText, notes })] }
+        return { effects: [effect('asset', targetId, { tag, name, serial: get('Serial Number') || null, location, custodian, category: get('Types').split(',')[0]?.trim() || null, criticality: criticality.key, notes })] }
       }
       if (source.kind === 'part') {
         const id = get('ID'), name = get('Name')
@@ -266,6 +269,11 @@ async function build(env: Bindings, actor: Actor, input: Input) {
           return matches.length === 1 ? { id: matches[0] } : { refused: matches.length ? `asset name "${assetName}" matches more than one asset` : `asset "${assetName}" is not in this move-in or in Gasket` }
         } })
         if ('refused' in mapped) return reject(source, mapped.refused)
+        // The first category that is a failure mode code (by key, label or import name) classifies it; otherwise it moves in unclassified.
+        const categories = String(mapped.value.categories ?? '').split(',').map(name => name.trim()).filter(Boolean)
+        const failureMode = categories.map(name => matchCode(catalog, 'failure_mode', name)).find(Boolean) ?? null
+        if (categories.length && !failureMode) attention.push({ location: at(source), reason: `#${id} ${mapped.value.title}: no failure mode code matches its categories (${categories.join(', ')}); it moves in unclassified` })
+        mapped.value.failureMode = failureMode?.id ?? null
         const targetId = targetIds.work(id)
         if (conflict('work', targetId, source)) return reject(source, 'already moved in earlier with different values')
         counted('work', targetId)

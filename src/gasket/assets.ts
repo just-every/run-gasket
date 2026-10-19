@@ -3,12 +3,12 @@
 // register against what is physically on the floor.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
+import { activeCode } from './codes'
 import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import type { Input } from './input'
 import { DEFAULT_FEED_WINDOW_HOURS, FEED_WINDOW_HOURS, meterView } from './meters'
 import { DECLARED_STATE, stateConflicts, stateHistory } from './states'
 
-const CRITICALITY = ['normal', 'important', 'critical']
 export const METER_KINDS = ['counter', 'gauge', 'condition']
 const IDENTITY = ['tag', 'name', 'serial', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
 
@@ -20,11 +20,16 @@ function identity(input: Input) {
     location: input.text('location', { max: 160 }),
     custodian: input.text('custodian', { optional: true, max: 120 }) || null,
     category: input.text('category', { optional: true, max: 80 }) || null,
-    criticality: input.text('criticality', { optional: true, max: 20 }) || 'normal',
+    criticality: input.text('criticality', { optional: true, max: 40 }) || 'normal',
     notes: input.text('notes', { optional: true, max: 2000 }) || null,
   }
-  insist(CRITICALITY.includes(value.criticality), 'invalid_criticality')
   return value
+}
+
+/** A criticality an asset is given must be an active catalog level; an asset keeps a level retired since. */
+const CRITICALITY_LABEL = "(SELECT label FROM gk_codes WHERE id = 'criticality:' || a.criticality) AS criticality_label"
+async function checkCriticality(env: Bindings, key: string, kept?: string) {
+  if (key !== kept) await activeCode(env, 'criticality', key)
 }
 
 /** Status: retired, down while downtime is open, otherwise the declared state (ASSET-004), in service by default. */
@@ -33,6 +38,7 @@ export const ASSET_STATUS = `CASE WHEN a.retired_at IS NOT NULL THEN 'retired' W
 export async function createAsset(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'register.manage')
   const value = identity(input), id = newId(), at = now()
+  await checkCriticality(env, value.criticality)
   await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, location, custodian, category, criticality, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, at, at)],
     { actor: actor.id, action: 'asset.create', subject: id, detail: value })
   return { id }
@@ -46,6 +52,7 @@ export async function updateAsset(env: Bindings, actor: Actor, input: Input) {
   const revision = input.integer('revision', { min: 1, max: 1_000_000 })
   insist(revision === asset.revision, 'stale', 409)
   const value = identity(input)
+  await checkCriticality(env, value.criticality, asset.criticality)
   const before = Object.fromEntries(IDENTITY.map(key => [key, asset[key]]))
   await commit(env, [
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND revision = ?)', asset.id, revision),
@@ -98,7 +105,7 @@ export async function recordSighting(env: Bindings, actor: Actor, input: Input) 
 }
 
 export async function assetList(env: Bindings, _actor: Actor) {
-  const rows = await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, a.origin, ${ASSET_STATUS} AS status,
+  const rows = await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, ${CRITICALITY_LABEL}, a.origin, ${ASSET_STATUS} AS status,
     (SELECT s.outcome || '|' || s.recorded_at FROM gk_sightings s WHERE s.asset_id = a.id ORDER BY s.recorded_at DESC LIMIT 1) AS last_sighting,
     (SELECT MIN(w.due_date) FROM gk_work_orders w WHERE w.asset_id = a.id AND w.status NOT IN ('closed', 'cancelled')) AS next_due
     FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)
@@ -108,7 +115,7 @@ export async function assetList(env: Bindings, _actor: Actor) {
 }
 
 export async function assetDetail(env: Bindings, actor: Actor, id: string) {
-  const asset = await one(env, `SELECT a.*, ${ASSET_STATUS} AS status FROM gk_assets a WHERE a.id = ?`, id)
+  const asset = await one(env, `SELECT a.*, ${CRITICALITY_LABEL}, ${ASSET_STATUS} AS status FROM gk_assets a WHERE a.id = ?`, id)
   insist(asset, 'asset_not_found', 404)
   const meters = await Promise.all((await all(env, 'SELECT m.id, m.name, m.unit, m.kind, m.feed_window_hours, m.revision FROM gk_meters m WHERE m.asset_id = ? ORDER BY m.name', id))
     .map(async meter => ({ ...meter, ...await meterView(env, actor, meter.id) })))

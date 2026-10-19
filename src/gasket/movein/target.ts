@@ -103,7 +103,7 @@ const part: Kind = {
 }
 
 const WORK_FIELDS: [string, string][] = [['asset', 'asset_id'], ['sourceRef', 'source_ref'], ['title', 'title'], ['kind', 'kind'], ['description', 'description'], ['completedOn', 'completed_on'], ['completedBy', 'completed_by'],
-  ['assignedTo', 'assigned_to'], ['categories', 'categories'], ['recurrence', 'recurrence'], ['partsCents', 'parts_cents'], ['laborCents', 'labor_cents'], ['otherCents', 'other_cents']]
+  ['assignedTo', 'assigned_to'], ['categories', 'categories'], ['recurrence', 'recurrence'], ['partsCents', 'parts_cents'], ['laborCents', 'labor_cents'], ['otherCents', 'other_cents'], ['failureMode', 'failure_mode']]
 
 const work: Kind = {
   async read(db, id) {
