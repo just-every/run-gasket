@@ -24,7 +24,9 @@ export async function purchaseOrderDetail(env: Bindings, _actor: Actor, id: stri
     send: await one(env, 'SELECT s.*,m.name AS sender FROM gk_purchase_sends s JOIN gk_members m ON m.id=s.claimed_by WHERE s.revision_id=?', row.id),
     acknowledgments: await all(env, `SELECT a.*,m.name AS recorder FROM gk_purchase_acknowledgments a JOIN gk_purchase_sends s ON s.id=a.send_id
       JOIN gk_members m ON m.id=a.recorded_by WHERE s.revision_id=? ORDER BY a.recorded_at,a.id`, row.id) })))
-  return { ...order, revisions: history, current: history.find(row => row.revision === order.current_revision)! }
+  const current = history.find(row => row.revision === order.current_revision)!
+  const approver = await one(env, "SELECT id FROM gk_members WHERE status='active' AND role IN ('owner','supervisor') AND id NOT IN (?,?) LIMIT 1", order.created_by, current.created_by)
+  return { ...order, revisions: history, current, approvalAvailable: Boolean(approver) }
 }
 
 export async function savePurchaseOrder(env: Bindings, actor: Actor, input: Input) {

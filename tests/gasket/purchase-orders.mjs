@@ -93,6 +93,17 @@ export async function purchaseOrdersJourney(h, cookie, ids, onReady) {
     assert.equal((await h.api(`purchase-orders/${attempted}`, cookie.owner)).current.acknowledgments.length, 0)
     h.setMailOutcome('accepted')
   }
+  await h.api('access.role', cookie.owner, { member: ids.sam, role: 'lead' })
+  const blocked = (await h.api('purchase.save', cookie.owner, { ...facts, supplier: alternative, reason: 'Approval needs another authorized person' })).id
+  assert.equal((await h.api(`purchase-orders/${blocked}`, cookie.owner)).approvalAvailable, false)
+  const blockedPage = await (await h.raw(`/app/purchase-orders/${blocked}`, { cookie: cookie.owner })).text()
+  assert.ok(blockedPage.includes('No independent approver is available'))
+  assert.ok(blockedPage.includes('href="/app/access"'))
+  await h.api('purchase.approve', cookie.owner, { order: blocked, revision: 1 }, 403)
+  await h.api('purchase.send', cookie.owner, { order: blocked, revision: 1 }, 409)
+  await onReady?.({ h, cookie, paths: [`/app/purchase-orders/${blocked}`], variant: 'blocked' })
+  await h.api('access.role', cookie.owner, { member: ids.sam, role: 'supervisor' })
+  assert.equal((await h.api(`purchase-orders/${blocked}`, cookie.owner)).approvalAvailable, true)
   const page = await (await h.raw(`/app/purchase-orders/${order}`, { cookie: cookie.max })).text()
   for (const text of ['Revision 1', 'Revision 2', 'ACK-110', 'Provider accepted', `/app/assets/${ids.asset}`, `/app/work/${ids.work}`, 'access.txt']) assert.ok(page.includes(text), text)
   for (const path of ['quotes', 'purchase-orders', `purchase-orders/${order}`]) assert.equal((await h.raw(`/api/gasket/${path}`)).status, 401)
