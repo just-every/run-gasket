@@ -29,8 +29,8 @@ export function partOf(row: Row, actor: Actor): Part | null {
 export const ownOnly = (actor: Actor, url: URL) => url.searchParams.get('mine') === '1' || (!can(actor, 'work.assign') && !can(actor, 'work.review') && actor.role !== 'agent')
 
 const ROWS = `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.submitted_at, w.closed_at, w.version, w.assignee_id, m.name AS assignee,
-  a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, a.location AS asset_location, a.category AS asset_category
-  FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id`
+  w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location
+  FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id`
 
 const ORDER: Record<Part, number> = { overdue: 0, progress: 1, due: 2, done: 3 }
 
@@ -94,7 +94,7 @@ async function exceptionOf(env: Bindings, actor: Actor, overdue: Row[], rows: Ro
  */
 async function plansFor(env: Bindings, actor: Actor, order: Row, busy: Row[]): Promise<Plan[]> {
   const load = `(SELECT COUNT(*) FROM gk_work_orders w WHERE w.assignee_id = m.id AND w.status IN ${OPEN} AND w.due_date <= ? AND w.id <> ?)`
-  const doing = `(SELECT GROUP_CONCAT(printf('%04d', w.number) || ' ' || a.name, ' and ') FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id WHERE w.assignee_id = m.id AND w.status = 'in_progress')`
+  const doing = `(SELECT GROUP_CONCAT(printf('%04d', w.number) || ' ' || COALESCE(a.name, w.location), ' and ') FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id WHERE w.assignee_id = m.id AND w.status = 'in_progress')`
   const people = await all<{ id: string; name: string; due: number; doing: string | null }>(env, `SELECT m.id, m.name, ${load} AS due, ${doing} AS doing FROM gk_members m
     WHERE m.status = 'active' AND m.role IN ('lead', 'maintainer') AND m.id IS NOT ? AND m.id <> ? ORDER BY m.role <> 'maintainer', due, m.name LIMIT 3`, actor.today, order.id, order.assignee_id, actor.id)
   const due = (count: number, other = '') => count ? `${count}${other} due today or overdue` : `nothing${other ? ' else' : ''} due today`

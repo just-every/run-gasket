@@ -51,9 +51,14 @@ const touch = (env: Bindings, order: { id: string; version: number }) => [
 
 export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
   requireCapability(actor, proposal ? 'proposal.decide' : 'work.assign')
-  const asset = await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
-  insist(asset, 'asset_not_found', 404)
-  insist(!asset.retired_at, 'asset_retired', 409)
+  // PLAN-001: work names an asset or, with no asset, a location (the text given, trimmed); never both.
+  const assetId = input.text('asset', { optional: true, max: 100 }) || null, location = input.text('location', { optional: true, max: 160 }) || null
+  insist(Boolean(assetId) !== Boolean(location), 'asset_or_location')
+  const asset = assetId ? await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', assetId) : null
+  if (assetId) {
+    insist(asset, 'asset_not_found', 404)
+    insist(!asset.retired_at, 'asset_retired', 409)
+  }
   // PLAN-001: a template fills the title, instructions, priority and estimate that the work does not give itself.
   const template = await chosenTemplate(env, input)
   const title = input.text('title', { optional: Boolean(template), max: 160 }) || template!.title as string
@@ -66,8 +71,8 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   if (assignee) await assigneeFits(env, assignee, crew.team)
   const estimateMinutes = estimate(input) ?? (template?.estimate_minutes as number | null) ?? null
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, actor.id, now()), ...(also?.(id) ?? [])],
-    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
   return { id }
 }
 
@@ -172,6 +177,7 @@ export async function addEvidence(env: Bindings, actor: Actor, input: Input) {
 /** Dated readings for the asset's meters, taken by the assigned person (ASSET-005 keeps their unit, source and quality). */
 export async function recordReadings(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
+  insist(order.asset_id, 'no_asset', 409)
   const takenOn = input.text('takenOn', { max: 16 })
   insist(isLocalTime(takenOn), 'invalid_takenOn')
   insist(takenOn <= localNow(actor.zone), 'reading_in_future')
@@ -209,6 +215,8 @@ export async function giveBack(env: Bindings, actor: Actor, input: Input) {
 
 export async function downtimeStart(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
+  // Downtime is an asset out of service: work at a location with no asset has none to record.
+  insist(order.asset_id, 'no_asset', 409)
   const startedOn = input.text('startedOn', { max: 16 }), reason = input.text('reason', { max: 300 })
   insist(isLocalTime(startedOn), 'invalid_startedOn')
   insist(startedOn <= localNow(actor.zone), 'downtime_in_future')
@@ -264,8 +272,8 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   if (followUpId) {
     const due = input.text('followUpDue', { optional: true, max: 10 }) || addDays(actor.today, severity === 'high' ? 1 : 7)
     insist(isDate(due), 'invalid_followUpDue')
-    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, follow_up_of, title, description, due_date, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, 'open', ?, ?)`,
-      followUpId, order.asset_id, order.id, `Follow-up: ${text.slice(0, 120)}`, text, due, actor.id, now()))
+    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, follow_up_of, title, description, due_date, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, 'open', ?, ?)`,
+      followUpId, order.asset_id, order.location, order.id, `Follow-up: ${text.slice(0, 120)}`, text, due, actor.id, now()))
   }
   statements.push(stmt(env, 'INSERT INTO gk_findings (id, work_order_id, asset_id, item, severity, text, follow_up_id, failure_mode, cause, remedy, risk, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, order.asset_id, item, severity, text, followUpId, codes.failure_mode, codes.cause, codes.remedy, codes.risk, actor.id, now()))
   await commit(env, statements, [{ actor: actor.id, action: 'finding.record', subject: order.id, detail: { finding: id, item, severity, followUp: followUpId, ...codes } },
@@ -273,13 +281,14 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>>; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; costs: Awaited<ReturnType<typeof workCosts>>; mine: boolean; missing: string[] }
+export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; costs: Awaited<ReturnType<typeof workCosts>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
-  const order = await one(env, `SELECT w.*, a.tag AS asset_tag, a.name AS asset_name, a.serial AS asset_serial, a.location AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
+  // Work at a location with no asset (PLAN-001) shows the location where an asset's name and place would be.
+  const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
     m.name AS assignee_name, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
-    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_work_templates t ON t.id = w.template_id
+    FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_work_templates t ON t.id = w.template_id
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
     LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
   insist(order, 'work_order_not_found', 404)
@@ -296,7 +305,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     .map(row => ({ ...row, obligation: obligation(row) }))
   const reserved = await reservations(env, 'r.work_order_id = ?', id)
   // ASSET-006: the asset's current bill of materials, with stock and fit, for planning.
-  const bom = await bomOf(env, { id: order.asset_id, serial: order.asset_serial }, await partList(env, actor))
+  const bom = order.asset_id ? await bomOf(env, { id: order.asset_id, serial: order.asset_serial }, await partList(env, actor)) : null
   const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
@@ -337,9 +346,9 @@ export async function workList(env: Bindings, actor: Actor, url: URL) {
   const state = url.searchParams.get('state') ?? 'open'
   const filter = state === 'closed' ? "w.status IN ('closed', 'cancelled')" : "w.status NOT IN ('closed', 'cancelled')"
   const collaborating = 'EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id = w.id AND c.member_id = ? AND c.removed_at IS NULL)'
-  return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.priority, w.status, w.due_date, w.version, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, a.location AS asset_location, a.category AS asset_category, m.name AS assignee, w.assignee_id,
+  return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.priority, w.status, w.due_date, w.version, w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location, m.name AS assignee, w.assignee_id,
     t.name AS team, w.trade, w.shift, CASE WHEN w.assignee_id = ? THEN 'assignee' WHEN ${collaborating} THEN 'collaborator' END AS my_part
-    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_teams t ON t.id = w.team_id
+    FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_teams t ON t.id = w.team_id
     WHERE ${filter} ${mine ? `AND (w.assignee_id = ? OR ${collaborating})` : ''} ${team ? 'AND w.team_id = ?' : ''} ORDER BY ${state === 'closed' ? 'w.closed_at DESC' : 'w.due_date, w.number'} LIMIT 500`,
   actor.id, actor.id, ...(mine ? [actor.id, actor.id] : []), ...(team ? [team] : []))
 }

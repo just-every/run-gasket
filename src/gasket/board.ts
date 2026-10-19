@@ -6,8 +6,8 @@ import { all } from './core'
 import { addDays, localNow, minutesBetween } from './dates'
 import { partList } from './parts'
 
-const ORDER = `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.follow_up_of, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, m.name AS assignee
-  FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id`
+const ORDER = `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.follow_up_of, w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, w.location, m.name AS assignee
+  FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id`
 
 export async function board(env: Bindings, actor: Actor) {
   requireCapability(actor, 'board.read')

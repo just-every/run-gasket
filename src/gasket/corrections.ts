@@ -54,8 +54,8 @@ export async function correctionStatements(env: Bindings, actor: Actor, order: R
       ...evidence.map(file => `Evidence: ${file.filename} (SHA-256 ${file.sha256})`)].join('\n')
     const finding = newId(), correction = newId(), due = addDays(actor.today, rule.due_days)
     statements.push(
-      stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, follow_up_of, title, description, due_date, assignee_id, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, ?, 'open', ?, ?)`,
-        correction, order.asset_id, order.id, `Correct: ${what}`.slice(0, 160), description, due, order.assignee_id, actor.id, now()),
+      stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, follow_up_of, title, description, due_date, assignee_id, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, 'open', ?, ?)`,
+        correction, order.asset_id, order.location ?? null, order.id, `Correct: ${what}`.slice(0, 160), description, due, order.assignee_id, actor.id, now()),
       stmt(env, 'INSERT INTO gk_findings (id, work_order_id, asset_id, item, severity, text, follow_up_id, rule_id, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         finding, order.id, order.asset_id, row.item, rule.severity, what, correction, rule.id, actor.id, now()))
     audits.push({ actor: actor.id, action: 'finding.record', subject: order.id, detail: { finding, item: row.item, severity: rule.severity, followUp: correction, rule: rule.id } },

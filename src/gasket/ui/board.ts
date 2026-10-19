@@ -7,7 +7,7 @@ import { showNumber } from '../quantity'
 import { STATUS, amount, card, h, table, tag, woNumber } from './html'
 import { page } from './shell'
 
-const orderRows = (rows: any[], today: string) => rows.map(row => [h`<a href="/app/work/${row.id}"><span class="gk-nowrap">${woNumber(row.number)}</span> · ${row.title}</a>`, h`<a href="/app/assets/${row.asset_id}">${row.asset_name}</a><span class="gk-sub">${row.asset_tag}</span>`, h`${showDate(row.due_date)}${row.due_date < today && row.status !== 'submitted' ? h` ${tag('Overdue')}` : ''}`, row.assignee ?? 'Not assigned', tag(STATUS[row.status])])
+const orderRows = (rows: any[], today: string) => rows.map(row => [h`<a href="/app/work/${row.id}"><span class="gk-nowrap">${woNumber(row.number)}</span> · ${row.title}</a>`, row.asset_id ? h`<a href="/app/assets/${row.asset_id}">${row.asset_name}</a><span class="gk-sub">${row.asset_tag}</span>` : h`${row.location}<span class="gk-sub">Location, no asset</span>`, h`${showDate(row.due_date)}${row.due_date < today && row.status !== 'submitted' ? h` ${tag('Overdue')}` : ''}`, row.assignee ?? 'Not assigned', tag(STATUS[row.status])])
 
 export async function boardPage(env: Bindings, actor: Actor, url: URL) {
   const b = await board(env, actor)

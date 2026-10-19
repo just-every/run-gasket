@@ -56,7 +56,7 @@ function workTable(rows: any[], today: string, alert: string | null) {
   return h`<table class="gk-work-table"><caption class="gk-visually-hidden">Work orders</caption><thead><tr><th scope="col">WO</th><th scope="col">Asset</th><th scope="col">Task</th><th scope="col">Assigned</th><th scope="col">Due</th><th scope="col">Status</th></tr></thead>
     <tbody>${rows.map(row => h`<tr${row.id === alert ? raw(' class="gk-row-alert"') : ''}>
       <td data-label="WO" class="gk-num"><a class="gk-wo" href="/app/work/${row.id}">${woDigits(row.number)}</a></td>
-      <td data-label="Asset"><a class="gk-asset-cell" href="/app/assets/${row.asset_id}">${machine({ name: row.asset_name, category: row.asset_category })}<span>${row.asset_name}</span></a></td>
+      <td data-label="Asset">${row.asset_id ? h`<a class="gk-asset-cell" href="/app/assets/${row.asset_id}">${machine({ name: row.asset_name, category: row.asset_category })}<span>${row.asset_name}</span></a>` : h`<span class="gk-asset-cell">${machine({ name: row.asset_name, category: null })}<span>${row.asset_name}<span class="gk-sub">Location, no asset</span></span></span>`}</td>
       <td data-label="Task" class="gk-task"><a href="/app/work/${row.id}">${row.title}</a></td>
       <td data-label="Assigned">${person(row.assignee)}</td>
       <td data-label="Due" class="gk-num">${dueText(row.due_date, today)}</td>
@@ -87,7 +87,7 @@ function exceptionPanel(actor: Actor, exception: Awaited<ReturnType<typeof workT
     <form method="post" action="/app/do/workorder.plan" class="gk-panel-actions gk-panel-keep">${hidden('returnTo', '/app')}${hidden('workOrder', order.id)}${hidden('version', order.version)}${hidden('plan', 'as_is')}<button type="submit" class="gk-secondary">Keep as is</button></form>` : ''
   const decided = decision ? h`<section class="gk-decided" aria-labelledby="decided-h">${ICON.done}<div><h3 id="decided-h">Decided</h3><p>${outcome(decision, busy)}</p><p class="gk-sub">${decision.by ?? '—'}, ${showTime(decision.at, actor.zone)}</p></div></section>` : ''
   return h`<aside class="gk-panel" aria-labelledby="panel-h"><header class="gk-panel-head"><span class="gk-wo-id">${woNumber(order.number)}</span><a class="gk-icon-link" href="/app/work/${order.id}" aria-label="Open ${woNumber(order.number)}">${ICON.open}</a></header>
-    <div class="gk-equipment">${machine({ name: order.asset_name, category: order.asset_category }, 'band')}<div><h2 id="panel-h">${order.asset_name}</h2><p>${order.asset_tag}${order.asset_category ? h` · ${order.asset_category}` : ''}</p><p>${order.asset_location}</p></div></div>
+    <div class="gk-equipment">${machine({ name: order.asset_name, category: order.asset_category }, 'band')}<div><h2 id="panel-h">${order.asset_name}</h2><p>${order.asset_tag ?? 'Location, no asset'}${order.asset_category ? h` · ${order.asset_category}` : ''}</p><p>${order.asset_location}</p></div></div>
     <section class="gk-warning" aria-label="Overdue">${ICON.clock}<div><h3>${late(order.due_date, actor.today)}</h3><p>${order.title}, due ${showDay(order.due_date, { short: true })}${order.assignee ? `, assigned to ${order.assignee}` : ', not assigned'}.${busy.length ? ` ${holder} is on ${busy.map(row => `${woDigits(row.number)} ${row.asset_name}`).join(' and ')}, in progress.` : ''}</p></div></section>
     ${decided}${decide}${plans.length ? '' : h`<div class="gk-panel-actions"><a class="gk-button gk-secondary" href="/app/work/${order.id}">Open work order</a></div>`}</aside>`
 }
@@ -123,7 +123,7 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const empty = h`<div class="gk-empty gk-empty-flat"><img src="/brand/assets/clipboard.svg" alt="" width="160" height="128"><h2>${title}</h2><p>${text}</p>${assigner && !filtered && tab === 'today' ? h`<p><a class="gk-button gk-secondary" href="/app/schedules">Go to schedules</a></p>` : ''}</div>`
 
   const more = rows.length > shown.length ? h`<a class="gk-more-rows" href="${here([filtered ? url.searchParams.toString() : tab === 'today' ? '' : `tab=${tab}`, 'all=1'].filter(Boolean).join('&'))}">+ ${rows.length - shown.length} more</a>` : ''
-  const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${woDigits(row.number)} ${row.asset_tag}</a> ${shortTask(row.title)}`)}</span><a class="gk-icon-link" href="${here('state=open')}" aria-label="All open work">${ICON.arrow}</a></p>` : ''
+  const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${woDigits(row.number)} ${row.asset_tag ?? row.location}</a> ${shortTask(row.title)}`)}</span><a class="gk-icon-link" href="${here('state=open')}" aria-label="All open work">${ICON.arrow}</a></p>` : ''
 
   let log: Html = h``
   if (activity) {
@@ -156,8 +156,8 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
 
   const band = h`${headerBand({ id: 'wo-asset',
     eyebrow: h`${woNumber(w.number)} · ${w.kind === 'preventive' ? 'Preventive' : 'Corrective'} · ${PRIORITY_LABELS[w.priority as Priority]} priority${w.template_name ? ` · from template ${w.template_name} (revision ${w.template_revision})` : ''}${w.follow_up_of_number ? h` · follow-up of <a href="/app/work/${w.follow_up_of}">${woNumber(w.follow_up_of_number)}</a>` : ''}`,
-    title: h`<a href="/app/assets/${w.asset_id}">${w.asset_name}</a>`,
-    facts: [`Serial ${w.asset_serial ?? '—'}`, w.asset_location, `Custodian: ${w.asset_custodian ?? '—'}`],
+    title: w.asset_id ? h`<a href="/app/assets/${w.asset_id}">${w.asset_name}</a>` : h`${w.location}`,
+    facts: w.asset_id ? [`Serial ${w.asset_serial ?? '—'}`, w.asset_location, `Custodian: ${w.asset_custodian ?? '—'}`] : ['Location, no asset'],
     status: tag(STATUS[w.status]),
     meta: [{ label: 'Due date', icon: ICON.calendar, value: h`${showDate(w.due_date)} ${dueTag(w.due_date, w.status, actor.today)}` }, { label: 'Assigned maintainer', icon: ICON.person, value: w.assignee_name ?? 'Not assigned' }],
     art: machine({ name: w.asset_name, category: w.asset_category }, 'band') })}`
@@ -178,7 +178,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     ${recording && meters.length ? post('workorder.readings', h`${field('Taken on', 'takenOn', { type: 'datetime-local', value: localNow(actor.zone) })}<div class="gk-grid">${meters.map(meter => h`${hidden('meter', meter.id)}${meter.kind === 'condition'
       ? select(`${meter.name}`, 'value', [{ value: 'good', label: 'Good' }, { value: 'fair', label: 'Fair' }, { value: 'poor', label: 'Poor' }], '', { required: false, blank: 'Not read' })
       : field(`${meter.name} (${meter.unit})`, 'value', { required: false, attrs: 'inputmode="decimal"' })}`)}</div>`, 'Record readings', { secondary: true }) : ''}
-    ${recording && !meters.length ? h`<p class="gk-muted">This asset has no meters. A lead adds them on the asset.</p>` : ''}`, { id: 'readings' })
+    ${recording && !meters.length ? h`<p class="gk-muted">${w.asset_id ? 'This asset has no meters. A lead adds them on the asset.' : 'Work at a location has no asset meters to read.'}</p>` : ''}`, { id: 'readings' })
 
   // PART-002: what is reserved to this work order, and the planner's reserve and release doors.
   const planning = can(actor, 'work.assign') && ['open', 'in_progress', 'returned'].includes(w.status)
@@ -206,8 +206,8 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   // REPORT-003: each stop is a planned stop or a failure, with the failure mode that counts and whether it was reclassified.
   // REPORT-002: degraded operation (still running at reduced output) is not a stop.
   const stopKind = (row: (typeof w.downtime)[number]) => row.planned ? 'Planned stop' : row.degraded ? `Degraded operation${row.failure_mode ? `: ${row.failure_mode.label}` : ''}` : `Failure${row.failure_mode ? `: ${row.failure_mode.label}` : ', not classified'}`
-  const downtime = card('Downtime', h`${w.downtime.length ? h`<dl class="gk-pairs">${w.downtime.map(row => h`<div><dt>Start</dt><dd>${showLocal(row.started_on)}</dd></div><div><dt>End</dt><dd>${row.ended_on ? showLocal(row.ended_on) : tag(row.degraded ? 'Degraded' : 'Down')}</dd></div>${row.minutes !== null ? h`<div class="gk-total"><dt>Total downtime</dt><dd>${row.minutes} minutes</dd></div>` : ''}<div><dt>Reason</dt><dd>${row.reason}</dd></div><div><dt>Counts as</dt><dd>${stopKind(row)}${row.reclassified ? h`<span class="gk-sub">Reclassified: ${row.classifications.at(-1)!.reason}</span>` : ''}</dd></div>`)}</dl>` : h`<p class="gk-muted">The asset has not been taken down for this work.</p>`}
-    ${recording && !open ? post('downtime.start', h`${field('Went down at', 'startedOn', { type: 'datetime-local', value: localNow(actor.zone) })}${field('Reason', 'reason')}${checkbox('Planned stop (not a failure)', 'planned')}${checkbox('Degraded: still running at reduced output', 'degraded')}${failureModes.length ? select('Failure mode', 'failureMode', failureModes, '', { required: false, blank: 'Not classified' }) : ''}`, 'Record asset down', { secondary: true }) : ''}
+  const downtime = card('Downtime', h`${w.downtime.length ? h`<dl class="gk-pairs">${w.downtime.map(row => h`<div><dt>Start</dt><dd>${showLocal(row.started_on)}</dd></div><div><dt>End</dt><dd>${row.ended_on ? showLocal(row.ended_on) : tag(row.degraded ? 'Degraded' : 'Down')}</dd></div>${row.minutes !== null ? h`<div class="gk-total"><dt>Total downtime</dt><dd>${row.minutes} minutes</dd></div>` : ''}<div><dt>Reason</dt><dd>${row.reason}</dd></div><div><dt>Counts as</dt><dd>${stopKind(row)}${row.reclassified ? h`<span class="gk-sub">Reclassified: ${row.classifications.at(-1)!.reason}</span>` : ''}</dd></div>`)}</dl>` : h`<p class="gk-muted">${w.asset_id ? 'The asset has not been taken down for this work.' : 'Work at a location has no asset to take down.'}</p>`}
+    ${recording && !open && w.asset_id ? post('downtime.start', h`${field('Went down at', 'startedOn', { type: 'datetime-local', value: localNow(actor.zone) })}${field('Reason', 'reason')}${checkbox('Planned stop (not a failure)', 'planned')}${checkbox('Degraded: still running at reduced output', 'degraded')}${failureModes.length ? select('Failure mode', 'failureMode', failureModes, '', { required: false, blank: 'Not classified' }) : ''}`, 'Record asset down', { secondary: true }) : ''}
     ${recording && open ? post('downtime.end', field('Back in service at', 'endedOn', { type: 'datetime-local', value: localNow(actor.zone) }), 'Record back in service', { secondary: true }) : ''}`, { id: 'downtime' })
 
   const codeFields = h`<div class="gk-grid">${(['failure_mode', 'cause', 'remedy', 'risk'] as const).map(kind => ({ kind, options: catalog.filter(code => code.kind === kind) })).filter(({ options }) => options.length).map(({ kind, options }) => select(CODE_KIND[kind], kind === 'failure_mode' ? 'failureMode' : kind, options.map(code => ({ value: code.key, label: code.label })), '', { required: false, blank: 'Not classified' }))}</div>`
@@ -224,7 +224,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
 
   const lead = can(actor, 'work.assign')
   const siblings = lead && w.kind === 'corrective' && ['open', 'in_progress', 'returned'].includes(w.status)
-    ? (await workList(env, actor, new URL('https://gasket.invalid/?state=open'))).filter(row => row.asset_id === w.asset_id && row.id !== w.id) : []
+    ? (await workList(env, actor, new URL('https://gasket.invalid/?state=open'))).filter(row => row.asset_id === w.asset_id && row.location === w.location && row.id !== w.id) : []
   const assign = lead && ['open', 'in_progress', 'returned'].includes(w.status)
     ? card('Assignment', h`${post('workorder.assign', h`<div class="gk-grid">${select('Assign to', 'assignee', (await assignable(env)).map(person => ({ value: person.id, label: person.name })), w.assignee_id ?? '', { blank: 'Choose a person' })}${select('Team', 'team', (await teamList(env)).map(team => ({ value: team.id, label: `${team.name} (${team.trade})` })), w.team_id ?? '', { required: false, blank: 'No team' })}${field('Trade', 'trade', { required: false, value: w.trade ?? '', hint: 'Leave empty for the team\'s trade.' })}${field('Shift', 'shift', { required: false, value: w.shift ?? '', hint: 'For example Day or Night.' })}</div>${area('Handoff note', 'note', { required: false, hint: 'What the next person needs to know.' })}`, 'Assign', { secondary: true })}
       ${post('workorder.cancel', field('Reason to cancel', 'reason'), 'Cancel work order', { secondary: true })}

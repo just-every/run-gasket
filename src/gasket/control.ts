@@ -116,6 +116,7 @@ export async function merge(env: Bindings, actor: Actor, input: Input) {
   insist(duplicate.kind === 'corrective', 'merge_preventive', 409)
   insist(OPEN_STATES.includes(duplicate.status) && OPEN_STATES.includes(into.status), 'work_order_not_open', 409)
   insist(duplicate.asset_id === into.asset_id, 'different_asset', 409)
+  insist(duplicate.location === into.location, 'different_location', 409)
   await commit(env, [
     unchanged(env, duplicate.id, duplicate.version),
     guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, into.id, into.version),

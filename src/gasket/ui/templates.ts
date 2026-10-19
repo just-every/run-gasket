@@ -1,10 +1,12 @@
 // PLAN-001 (slice): the Work templates page: every template with its revision,
-// the form a lead saves a new one or the next revision with, and retirement.
+// the form a lead saves a new one or the next revision with, and retirement;
+// beside them, raising work at a location that has no asset (a dock light).
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
 import { PRIORITIES, PRIORITY_LABELS, templateList, type Priority } from '../templates'
 import { all } from '../core'
 import { addDays } from '../dates'
+import { assignable } from '../site'
 import { area, card, checkbox, field, form, h, hidden, select, tag } from './html'
 import { page } from './shell'
 
@@ -23,6 +25,12 @@ export async function templatesPage(env: Bindings, actor: Actor, url: URL) {
     ${lead && !row.retired_at ? h`<details class="gk-details"><summary>Edit</summary>${form('template.save', '/app/templates', h`${hidden('template', row.id)}${hidden('revision', row.revision)}${fields(row)}`, 'Save revision', { secondary: true })}</details><details class="gk-details"><summary>Raise for several assets</summary>${raise(row)}</details>${form('template.retire', '/app/templates', hidden('template', row.id), 'Retire', { secondary: true })}` : ''}`, { id: `template-${row.id}` }))
     : [h`<p class="gk-muted">No work templates yet.</p>`]
   const add = lead ? card('New template', form('template.save', '/app/templates', fields(), 'Save template', { secondary: true }), { id: 'new' }) : ''
+  // Known places (asset locations and earlier work locations) are offered; any other place is typed as it is.
+  const places = lead ? (await all(env, 'SELECT location FROM gk_assets WHERE retired_at IS NULL UNION SELECT location FROM gk_work_orders WHERE location IS NOT NULL ORDER BY 1')).map(row => row.location as string) : []
+  const active = templates.filter(row => !row.retired_at)
+  const atLocation = lead ? card('Raise work at a location', form('workorder.create', '/app/work/{id}', h`${field('Location', 'location', { attrs: 'list="gk-places" autocomplete="off"', hint: 'Where the work is, with no asset: Dock 3 light, Restroom 2 door.' })}<datalist id="gk-places">${places.map(place => h`<option value="${place}"></option>`)}</datalist>
+    ${active.length ? select('From template', 'template', active.map(row => ({ value: row.id, label: row.name })), '', { required: false, blank: 'No template' }) : ''}${field('What needs doing', 'title', { required: !active.length, hint: active.length ? 'Leave empty to use the template\'s title.' : '' })}${area('Details', 'description', { required: false })}
+    <div class="gk-grid">${select('Priority', 'priority', [{ value: '', label: 'Template or normal' }, ...PRIORITIES.map(value => ({ value, label: PRIORITY_LABELS[value] }))], '', { required: false })}${field('Due', 'due', { type: 'date', value: addDays(actor.today, 7) })}${select('Assign to', 'assignee', (await assignable(env)).map(person => ({ value: person.id, label: person.name })), '', { required: false, blank: 'Not yet' })}</div>`, 'Raise work order', { secondary: true }), { id: 'location-work' }) : ''
   return page(env, 'Work templates', actor, h`<h1>Work templates</h1><p class="gk-lede">Reusable work: a title, instructions, priority and estimate copied into each work order made from it. Editing a template never changes work already made.</p>
-    <div class="gk-columns"><div class="gk-col-main">${list}</div><div class="gk-col-side">${add}</div></div>`, { url })
+    <div class="gk-columns"><div class="gk-col-main">${list}</div><div class="gk-col-side">${atLocation}${add}</div></div>`, { url })
 }
