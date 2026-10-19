@@ -10,6 +10,7 @@ import { closures } from './calendar'
 import { chaseRule, notices } from './chasing'
 import { teamList } from './crew'
 import { performance } from './performance'
+import { reliability } from './reliability'
 import { codeList, failureReport } from './codes'
 import { GasketError } from './core'
 import { API_DOORS, match } from './doors'
@@ -49,6 +50,7 @@ export const views: Record<string, View> = {
   chaseRule: env => chaseRule(env),
   teams: env => teamList(env),
   performance: (env, actor, _id, url) => performance(env, actor, url),
+  reliability: (env, actor, _id, url) => reliability(env, actor, url),
   failures: (env, actor) => failureReport(env, actor),
 }
 

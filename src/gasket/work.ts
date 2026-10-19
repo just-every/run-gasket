@@ -15,6 +15,7 @@ import { activeCode } from './codes'
 import { readingStatements } from './meters'
 import { fromMilli } from './quantity'
 import { estimate } from './performance'
+import { classifiedStops, stopClass } from './reliability'
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
@@ -200,12 +201,14 @@ export async function downtimeStart(env: Bindings, actor: Actor, input: Input) {
   const startedOn = input.text('startedOn', { max: 16 }), reason = input.text('reason', { max: 300 })
   insist(isLocalTime(startedOn), 'invalid_startedOn')
   insist(startedOn <= localNow(actor.zone), 'downtime_in_future')
+  // REPORT-003: a planned stop, or a failure with an optional failure mode.
+  const kind = await stopClass(env, input)
   // Downtime never overlaps an earlier outage of the same asset (an open one is refused by gk_downtime_one_open).
   const overlap = 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE asset_id = ? AND ended_on > ?)'
   insist(!await one(env, `SELECT 1 WHERE ${overlap.replace('NOT EXISTS', 'EXISTS')}`, order.asset_id, startedOn), 'downtime_overlaps', 409)
   const id = newId()
-  await commit(env, [...touch(env, order), guard(env, 'downtime_overlaps', overlap, order.asset_id, startedOn), stmt(env, 'INSERT INTO gk_downtime (id, asset_id, work_order_id, started_on, reason, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)', id, order.asset_id, order.id, startedOn, reason, actor.id, now())],
-    { actor: actor.id, action: 'downtime.start', subject: order.asset_id, detail: { workOrder: order.id, startedOn, reason } })
+  await commit(env, [...touch(env, order), guard(env, 'downtime_overlaps', overlap, order.asset_id, startedOn), stmt(env, 'INSERT INTO gk_downtime (id, asset_id, work_order_id, started_on, reason, planned, failure_mode, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.asset_id, order.id, startedOn, reason, kind.planned ? 1 : 0, kind.failureMode, actor.id, now())],
+    { actor: actor.id, action: 'downtime.start', subject: order.asset_id, detail: { workOrder: order.id, startedOn, reason, planned: kind.planned, failureMode: kind.key } })
   return { id: order.id, downtime: id }
 }
 
@@ -274,7 +277,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     -SUM(CASE WHEN mv.kind = 'issue' THEN mv.quantity_milli ELSE 0 END) AS issued, SUM(CASE WHEN mv.kind = 'return' THEN mv.quantity_milli ELSE 0 END) AS returned
     FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
     .map(row => ({ ...row, issued: fromMilli(row.issued), returned: fromMilli(row.returned), used: fromMilli(row.issued - row.returned) }))
-  const downtime = await all(env, 'SELECT id, started_on, ended_on, minutes, reason FROM gk_downtime WHERE work_order_id = ? ORDER BY started_on', id)
+  const downtime = (await classifiedStops(env, 'd.work_order_id = ?', id)).map(row => ({ id: row.id, started_on: row.started_on, ended_on: row.ended_on, minutes: row.minutes, reason: row.reason, planned: row.planned, failure_mode: row.failureMode, reclassified: row.reclassified, classifications: row.classifications }))
   const findings = (await all(env, 'SELECT f.id, f.item, f.severity, f.text, f.follow_up_id, f.rule_id, (SELECT group_concat(c.label, \' · \') FROM gk_codes c WHERE c.id IN (f.failure_mode, f.cause, f.remedy, f.risk)) AS codes, f.failure_mode, f.cause, f.remedy, f.risk, w.number AS follow_up_number, w.status AS follow_up_status, w.acknowledged_at AS follow_up_acknowledged, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at, f.item', id))
     .map(row => ({ ...row, obligation: obligation(row) }))
   const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)

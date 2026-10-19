@@ -18,7 +18,8 @@ const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zo
 const today = `${parts.year}-${parts.month}-${parts.day}`
 const addDays = (date, days) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10) }
 /** The site's wall clock N minutes ago, as a person would type it. */
-const ago = minutes => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(Date.now() - minutes * 60_000).map(part => [part.type, part.value])); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}` }
+const localAt = instant => { const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(instant).map(part => [part.type, part.value])); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}` }
+const ago = minutes => localAt(Date.now() - minutes * 60_000)
 const ids = {}, cookie = {}
 const wo = async (who, id) => await h.api(`work/${id}`, cookie[who])
 
@@ -1006,6 +1007,82 @@ try {
     const page = await (await h.raw(`/app/performance?${period}&team=${team}`, { cookie: cookie.sam })).text()
     for (const text of ['PM compliance', 'Not generated', 'Skipped: Boiler out of service', 'Gasket kit on order', '16.7%', '33.3%', '66.7%']) assert.ok(page.includes(text), text)
     assert.equal((await h.raw('/app/performance', { cookie: cookie.max })).status, 403)
+  })
+
+  await check('REPORT-003 MTBF, MTTR, MTTA and failure analysis', async () => {
+    // A brine pump with an hour meter whose readings start after the period does: three failures and one planned stop.
+    const pump = (await h.api('asset.create', cookie.lead, { tag: 'HK-050', name: 'Brine chiller pump', location: 'Plant room B', criticality: 'critical' })).id
+    const meter = (await h.api('meter.create', cookie.lead, { asset: pump, name: 'Run hours', unit: 'h', kind: 'counter', feedWindowHours: '168' })).id
+    await h.api('code.set', cookie.lead, { kind: 'failure_mode', key: 'bearing', label: 'Bearing failure' })
+    const moment = minutes => { const instant = Math.floor((Date.now() - minutes * 60_000) / 60_000) * 60_000; return { local: localAt(instant), instant } }
+    const at = Object.fromEntries(Object.entries({ f1: 2700, f1End: 2640, r0: 2400, r1: 1500, f2: 1400, f2End: 1310, p: 1200, pEnd: 1080, f3: 600, f3End: 570, r2: 300 }).map(([key, minutes]) => [key, moment(minutes)]))
+    for (const [key, value] of [['r0', '1000'], ['r1', '1020'], ['r2', '1045.5']]) await h.api('meter.feed', cookie.lead, { meter, source: 'Pump VFD', unit: 'h', value, takenOn: at[key].local })
+    const repair = async title => (await h.api('workorder.create', cookie.lead, { asset: pump, title, due: today, assignee: ids.max })).id
+    const w1 = await repair('Pump seized'), w2 = await repair('Pump tripped on vibration'), wp = await repair('Swap the impeller'), w3 = await repair('Pump leaking at the shaft')
+    await h.api('downtime.start', cookie.max, { workOrder: w1, startedOn: at.f1.local, reason: 'Seized', planned: true, failureMode: 'bearing' }, 400)
+    await h.api('downtime.start', cookie.max, { workOrder: w1, startedOn: at.f1.local, reason: 'Seized', failureMode: 'worn_out' }, 400)
+    const stop = async (workOrder, start, end, fields) => { const { downtime } = await h.api('downtime.start', cookie.max, { workOrder, startedOn: at[start].local, ...fields }); await h.api('downtime.end', cookie.max, { workOrder, endedOn: at[end].local }); return downtime }
+    const s1 = await stop(w1, 'f1', 'f1End', { reason: 'Bearing seized', failureMode: 'bearing' })
+    const s2 = await stop(w2, 'f2', 'f2End', { reason: 'Bearing noise, tripped', failureMode: 'bearing' })
+    // The planned stop goes through the work page's form door with its checkbox.
+    assert.equal((await h.submit('downtime.start', cookie.max, { workOrder: wp, startedOn: at.p.local, reason: 'Impeller swap in the shutdown window', planned: 'yes' }, `/app/work/${wp}`)).searchParams.get('error'), null)
+    await h.api('downtime.end', cookie.max, { workOrder: wp, endedOn: at.pEnd.local })
+    const sp = (await wo('max', wp)).downtime[0]
+    assert.deepEqual([sp.planned, sp.failure_mode, sp.minutes], [true, null, 120])
+    const s3 = await stop(w3, 'f3', 'f3End', { reason: 'Leak at the shaft seal', failureMode: 'bearing' })
+    for (const id of [w1, w2]) await h.api('workorder.acknowledge', cookie.max, { workOrder: id })
+
+    const period = `from=${addDays(today, -2)}&to=${today}&asset=${pump}`
+    await h.api(`reliability?${period}`, cookie.max, undefined, 403)
+    await h.api(`reliability?${period}&site=Elsewhere`, cookie.lead, undefined, 404)
+    await h.api(`reliability?from=${today}&to=${addDays(today, -1)}`, cookie.lead, undefined, 400)
+    let report = await h.api(`reliability?${period}&site=Harbour%20Kitchen%20Co`, cookie.sam)
+    // Hand calculation from the source events above.
+    const minutes = (a, b) => (Date.parse(`${b}:00Z`) - Date.parse(`${a}:00Z`)) / 60_000
+    const round1 = value => Math.round(value * 10) / 10
+    const unknown = round1((minutes(report.window.start, at.r0.local) + minutes(at.r2.local, report.window.end)) / 60)
+    assert.equal(report.window.start, `${addDays(today, -2)}T00:00`)
+    assert.deepEqual(report.assets.map(row => [row.id, row.meter, row.from, row.to, row.operatingHours, row.unknownHours, row.failures, row.coveredFailures, row.mtbfHours]), [[pump, 'Run hours', at.r0.local, at.r2.local, 45.5, unknown, 3, 2, 22.8]])
+    assert.deepEqual(report.mtbf, { hours: 22.8, operatingHours: 45.5, failures: 2, excluded: 1, unknownHours: unknown }, '45.5 h over the two failures inside the covered time')
+    assert.deepEqual(report.failures.map(row => [row.id, row.covered, row.minutes]), [[s1, false, 60], [s2, true, 90], [s3, true, 30]])
+    assert.deepEqual(report.mttr, { minutes: 60, sample: 3, excluded: 0 }, '(60 + 90 + 30) / 3; the 120-minute planned stop is left out')
+    assert.deepEqual(report.plannedStops.map(row => [row.id, row.minutes]), [[sp.id, 120]])
+    const acknowledged = async (workOrder, start) => (((await wo('lead', workOrder)).crew.answers.find(row => row.answer === 'acknowledged').at) - at[start].instant) / 60_000
+    const ackMinutes = [await acknowledged(w1, 'f1'), await acknowledged(w2, 'f2')]
+    assert.deepEqual(report.mtta, { minutes: round1((ackMinutes[0] + ackMinutes[1]) / 2), sample: 2, excluded: 1 }, 'the unacknowledged leak is excluded')
+    assert.deepEqual(report.failures.map(row => row.ackMinutes), [...ackMinutes, null])
+    assert.deepEqual(report.pareto.map(row => [row.key, row.count, row.percent, row.cumulativePercent, row.work.map(item => item.id)]), [['bearing', 3, 100, 100, [w1, w2, w3]]])
+    assert.deepEqual(report.repeats.map(row => [row.asset.id, row.failureMode.key, row.count]), [[pump, 'bearing', 3]])
+    assert.deepEqual(report.definitions.map(row => row.term), ['Failure', 'Operating time', 'MTBF', 'MTTR', 'MTTA', 'Failure Pareto', 'Repeat failure', 'Rounding'])
+
+    // The leak was a seal, not the bearing: a lead corrects the classification, and the original stays on record.
+    const correction = { downtime: s3, failureMode: 'seal_leak', reason: 'Teardown found the shaft seal, bearing fine' }
+    await h.api('downtime.classify', cookie.max, correction, 403)
+    await h.api('downtime.classify', cookie.sam, correction, 403)
+    await h.api('downtime.classify', cookie.lead, { ...correction, reason: '' }, 400)
+    await h.api('downtime.classify', cookie.lead, { ...correction, failureMode: 'bearing' }, 409)
+    await h.api('downtime.classify', cookie.lead, { ...correction, planned: true }, 400)
+    await h.api('downtime.classify', cookie.lead, correction)
+    report = await h.api(`reliability?${period}`, cookie.sam)
+    assert.deepEqual(report.pareto.map(row => [row.key, row.count, row.percent, row.cumulativePercent]), [['bearing', 2, 66.7, 66.7], ['seal_leak', 1, 33.3, 100]])
+    assert.deepEqual(report.repeats.map(row => [row.failureMode.key, row.count, row.failures.map(item => item.work.id)]), [['bearing', 2, [w1, w2]]])
+    const leak = report.failures.find(row => row.id === s3)
+    assert.deepEqual([leak.reclassified, leak.classifications.map(row => [row.original, row.planned, row.failureMode.key, row.reason, row.by])],
+      [true, [[true, false, 'bearing', 'Leak at the shaft seal', 'Max Ortiz'], [false, false, 'seal_leak', correction.reason, 'Lena Park']]])
+    assert.deepEqual([report.mtbf.hours, report.mttr.minutes], [22.8, 60], 'a failure mode correction keeps the measures')
+    // Reclassifying the planned stop as a failure revises every measure from the same source events.
+    await h.api('downtime.classify', cookie.lead, { downtime: sp.id, reason: 'The impeller broke; the swap was not planned' })
+    report = await h.api(`reliability?${period}`, cookie.sam)
+    assert.deepEqual([report.failures.length, report.plannedStops.length, report.mtbf.failures, report.mtbf.hours, report.mttr.minutes, report.mtta.excluded], [4, 0, 3, 15.2, 75, 2], '45.5 / 3 and (60 + 90 + 120 + 30) / 4')
+    assert.deepEqual(report.pareto.map(row => [row.key, row.count]), [['bearing', 2], ['seal_leak', 1], [null, 1]])
+    assert.ok((await h.api(`assets/${pump}/history`, cookie.sam)).events.some(event => event.what === `Stop reclassified from failure (bearing) to failure (seal_leak): ${correction.reason}`))
+    assert.ok((await h.api('reliability', cookie.lead)).failures.some(row => row.id === s3), 'the site report over the last 30 days')
+    const work = await (await h.raw(`/app/work/${w3}`, { cookie: cookie.sam })).text()
+    for (const text of ['Counts as', 'Failure: Seal leak', 'Reclassified: Teardown found the shaft seal']) assert.ok(work.includes(text), text)
+    const page = await (await h.raw(`/app/reliability?${period}`, { cookie: cookie.lead })).text()
+    for (const text of ['MTBF', '15.2 h', '75.0 min', 'Bearing failure', 'Unclassified', 'Outside hour-meter coverage', 'Not acknowledged since', 'Reclassified as failure: seal leak', 'Correct a classification', 'Definitions', 'Run hours']) assert.ok(page.includes(text), text)
+    assert.ok(!(await (await h.raw(`/app/reliability?${period}`, { cookie: cookie.sam })).text()).includes('Correct a classification'), 'only leads correct')
+    assert.equal((await h.raw('/app/reliability', { cookie: cookie.max })).status, 403)
   })
 
   await check('GAS-11 rer export and rer import keep every record', async () => {

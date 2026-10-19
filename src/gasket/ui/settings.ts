@@ -42,7 +42,7 @@ export const ACTIONS: Record<string, string> = {
   'workorder.results': 'Recorded checklist results', 'workorder.readings': 'Recorded readings', 'workorder.evidence': 'Attached evidence',
   'workorder.submit': 'Submitted for review', 'workorder.approve': 'Approved and closed', 'workorder.return': 'Returned for more work',
   'part.create': 'Added a part', 'part.receive': 'Received stock', 'part.count': 'Recorded a physical count', 'part.issue': 'Issued a part', 'part.return': 'Returned a part',
-  'downtime.start': 'Took the asset down', 'downtime.end': 'Put the asset back in service', 'finding.record': 'Recorded a finding',
+  'downtime.start': 'Took the asset down', 'downtime.end': 'Put the asset back in service', 'downtime.classify': 'Corrected a stop\'s classification', 'finding.record': 'Recorded a finding',
   'proposal.prepare': 'Prepared a proposal', 'proposal.approve': 'Approved a proposal', 'proposal.reject': 'Rejected a proposal',
   'import.apply': 'Moved in from MaintainX', 'import.undo': 'Undid a move-in',
 }

@@ -15,6 +15,7 @@ import type { Input } from './input'
 import { adjustMeter, feedReading, setFeedWindow } from './meters'
 import { moveCode, retireCode, setCode } from './codes'
 import { declareState } from './states'
+import { classifyStop } from './reliability'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
 import { decide, prepare } from './proposals'
@@ -80,6 +81,7 @@ export const actions: Record<string, Handler> = {
   'workorder.return': (env, actor, input) => giveBack(env, actor, input),
   'downtime.start': (env, actor, input) => downtimeStart(env, actor, input),
   'downtime.end': (env, actor, input) => downtimeEnd(env, actor, input),
+  'downtime.classify': (env, actor, input) => classifyStop(env, actor, input),
   'finding.record': (env, actor, input) => recordFinding(env, actor, input),
   'workorder.submit': (env, actor, input) => submit(env, actor, input),
   'workorder.review': (env, actor, input) => review(env, actor, input),

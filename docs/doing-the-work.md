@@ -22,6 +22,8 @@ Under **Meter and condition readings**, enter the time the readings were taken a
 
 If the asset has to come out of service, press **Record asset down** with the time it went down and why, then **Record back in service** when it is running again. Gasket works out the minutes. An asset is down only once at a time, and a new outage cannot start inside an earlier one.
 
+Tick **Planned stop (not a failure)** when the stop was planned, such as a shutdown window; otherwise it counts as a failure, and you can choose its **Failure mode**. The card shows what each stop counts as. A lead can correct that later on the Reliability page; the original stays on record.
+
 ## Findings
 
 Under **Corrective findings**, choose the checklist step the finding is about (or the whole work order), then record what you found and what you did, with a severity of Low, Medium or High. Tick **Needs follow-up work** to raise a corrective work order linked to this one.
