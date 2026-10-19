@@ -17,6 +17,8 @@ import { workList, workOrderDetail } from '../work'
 import { teamList } from '../crew'
 import { kitList, substituteList } from '../reservations'
 import { chaseCard } from './chasing'
+import { commentsCard } from './comments'
+import { mentionable, readThread } from '../comments'
 import { bomCard } from './bom'
 import { crewCard } from './crew'
 import { CODE_KIND } from './codes'
@@ -141,6 +143,8 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
 export async function workOrderPage(env: Bindings, actor: Actor, id: string, url: URL) {
   const w = await workOrderDetail(env, actor, id)
   const back = `/app/work/${w.id}`
+  // PLAN-006: opening the page reads its thread; the card still marks what was unread.
+  await readThread(env, actor, 'work', w.id)
   const working = w.mine && can(actor, 'work.do') && ['open', 'in_progress', 'returned'].includes(w.status)
   // PLAN-002: collaborators record alongside the accountable assignee, who alone submits.
   const recording = (w.mine || w.collaborating) && can(actor, 'work.do') && ['open', 'in_progress', 'returned'].includes(w.status)
@@ -239,7 +243,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     <form method="post" action="/app/do/workorder.review" class="gk-inline">${hidden('returnTo', back)}${ids}${hidden('decision', 'approve')}<button type="submit">Approve and close</button></form>`
 
   const body = h`${backLink('/app', 'Work orders')}${band}
-    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${w.bom ? bomCard(w.bom, actor.zone) : ''}${parts}${evidence}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${findings}${reviews}${assign}${control}
+    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${w.bom ? bomCard(w.bom, actor.zone) : ''}${parts}${evidence}${commentsCard(w.comments, actor, { field: 'workOrder', id: w.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${findings}${reviews}${assign}${control}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ...(w.trigger ? [['Raised by reading', `${w.trigger.meter} ${w.trigger.value}${w.trigger.unit === 'condition' ? '' : ` ${w.trigger.unit}`}, taken ${showLocal(w.trigger.taken_on)}${w.trigger.provenance === 'feed' ? ` (feed: ${w.trigger.source})` : ''}`] as [string, unknown]] : []), ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

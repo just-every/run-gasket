@@ -18,13 +18,13 @@ export const ROLE_LABELS: Record<Role, string> = {
 
 export type Capability =
   | 'site.manage' | 'register.manage' | 'work.assign' | 'work.do' | 'work.review'
-  | 'board.read' | 'history.export' | 'audit.read' | 'proposal.prepare' | 'proposal.decide' | 'import.run'
+  | 'board.read' | 'history.export' | 'audit.read' | 'proposal.prepare' | 'proposal.decide' | 'import.run' | 'comment.write'
 
 const GRANTS: Record<Role, Capability[]> = {
-  owner: ['site.manage', 'register.manage', 'work.assign', 'work.do', 'work.review', 'board.read', 'history.export', 'audit.read', 'proposal.prepare', 'proposal.decide', 'import.run'],
-  lead: ['register.manage', 'work.assign', 'work.do', 'board.read', 'history.export', 'proposal.prepare', 'proposal.decide', 'import.run'],
-  maintainer: ['work.do'],
-  supervisor: ['work.review', 'board.read', 'history.export', 'audit.read'],
+  owner: ['site.manage', 'register.manage', 'work.assign', 'work.do', 'work.review', 'board.read', 'history.export', 'audit.read', 'proposal.prepare', 'proposal.decide', 'import.run', 'comment.write'],
+  lead: ['register.manage', 'work.assign', 'work.do', 'board.read', 'history.export', 'proposal.prepare', 'proposal.decide', 'import.run', 'comment.write'],
+  maintainer: ['work.do', 'comment.write'],
+  supervisor: ['work.review', 'board.read', 'history.export', 'audit.read', 'comment.write'],
   agent: ['proposal.prepare'],
 }
 

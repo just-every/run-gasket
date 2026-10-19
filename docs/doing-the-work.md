@@ -28,6 +28,10 @@ Tick **Planned stop (not a failure)** when the stop was planned, such as a shutd
 
 Under **Corrective findings**, choose the checklist step the finding is about (or the whole work order), then record what you found and what you did, with a severity of Low, Medium or High. Tick **Needs follow-up work** to raise a corrective work order linked to this one.
 
+## Comments and shift handoffs
+
+Every work order and asset page has **Comments**. Write a note, attach up to four photos, tick the people who should know (each gets a notice on **Notices** that opens the comment), and tick **This is a shift handoff summary** when you hand a job to the next shift. Comments are internal notes for people with access to Gasket. Comments from others that you have not seen are marked **Unread** until you open the page. You can edit your own comment; the earlier versions stay readable. Closing a work order keeps its comments, and you can still add to them.
+
 ## Submit for review
 
 The bar at the bottom of the page says what still blocks submission. You can submit when every item has a result, every fail or needs-attention step has its own linked finding, and no downtime is still open. Then press **Submit for review**.

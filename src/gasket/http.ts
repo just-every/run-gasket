@@ -12,6 +12,7 @@ import { assetHistoryCsv } from './history'
 import { Input } from './input'
 import { site } from './site'
 import { evidenceFile } from './work'
+import { commentPhoto } from './comments'
 import { route } from './views'
 import { assetPage, assetsPage } from './ui/assets'
 import { boardPage } from './ui/board'
@@ -112,6 +113,7 @@ const pages: Record<string, Page> = {
   work: (env, actor, url) => workPage(env, actor, url),
   workOrder: (env, actor, url, id) => workOrderPage(env, actor, id, url),
   evidence: (env, actor, _url, id) => evidenceFile(env, actor, id),
+  commentPhoto: (env, actor, _url, id) => commentPhoto(env, actor, id),
   assets: (env, actor, url) => assetsPage(env, actor, url),
   asset: (env, actor, url, id) => assetPage(env, actor, id, url),
   historyCsv: async (env, actor, _url, id) => new Response(await assetHistoryCsv(env, actor, id), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="asset-history-${id.slice(0, 8)}.csv"`, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),

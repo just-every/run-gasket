@@ -7,13 +7,14 @@ import { audit } from './audit'
 import { board } from './board'
 import { checklistDetail, checklistList } from './checklists'
 import { closures } from './calendar'
+import { thread } from './comments'
 import { chaseRule, notices } from './chasing'
 import { teamList } from './crew'
 import { performance } from './performance'
 import { reliability } from './reliability'
 import { kitList, substituteList } from './reservations'
 import { codeList, failureReport } from './codes'
-import { GasketError } from './core'
+import { GasketError, insist, one } from './core'
 import { API_DOORS, match } from './doors'
 import { assetHistory } from './history'
 import { importJobs } from './movein/maintainx'
@@ -40,6 +41,8 @@ export const views: Record<string, View> = {
   schedules: (env, actor) => scheduleList(env, actor),
   work: (env, actor, _id, url) => workList(env, actor, url),
   workOrder: (env, actor, id) => workOrderDetail(env, actor, id),
+  workComments: async (env, actor, id) => { insist(await one(env, 'SELECT 1 FROM gk_work_orders WHERE id = ?', id), 'work_order_not_found', 404); return await thread(env, actor, 'work', id) },
+  assetComments: async (env, actor, id) => { insist(await one(env, 'SELECT 1 FROM gk_assets WHERE id = ?', id), 'asset_not_found', 404); return await thread(env, actor, 'asset', id) },
   board: (env, actor) => board(env, actor),
   proposals: (env, actor) => proposalList(env, actor),
   imports: (env, actor) => importJobs(env, actor),

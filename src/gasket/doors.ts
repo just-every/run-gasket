@@ -5,13 +5,13 @@ export const API_DOORS: [string, string][] = [
   ['^me$', 'me'], ['^site$', 'site'], ['^members$', 'members'],
   ['^assets$', 'assets'], ['^assets/([\\w-]+)$', 'asset'], ['^assets/([\\w-]+)/history$', 'history'],
   ['^parts$', 'parts'], ['^parts/([\\w-]+)$', 'part'], ['^checklists$', 'checklists'], ['^checklists/([\\w-]+)$', 'checklist'],
-  ['^schedules$', 'schedules'], ['^work$', 'work'], ['^work/([\\w-]+)$', 'workOrder'], ['^board$', 'board'],
+  ['^schedules$', 'schedules'], ['^work$', 'work'], ['^work/([\\w-]+)$', 'workOrder'], ['^work/([\\w-]+)/comments$', 'workComments'], ['^assets/([\\w-]+)/comments$', 'assetComments'], ['^board$', 'board'],
   ['^proposals$', 'proposals'], ['^imports$', 'imports'], ['^audit$', 'audit'], ['^codes$', 'codes'], ['^failures$', 'failures'], ['^closures$', 'closures'], ['^scheduler$', 'scheduler'], ['^notices$', 'notices'], ['^chase-rule$', 'chaseRule'], ['^teams$', 'teams'], ['^performance$', 'performance'], ['^reliability$', 'reliability'], ['^kits$', 'kits'],
 ]
 
 export const PAGE_DOORS: [string, string][] = [
   ['^/app$', 'work'], ['^/app/site$', 'site'], ['^/app/access$', 'access'],
-  ['^/app/work/([\\w-]+)$', 'workOrder'], ['^/app/evidence/([\\w-]+)$', 'evidence'],
+  ['^/app/work/([\\w-]+)$', 'workOrder'], ['^/app/evidence/([\\w-]+)$', 'evidence'], ['^/app/comment-photos/([\\w-]+)$', 'commentPhoto'],
   ['^/app/assets$', 'assets'], ['^/app/assets/([\\w-]+)$', 'asset'], ['^/app/assets/([\\w-]+)/history\\.csv$', 'historyCsv'],
   ['^/app/schedules$', 'schedules'], ['^/app/checklists/([\\w-]+)$', 'checklist'], ['^/app/parts$', 'parts'], ['^/app/parts/([\\w-]+)$', 'part'],
   ['^/app/board$', 'board'], ['^/app/proposals$', 'proposals'], ['^/app/move-in$', 'moveIn'], ['^/app/audit$', 'audit'], ['^/app/audit\\.csv$', 'auditCsv'], ['^/app/codes$', 'codes'], ['^/app/notices$', 'notices'], ['^/app/teams$', 'teams'], ['^/app/performance$', 'performance'], ['^/app/reliability$', 'reliability'], ['^/app/more$', 'more'],

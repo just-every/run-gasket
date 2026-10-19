@@ -94,6 +94,22 @@ export class Input {
     insist(bytes.length > 0 && bytes.length <= maxBytes, 'file_size')
     return { filename: cleanFilename(value.filename), bytes, declaredType: typeof value.type === 'string' ? value.type : '' }
   }
+
+  /** Up to `max` files under one name: repeated form fields, or a JSON array of base64 files. Empty form fields are skipped. */
+  async files(name: string, { max, maxBytes = 8_000_000 }: { max: number; maxBytes?: number }) {
+    const values = this.form ? this.form.getAll(name).filter(value => typeof value !== 'string' && value.size > 0) : this.values[name] === undefined ? [] : this.values[name]
+    insist(Array.isArray(values), `invalid_${name}`)
+    insist(values.length <= max, `too_many_${name}`)
+    const out: { filename: string; bytes: Uint8Array; declaredType: string }[] = []
+    for (const value of values) out.push((await (this.form ? new Input({}, single(name, value as File)) : new Input({ [name]: value }, null)).file(name, { maxBytes }))!)
+    return out
+  }
+}
+
+function single(name: string, value: File) {
+  const form = new FormData()
+  form.set(name, value)
+  return form
 }
 
 function cleanFilename(name: string): string {

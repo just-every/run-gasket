@@ -12,6 +12,7 @@
 import type { Bindings } from '../auth.server'
 import { can, requireCapability, type Actor } from './actor'
 import { all, commit, insist, newId, now, one, stmt, type Row } from './core'
+import { NOTICE_UNREAD, noticeLink } from './comments'
 import { addDays, daysBetween, isDate } from './dates'
 import type { Input } from './input'
 
@@ -116,8 +117,9 @@ export async function chase(env: Bindings, today: string) {
   if (statements.length) await env.DB.batch(statements)
 }
 
-/** My notices, newest first. */
-export const notices = (env: Bindings, actor: Actor) => all(env, 'SELECT n.id, n.kind, n.text, n.work_order_id, n.created_at FROM gk_notices n WHERE n.recipient_id = ? ORDER BY n.created_at DESC, n.id LIMIT 100', actor.id)
+/** My notices, newest first; a mention (PLAN-006) links to its comment and stays unread until I have read that comment. */
+export const notices = async (env: Bindings, actor: Actor) => (await all(env, `SELECT n.id, n.kind, n.text, n.work_order_id, n.asset_id, n.comment_id, ${NOTICE_UNREAD} AS unread, n.created_at FROM gk_notices n WHERE n.recipient_id = ? ORDER BY n.created_at DESC, n.id LIMIT 100`, actor.id))
+  .map(row => ({ ...row, unread: Boolean(row.unread), link: noticeLink(row) }))
 
 /** One work order's chase: overdue start and age, responses, blockers and every notice sent about it. */
 export async function chaseOf(env: Bindings, order: Row, today: string) {
@@ -125,6 +127,6 @@ export async function chaseOf(env: Bindings, order: Row, today: string) {
     overdue_since: order.overdue_since ?? null, overdue_days: order.overdue_since ? daysBetween(order.overdue_since, today) : 0,
     responses: await all(env, 'SELECT r.response, r.note, r.at, m.name AS by FROM gk_chase_responses r LEFT JOIN gk_members m ON m.id = r.member_id WHERE r.work_order_id = ? ORDER BY r.at, r.id', order.id),
     blockers: await all(env, 'SELECT b.id, b.kind, b.next_action, b.promised_on, b.resolved_at, b.resolution, o.name AS owner, b.owner_id FROM gk_blockers b LEFT JOIN gk_members o ON o.id = b.owner_id WHERE b.work_order_id = ? ORDER BY b.raised_at, b.id', order.id),
-    notices: await all(env, 'SELECT n.kind, n.text, n.created_at, m.name AS recipient FROM gk_notices n LEFT JOIN gk_members m ON m.id = n.recipient_id WHERE n.work_order_id = ? ORDER BY n.created_at, n.kind, m.name', order.id),
+    notices: await all(env, 'SELECT n.kind, n.text, n.created_at, m.name AS recipient FROM gk_notices n LEFT JOIN gk_members m ON m.id = n.recipient_id WHERE n.work_order_id = ? AND n.kind != \'mention\' ORDER BY n.created_at, n.kind, m.name', order.id),
   }
 }

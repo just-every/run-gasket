@@ -8,6 +8,8 @@ import { addDays, showDate, showInstant, showLocal } from '../dates'
 import { assetHistory } from '../history'
 import { COUNTER_CHANGES } from '../meters'
 import { assignable } from '../site'
+import { mentionable, readThread } from '../comments'
+import { commentsCard } from './comments'
 import { STATUS, amount, area, assetMark, backLink, band as headerBand, card, details, field, form, h, hidden, select, table, tag, woNumber } from './html'
 import { machine } from './icons'
 import { bomCard, bomForm } from './bom'
@@ -41,6 +43,8 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const { asset, orders, events, downtimeMinutes } = await assetHistory(env, actor, id)
   const manage = can(actor, 'register.manage') && !asset.retired_at
   const back = `/app/assets/${asset.id}`
+  // PLAN-006: opening the page reads its thread; the card still marks what was unread.
+  await readThread(env, actor, 'asset', asset.id)
   const band = headerBand({ id: 'asset-name', eyebrow: `${asset.tag}${asset.category ? ` · ${asset.category}` : ''}`, title: asset.name,
     facts: [`Serial ${asset.serial ?? '—'}`, asset.location, `Custodian: ${asset.custodian ?? '—'}`], status: tag(STATUS[asset.status]),
     meta: [{ label: 'Criticality', value: asset.criticality_label ?? asset.criticality }, { label: 'Downtime recorded', value: `${downtimeMinutes} minutes` }],
@@ -61,7 +65,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(await codeList(env, 'criticality'), asset)}`, 'Save changes', { secondary: true })}
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
-  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${bomCard(asset.bom, actor.zone, manage ? bomForm(asset.bom, asset.id, back, await partList(env, actor)) : '')}${history}</div><div class="gk-col-side">${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
+  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${bomCard(asset.bom, actor.zone, manage ? bomForm(asset.bom, asset.id, back, await partList(env, actor)) : '')}${history}${commentsCard(asset.comments, actor, { field: 'asset', id: asset.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
   return page(env, asset.name, actor, body, { url })
 }
 

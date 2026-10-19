@@ -83,9 +83,9 @@ export function select(label: string, name: string, options: { value: string; la
   return h`<div class="gk-field"><label for="${id}">${label}</label><select id="${id}" name="${name}"${required ? raw(' required') : ''}>${blank ? h`<option value="">${blank}</option>` : ''}${options.map(option => h`<option value="${option.value}"${option.value === selected ? raw(' selected') : ''}>${option.label}</option>`)}</select></div>`
 }
 
-export function fileField(label: string, name: string, { required = false, accept = '', hint = '' } = {}) {
+export function fileField(label: string, name: string, { required = false, accept = '', hint = '', multiple = false } = {}) {
   const id = uid(name)
-  return h`<div class="gk-field"><label for="${id}">${label}</label>${hint ? h`<p class="gk-hint" id="${id}-hint">${hint}</p>` : ''}<input id="${id}" type="file" name="${name}"${accept ? h` accept="${accept}"` : ''}${required ? raw(' required') : ''}${hint ? raw(` aria-describedby="${esc(id)}-hint"`) : ''}></div>`
+  return h`<div class="gk-field"><label for="${id}">${label}</label>${hint ? h`<p class="gk-hint" id="${id}-hint">${hint}</p>` : ''}<input id="${id}" type="file" name="${name}"${accept ? h` accept="${accept}"` : ''}${multiple ? raw(' multiple') : ''}${required ? raw(' required') : ''}${hint ? raw(` aria-describedby="${esc(id)}-hint"`) : ''}></div>`
 }
 
 export const checkbox = (label: string, name: string, checked = false) => h`<label class="gk-check"><input type="checkbox" name="${name}" value="yes"${checked ? raw(' checked') : ''}> ${label}</label>`

@@ -1186,6 +1186,73 @@ try {
     for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; this asset is M-2500']) assert.ok(work.includes(text), text)
   })
 
+  await check('PLAN-006 comments, mentions and shift handoff', async () => {
+    // A returning job: the supervisor sends Max's repair back and the lead hands it to Uma on the night shift.
+    const job = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Replace fryer thermostat', due: addDays(today, 2), assignee: ids.max })).id
+    await h.api('workorder.submit', cookie.max, { workOrder: job, version: (await wo('max', job)).version })
+    await h.api('workorder.review', cookie.sam, { workOrder: job, version: (await wo('sam', job)).version, decision: 'return', reason: 'Oil still reads 12 °F high' })
+    await h.api('workorder.assign', cookie.lead, { workOrder: job, assignee: ids.uma, shift: 'Night' })
+    // Max leaves a shift handoff on the work order's form door: two photos, an internal cost note, Uma mentioned.
+    const said = 'Swapped the probe; still 12 °F high on the bench check.\nInternal cost note: the OEM thermostat is $186 against $74 for the generic one, so I held off ordering.'
+    const photos = ['probe-reading.png', 'thermostat-label.png'].map(name => new File([png], name, { type: 'image/png' }))
+    await h.api('comment.post', cookie.agent, { workOrder: job, body: 'Agents prepare proposals; they do not comment' }, 403)
+    await h.api('comment.post', cookie.max, { workOrder: job, body: 'x', mention: [ids.agent] }, 409)
+    await h.api('comment.post', cookie.max, { workOrder: job, asset: ids.fryer, body: 'x' }, 400)
+    await h.api('comment.post', cookie.max, { workOrder: job, body: 'x', photo: [file('quote.pdf', 'x', 'application/pdf')] }, 400)
+    assert.equal((await h.submit('comment.post', cookie.max, { workOrder: job, body: said, handoff: 'yes', mention: [ids.uma], photo: photos }, `/app/work/${job}`)).searchParams.get('error'), null)
+    const [note] = (await h.api(`work/${job}/comments`, cookie.uma)).comments
+    assert.deepEqual([note.kind, note.author, note.body, note.unread, note.mentions.map(row => row.name), note.photos.map(row => [row.filename, row.sha256])],
+      ['handoff', 'Max Ortiz', said, true, ['Uma Reyes'], photos.map(photo => [photo.name, createHash('sha256').update(png).digest('hex')])])
+    // Uma signs in on a phone through the emailed link and follows the notice to the comment.
+    const phone = await h.signIn('uma@example.test')
+    const notice = (await h.api('notices', phone)).find(row => row.comment_id === note.id)
+    assert.deepEqual([notice.kind, notice.unread, notice.link], ['mention', true, `/app/work/${job}#comment-${note.id}`])
+    const notices = await (await h.raw('/app/notices', { cookie: phone })).text()
+    for (const text of [`href="${notice.link}"`, 'Mentioned', 'Unread']) assert.ok(notices.includes(text), text)
+    assert.ok(notices.replace(/<[^>]+>/g, '').includes('Max Ortiz mentioned you in a shift handoff on WO-'))
+    const opened = await (await h.raw(notice.link.split('#')[0], { cookie: phone })).text()
+    for (const text of [`id="comment-${note.id}"`, `/app/comment-photos/${note.photos[1].id}`]) assert.ok(opened.includes(text), text)
+    for (const text of ['Shift handoff', 'Unread', 'Internal cost note: the OEM thermostat is $186']) assert.ok(opened.replace(/<[^>]+>/g, '').includes(text), text)
+    const photo = await h.raw(`/app/comment-photos/${note.photos[0].id}`, { cookie: phone })
+    assert.deepEqual([photo.status, photo.headers.get('content-type'), createHash('sha256').update(Buffer.from(await photo.arrayBuffer())).digest('hex')], [200, 'image/png', note.photos[0].sha256])
+    // Opening the work order read the thread and the notice.
+    assert.deepEqual([(await h.api(`work/${job}/comments`, phone)).unread, (await h.api('notices', phone)).find(row => row.comment_id === note.id).unread], [0, false])
+    const reply = await h.api('comment.post', phone, { workOrder: job, body: 'Got it. Ordering the OEM part first thing.', mention: [ids.max] })
+    let talk = await h.api(`work/${job}/comments`, cookie.max)
+    assert.deepEqual([talk.unread, talk.comments.map(row => [row.author, row.unread])], [1, [['Max Ortiz', false], ['Uma Reyes', true]]])
+    await h.api('comment.read', cookie.max, { workOrder: job })
+    assert.equal((await h.api(`work/${job}/comments`, cookie.max)).unread, 0)
+    // Only the author edits; every version stays readable and an edit does not reopen a read comment.
+    const corrected = said.replace('$186', '$192 with freight')
+    await h.api('comment.edit', phone, { comment: note.id, body: 'Rewritten by someone else' }, 403)
+    await h.api('comment.edit', cookie.max, { comment: note.id, body: said }, 409)
+    await h.api('comment.edit', cookie.max, { comment: note.id, body: corrected })
+    const edited = (await h.api(`work/${job}/comments`, phone)).comments[0]
+    assert.deepEqual([edited.body, edited.unread, edited.revisions.map(row => [row.number, row.body, row.by])], [corrected, false, [[1, said, 'Max Ortiz'], [2, corrected, 'Max Ortiz']]])
+    assert.ok((await (await h.raw(`/app/work/${job}`, { cookie: cookie.sam })).text()).replace(/<[^>]+>/g, '').includes('Version 1 · Max Ortiz'))
+    // Resolution keeps the conversation, which can go on.
+    await h.api('workorder.submit', phone, { workOrder: job, version: (await wo('uma', job)).version })
+    await h.api('workorder.review', cookie.sam, { workOrder: job, version: (await wo('sam', job)).version, decision: 'approve' })
+    await h.api('comment.post', cookie.sam, { workOrder: job, body: 'Closed: thermostat within 2 °F after the swap.' })
+    const closed = await wo('lead', job)
+    assert.deepEqual([closed.status, closed.comments.comments.map(row => row.id).slice(0, 2)], ['closed', [note.id, reply.comment]])
+    // Asset comments work the same way, with a durable link to the asset.
+    const fleet = await h.api('comment.post', cookie.lead, { asset: ids.fryer, body: 'Second thermostat failure on this fryer this quarter', mention: [ids.sam] })
+    assert.equal((await h.api('notices', cookie.sam)).find(row => row.comment_id === fleet.comment).link, `/app/assets/${ids.fryer}#comment-${fleet.comment}`)
+    assert.equal((await h.api(`assets/${ids.fryer}`, cookie.sam)).comments.unread, 1)
+    assert.ok((await (await h.raw(`/app/assets/${ids.fryer}`, { cookie: cookie.sam })).text()).includes(`id="comment-${fleet.comment}"`))
+    assert.equal((await h.api(`assets/${ids.fryer}/comments`, cookie.sam)).unread, 0)
+    // Internal notes: no requester or contractor identity can be given access, and signed-out or ended access reads nothing.
+    for (const role of ['requester', 'contractor']) await h.api('access.give', cookie.owner, { name: 'Outside Person', email: `${role}@example.test`, role }, 400)
+    for (const path of [`/api/gasket/work/${job}/comments`, `/api/gasket/assets/${ids.fryer}/comments`, `/app/comment-photos/${note.photos[0].id}`]) {
+      for (const who of [undefined, cookie.temp]) {
+        const response = await h.raw(path, { cookie: who })
+        assert.ok([303, 401, 403].includes(response.status), `${path}: ${response.status}`)
+        assert.ok(!(await response.text()).includes('$192'), path)
+      }
+    }
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
@@ -1193,8 +1260,9 @@ try {
       const assets = await h.api('assets', cookie.owner), work = [...await h.api('work', cookie.owner), ...await h.api('work?state=closed', cookie.owner)]
       const orders = await Promise.all(work.map(row => h.api(`work/${row.id}`, cookie.sam)))
       const files = []
-      for (const evidence of orders.flatMap(order => order.evidence)) {
-        const download = await h.raw(`/app/evidence/${evidence.id}`, { cookie: cookie.sam })
+      // PLAN-006: comment photos are attachments too.
+      for (const evidence of [...orders.flatMap(order => order.evidence), ...orders.flatMap(order => order.comments.comments.flatMap(comment => comment.photos)).map(photo => ({ ...photo, path: 'comment-photos' }))]) {
+        const download = await h.raw(`/app/${evidence.path ?? 'evidence'}/${evidence.id}`, { cookie: cookie.sam })
         assert.equal(download.status, 200)
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }

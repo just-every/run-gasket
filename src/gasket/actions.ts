@@ -4,6 +4,7 @@
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
 import { collaborate, createTeam, decline, teamMember } from './crew'
+import { editComment, markRead, postComment } from './comments'
 import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from './assets'
 import { createChecklist, reviseChecklist } from './checklists'
 import { bulk, merge, reopen } from './control'
@@ -83,6 +84,9 @@ export const actions: Record<string, Handler> = {
   'workorder.merge': (env, actor, input) => merge(env, actor, input),
   'workorder.results': (env, actor, input) => recordResults(env, actor, input),
   'workorder.evidence': (env, actor, input) => addEvidence(env, actor, input),
+  'comment.post': (env, actor, input) => postComment(env, actor, input),
+  'comment.edit': (env, actor, input) => editComment(env, actor, input),
+  'comment.read': (env, actor, input) => markRead(env, actor, input),
   'workorder.readings': async (env, actor, input) => { const kept = await recordReadings(env, actor, input); const created = []; for (const meter of kept.meters) created.push(...await evaluateMeter(env, actor, meter)); return { id: kept.id, created } },
   'workorder.issue': (env, actor, input) => issue(env, actor, input),
   'workorder.return': (env, actor, input) => giveBack(env, actor, input),
