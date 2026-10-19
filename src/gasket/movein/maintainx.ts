@@ -8,7 +8,7 @@ import { applyD1ImportBatches, canonicalJson, createD1ImportJob, planD1Import, r
 import { sourceIdentity } from '../../modules/import-kit/src/provenance/identity'
 import { capabilitySql, requireCapability, type Actor } from '../actor'
 import { codeList, matchCode } from '../codes'
-import { GasketError, all, commit, insist, one, sha256Hex } from '../core'
+import { GasketError, all, commit, insist, one, now, stmt, sha256Hex } from '../core'
 import { isDate, localNow } from '../dates'
 import type { Input } from '../input'
 import { compareMeter, meterNumber, toMilli } from '../quantity'
@@ -331,12 +331,13 @@ export async function previewImport(env: Bindings, actor: Actor, input: Input) {
 export async function applyImport(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'import.run')
   const reviewed = input.text('fingerprint', { max: 100 })
-  const { plan, context } = await build(env, actor, input)
+  const { plan, context, preview } = await build(env, actor, input)
   insist(plan.fingerprint === reviewed, 'reviewed_fingerprint_changed', 409)
   // Repeating an apply returns its job; after an undo, applying again is a new job.
   const undone = (await one<{ n: number }>(env, "SELECT COUNT(*) AS n FROM ik_jobs WHERE destination = ? AND fingerprint = ? AND state IN ('undone', 'rolled_back')", destination, reviewed))!.n
   const reviewedContext = { ...context, reviewedFingerprint: reviewed, ...(undone ? { operationKey: `${reviewed}:${undone}` } : {}) }
   const job = await createD1ImportJob(plan, reviewedContext)
+  await commit(env, [stmt(env, 'INSERT OR IGNORE INTO gk_import_quality(job_id,reviewed_json,recorded_at) VALUES (?,?,?)', job.id, JSON.stringify({ fingerprint: reviewed, rejected: preview.rejected, attention: preview.attention, gaps: preview.gaps }), now())], [])
   const result = await applyD1ImportBatches(job.id, reviewedContext)
   if (!await one(env, "SELECT 1 FROM gk_audit WHERE action = 'import.apply' AND subject = ?", job.id))
     await commit(env, [], { actor: actor.id, action: 'import.apply', subject: job.id, detail: { kit: 'maintainx', fingerprint: reviewed, counts: plan.counts } })
