@@ -15,6 +15,7 @@ import { importJobs } from './movein/maintainx'
 import { partDetail, partList } from './parts'
 import { proposalList } from './proposals'
 import { scheduleList } from './schedules'
+import { schedulerView } from './scheduler'
 import { members, site } from './site'
 import { workList, workOrderDetail } from './work'
 
@@ -40,6 +41,7 @@ export const views: Record<string, View> = {
   audit: (env, actor, _id, url) => audit(env, actor, url),
   codes: env => codeList(env),
   closures: env => closures(env),
+  scheduler: (env, actor) => schedulerView(env, actor),
   failures: (env, actor) => failureReport(env, actor),
 }
 

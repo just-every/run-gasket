@@ -2,7 +2,7 @@
 // closures, and skip and deferral requests with their independent decisions.
 import type { Actor } from '../actor'
 import { can } from '../actor'
-import { showDate } from '../dates'
+import { showDate, showInstant } from '../dates'
 import { card, field, form, h, hidden, raw, select, table, tag } from './html'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -32,6 +32,13 @@ export function pending(row: any, actor: Actor) {
   const what = ask.kind === 'skip' ? `Skip of ${showDate(ask.occurrence)}` : `Deferral of ${showDate(ask.occurrence)} to ${showDate(ask.until)}`
   const decide = can(actor, 'work.review') && ask.requested_by !== actor.id ? h`${form('schedule.exception', '/app/schedules', h`${hidden('exception', ask.id)}${hidden('decision', 'approve')}`, 'Approve', { secondary: true, layout: 'gk-inline' })}${form('schedule.exception', '/app/schedules', h`${hidden('exception', ask.id)}${hidden('decision', 'reject')}`, 'Reject', { secondary: true, layout: 'gk-inline' })}` : ''
   return h`<span class="gk-sub">${tag('Waiting for approval')} ${what}: ${ask.reason} (${ask.requested_by_name ?? '—'})</span>${decide}`
+}
+
+/** PM-001: when the scheduler last ran, when it did not, and what it issued late. */
+export function schedulerCard(health: any, actor: Actor) {
+  const gaps = health.gaps.slice(0, 5).map((row: any) => h`<li>${tag('Missed runs')} Not running for ${row.minutes} minutes before ${showInstant(row.until, actor.zone)}</li>`)
+  const late = health.late.slice(0, 10).map((row: any) => h`<li>${tag('Issued late')} <a href="/app/work/${row.id}">${row.title}</a>, due ${showDate(row.due_date)}, issued ${showDate(row.issued_on)}</li>`)
+  return card('Automatic scheduling', h`<p>${health.lastRun ? h`Gasket issues due work every 15 minutes; last run ${showInstant(health.lastRun, actor.zone)}.` : 'The scheduler has not run yet.'}</p>${gaps.length || late.length ? h`<ul class="gk-plain-list">${gaps}${late}</ul>` : h`<p class="gk-muted">No missed runs.</p>`}`, { id: 'scheduler' })
 }
 
 export function exceptionsCard(schedules: any[]) {

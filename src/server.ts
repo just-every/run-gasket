@@ -11,6 +11,7 @@ import { authResponse, runtimeBindings, type Bindings } from './auth.server'
 import { identity } from './identity'
 import { withIconsResponse } from './icon-head'
 import { gasketResponse } from './gasket/http'
+import { runScheduler } from './gasket/scheduler'
 
 const api = new Hono<{ Bindings: Bindings }>()
 api.get('/health', (context) => context.json({ status: 'ok', ...deploymentHealth(context.env) }))
@@ -39,5 +40,9 @@ export default withDemo({
     const gasket = await gasketResponse(request, env)
     if (gasket) return gasket
     return dispatch(request, () => api.fetch(request, env, execution), async () => noTransform(await start.fetch(request)))
+  },
+  // PM-001: the Cron Trigger declared in wrangler.jsonc and deploy.json.
+  async scheduled(controller, env) {
+    await runScheduler(runtimeBindings(env), controller.scheduledTime, controller.cron)
   },
 } satisfies ExportedHandler<Bindings>, { seed: seedDemo })

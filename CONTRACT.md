@@ -142,7 +142,7 @@ The scheduler's existing fixed-calendar and approval-reading meter cadence remai
 
 ### Preventive maintenance and automatic follow-up
 
-- **PM-001 — Unattended calendar generation.** An installation-owned scheduler generates recurring calendar PMs without a person pressing a button, using each site's time zone, lead time and fixed- or completion-based policy. Each due occurrence has a stable identity; restart, overlap and retry create one work order and retain missed-run debt. **Acceptance evidence:** Save a monthly PM through the schedule door, leave the app, cross its due window and restart the scheduler twice. Open one generated order, its due occurrence and any missed-run warning without invoking manual generation.
+- **PM-001 — Unattended calendar generation.** An installation-owned scheduler generates recurring calendar PMs without a person pressing a button, using each site's time zone, lead time and fixed- or completion-based policy. Each due occurrence has a stable identity; restart, overlap and retry create one work order and retain missed-run debt. The scheduler is a Cron Trigger every 15 minutes (UTC), declared for the deployed Worker and run by `rer dev`; each run issues, at the site's time zone, calendar work seven days ahead of its due date and counter or trigger work as soon as it is due (PM-002, PM-003). An occurrence is its schedule plus its due date (or counter value, or triggering reading); the scheduler never issues an occurrence that already had a work order, so a cancelled occurrence stays owed until a person reissues or skips it. Every run is kept; a run more than 45 minutes after the one before records the gap, and calendar work the scheduler issued after its due date is listed as issued late, on the Schedules page and in `scheduler`. **Acceptance evidence:** Save a monthly PM through the schedule door, leave the app, cross its due window and restart the scheduler twice. Open one generated order, its due occurrence and any missed-run warning without invoking manual generation.
 
 - **PM-002 — Automatic meter and condition triggers.** Validated manual or integrated counter, gauge and condition readings automatically evaluate thresholds, trend duration and hysteresis. Combined calendar/meter policies state whichever-first or both; repeated/late sensor deliveries do not duplicate work or satisfy a condition with stale data. Every reading a door keeps (a feed reading or one taken on a work order) evaluates the schedules on its meter at once. A gauge trigger fires when good readings stay strictly above (or below) its threshold and a condition trigger when they stay in its chosen conditions, for at least its sustain minutes measured between source times (0: the first such reading); after firing it re-arms only once a later good reading is at or past its reset value (the threshold unless set; for a condition, out of the chosen conditions). Only good readings received after the trigger was set up count, so stale, suspect, moved-in or earlier readings never fire one. A counter is due at its value. A schedule with a calendar and a meter is due on whichever comes first unless it states both. A feed delivery repeating a kept reading (same meter, feed, source time and value) is that reading, not a new one, and a schedule never has more than one open order. Generated work names the reading that raised it. **Acceptance evidence:** Configure counter and sustained-temperature triggers, send fresh, repeated, late and recovered readings through ingest and await generated work. Inspect one order per trigger, source evidence and explicit rejection of stale data.
 
@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003 and PM-002 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002 and PM-001 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 6 | 38 | 78 | 122 |
-| All | 20 | 38 | 78 | 136 |
+| Target and push further | 7 | 37 | 78 | 122 |
+| All | 21 | 37 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -419,7 +419,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `PLAN-007` | Bulk actions and controlled cancellation | target | partial | `src/gasket/control.ts`; `src/gasket/work.ts`; `src/gasket/schedules.ts`; `migrations/core/0019_work_merge.sql`; `tests/gasket/flows.mjs` | Bulk assign, reschedule and cancel with preview and per-row outcomes, reopen, merge and PM skip are served through the JSON door; selecting work in bulk on the Work page is still owed and arrives with the Work table look. |
 | `PLAN-008` | Team, group and direct messaging | target | missing |  | No conversations, team or All team chat, direct/group messages, unread state, offline message queue or message-to-work conversion. |
 | `PLAN-009` | No-code automation rules | target | missing |  | Routing, priority and assignment are manual; no rule builder, triggers/conditions/actions, test mode, loop protection or rule-revision audit. |
-| `PM-001` | Unattended calendar generation | target | partial | `src/gasket/schedules.ts`; `tests/gasket/flows.mjs` | Calendar generation is command-driven only; no unattended scheduler, occurrence ledger or missed-run recovery. |
+| `PM-001` | Unattended calendar generation | target | done | `src/gasket/scheduler.ts`; `src/server.ts`; `src/gasket/schedules.ts`; `wrangler.jsonc`; `deploy.json`; `migrations/core/0028_scheduler.sql`; `tests/gasket/flows.mjs` |  |
 | `PM-002` | Automatic meter and condition triggers | target | done | `src/gasket/schedules.ts`; `src/gasket/triggers.ts`; `src/gasket/meters.ts`; `src/gasket/actions.ts`; `migrations/core/0027_meter_triggers.sql`; `tests/gasket/flows.mjs` |  |
 | `PM-003` | Cadence, seasonal windows and exceptions | target | done | `src/gasket/schedules.ts`; `src/gasket/calendar.ts`; `src/gasket/exceptions.ts`; `migrations/core/0026_pm_calendar.sql`; `tests/gasket/flows.mjs` |  |
 | `PM-004` | Failed inspection creates accountable correction | target | done | `src/gasket/corrections.ts`; `src/gasket/work.ts`; `src/gasket/review.ts`; `migrations/core/0020_failure_rules.sql`; `tests/gasket/flows.mjs` |  |

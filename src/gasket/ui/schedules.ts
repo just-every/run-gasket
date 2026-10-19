@@ -10,7 +10,8 @@ import { closures } from '../calendar'
 import { HORIZON_DAYS, scheduleList } from '../schedules'
 import { assignable } from '../site'
 import { amount, area, backLink, card, field, form, h, hidden, raw, select, table, tag } from './html'
-import { changesCard, exceptionsCard, pending, policyFields, policyText } from './calendar'
+import { schedulerView } from '../scheduler'
+import { changesCard, exceptionsCard, pending, policyFields, policyText, schedulerCard } from './calendar'
 import { page } from './shell'
 
 export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
@@ -43,7 +44,7 @@ export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
   }
   const checklistCard = card('Checklists', h`${checklists.length ? table(['Checklist', 'Revision', 'Items'], checklists.map(item => [h`<a href="/app/checklists/${item.id}">${item.name}</a>`, `Revision ${item.revision.number}`, String(item.revision.items.length)]), 'Checklists', { wrap: [0] }) : h`<p class="gk-muted">No checklists yet.</p>`}
     ${manage ? form('checklist.create', '/app/checklists/{id}', h`${field('Checklist name', 'name')}${area('Items, one per line', 'items', { hint: 'Each line is one check the maintainer marks pass, needs attention or fail.' })}`, 'Write checklist', { secondary: true }) : ''}`, { id: 'checklists' })
-  return page(env, 'Schedules', actor, h`<div class="gk-head"><div><h1>Schedules</h1><p class="gk-lede">Preventive work by calendar or meter, and the checklists it follows.</p></div>${generate}</div>${list}<div class="gk-columns"><div class="gk-col-main">${create}${exceptionsCard(schedules)}${changesCard(schedules, closed, actor)}</div><div class="gk-col-side">${checklistCard}</div></div>`, { url })
+  return page(env, 'Schedules', actor, h`<div class="gk-head"><div><h1>Schedules</h1><p class="gk-lede">Preventive work by calendar or meter, and the checklists it follows.</p></div>${generate}</div>${list}<div class="gk-columns"><div class="gk-col-main">${create}${exceptionsCard(schedules)}${changesCard(schedules, closed, actor)}</div><div class="gk-col-side">${can(actor, 'board.read') ? schedulerCard(await schedulerView(env, actor), actor) : ''}${checklistCard}</div></div>`, { url })
 }
 
 export async function checklistPage(env: Bindings, actor: Actor, id: string, url: URL) {

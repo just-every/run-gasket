@@ -58,7 +58,12 @@ export async function emittedWorker(vars, { installation } = {}) {
   } catch (error) { await close(); throw error }
   return worker()
 
-  function worker() { return { origin, mails, request, signInToken, close } }
+  function worker() { return { origin, mails, request, scheduled, signInToken, close } }
+
+  /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms). */
+  async function scheduled(cron, at = Date.now()) {
+    return await (await mf.getWorker()).scheduled({ cron, scheduledTime: new Date(at) })
+  }
 
   /** One request to the Worker. Form bodies are encoded here, so every body reaches it as bytes. */
   async function request(path, init = {}) {

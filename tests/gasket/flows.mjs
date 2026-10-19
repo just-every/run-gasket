@@ -700,6 +700,37 @@ try {
     assert.equal((await h.api(`assets/${ids.compressor}`, cookie.max)).meters.find(row => row.id === ids.runHours).feed_window_hours, 24)
   })
 
+  await check('PM-001 unattended calendar generation', async () => {
+    // A monthly PM saved through the schedule door; nobody presses Create due work orders.
+    const monthly = (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: ids.checklist, title: 'Monthly fryer gas check', everyDays: 30, firstDue: addDays(today, 5), assignee: ids.max })).id
+    const missed = (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: ids.checklist, title: 'Fryer thermostat calibration', everyDays: 90, firstDue: addDays(today, -2), assignee: ids.max })).id
+    const cron = '*/15 * * * *', minutes = n => Date.now() - n * 60_000
+    const before = (await h.api('work', cookie.lead)).length
+    await h.scheduled(cron, minutes(200))
+    // Restarted twice, the second run three hours later: still one order per occurrence.
+    await h.scheduled(cron, minutes(15))
+    await h.scheduled(cron, minutes(15))
+    const work = await h.api('work', cookie.lead)
+    const byTitle = title => work.filter(row => row.title === title)
+    assert.deepEqual([byTitle('Monthly fryer gas check').length, byTitle('Fryer thermostat calibration').length], [1, 1], `one order each (${work.length - before} new)`)
+    const order = await wo('max', byTitle('Monthly fryer gas check')[0].id)
+    assert.deepEqual([order.occurrence, order.due_date, order.created_by, order.schedule_id], [`${monthly}@${addDays(today, 5)}`, addDays(today, 5), 'scheduler', monthly])
+    // The scheduler's health: its runs, the three-hour gap, and the overdue calibration issued late.
+    const health = await h.api('scheduler', cookie.sam)
+    assert.ok(health.runs.length >= 3 && health.gaps.some(row => row.minutes >= 180), JSON.stringify(health.gaps))
+    assert.ok(health.late.some(row => row.title === 'Fryer thermostat calibration' && row.due_date === addDays(today, -2)), 'issued after its due date')
+    assert.ok(!health.late.some(row => row.title === 'Monthly fryer gas check'))
+    await h.api('scheduler', cookie.max, undefined, 403)
+    // A cancelled occurrence stays owed: the scheduler does not issue it again, and the schedule shows it overdue.
+    const calibration = byTitle('Fryer thermostat calibration')[0].id
+    await h.api('workorder.cancel', cookie.lead, { workOrder: calibration, reason: 'Thermostat being replaced' })
+    await h.scheduled(cron)
+    assert.equal((await h.api('work', cookie.lead)).filter(row => row.title === 'Fryer thermostat calibration').length, 0)
+    assert.equal((await h.api('schedules', cookie.lead)).find(row => row.id === missed).overdue, true)
+    const page = await (await h.raw('/app/schedules', { cookie: cookie.lead })).text()
+    assert.ok(page.includes('Automatic scheduling'), 'the Schedules page shows the scheduler')
+  })
+
   await check('PM-002 automatic meter and condition triggers', async () => {
     // A blast freezer: a sustained-temperature trigger with hysteresis, a condition trigger and a counter that must meet its calendar.
     const freezer = (await h.api('asset.create', cookie.lead, { tag: 'HK-040', name: 'Blast freezer', location: 'Cold prep', criticality: 'critical' })).id

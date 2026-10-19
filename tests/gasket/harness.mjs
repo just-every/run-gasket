@@ -59,7 +59,7 @@ export async function harness({ vars, installation } = {}) {
     return cookie
   }
 
-  return { origin, vars, installation, raw, api, submit, signIn, owner, stop, close }
+  return { origin, vars, installation, raw, api, submit, signIn, owner, stop, close, scheduled: worker.scheduled }
 }
 
 export const file = (filename, content, type = 'application/octet-stream') => ({ filename, base64: Buffer.from(content).toString('base64'), type })

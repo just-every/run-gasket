@@ -10,6 +10,9 @@
       "binding": "DB"
     }
   ],
+  "crons": [
+    "*/15 * * * *"
+  ],
   "originVar": "AUTH_ORIGIN",
   "vars": {
     "AUTH_LOCAL": "false",

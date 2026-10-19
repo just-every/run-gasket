@@ -22,6 +22,7 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 | `parts`, `parts/ID` | Parts with on-hand and minimum; one part with every movement. `seen` is the movement sequence a count must name |
 | `checklists`, `checklists/ID` | Checklists and every published revision |
 | `schedules` | Schedules with cadence, next due date or meter value and any open work order |
+| `scheduler` | The automatic scheduler (lead, owner, supervisor): `cron`, `lastRun`, recent `runs`, `gaps` (when it had not run for more than 45 minutes) and `late` (calendar work it issued after its due date) |
 | `work` (`?mine=1`, `?state=closed`), `work/ID` | Work lists; one work order with checklist results, readings, parts, downtime, findings, evidence, reviews, overdue decisions and what still blocks submission |
 | `board` | Overdue work, waiting for review, open follow-ups, assets down, 30-day downtime, low parts (lead, supervisor, owner) |
 | `proposals` | Proposals with payload, reasoning, basis, status and decision |

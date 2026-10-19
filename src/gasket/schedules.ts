@@ -71,14 +71,14 @@ export async function createSchedule(env: Bindings, actor: Actor, input: Input, 
   return { id }
 }
 
-const DUE_SCHEDULES = `SELECT s.* FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id
+export const DUE_SCHEDULES = `SELECT s.* FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id
     WHERE s.active = 1 AND a.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM gk_work_orders w WHERE w.schedule_id = s.id AND w.status NOT IN ('closed', 'cancelled'))`
 
 /** One work order for each given schedule that is due: by date within the horizon, by its counter value or its
  * trigger (PM-002), on whichever comes first or, when it says both, only once both are due. */
-async function issueDue(env: Bindings, actor: Actor, schedules: Row[], action: string) {
+export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>, schedules: Row[], action: string, { automatic = false } = {}) {
   const horizon = addDays(actor.today, HORIZON_DAYS)
-  const created: { id: string; schedule: string; due: string; reason: string; reading?: string }[] = []
+  const created: { id: string; schedule: string; due: string; reason: string; occurrence: string; reading?: string }[] = []
   const held: { schedule: string; readings: number }[] = []
   const statements: D1PreparedStatement[] = []
   for (const schedule of schedules) {
@@ -91,12 +91,15 @@ async function issueDue(env: Bindings, actor: Actor, schedules: Row[], action: s
     if (!due && state?.held.length) held.push({ schedule: schedule.id, readings: state.held.length })
     if (!due) continue
     const id = newId(), dueDate = byDate ? schedule.next_due_date : actor.today, reading = fired?.id ?? (byMeter ? state!.latest?.id : null) ?? null
-    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, assignee_id, status, created_by, created_at)
-      SELECT ?, ${NEXT_NUMBER}, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, 'open', ?, ?
+    // PM-001: the occurrence's stable identity; the scheduler never issues one that already had work (a cancelled one stays owed).
+    const occurrence = `${schedule.id}@${byDate ? schedule.next_due_date : fired ? `reading:${fired.id}` : `meter:${schedule.next_due_meter}`}`
+    if (automatic && await one(env, 'SELECT 1 FROM gk_work_orders WHERE occurrence = ?', occurrence)) continue
+    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, occurrence, assignee_id, status, created_by, created_at)
+      SELECT ?, ${NEXT_NUMBER}, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, 'open', ?, ?
       WHERE NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE schedule_id = ? AND status NOT IN ('closed', 'cancelled'))`,
-    id, schedule.asset_id, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, schedule.assignee_id, actor.id, now(), schedule.id))
+    id, schedule.asset_id, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, occurrence, schedule.assignee_id, actor.id, now(), schedule.id))
     if (fired) statements.push(stmt(env, 'UPDATE gk_schedules SET trigger_fired_on = ?, revision = revision + 1 WHERE id = ?', fired.taken_on, schedule.id))
-    created.push({ id, schedule: schedule.id, due: dueDate, reason: byDate && byMeter ? 'both' : byDate ? 'date' : 'meter', ...(byMeter && reading ? { reading } : {}) })
+    created.push({ id, schedule: schedule.id, due: dueDate, reason: byDate && byMeter ? 'both' : byDate ? 'date' : 'meter', occurrence, ...(byMeter && reading ? { reading } : {}) })
   }
   if (statements.length) await commit(env, statements, created.map(item => ({ actor: actor.id, action, subject: item.id, detail: item })))
   return { created, held }
