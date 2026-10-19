@@ -7,7 +7,7 @@ It is free and open source under the MIT license. You run your own copy, and you
 ## How work moves through Gasket
 
 1. A maintenance lead registers the equipment, writes a checklist and schedules it on an asset: every so many days, every so many units of a counter meter, or both.
-2. **Create due work orders** turns each schedule that falls due within seven days into one work order, assigned to its default maintainer.
+2. **Create due work orders** turns each schedule that falls due within the site's lead time (seven days unless the owner changes it on the Site page) into one work order, assigned to its default maintainer.
 3. The maintainer records a result and a note for every checklist item, attaches photos, records readings, issues the parts they used, records downtime and findings, and submits the work for review.
 4. A supervisor reads exactly what was recorded and approves it, or returns it with a reason. Approval closes the work order and moves the schedule on to its next due date.
 5. Everything lands in the asset's history, with who did what and when. The board shows what is overdue, waiting for review and down right now.

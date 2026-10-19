@@ -12,6 +12,7 @@ import { closures, nextAllowed, policyFields, policyOf } from './calendar'
 import { CURRENT_REVISION } from './checklists'
 import { NEXT_NUMBER, all, commit, insist, newId, now, one, stmt, type Row } from './core'
 import { assigneeFits } from './crew'
+import { leadDays } from './site'
 import { addDays, isDate } from './dates'
 import { estimate } from './performance'
 import type { Input } from './input'
@@ -19,7 +20,6 @@ import { meterState } from './meters'
 import { addMeter, compareMeter, meterNumber } from './quantity'
 import { firingReading, triggerFields } from './triggers'
 
-export const HORIZON_DAYS = 7
 /** A counter's normalized value now and its readings held back as stale or suspect. */
 const meterNow = async (env: Bindings, meterId: string | null) => {
   if (!meterId) return { now: null, held: 0 }
@@ -80,10 +80,10 @@ export async function createSchedule(env: Bindings, actor: Actor, input: Input, 
 export const DUE_SCHEDULES = `SELECT s.* FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id
     WHERE s.active = 1 AND a.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM gk_work_orders w WHERE w.schedule_id = s.id AND w.status NOT IN ('closed', 'cancelled'))`
 
-/** One work order for each given schedule that is due: by date within the horizon, by its counter value or its
+/** One work order for each given schedule that is due: by date within the site's lead time (PM-001), by its counter value or its
  * trigger (PM-002), on whichever comes first or, when it says both, only once both are due. */
 export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>, schedules: Row[], action: string, { automatic = false } = {}) {
-  const horizon = addDays(actor.today, HORIZON_DAYS)
+  const horizon = addDays(actor.today, await leadDays(env))
   const created: { id: string; schedule: string; due: string; reason: string; occurrence: string; reading?: string }[] = []
   const held: { schedule: string; readings: number }[] = []
   const statements: D1PreparedStatement[] = []

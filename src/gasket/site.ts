@@ -8,17 +8,21 @@ import { isTimeZone } from './dates'
 import type { Input } from './input'
 
 export async function site(env: Bindings) {
-  return await one<{ name: string; timezone: string }>(env, 'SELECT name, timezone FROM gk_site WHERE singleton = 1')
+  return await one<{ name: string; timezone: string; lead_days: number }>(env, 'SELECT name, timezone, lead_days FROM gk_site WHERE singleton = 1')
 }
+
+/** PM-001: the site's lead time, the whole days ahead of its due date that calendar PM work is issued. */
+export const leadDays = async (env: Bindings) => (await site(env))?.lead_days ?? 7
 
 export async function configureSite(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'site.manage')
   const name = input.text('name', { max: 120 }), timezone = input.text('timezone', { max: 64 })
   insist(isTimeZone(timezone), 'invalid_timezone')
-  await commit(env, [stmt(env, `INSERT INTO gk_site (singleton, name, timezone, created_at, updated_at) VALUES (1, ?, ?, ?, ?)
-    ON CONFLICT(singleton) DO UPDATE SET name = excluded.name, timezone = excluded.timezone, updated_at = excluded.updated_at`, name, timezone, now(), now())],
-  { actor: actor.id, action: 'site.configure', subject: 'site', detail: { name, timezone } })
-  return { name, timezone }
+  const lead = input.integer('leadDays', { min: 0, max: 90, optional: true }) ?? await leadDays(env)
+  await commit(env, [stmt(env, `INSERT INTO gk_site (singleton, name, timezone, lead_days, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?)
+    ON CONFLICT(singleton) DO UPDATE SET name = excluded.name, timezone = excluded.timezone, lead_days = excluded.lead_days, updated_at = excluded.updated_at`, name, timezone, lead, now(), now())],
+  { actor: actor.id, action: 'site.configure', subject: 'site', detail: { name, timezone, leadDays: lead } })
+  return { name, timezone, leadDays: lead }
 }
 
 export async function members(env: Bindings) {

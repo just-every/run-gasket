@@ -15,7 +15,7 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 | Path | Returns |
 | --- | --- |
 | `me` | The signed-in person, their role, the site's date and time zone |
-| `site` | Site name and time zone |
+| `site` | Site name, time zone and `lead_days` (PM-001: whole days ahead of its due date that calendar PM work is issued; `site.configure` takes optional `leadDays`, 0 to 90, 7 by default) |
 | `members` | People with access (owner only) |
 | `assets`, `assets/ID` | The register; one asset with meters (latest good reading, normalized counter total, every reading with its source and receipt times, provenance and quality, and its explained changes), earlier identities, sightings and schedules |
 | `assets/ID/history` | Every event on the asset in time order, with who did it |

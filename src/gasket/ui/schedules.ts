@@ -7,8 +7,8 @@ import { all } from '../core'
 import { showDate, showInstant } from '../dates'
 import { showNumber } from '../quantity'
 import { closures } from '../calendar'
-import { HORIZON_DAYS, scheduleList } from '../schedules'
-import { assignable } from '../site'
+import { scheduleList } from '../schedules'
+import { assignable, leadDays } from '../site'
 import { amount, area, backLink, card, field, form, h, hidden, raw, select, table, tag } from './html'
 import { schedulerView } from '../scheduler'
 import { changesCard, exceptionsCard, pending, policyFields, policyText, schedulerCard } from './calendar'
@@ -39,7 +39,7 @@ export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
       ${select('Gauge: when the reading is', 'when', [{ value: 'above', label: 'Above the threshold' }, { value: 'below', label: 'Below the threshold' }], '', { required: false, blank: 'Not a gauge' })}${field('Gauge threshold', 'threshold', { required: false, attrs: 'inputmode="decimal"' })}${field('Gauge re-arms at', 'resetAt', { required: false, attrs: 'inputmode="decimal"', hint: 'After it fires, a reading back at or past this value re-arms it. Empty: the threshold.' })}
       ${field('Condition: when it is', 'conditions', { required: false, hint: 'For a condition meter: fair, poor or "fair, poor".' })}${field('Sustained for (minutes)', 'sustainMinutes', { type: 'number', required: false, value: '0', attrs: 'min="0" max="10080"' })}
       ${select('With a calendar and a meter', 'combine', [{ value: 'first', label: 'Due on whichever comes first' }, { value: 'both', label: 'Due only when both are due' }], 'first')}
-      </div><p class="gk-hint">Give days, a meter, or both. Work orders are created ${HORIZON_DAYS} days ahead of their due date, or as soon as a good reading reaches the counter value or fires the trigger.</p>`, 'Create schedule'), { id: 'schedule' })
+      </div><p class="gk-hint">Give days, a meter, or both. Work orders are created ${await leadDays(env)} days ahead of their due date (the site's lead time), or as soon as a good reading reaches the counter value or fires the trigger.</p>`, 'Create schedule'), { id: 'schedule' })
       : card('Schedule preventive work', h`<p class="gk-muted">${assets.length ? 'Write a checklist first.' : 'Register an asset first.'}</p>`)
   }
   const checklistCard = card('Checklists', h`${checklists.length ? table(['Checklist', 'Revision', 'Items'], checklists.map(item => [h`<a href="/app/checklists/${item.id}">${item.name}</a>`, `Revision ${item.revision.number}`, String(item.revision.items.length)]), 'Checklists', { wrap: [0] }) : h`<p class="gk-muted">No checklists yet.</p>`}

@@ -720,7 +720,16 @@ try {
     const missed = (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: ids.checklist, title: 'Fryer thermostat calibration', everyDays: 90, firstDue: addDays(today, -2), assignee: ids.max })).id
     const cron = '*/15 * * * *', minutes = n => Date.now() - n * 60_000
     const before = (await h.api('work', cookie.lead)).length
+    // The site's lead time decides how far ahead calendar work is issued: three days leaves the monthly PM five days out.
+    const place = { name: 'Harbour Kitchen Co', timezone: zone }
+    await h.api('site.configure', cookie.owner, { ...place, leadDays: 91 }, 400)
+    await h.submit('site.configure', cookie.owner, { ...place, leadDays: '3' }, '/app/site')
+    assert.equal((await h.api('site', cookie.lead)).lead_days, 3)
     await h.scheduled(cron, minutes(200))
+    const early = await h.api('work', cookie.lead)
+    assert.deepEqual([early.filter(row => row.title === 'Monthly fryer gas check').length, early.filter(row => row.title === 'Fryer thermostat calibration').length], [0, 1], 'five days out is beyond a three-day lead time')
+    await h.api('site.configure', cookie.owner, { ...place, leadDays: 5 })
+    assert.match(await (await h.raw('/app/schedules', { cookie: cookie.lead })).text(), /created 5 days ahead of their due date/)
     // Restarted twice, the second run three hours later: still one order per occurrence.
     await h.scheduled(cron, minutes(15))
     await h.scheduled(cron, minutes(15))
@@ -743,6 +752,7 @@ try {
     assert.equal((await h.api('schedules', cookie.lead)).find(row => row.id === missed).overdue, true)
     const page = await (await h.raw('/app/schedules', { cookie: cookie.lead })).text()
     assert.ok(page.includes('Automatic scheduling'), 'the Schedules page shows the scheduler')
+    await h.api('site.configure', cookie.owner, { name: 'Harbour Kitchen Co', timezone: zone, leadDays: 7 })
   })
 
   await check('PM-002 automatic meter and condition triggers', async () => {

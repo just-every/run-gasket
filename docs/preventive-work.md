@@ -22,7 +22,7 @@ Calendar schedules keep a fixed cadence. The next due date is the previous due d
 
 ## Create due work orders
 
-Gasket does this on its own every 15 minutes, and a reading that reaches a meter's due value or trigger raises its work at once; **Automatic scheduling** on **Schedules** shows the last run, any time it was not running, and work it issued after its due date. A work order cancelled by a person stays owed: the scheduler does not issue that occurrence again. You can also press **Create due work orders** on **Work** or **Schedules**. Gasket creates one work order for each schedule due within the next seven days, or whose meter has reached its due value, and never a second open one for the same schedule. Each is assigned to the schedule's default maintainer.
+Gasket does this on its own every 15 minutes, issuing calendar work the site's lead time ahead of its due date (seven days unless the owner sets another on the Site page), and a reading that reaches a meter's due value or trigger raises its work at once; **Automatic scheduling** on **Schedules** shows the last run, any time it was not running, and work it issued after its due date. A work order cancelled by a person stays owed: the scheduler does not issue that occurrence again. You can also press **Create due work orders** on **Work** or **Schedules**. Gasket creates one work order for each schedule due within the next seven days, or whose meter has reached its due value, and never a second open one for the same schedule. Each is assigned to the schedule's default maintainer.
 
 Gasket does not create work in the background; it creates work when a lead presses the button, or when an approved agent proposal does.
 
