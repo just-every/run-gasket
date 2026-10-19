@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006 and PLAN-007 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007 and PM-004 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 2 | 42 | 78 | 122 |
-| All | 16 | 42 | 78 | 136 |
+| Target and push further | 3 | 41 | 78 | 122 |
+| All | 17 | 41 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -422,7 +422,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `PM-001` | Unattended calendar generation | target | partial | `src/gasket/schedules.ts`; `tests/gasket/flows.mjs` | Calendar generation is command-driven only; no unattended scheduler, occurrence ledger or missed-run recovery. |
 | `PM-002` | Automatic meter and condition triggers | target | partial | `src/gasket/schedules.ts`; `src/gasket/work.ts` | Manual counter-threshold generation exists; gauge/condition policies, event-driven evaluation and ingest deduplication do not. |
 | `PM-003` | Cadence, seasonal windows and exceptions | target | partial | `src/gasket/schedules.ts` | Fixed-day calendar and approval-based meter advancement exist; seasonal/business calendars, configurable cadence and approved deferral do not. |
-| `PM-004` | Failed inspection creates accountable correction | target | partial | `src/gasket/work.ts`; `src/gasket/review.ts`; `tests/gasket/flows.mjs` | Explicit follow-up findings create linked work; automatic per-step rule, deadline and verified corrective closure are absent. |
+| `PM-004` | Failed inspection creates accountable correction | target | done | `src/gasket/corrections.ts`; `src/gasket/work.ts`; `src/gasket/review.ts`; `migrations/core/0020_failure_rules.sql`; `tests/gasket/flows.mjs` |  |
 | `PM-005` | Assignee and approver notifications | target | missing |  | No maintenance notification outbox, provider delivery, push registration or preferences. |
 | `PM-006` | Overdue escalation and blocker chasing | target | partial | `src/gasket/board.ts` | Overdue display exists; automatic reminders, acknowledgements, owned blockers and timed escalation do not. |
 | `PM-007` | PM template rollout and change control | target | partial | `src/gasket/checklists.ts`; `src/gasket/schedules.ts` | Checklist revisions are pinned on issued work; no asset-class/site program rollout, override merge or strategy approval. |

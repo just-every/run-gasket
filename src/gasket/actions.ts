@@ -6,6 +6,7 @@ import type { Actor } from './actor'
 import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from './assets'
 import { createChecklist, reviseChecklist } from './checklists'
 import { bulk, merge, reopen, skipOccurrence } from './control'
+import { acknowledge, setRule } from './corrections'
 import type { Input } from './input'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
@@ -32,6 +33,8 @@ export const actions: Record<string, Handler> = {
   'part.count': (env, actor, input) => countPart(env, actor, input),
   'checklist.create': (env, actor, input) => createChecklist(env, actor, input),
   'checklist.revise': (env, actor, input) => reviseChecklist(env, actor, input),
+  'rule.set': (env, actor, input) => setRule(env, actor, input),
+  'workorder.acknowledge': (env, actor, input) => acknowledge(env, actor, input),
   'schedule.create': (env, actor, input) => createSchedule(env, actor, input),
   'workorders.generate': (env, actor) => generateDue(env, actor),
   'workorders.bulk': (env, actor, input) => bulk(env, actor, input),

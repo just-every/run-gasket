@@ -37,7 +37,7 @@ export async function accessPage(env: Bindings, actor: Actor, url: URL) {
 export const ACTIONS: Record<string, string> = {
   'site.configure': 'Changed the site settings', 'access.give': 'Gave access', 'access.role': 'Changed a role', 'access.end': 'Ended access',
   'asset.create': 'Registered an asset', 'asset.update': 'Changed asset details', 'asset.retire': 'Retired an asset', 'asset.sighting': 'Recorded a sighting', 'meter.create': 'Added a meter',
-  'checklist.create': 'Wrote a checklist', 'checklist.revise': 'Published a checklist revision', 'schedule.create': 'Scheduled preventive work',
+  'checklist.create': 'Wrote a checklist', 'checklist.revise': 'Published a checklist revision', 'rule.set': 'Approved a failed-step rule', 'workorder.acknowledge': 'Acknowledged a correction', 'schedule.create': 'Scheduled preventive work',
   'workorder.generate': 'Created a work order from its schedule', 'workorder.create': 'Raised a work order', 'workorder.assign': 'Assigned the work', 'workorder.plan': 'Decided on overdue work', 'workorder.cancel': 'Cancelled a work order', 'workorder.reschedule': 'Rescheduled a work order', 'workorder.reopen': 'Reopened a work order', 'workorder.merge': 'Merged a duplicate work order', 'workorder.merged': 'Took in a duplicate work order', 'schedule.skip': 'Skipped a missed preventive occurrence',
   'workorder.results': 'Recorded checklist results', 'workorder.readings': 'Recorded readings', 'workorder.evidence': 'Attached evidence',
   'workorder.submit': 'Submitted for review', 'workorder.approve': 'Approved and closed', 'workorder.return': 'Returned for more work',

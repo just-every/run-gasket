@@ -488,6 +488,56 @@ try {
     assert.equal((await h.raw(`/app/work/${rattle}`, { cookie: cookie.lead })).status, 200)
   })
 
+  await check('PM-004 failed inspection raises an accountable correction', async () => {
+    const checklist = (await h.api('checklist.create', cookie.lead, { name: 'Compressor safety check', items: ['Belt guard in place', 'Pressure relief valve lifts'] })).id
+    await h.api('rule.set', cookie.max, { checklist, outcome: ['fail'], severity: 'high', dueDays: 1 }, 403)
+    await h.api('rule.set', cookie.lead, { checklist, outcome: ['fail'], severity: 'high', dueDays: 1 })
+    const schedule = (await h.api('schedule.create', cookie.lead, { asset: ids.compressor, checklist, title: 'Quarterly compressor safety check', everyDays: 90, firstDue: today, assignee: ids.max })).id
+    const pm = (await h.api('workorders.generate', cookie.lead, {})).created.find(row => row.schedule === schedule).id
+    await h.api('workorder.readings', cookie.max, { workOrder: pm, takenOn: ago(5), meter: [ids.discharge], value: ['44'] })
+    await h.api('workorder.evidence', cookie.max, { workOrder: pm, file: file('valve.png', png, 'image/png') })
+    // A failed step through the API, with no follow-up asked for: the rule raises the correction.
+    await h.api('workorder.results', cookie.max, { workOrder: pm, outcome: ['pass', 'fail'], note: ['', 'Valve stuck shut at 150 psi'] })
+    await h.api('workorder.results', cookie.max, { workOrder: pm, outcome: ['pass', 'fail'], note: ['', 'Still stuck'] })
+    let inspection = await wo('max', pm)
+    assert.equal(inspection.findings.length, 1, 'one correction per failed step, however often it is recorded')
+    const [finding] = inspection.findings
+    assert.deepEqual([finding.item, finding.severity, finding.obligation, Boolean(finding.rule_id)], [1, 'high', 'open', true])
+    assert.deepEqual(inspection.missing, [])
+    let correction = await wo('max', finding.follow_up_id)
+    assert.deepEqual([correction.kind, correction.follow_up_of, correction.due_date, correction.assignee_id], ['corrective', pm, addDays(today, 1), ids.max])
+    assert.equal(correction.origin.item, 1)
+    assert.deepEqual(correction.origin.readings.map(row => [row.meter, row.value]), inspection.readings.map(row => [row.meter, row.value]))
+    assert.equal(correction.origin.readings.length, 1)
+    assert.equal(correction.origin.evidence[0].sha256, inspection.evidence[0].sha256)
+    // The assignee's notice: the correction is on their own list and on the board.
+    assert.ok((await h.api('work?mine=1', cookie.max)).some(row => row.id === correction.id))
+    assert.ok((await h.api('board', cookie.sam)).followUps.some(row => row.id === correction.id))
+    // Closing the inspection does not close the correction.
+    await h.api('workorder.submit', cookie.max, { workOrder: pm, version: inspection.version })
+    await h.api('workorder.review', cookie.sam, { workOrder: pm, version: (await wo('sam', pm)).version, decision: 'approve' })
+    inspection = await wo('sam', pm)
+    assert.deepEqual([inspection.status, inspection.findings[0].obligation], ['closed', 'open'])
+    assert.ok((await h.api('board', cookie.sam)).followUps.some(row => row.id === correction.id))
+    // Acknowledgement before submission, then only independent approval resolves the failure.
+    assert.equal(correction.missing.length, 1)
+    assert.equal((await h.api('workorder.submit', cookie.max, { workOrder: correction.id, version: correction.version }, 409)).error, 'not_ready_for_review')
+    await h.api('workorder.acknowledge', cookie.lead, { workOrder: correction.id }, 403)
+    await h.submit('workorder.acknowledge', cookie.max, { workOrder: correction.id }, `/app/work/${correction.id}`)
+    assert.equal((await wo('sam', pm)).findings[0].obligation, 'acknowledged')
+    correction = await wo('max', correction.id)
+    await h.api('workorder.submit', cookie.max, { workOrder: correction.id, version: correction.version })
+    const submitted = (await wo('sam', correction.id)).version
+    await h.api('workorder.review', cookie.max, { workOrder: correction.id, version: submitted, decision: 'approve' }, 403)
+    await h.api('workorder.review', cookie.sam, { workOrder: correction.id, version: submitted, decision: 'approve' })
+    assert.equal((await wo('sam', pm)).findings[0].obligation, 'resolved')
+    assert.ok(!(await h.api('board', cookie.sam)).followUps.some(row => row.id === correction.id))
+    // The rule is revised by appending a numbered revision.
+    await h.api('rule.set', cookie.lead, { checklist, outcome: ['fail', 'attention'], severity: 'medium', dueDays: 3 })
+    assert.deepEqual((await h.api(`checklists/${checklist}`, cookie.lead)).rules.map(row => [row.number, row.outcomes]), [[2, ['fail', 'attention']], [1, ['fail']]])
+    assert.equal((await h.raw(`/app/checklists/${checklist}`, { cookie: cookie.lead })).status, 200)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

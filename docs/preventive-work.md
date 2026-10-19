@@ -8,6 +8,8 @@ On **Schedules**, under **Checklists**, give the checklist a name and write its 
 
 To change a checklist, open it and **Publish a new revision** with a note of what changed. Work orders keep the revision they were created with, so a new revision never changes work already issued.
 
+A lead can also approve the checklist's **Failed-step rule**: which results (Fail, Needs attention or both) raise a correction, its severity and how many days it is due in. When a maintainer records such a result, Gasket records that step's finding and raises a corrective work order for the same maintainer, carrying the step, the note, the readings and the evidence. The maintainer acknowledges the correction before submitting it, and the original failure counts as resolved only when a supervisor approves the correction; closing the inspection leaves the correction open on the board.
+
 ## Schedule it on an asset
 
 Under **Schedule preventive work**, choose the asset and the checklist, give the work a title (for example "Monthly compressor check") and a default maintainer, then set its cadence:

@@ -22,6 +22,7 @@ const condition = (value: string) => value.charAt(0).toUpperCase() + value.slice
 const dueTag = (due: string, status: string, today: string) => !['closed', 'cancelled', 'submitted'].includes(status) && due < today ? tag('Overdue') : ''
 const TAB_LABEL: Record<Tab, string> = { today: 'Today', overdue: 'Overdue', progress: 'In progress', done: 'Done today' }
 const SHOWN = 6
+const OBLIGATION: Record<string, string> = { open: 'not acknowledged', acknowledged: 'acknowledged', resolved: 'resolved by independent review', cancelled: 'cancelled' }
 
 const isOpen = (status: string) => ['open', 'in_progress', 'returned'].includes(status)
 const late = (due: string, today: string) => { const days = daysBetween(due, today); return `Overdue ${days} day${days === 1 ? '' : 's'}` }
@@ -177,9 +178,14 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     ${working && !open ? post('downtime.start', h`${field('Went down at', 'startedOn', { type: 'datetime-local', value: localNow(actor.zone) })}${field('Reason', 'reason')}`, 'Record asset down', { secondary: true }) : ''}
     ${working && open ? post('downtime.end', field('Back in service at', 'endedOn', { type: 'datetime-local', value: localNow(actor.zone) }), 'Record back in service', { secondary: true }) : ''}`, { id: 'downtime' })
 
-  const findings = card('Corrective findings', h`${w.findings.length ? h`<ul class="gk-findings">${w.findings.map(row => h`<li>${tag(row.severity === 'high' ? 'High' : row.severity === 'medium' ? 'Medium' : 'Low')} ${row.item !== null ? h`<b>Step ${row.item + 1}:</b> ` : ''}${row.text}${row.follow_up_id ? h`<span class="gk-sub">Follow-up <a href="/app/work/${row.follow_up_id}">${woNumber(row.follow_up_number)}</a> · ${STATUS[row.follow_up_status]}</span>` : ''}</li>`)}</ul>` : h`<p class="gk-muted">No findings recorded.</p>`}
+  const findings = card('Corrective findings', h`${w.findings.length ? h`<ul class="gk-findings">${w.findings.map(row => h`<li>${tag(row.severity === 'high' ? 'High' : row.severity === 'medium' ? 'Medium' : 'Low')} ${row.item !== null ? h`<b>Step ${row.item + 1}:</b> ` : ''}${row.text}${row.follow_up_id ? h`<span class="gk-sub">${row.rule_id ? 'Correction' : 'Follow-up'} <a href="/app/work/${row.follow_up_id}">${woNumber(row.follow_up_number)}</a> · ${STATUS[row.follow_up_status]}${row.obligation ? ` · ${OBLIGATION[row.obligation]}` : ''}</span>` : ''}</li>`)}</ul>` : h`<p class="gk-muted">No findings recorded.</p>`}
     ${working ? post('finding.record', h`${w.items.length ? select('Checklist step', 'item', w.items.map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}${item.result && item.result.outcome !== 'pass' ? ` (${OUTCOME[item.result.outcome]})` : ''}` })), w.items.find(item => item.result && item.result.outcome !== 'pass' && !w.findings.some(row => row.item === item.index))?.index.toString() ?? '', { required: false, blank: 'The whole work order' }) : ''}${area('What was found and what was done', 'text')}${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], 'low')}${checkbox('Needs follow-up work (raises a corrective work order)', 'followUp')}${field('Follow-up due', 'followUpDue', { type: 'date', required: false, hint: 'Leave empty for tomorrow (high) or a week from today.' })}`, 'Record finding', { secondary: true }) : ''}`, { id: 'findings' })
 
+  // PM-004: the failure this correction answers, and its assignee's acknowledgement.
+  const origin = w.origin ? card('Failed step to correct', h`<p>${w.origin.text}</p><p class="gk-sub">From <a href="/app/work/${w.origin.work_order_id}">${woNumber(w.origin.number)}</a> · ${w.origin.severity} severity · rule ${w.origin.rule}</p>
+    ${w.origin.readings.length ? h`<ul class="gk-files">${w.origin.readings.map(row => h`<li>${row.meter}: ${row.kind === 'condition' ? condition(row.value) : amount(row.value, row.unit)}<span class="gk-sub">Taken ${showLocal(row.taken_on)}</span></li>`)}</ul>` : ''}
+    ${w.origin.evidence.length ? h`<ul class="gk-files">${w.origin.evidence.map(file => h`<li><a href="/app/evidence/${file.id}">${file.filename}</a>${details([['SHA-256', file.sha256]])}</li>`)}</ul>` : ''}
+    ${w.acknowledged_at ? h`<p class="gk-sub">Acknowledged ${showInstant(w.acknowledged_at, actor.zone)}</p>` : working ? post('workorder.acknowledge', '', 'Acknowledge correction', { secondary: true }) : h`<p class="gk-sub">Not acknowledged yet</p>`}`, { id: 'origin' }) : ''
   const decisions = w.decisions.length ? card('Overdue decisions', h`<ul class="gk-findings">${w.decisions.map(row => h`<li>${row.plan === 'keep' ? `Kept with ${row.holder ?? 'the assignee'}` : row.plan === 'reassign' ? `Reassigned to ${row.to ?? 'someone else'}` : `Kept as is${row.holder ? `, with ${row.holder}` : ''}`}<span class="gk-sub">${row.decided_by ?? '—'} · ${showInstant(row.at, actor.zone)}</span></li>`)}</ul>`, { id: 'decisions' }) : ''
   const reviews = w.reviews.length ? card('Reviews', table(['Decision', 'By', 'Reason'], w.reviews.map(row => [tag(row.decision === 'approved' ? 'Approved' : 'Returned'), h`${row.reviewer}<span class="gk-sub">${showInstant(row.at, actor.zone)}</span>`, row.reason ?? '']), 'Reviews', { wrap: [2] }), { id: 'reviews' }) : ''
 
@@ -207,7 +213,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     <form method="post" action="/app/do/workorder.review" class="gk-inline">${hidden('returnTo', back)}${ids}${hidden('decision', 'approve')}<button type="submit">Approve and close</button></form>`
 
   const body = h`${backLink('/app', 'Work orders')}${band}
-    <div class="gk-columns"><div class="gk-col-main">${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${downtime}${findings}${reviews}${assign}${control}
+    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${downtime}${findings}${reviews}${assign}${control}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

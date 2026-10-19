@@ -8,7 +8,7 @@ import { showDate, showInstant } from '../dates'
 import { showNumber } from '../quantity'
 import { HORIZON_DAYS, scheduleList } from '../schedules'
 import { assignable } from '../site'
-import { amount, area, backLink, card, field, form, h, hidden, select, table, tag } from './html'
+import { amount, area, backLink, card, field, form, h, hidden, raw, select, table, tag } from './html'
 import { page } from './shell'
 
 export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
@@ -44,6 +44,12 @@ export async function checklistPage(env: Bindings, actor: Actor, id: string, url
   const checklist = await checklistDetail(env, actor, id)
   const latest = checklist.revisions[0]
   const revise = can(actor, 'register.manage') ? card('Publish a new revision', form('checklist.revise', `/app/checklists/${checklist.id}`, h`${hidden('checklist', checklist.id)}${area('Items, one per line', 'items', { value: latest.items.map(item => item.text).join('\n') })}${field('What changed', 'note')}`, 'Publish revision', { secondary: true }), { id: 'revise' }) : ''
+  // PM-004: the lead-approved rule that turns a failed step into a correction.
+  const rule = checklist.rules[0]
+  const ruleText = (row: typeof rule) => row.active ? `${row.outcomes.map(outcome => outcome === 'fail' ? 'Fail' : 'Needs attention').join(' or ')} raises a ${row.severity}-severity correction due in ${row.due_days} day${row.due_days === 1 ? '' : 's'}` : 'Off: failed steps need a finding recorded by hand'
+  const ruleCard = card('Failed-step rule', h`${rule ? h`<p>${ruleText(rule)}.</p><p class="gk-sub">Rule ${rule.number} · ${rule.approved_by ?? '—'} · ${showInstant(rule.approved_at, actor.zone)}</p>` : h`<p class="gk-muted">No rule: failed steps need a finding recorded by hand.</p>`}
+    ${can(actor, 'register.manage') ? form('rule.set', `/app/checklists/${checklist.id}`, h`${hidden('checklist', checklist.id)}<fieldset><legend>Raise a correction on</legend><label class="gk-check"><input type="checkbox" name="outcome" value="fail"${!rule || rule.outcomes.includes('fail') ? raw(' checked') : ''}> Fail</label><label class="gk-check"><input type="checkbox" name="outcome" value="attention"${rule?.outcomes.includes('attention') ? raw(' checked') : ''}> Needs attention</label></fieldset>
+      ${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], rule?.severity ?? 'medium')}${field('Due within (days)', 'dueDays', { type: 'number', value: String(rule?.due_days ?? 3), attrs: 'min="0" max="365"' })}`, 'Approve rule', { secondary: true }) : ''}`, { id: 'rule' })
   const revisions = checklist.revisions.map(revision => card(`Revision ${revision.number}`, h`<ol class="gk-plain-list">${revision.items.map(item => h`<li>${item.text}</li>`)}</ol><p class="gk-sub">${revision.note ?? ''} · ${revision.publishedBy ?? ''} · ${showInstant(revision.publishedAt, actor.zone)}</p>`, { extra: revision === latest ? tag('Current') : '' }))
-  return page(env, checklist.name, actor, h`${backLink('/app/schedules', 'Schedules')}<h1>${checklist.name}</h1><p class="gk-lede">Work orders keep the revision they were created with.</p><div class="gk-columns"><div class="gk-col-main">${revisions}</div><div class="gk-col-side">${revise}</div></div>`, { url })
+  return page(env, checklist.name, actor, h`${backLink('/app/schedules', 'Schedules')}<h1>${checklist.name}</h1><p class="gk-lede">Work orders keep the revision they were created with.</p><div class="gk-columns"><div class="gk-col-main">${revisions}</div><div class="gk-col-side">${ruleCard}${revise}</div></div>`, { url })
 }

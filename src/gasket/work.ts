@@ -5,6 +5,7 @@ import type { Bindings } from '../auth.server'
 import { can, requireCapability, type Actor } from './actor'
 import { NEXT_NUMBER, all, commit, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'
 import { addDays, isDate, isLocalTime, localNow, minutesBetween } from './dates'
+import { correctionOrigin, correctionStatements, obligation } from './corrections'
 import type { Input } from './input'
 import { issuePart, returnPart } from './parts'
 import type { FromProposal } from './schedules'
@@ -122,7 +123,7 @@ export async function recordResults(env: Bindings, actor: Actor, input: Input) {
   const outcomes = keyed ? Array.from({ length: count }, (_, item) => input.text(`outcome-${item}`, { optional: true, max: 20 })) : input.list('outcome', { keepEmpty: true })
   const notes = keyed ? Array.from({ length: count }, (_, item) => input.text(`note-${item}`, { optional: true, max: 1000 })) : input.list('note', { keepEmpty: true })
   insist(outcomes.length === count, 'invalid_outcome')
-  const statements: D1PreparedStatement[] = [], recorded: { item: number; outcome: string }[] = []
+  const statements: D1PreparedStatement[] = [], recorded: { item: number; outcome: string; note: string | null }[] = []
   outcomes.forEach((outcome, item) => {
     if (!outcome) return
     insist(['pass', 'fail', 'attention'].includes(outcome), 'invalid_outcome')
@@ -130,10 +131,12 @@ export async function recordResults(env: Bindings, actor: Actor, input: Input) {
     statements.push(
       stmt(env, 'INSERT INTO gk_results (work_order_id, item, outcome, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(work_order_id, item) DO UPDATE SET outcome = excluded.outcome, note = excluded.note, recorded_by = excluded.recorded_by, recorded_at = excluded.recorded_at', order.id, item, outcome, note, actor.id, now()),
       stmt(env, 'INSERT INTO gk_result_log (work_order_id, item, outcome, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?)', order.id, item, outcome, note, actor.id, now()))
-    recorded.push({ item, outcome })
+    recorded.push({ item, outcome, note })
   })
   insist(recorded.length, 'invalid_outcome')
-  await commit(env, [...touch(env, order), ...statements], { actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded } })
+  // PM-004: results the checklist's failure rule covers raise their correction in the same batch.
+  const correction = await correctionStatements(env, actor, order, recorded)
+  await commit(env, [...touch(env, order), ...statements, ...correction.statements], [{ actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded } }, ...correction.audits])
   return { id: order.id }
 }
 
@@ -253,7 +256,7 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; mine: boolean; missing: string[] }
+export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
@@ -272,7 +275,8 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
     .map(row => ({ ...row, issued: fromMilli(row.issued), returned: fromMilli(row.returned), used: fromMilli(row.issued - row.returned) }))
   const downtime = await all(env, 'SELECT id, started_on, ended_on, minutes, reason FROM gk_downtime WHERE work_order_id = ? ORDER BY started_on', id)
-  const findings = await all(env, 'SELECT f.id, f.item, f.severity, f.text, f.follow_up_id, w.number AS follow_up_number, w.status AS follow_up_status, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at', id)
+  const findings = (await all(env, 'SELECT f.id, f.item, f.severity, f.text, f.follow_up_id, f.rule_id, w.number AS follow_up_number, w.status AS follow_up_status, w.acknowledged_at AS follow_up_acknowledged, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at, f.item', id))
+    .map(row => ({ ...row, obligation: obligation(row) }))
   const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
@@ -283,13 +287,15 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     WHERE a.subject = ? AND a.action IN ('workorder.cancel', 'workorder.reschedule', 'workorder.reopen', 'workorder.merge', 'workorder.merged') ORDER BY a.seq`, id))
     .map(({ detail, ...row }) => ({ ...row, ...JSON.parse(detail) }))
   const merged = await all(env, 'SELECT id, number, title FROM gk_work_orders WHERE merged_into = ? ORDER BY number', id)
+  const origin = await correctionOrigin(env, id)
   const { items_json: _items, ...rest } = order
-  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime }) }
+  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */
-export function submitBlockers({ items, findings, downtime }: { items: { index: number; text: string; result: { outcome: string } | null }[]; findings: { item: number | null }[]; downtime: { ended_on: string | null }[] }) {
+export function submitBlockers({ items, findings, downtime, unacknowledged = false }: { items: { index: number; text: string; result: { outcome: string } | null }[]; findings: { item: number | null }[]; downtime: { ended_on: string | null }[]; unacknowledged?: boolean }) {
   const blockers: string[] = []
+  if (unacknowledged) blockers.push('the assignee has not acknowledged this correction')
   const missing = items.filter(item => !item.result).length
   if (missing) blockers.push(`${missing} checklist item${missing === 1 ? '' : 's'} without a result`)
   for (const item of items) if (item.result && item.result.outcome !== 'pass' && !findings.some(finding => finding.item === item.index))
