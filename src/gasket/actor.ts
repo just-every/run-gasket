@@ -17,13 +17,14 @@ export const ROLE_LABELS: Record<Role, string> = {
 }
 
 export type Capability =
-  | 'site.manage' | 'register.manage' | 'work.assign' | 'work.do' | 'work.review'
+  | 'site.manage' | 'register.manage' | 'work.create' | 'work.assign' | 'work.do' | 'work.review'
   | 'board.read' | 'history.export' | 'audit.read' | 'proposal.prepare' | 'proposal.decide' | 'import.run' | 'comment.write'
 
 const GRANTS: Record<Role, Capability[]> = {
-  owner: ['site.manage', 'register.manage', 'work.assign', 'work.do', 'work.review', 'board.read', 'history.export', 'audit.read', 'proposal.prepare', 'proposal.decide', 'import.run', 'comment.write'],
-  lead: ['register.manage', 'work.assign', 'work.do', 'board.read', 'history.export', 'proposal.prepare', 'proposal.decide', 'import.run', 'comment.write'],
-  maintainer: ['work.do', 'comment.write'],
+  owner: ['site.manage', 'register.manage', 'work.create', 'work.assign', 'work.do', 'work.review', 'board.read', 'history.export', 'audit.read', 'proposal.prepare', 'proposal.decide', 'import.run', 'comment.write'],
+  lead: ['register.manage', 'work.create', 'work.assign', 'work.do', 'board.read', 'history.export', 'proposal.prepare', 'proposal.decide', 'import.run', 'comment.write'],
+  // FIELD-009 (slice): technicians create corrective and emergency work for themselves (ADMIN-003's default right).
+  maintainer: ['work.create', 'work.do', 'comment.write'],
   supervisor: ['work.review', 'board.read', 'history.export', 'audit.read', 'comment.write'],
   agent: ['proposal.prepare'],
 }

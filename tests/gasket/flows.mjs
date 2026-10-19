@@ -1449,7 +1449,8 @@ try {
     // Location-only work: a dock light has no asset. Work names an asset or a location, never both or neither.
     assert.equal((await h.api('workorder.create', cookie.lead, { title: 'Fix it', due: today }, 400)).error, 'asset_or_location')
     assert.equal((await h.api('workorder.create', cookie.lead, { asset: dock, location: 'Dock 3 light', title: 'Fix it', due: today }, 400)).error, 'asset_or_location')
-    await h.api('workorder.create', cookie.max, { location: 'Dock 3 light', title: 'Fix it', due: today }, 403)
+    assert.equal((await h.api('workorder.create', cookie.max, { location: 'Dock 3 light', title: 'Fix it', due: today, assignee: ids.nia }, 403)).error, 'assign_to_self')
+    await h.api('workorder.create', cookie.sam, { location: 'Dock 3 light', title: 'Fix it', due: today }, 403)
     const light = (await h.submit('workorder.create', cookie.lead, { location: '  Dock 3 light ', template: template.id, title: '', priority: 'emergency', due: today, assignee: ids.max }, '/app/work/{id}')).pathname.split('/').pop()
     const lit = await wo('max', light)
     assert.deepEqual([lit.asset_id, lit.location, lit.title, lit.priority, lit.template_revision, lit.number], [null, 'Dock 3 light', fields.title, 'emergency', 1, numbers[0] + 3])
@@ -1514,6 +1515,12 @@ try {
     const owed = ['the required field Lamp type has no value', 'the required field Fault code has no value', 'the template requires a photo or document as evidence']
     assert.deepEqual(await refused('max', job), owed, 'the assignee cannot submit past the requirements')
     assert.deepEqual(await refused('lead', ownJob), owed, 'nor can a lead on their own work')
+    // FIELD-009 parity: a technician creates their own work from the same template and meets the same refusal.
+    const techJob = (await h.submit('workorder.create', cookie.max, { location: 'Dock 5 light', template: check.id, title: '', priority: 'emergency', due: today }, '/app/work/{id}')).pathname.split('/').pop()
+    const made = await wo('max', techJob)
+    assert.deepEqual([made.assignee_id, made.created_by, made.priority, made.requires_evidence, JSON.parse(made.required_fields)], [ids.max, ids.max, 'emergency', 1, [lamp]])
+    assert.ok((await h.api('work?mine=1', cookie.max)).some(row => row.id === techJob) && (await h.api('work', cookie.lead)).some(row => row.id === techJob), 'in their own queue and the lead\'s list')
+    assert.deepEqual(await refused('max', techJob), owed, 'the technician who created it cannot submit past the requirements')
     assert.equal((await h.api('workorder.field', cookie.lead, { workOrder: job, field: lamp, value: 'Halogen' }, 400)).error, 'invalid_value')
     await h.api('workorder.field', cookie.nia, { workOrder: job, field: lamp, value: 'LED' }, 403)
     await h.api('workorder.field', cookie.lead, { workOrder: job, field: lamp, value: 'LED' })

@@ -51,7 +51,7 @@ const touch = (env: Bindings, order: { id: string; version: number }) => [
 ]
 
 export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
-  requireCapability(actor, proposal ? 'proposal.decide' : 'work.assign')
+  requireCapability(actor, proposal ? 'proposal.decide' : 'work.create')
   // PLAN-001: work names an asset or, with no asset, a location (the text given, trimmed); never both.
   const assetId = input.text('asset', { optional: true, max: 100 }) || null, location = input.text('location', { optional: true, max: 160 }) || null
   insist(Boolean(assetId) !== Boolean(location), 'asset_or_location')
@@ -67,7 +67,10 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   const priority = priorityOf(input) ?? (template?.priority as string | undefined) ?? 'normal'
   const due = input.text('due', { max: 10 })
   insist(isDate(due), 'invalid_due')
-  const assignee = input.text('assignee', { optional: true, max: 100 }) || null
+  // FIELD-009 (slice): a technician's own work is assigned to them; only a lead or the owner assigns it to someone else.
+  const planner = Boolean(proposal) || can(actor, 'work.assign')
+  const assignee = input.text('assignee', { optional: true, max: 100 }) || (planner ? null : actor.id)
+  insist(planner || assignee === actor.id, 'assign_to_self', 403)
   const crew = await crewChoice(env, input, null)
   if (assignee) await assigneeFits(env, assignee, crew.team)
   const estimateMinutes = estimate(input) ?? (template?.estimate_minutes as number | null) ?? null
