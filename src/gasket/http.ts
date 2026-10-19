@@ -25,6 +25,7 @@ import { h } from './ui/html'
 import { page } from './ui/shell'
 import { moveInPage, previewPage } from './ui/movein'
 import { partPage, partsPage } from './ui/parts'
+import { countPage } from './ui/counts'
 import { proposalsPage } from './ui/proposals'
 import { checklistPage, schedulesPage } from './ui/schedules'
 import { codesPage } from './ui/codes'
@@ -137,6 +138,7 @@ const pages: Record<string, Page> = {
   checklist: (env, actor, url, id) => checklistPage(env, actor, id, url),
   parts: (env, actor, url) => partsPage(env, actor, url),
   part: (env, actor, url, id) => partPage(env, actor, id, url),
+  count: (env, actor, url, id) => countPage(env, actor, id, url),
   valuationCsv: async (env, actor, url) => new Response(await reconciliationCsv(env, actor, url), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="parts-valuation.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   board: guarded(actor => can(actor, 'board.read'), (env, actor, url) => boardPage(env, actor, url)),
   proposals: (env, actor, url) => proposalsPage(env, actor, url),

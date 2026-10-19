@@ -7,6 +7,7 @@ import { kitList } from '../reservations'
 import { showNumber } from '../quantity'
 import { usd } from '../bad-actors'
 import { POLICY } from '../valuation'
+import { countsCard } from './counts'
 import { amount, backLink, band as headerBand, card, checkbox, field, form, h, hidden, select, table, tag, woNumber } from './html'
 import { binDrawing } from './icons'
 import { page } from './shell'
@@ -27,7 +28,7 @@ export async function partsPage(env: Bindings, actor: Actor, url: URL) {
   // PART-007: the stock's value and the period reconciliation download.
   const valuation = card('Stock value', h`<p><span class="gk-big">${usd(parts.reduce((sum, part) => sum + part.valueCents, 0))}</span></p><p class="gk-muted">${POLICY}</p>
     ${can(actor, 'history.export') ? h`<form method="get" action="/app/parts/valuation.csv" class="gk-form"><div class="gk-grid">${field('From', 'from', { type: 'date', value: `${actor.today.slice(0, 8)}01` })}${field('To', 'to', { type: 'date', value: actor.today })}</div><div class="gk-actions"><button type="submit" class="gk-secondary">Download reconciliation</button></div></form>` : ''}`, { id: 'valuation' })
-  return page(env, 'Parts', actor, h`<div class="gk-columns"><div class="gk-col-main"><div class="gk-head"><div><h1>Parts</h1><p class="gk-lede">Spares on the shelf, what work used them, and physical counts.</p></div></div>${list}</div><div class="gk-col-side">${create}${valuation}${kitCard}</div></div>`, { url })
+  return page(env, 'Parts', actor, h`<div class="gk-columns"><div class="gk-col-main"><div class="gk-head"><div><h1>Parts</h1><p class="gk-lede">Spares on the shelf, what work used them, and physical counts.</p></div></div>${list}</div><div class="gk-col-side">${create}${await countsCard(env, actor, parts)}${valuation}${kitCard}</div></div>`, { url })
 }
 
 export async function partPage(env: Bindings, actor: Actor, id: string, url: URL) {
@@ -43,7 +44,7 @@ export async function partPage(env: Bindings, actor: Actor, id: string, url: URL
   const subs = card('Approved substitutes', h`${part.substitutes.length ? h`<ul class="gk-plain-list">${part.substitutes.map((row: any) => h`<li>${row.substitute_number} ${row.substitute_name} may fill ${row.part_number} ${row.part_name}<span class="gk-sub">${row.approved_by ?? '—'}${row.reason ? ` · ${row.reason}` : ''}</span></li>`)}</ul>` : h`<p class="gk-muted">No approved substitutes.</p>`}
     ${manage && others.length ? form('part.substitute', back, h`${hidden('part', part.id)}${select('Substitute part', 'substitute', others.map(row => ({ value: row.id, label: `${row.number} ${row.name}` })), '', { blank: 'Choose a part' })}${field('Reason', 'reason', { required: false })}${checkbox('Withdraw this approval', 'withdraw')}`, 'Save approval', { secondary: true }) : ''}`, { id: 'substitutes' })
   const moves = card('Movements', part.moves.length ? table(['When', 'Movement', 'Quantity', 'Value', 'Work order', 'By', 'Note'], part.moves.map((move: any) => [showInstant(move.at, actor.zone), KIND[move.kind],
-    move.kind === 'count' ? h`Counted ${amount(move.counted, part.unit)}<span class="gk-sub">variance ${move.quantity_milli > 0 ? '+' : ''}${showNumber(move.quantity)}</span>` : `${move.quantity_milli > 0 ? '+' : ''}${amount(move.quantity, part.unit)}`,
+    move.kind === 'count' ? h`Counted ${amount(move.counted, part.unit)}<span class="gk-sub">variance ${move.quantity_milli > 0 ? '+' : ''}${showNumber(move.quantity)}${move.reason ? ` · ${move.reason}` : ''}</span>` : `${move.quantity_milli > 0 ? '+' : ''}${amount(move.quantity, part.unit)}`,
     move.value_cents === null ? 'Unpriced' : h`${usd(move.value_cents)}${move.kind === 'receive' ? h`<span class="gk-sub">${move.unit_price_cents === null ? 'no unit price' : `${usd(move.unit_price_cents)} each`}${move.freight_cents ? ` · freight ${usd(move.freight_cents)}` : ''}${move.tax_cents ? ` · tax ${usd(move.tax_cents)}` : ''}</span>` : ''}`,
     move.work_order_id ? h`<a href="/app/work/${move.work_order_id}">${woNumber(move.work_order_number)}</a>` : '—', move.actor ?? (move.kind === 'opening' ? 'Move-in' : '—'), move.note ?? '']), 'Movements', { wrap: [6] }) : h`<p class="gk-muted">No movements yet.</p>`, { id: 'moves' })
   const side = manage ? h`${card('Receive stock', form('part.receive', back, h`${hidden('part', part.id)}${field(`Quantity (${part.unit})`, 'quantity', { attrs: 'inputmode="decimal"' })}<div class="gk-grid">${field(`Unit price (USD per ${part.unit})`, 'unitPrice', { required: false, attrs: 'inputmode="decimal"', hint: part.price_cents === null ? 'Leave blank if unknown.' : `Blank uses the vendor price, ${usd(part.price_cents)}.` })}${field('Freight (USD)', 'freight', { required: false, attrs: 'inputmode="decimal"' })}${field('Sales tax (USD)', 'tax', { required: false, attrs: 'inputmode="decimal"' })}</div>${field('Note', 'note', { required: false, hint: 'Supplier, docket or reason.' })}`, 'Receive', { secondary: true }), { id: 'receive' })}

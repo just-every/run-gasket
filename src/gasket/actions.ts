@@ -29,6 +29,7 @@ import { reviseBom } from './bom'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
 import { setVendorPrice } from './valuation'
+import { decideCountLine, planCount, setCountApproval, submitCount } from './counts'
 import { decide, prepare } from './proposals'
 import { exceptStep, review, submit } from './review'
 import { createRoute, issueRoute, missStop, signRun } from './routes'
@@ -74,6 +75,10 @@ export const actions: Record<string, Handler> = {
   'part.receive': (env, actor, input) => receivePart(env, actor, input),
   'part.count': (env, actor, input) => countPart(env, actor, input),
   'part.price': (env, actor, input) => setVendorPrice(env, actor, input),
+  'count.plan': (env, actor, input) => planCount(env, actor, input),
+  'count.submit': (env, actor, input) => submitCount(env, actor, input),
+  'count.decide': (env, actor, input) => decideCountLine(env, actor, input),
+  'site.countApproval': (env, actor, input) => setCountApproval(env, actor, input),
   'part.substitute': (env, actor, input) => approveSubstitute(env, actor, input),
   'kit.create': (env, actor, input) => createKit(env, actor, input),
   'bom.revise': (env, actor, input) => reviseBom(env, actor, input),

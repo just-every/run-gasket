@@ -8,6 +8,7 @@ On a part's page:
 
 - **Receive stock** adds what arrived, with a note of the supplier, docket or reason, and what it cost: the unit price (blank uses the part's **Vendor price**), freight and sales tax. Gasket values stock at moving-average cost: work takes parts at the average when they are issued, a return credits what that work paid, and a new vendor price never changes stock already on the shelf or work already done.
 - **Stock value** on the Parts page totals the shelf; **Download reconciliation** gives each part's opening, received, issued, returned, counted and closing quantity and value for the dates you choose.
+- **Cycle counts** plan a blind count of a shelf location for one person: their count sheet never shows what Gasket expects. Each difference needs a reason (lost, damaged or found) and is valued at the average cost; anything worth at least the site's approval amount waits for a lead or the owner who did not count it. Issues made while the shelf is counted are kept, not undone.
 - **Record a physical count** enters what is actually on the shelf. Gasket records the exact difference as its own movement, so the history is never rewritten.
 - **Movements** lists every opening, receipt, issue, return and count, with its work order and who made it.
 

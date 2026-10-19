@@ -8,7 +8,7 @@ import { isTimeZone } from './dates'
 import type { Input } from './input'
 
 export async function site(env: Bindings) {
-  return await one<{ name: string; timezone: string; lead_days: number; technician_create_work: number }>(env, 'SELECT name, timezone, lead_days, technician_create_work FROM gk_site WHERE singleton = 1')
+  return await one<{ name: string; timezone: string; lead_days: number; technician_create_work: number; count_approval_cents: number }>(env, 'SELECT name, timezone, lead_days, technician_create_work, count_approval_cents FROM gk_site WHERE singleton = 1')
 }
 
 /**

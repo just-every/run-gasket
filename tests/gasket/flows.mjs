@@ -1224,6 +1224,72 @@ try {
     for (const text of ['Parts cost', '$27.43']) assert.ok(workPage.includes(text), text)
   })
 
+  await check('PART-004 cycle counts and inventory adjustments', async () => {
+    const part = async (number, name, location, quantity, unitPrice) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each', location })).id; await h.api('part.receive', cookie.lead, { part: id, quantity, unitPrice }); return id }
+    const filter = await part('FLT-20', 'Air filter', 'Bin A3', '10', '4.00'), belt = await part('BLT-B48', 'V-belt B48', 'Bin A3', '4', '25.00'), gasket = await part('GSK-10', 'Flange gasket', 'Cage', '5', '2.00'), brush = await part('MTR-5', 'Motor brush', 'Cage', '4', '30.00')
+    // The owner configures independent approval for variances worth $20.00 or more.
+    await h.api('site.countApproval', cookie.lead, { threshold: '20.00' }, 403)
+    await h.api('site.countApproval', cookie.owner, { threshold: '20.005' }, 400)
+    assert.equal((await h.submit('site.countApproval', cookie.owner, { threshold: '20.00' }, '/app/site')).searchParams.get('error'), null)
+    // A lead plans a blind count of shelf Bin A3 plus the gasket for Max.
+    await h.api('count.plan', cookie.max, { title: 'Bin A3 cycle count', location: 'Bin A3', counter: ids.max }, 403)
+    await h.api('count.plan', cookie.lead, { title: 'Bin A3 cycle count', location: 'Bin A3', counter: ids.sam }, 400)
+    await h.api('count.plan', cookie.lead, { title: 'Nothing', location: 'Nowhere', counter: ids.max }, 400)
+    const first = (await h.api('count.plan', cookie.lead, { title: 'Bin A3 cycle count', location: 'Bin A3', part: [gasket], counter: ids.max })).id
+    const sheet = await h.api(`counts/${first}`, cookie.max)
+    assert.deepEqual([sheet.blind, sheet.lines.map(line => line.part.number), sheet.lines.some(line => 'expected' in line || 'onHand' in line)], [true, ['BLT-B48', 'FLT-20', 'GSK-10'], false], 'the counter never sees expected quantities')
+    assert.deepEqual((await h.api(`counts/${first}`, cookie.lead)).lines.map(line => line.onHand), ['4', '10', '5'])
+    await h.api(`counts/${first}`, cookie.sam, undefined, 403)
+    assert.deepEqual((await h.api('counts', cookie.sam)), [], 'only planners see counts they did not count')
+    const sheetPage = await (await h.raw(`/app/counts/${first}`, { cookie: cookie.max })).text()
+    assert.ok(sheetPage.includes('Submit count') && !sheetPage.includes('Expected'), 'the count sheet is blind')
+    // Another technician issues a filter while the shelf is being counted.
+    const job = (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title: 'Change the compressor filter and belt', due: addDays(today, 1), assignee: ids.mo })).id
+    await h.api('workorder.issue', cookie.mo, { workOrder: job, part: filter, quantity: '1' })
+    const lines = sheet.lines.map(line => line.id)
+    const answers = { count: first, line: lines, counted: ['3', '8', '5'], reason: ['damaged', 'lost', ''] }
+    await h.api('count.submit', cookie.lead, answers, 403)
+    await h.api('count.submit', cookie.max, { ...answers, reason: ['damaged', '', ''] }, 400)
+    await h.api('count.submit', cookie.max, { ...answers, reason: ['damaged', 'found', ''] }, 400)
+    await h.api('count.submit', cookie.max, { ...answers, reason: ['damaged', 'lost', 'found'] }, 400)
+    await h.api('count.submit', cookie.max, { ...answers, line: lines.slice(0, 2), counted: ['3', '8'] }, 400)
+    assert.deepEqual((await h.api('count.submit', cookie.max, answers)).lines, { [lines[0]]: 'waiting', [lines[1]]: 'posted', [lines[2]]: 'matched' })
+    await h.api('count.submit', cookie.max, answers, 409)
+    // The filter's $4.00 loss is under the threshold and posts at once, against the 9 on hand when counted (the issue is kept).
+    const stock = async id => { const row = await h.api(`parts/${id}`, cookie.lead); return [row.onHand, row.valueCents] }
+    assert.deepEqual(await stock(filter), ['8', 3200])
+    // The belt's $25.00 damage waits; a later issue is reconciled onto it.
+    await h.api('workorder.issue', cookie.mo, { workOrder: job, part: belt, quantity: '1' })
+    const waiting = (await h.api(`counts/${first}`, cookie.lead)).lines[0]
+    assert.deepEqual([waiting.expected, waiting.counted, waiting.variance, waiting.reason, waiting.state, waiting.onHand, waiting.afterApproval], ['4', '3', '-1', 'damaged', 'waiting', '3', '2'])
+    await h.api('count.decide', cookie.max, { line: lines[0], decision: 'approve' }, 403)
+    await h.api('count.decide', cookie.lead, { line: lines[0], decision: 'approve' })
+    await h.api('count.decide', cookie.lead, { line: lines[0], decision: 'approve' }, 409)
+    assert.deepEqual(await stock(belt), ['2', 5000])
+    const moves = async id => (await h.api(`parts/${id}`, cookie.lead)).moves.filter(move => move.kind === 'count').map(move => [move.quantity, move.counted, move.reason, move.value_cents, move.actor, move.note])
+    assert.deepEqual([await moves(filter), await moves(belt)], [[['-1', '8', 'lost', -400, 'Max Ortiz', 'Cycle count CC-1']], [['-1', '3', 'damaged', -2500, 'Lena Park', 'Cycle count CC-1']]])
+    // A count the lead made themselves needs someone else; a later count makes it stale; a rejection needs a reason.
+    const second = (await h.api('count.plan', cookie.lead, { title: 'Brush check', part: [brush], counter: ids.lead })).id
+    const [brushLine] = (await h.api(`counts/${second}`, cookie.lead)).lines.map(line => line.id)
+    assert.deepEqual((await h.api('count.submit', cookie.lead, { count: second, line: [brushLine], counted: ['5'], reason: ['found'] })).lines, { [brushLine]: 'waiting' })
+    await h.api('count.decide', cookie.lead, { line: brushLine, decision: 'approve' }, 403)
+    await h.api('part.count', cookie.lead, { part: brush, counted: '4', seen: (await h.api(`parts/${brush}`, cookie.lead)).seen })
+    await h.api('count.decide', cookie.owner, { line: brushLine, decision: 'approve' }, 409)
+    await h.api('count.decide', cookie.owner, { line: brushLine, decision: 'reject' }, 400)
+    await h.api('count.decide', cookie.owner, { line: brushLine, decision: 'reject', note: 'Recounted at 4 the same day' })
+    assert.deepEqual([await stock(brush), (await h.api(`counts/${second}`, cookie.lead)).lines.map(line => [line.state, line.decidedBy, line.decisionNote])], [['4', 12000], [['rejected', 'Olive Owner', 'Recounted at 4 the same day']]])
+    // Auditable: each posted adjustment is in the audit with its quantity and value, and in the period reconciliation's count column.
+    const approved = (await h.api('audit?action=count.approve', cookie.sam)).rows.map(row => JSON.parse(row.detail))
+    assert.deepEqual(approved.map(row => [row.variance, row.valueCents, row.reason]), [['-1', -2500, 'damaged']])
+    const period = (await h.api(`valuation?from=${today}&to=${today}`, cookie.lead)).parts
+    assert.deepEqual([filter, belt].map(id => period.find(row => row.id === id).counted), [{ quantity: '-1', valueCents: -400 }, { quantity: '-1', valueCents: -2500 }])
+    const lead = await (await h.raw(`/app/counts/${first}`, { cookie: cookie.lead })).text()
+    for (const text of ['Bin A3 cycle count', 'Expected', 'Damaged', 'Approved', '-$25.00', 'Variances of $20.00 or more wait for approval']) assert.ok(lead.includes(text), text)
+    const parts = await (await h.raw('/app/parts', { cookie: cookie.lead })).text()
+    for (const text of ['Cycle counts', 'Brush check', 'Plan count']) assert.ok(parts.includes(text), text)
+    assert.ok((await (await h.raw('/app/site', { cookie: cookie.owner })).text()).includes('Cycle count approval'))
+  })
+
   await check('ASSET-006 bill of materials and interchangeable spares', async () => {
     const motor = (await h.api('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', location: 'Dock' })).id
     const part = async (number, name, quantity) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each' })).id; if (quantity) await h.api('part.receive', cookie.lead, { part: id, quantity }); return id }
