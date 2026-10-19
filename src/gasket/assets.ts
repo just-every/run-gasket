@@ -12,6 +12,7 @@ import { hierarchyOf, placement } from './hierarchy'
 import type { Input } from './input'
 import { DEFAULT_FEED_WINDOW_HOURS, FEED_WINDOW_HOURS, meterView } from './meters'
 import { DECLARED_STATE, stateConflicts, stateHistory } from './states'
+import { disposalStatements, lifecycleOf } from './lifecycle'
 
 export const METER_KINDS = ['counter', 'gauge', 'condition']
 const IDENTITY = ['tag', 'name', 'serial', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
@@ -76,12 +77,15 @@ export async function retireAsset(env: Bindings, actor: Actor, input: Input) {
   const reason = input.text('reason', { max: 500 })
   // ASSET-001: nothing active is left under a retired entry; the batch checks again.
   insist(!await one(env, 'SELECT 1 FROM gk_assets WHERE parent_id = ? AND retired_at IS NULL', asset.id), 'active_children', 409)
+  // ASSET-007: the disposal, when given, is recorded with the retirement.
+  const disposal = disposalStatements(env, actor, asset.id, input)
   await commit(env, [
     guard(env, 'open_work_exists', "NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE asset_id = ? AND status NOT IN ('closed', 'cancelled'))", asset.id),
     guard(env, 'active_children', 'NOT EXISTS(SELECT 1 FROM gk_assets WHERE parent_id = ? AND retired_at IS NULL)', asset.id),
     stmt(env, 'UPDATE gk_schedules SET active = 0, revision = revision + 1 WHERE asset_id = ?', asset.id),
+    ...disposal.statements,
     stmt(env, 'UPDATE gk_assets SET retired_at = ?, revision = revision + 1, updated_at = ? WHERE id = ?', now(), now(), asset.id),
-  ], { actor: actor.id, action: 'asset.retire', subject: asset.id, detail: { reason } })
+  ], { actor: actor.id, action: 'asset.retire', subject: asset.id, detail: { reason, ...(disposal.disposal ? { disposal: disposal.disposal } : {}) } })
   return { id: asset.id }
 }
 
@@ -133,5 +137,5 @@ export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
   const states = await stateHistory(env, id)
   const bom = await bomOf(env, { id: asset.id, serial: asset.serial }, await partList(env, actor))
-  return { ...asset, bom, states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
+  return { ...asset, bom, lifecycle: await lifecycleOf(env, actor, id), states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
 }

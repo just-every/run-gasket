@@ -6,6 +6,7 @@ import type { Actor } from './actor'
 import { collaborate, createTeam, decline, teamMember } from './crew'
 import { editComment, markRead, postComment } from './comments'
 import { moveAsset } from './hierarchy'
+import { addAgreement, setLifecycle } from './lifecycle'
 import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from './assets'
 import { createChecklist, reviseChecklist } from './checklists'
 import { bulk, merge, reopen } from './control'
@@ -45,6 +46,8 @@ export const actions: Record<string, Handler> = {
   'asset.update': (env, actor, input) => updateAsset(env, actor, input),
   'asset.retire': (env, actor, input) => retireAsset(env, actor, input),
   'asset.move': (env, actor, input) => moveAsset(env, actor, input),
+  'asset.lifecycle': (env, actor, input) => setLifecycle(env, actor, input),
+  'asset.agreement': (env, actor, input) => addAgreement(env, actor, input),
   'asset.sighting': (env, actor, input) => recordSighting(env, actor, input),
   'asset.state': (env, actor, input) => declareState(env, actor, input),
   'meter.create': (env, actor, input) => addMeter(env, actor, input),

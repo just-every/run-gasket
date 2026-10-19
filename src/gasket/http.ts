@@ -9,6 +9,7 @@ import { GasketError } from './core'
 import { PAGE_DOORS, match } from './doors'
 import { auditCsv } from './audit'
 import { assetHistoryCsv } from './history'
+import { ledgerCsv } from './lifecycle'
 import { Input } from './input'
 import { site } from './site'
 import { evidenceFile } from './work'
@@ -124,6 +125,7 @@ const pages: Record<string, Page> = {
   assets: (env, actor, url) => assetsPage(env, actor, url),
   asset: (env, actor, url, id) => assetPage(env, actor, id, url),
   historyCsv: async (env, actor, _url, id) => new Response(await assetHistoryCsv(env, actor, id), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="asset-history-${id.slice(0, 8)}.csv"`, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
+  ledgerCsv: async (env, actor, _url, id) => new Response(await ledgerCsv(env, actor, id), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="asset-ledger-${id.slice(0, 8)}.csv"`, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   schedules: (env, actor, url) => schedulesPage(env, actor, url),
   checklist: (env, actor, url, id) => checklistPage(env, actor, id, url),
   parts: (env, actor, url) => partsPage(env, actor, url),

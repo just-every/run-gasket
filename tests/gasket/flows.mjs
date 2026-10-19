@@ -1673,6 +1673,48 @@ try {
     assert.deepEqual([closed.status, closed.reviews.map(row => [row.version, row.decision, row.reason, row.reviewer])], ['closed', [[first, 'returned', 'Record the gland torque', 'Sam Ito'], [final, 'approved', null, 'Sam Ito']]])
   })
 
+  await check('ASSET-007 asset lifecycle and replacement decision', async () => {
+    // The blast chiller came in with the MaintainX move-in (GAS-12): record its purchase, warranty and replacement value.
+    const chiller = (await h.api('assets', cookie.lead)).find(row => row.tag === 'HK-101').id
+    const facts = { asset: chiller, purchasedOn: '2021-03-01', purchaseCost: '$18,500.00', supplier: 'Coastal Catering Supply', commissionedOn: '2021-03-15', warrantyUntil: '2024-03-14', warrantyTerms: 'Parts and labor, 3 years', replacementValue: '22000', replacementBasis: 'Williams quote Q-2291, 2026' }
+    await h.api('asset.lifecycle', cookie.max, facts, 403)
+    assert.equal((await h.api('asset.lifecycle', cookie.lead, { ...facts, commissionedOn: '2021-02-01' }, 400)).error, 'commissioned_before_purchase')
+    assert.equal((await h.api('asset.lifecycle', cookie.lead, { ...facts, purchasedOn: addDays(today, 2) }, 400)).error, 'purchasedOn_in_future')
+    assert.equal((await h.api('asset.lifecycle', cookie.lead, { ...facts, replacementBasis: '' }, 400)).error, 'missing_replacementBasis')
+    assert.equal((await h.api('asset.lifecycle', cookie.lead, facts)).revision, 1)
+    assert.equal((await h.api('asset.lifecycle', cookie.lead, facts, 409)).error, 'stale')
+    await h.submit('asset.lifecycle', cookie.lead, { ...facts, revision: '1', replacementValue: '24,000.00', replacementBasis: 'Williams quote Q-2310, 2026' }, `/app/assets/${chiller}`)
+    // A service agreement, then two repairs with cost entries and a failure stop.
+    assert.equal((await h.api('asset.agreement', cookie.lead, { asset: chiller, provider: 'Polar Service Co', scope: 'Quarterly service', startsOn: '2026-01-01', endsOn: '2025-12-31' }, 400)).error, 'agreement_ends_before_start')
+    await h.api('asset.agreement', cookie.lead, { asset: chiller, provider: 'Polar Service Co', reference: 'PSC-118', scope: 'Quarterly coil clean and refrigerant check', startsOn: addDays(today, -100), endsOn: addDays(today, 265), annualCost: '1,800' })
+    const repair = async title => (await h.api('workorder.create', cookie.lead, { asset: chiller, title, due: today, assignee: ids.max })).id
+    const compressor = await repair('Compressor short-cycling'), door = await repair('Door gasket torn')
+    const day = addDays(today, -3)
+    await h.api('downtime.start', cookie.max, { workOrder: compressor, startedOn: `${day}T09:00`, reason: 'Not holding temperature' })
+    await h.api('downtime.end', cookie.max, { workOrder: compressor, endedOn: `${day}T13:30` })
+    for (const [workOrder, category, amount] of [[compressor, 'parts', '2400'], [compressor, 'labor', '600'], [door, 'parts', '180']]) await h.api('work.cost', cookie.lead, { workOrder, category, amount, note: 'Invoice' })
+    const life = (await h.api(`assets/${chiller}`, cookie.lead)).lifecycle
+    assert.deepEqual([life.facts.revision, life.facts.purchase_cents, life.facts.replacement_cents, life.agreements.map(row => [row.provider, row.annual_cents, row.active])], [2, 1850000, 2400000, [['Polar Service Co', 180000, true]]])
+    assert.deepEqual(life.comparison, { repairCents: 318000, workOrders: 2, costedWorkOrders: 2, failures: 1, failureMinutes: 270, replacementCents: 2400000, repairPercentOfReplacement: 13.3 })
+    const page = (await (await h.raw(`/app/assets/${chiller}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Lifecycle and replacement', '$3,180.00', '13.3%', 'Polar Service Co', 'Depreciation and book value stay in the connected ledger']) assert.ok(page.includes(text), text)
+    // Retire it with its disposal; its work and history stay, and the ledger handoff carries the facts.
+    for (const workOrder of [compressor, door]) await h.api('workorder.cancel', cookie.lead, { workOrder, reason: 'Replacing the chiller' })
+    assert.equal((await h.api('asset.retire', cookie.lead, { asset: chiller, reason: 'Replaced', disposalMethod: 'burned' }, 400)).error, 'invalid_disposalMethod')
+    await h.submit('asset.retire', cookie.lead, { asset: chiller, reason: 'Replaced by a larger chiller', disposalMethod: 'sold', disposalProceeds: '1,200', disposedOn: today }, '/app/assets')
+    const retired = await h.api(`assets/${chiller}`, cookie.lead)
+    assert.deepEqual([Boolean(retired.retired_at), retired.lifecycle.facts.disposal_method, retired.lifecycle.facts.disposal_cents, retired.lifecycle.comparison.repairCents], [true, 'sold', 120000, 318000])
+    await h.api('asset.lifecycle', cookie.lead, { ...facts, revision: retired.lifecycle.facts.revision }, 409)
+    const history = await h.api(`assets/${chiller}/history`, cookie.sam)
+    const said = JSON.stringify(history)
+    for (const text of ['Lifecycle record revision 2 saved', 'Service agreement recorded: Polar Service Co', 'Asset retired: Replaced by a larger chiller (sold', 'Compressor short-cycling']) assert.ok(said.includes(text), text)
+    assert.equal((await h.raw(`/app/assets/${chiller}/ledger.csv`, { cookie: cookie.max })).status, 403)
+    const ledger = await (await h.raw(`/app/assets/${chiller}/ledger.csv`, { cookie: cookie.sam })).text()
+    const [header, row] = ledger.trim().split('\r\n')
+    assert.ok(!/depreciation|book value/i.test(header), 'no book value is claimed')
+    for (const text of ['HK-101', '2021-03-01', '18500.00', 'Coastal Catering Supply', '24000.00', 'Polar Service Co PSC-118', '1800.00/yr', '3180.00', '270', 'yes', 'sold', '1200.00']) assert.ok(row.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

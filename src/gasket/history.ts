@@ -24,7 +24,8 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
     const labels: Record<string, string> = {
       'asset.create': 'Asset registered',
       // ASSET-001: a move shows on the entry and on the parents it left and joined.
-      'asset.move': row.subject === id ? `Moved from ${detail.fromTag ?? 'the site'} to ${detail.toTag ?? 'the site'}` : detail.to === id ? `${detail.tag} moved here from ${detail.fromTag ?? 'the site'}` : `${detail.tag} moved to ${detail.toTag ?? 'the site'}`, 'asset.update': 'Asset details changed', 'asset.retire': `Asset retired: ${detail.reason ?? ''}`,
+      'asset.move': row.subject === id ? `Moved from ${detail.fromTag ?? 'the site'} to ${detail.toTag ?? 'the site'}` : detail.to === id ? `${detail.tag} moved here from ${detail.fromTag ?? 'the site'}` : `${detail.tag} moved to ${detail.toTag ?? 'the site'}`, 'asset.update': 'Asset details changed', 'asset.retire': `Asset retired: ${detail.reason ?? ''}${detail.disposal ? ` (${detail.disposal.method} on ${detail.disposal.disposedOn})` : ''}`,
+      'asset.lifecycle': `Lifecycle record revision ${detail.revision} saved`, 'asset.agreement': `Service agreement recorded: ${detail.provider ?? ''} ${detail.startsOn ?? ''} to ${detail.endsOn ?? ''}`,
       'asset.sighting': `Sighting: ${detail.outcome}${detail.seen ? ` at ${detail.seen}` : ''}`,
       'asset.state': `${detail.corrects ? `Reclassified ${String(detail.was).replace(/_/g, ' ')} as` : 'Declared'} ${String(detail.state).replace(/_/g, ' ')} from ${showLocal(detail.effectiveOn)}: ${detail.reason}`, 'workorder.generate': 'Work order created from its schedule',
       'workorder.create': 'Work order created', 'workorder.assign': 'Work order assigned', 'workorder.plan': `Overdue decision: ${detail.plan === 'keep' ? 'kept with the assignee' : detail.plan === 'as_is' ? 'kept as is' : 'reassigned'}`, 'workorder.cancel': `Work order cancelled: ${detail.reason ?? ''}`,
