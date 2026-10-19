@@ -19,7 +19,9 @@ export async function metricsJourney(h, cookie, people) {
   const job = (await h.api('workorder.create', cookie.lead, { asset, title: 'Inspect noisy drive bearing and restore circulation', due: today, assignee: people.max })).id
   await h.api('downtime.start', cookie.max, { workOrder: job, startedOn: local(now()-120*60000), reason: 'Bearing vibration exceeded shutdown trigger' })
   await h.api('downtime.end', cookie.max, { workOrder: job, endedOn: local(now()-90*60000) })
-  const files = { assets: file('maintainx-assets-quality.csv', historyAssetsCsv), work: file('maintainx-incomplete-history.csv', workCsv) }
+  // This journey imports its own records: prior flows deliberately edit and retain their moved-in records.
+  const ownSource=text=>text.replaceAll('82001','92001').replaceAll('82002','92002').replaceAll('HK-201','DQ-201').replaceAll('HK-202','DQ-202').replace(/700([1-8])/g,'9700$1')
+  const files = { assets: file('maintainx-assets-quality.csv', ownSource(historyAssetsCsv)), work: file('maintainx-incomplete-history.csv', ownSource(workCsv)) }
   const preview = await h.api('import.preview', cookie.lead, files)
   const imported = await h.api('import.apply', cookie.lead, { ...files, fingerprint: preview.fingerprint })
   const part=(await h.api('part.create',cookie.lead,{number:'DQ-5',name:'Pump drive bearing',unit:'ea',location:'M-4',minimum:'1'})).id
@@ -33,7 +35,7 @@ export async function metricsJourney(h, cookie, people) {
   assert.equal(before.quality.missingFailureCodes.stops.find(row => row.work.id === job).reason,'Bearing vibration exceeded shutdown trigger')
   assert.ok(before.quality.unmatchedCosts.unpricedMovements.some(row=>row.part_id===part))
   assert.ok(before.quality.unmatchedCosts.workWithoutEntries.some(row => row.id === job))
-  assert.ok(before.quality.unmatchedCosts.imported.some(row => row.sourceRef === '7002' && row.laborCents === null))
+  assert.ok(before.quality.unmatchedCosts.imported.some(row => row.sourceRef === '97002' && row.laborCents === null))
   assert.deepEqual(before.quality.counterGaps.find(row => row.id === meter).held.map(row => [row.id,row.quality,row.source]),[[late.id,'stale','Delayed gateway file']])
   const reviewed = before.quality.unresolvedImports.find(row => row.id === imported.job).reviewed
   assert.deepEqual(reviewed.rejected,preview.rejected)
