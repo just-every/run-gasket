@@ -1354,7 +1354,7 @@ try {
     // Degraded operation is not a stop: the reliability report counts only the capper's failure.
     assert.deepEqual((await h.api(`reliability?${period}&asset=${capper}`, cookie.sam)).failures.map(item => item.id), [open])
     const page = (await (await h.raw(`/app/availability?${period}&asset=${line}`, { cookie: cookie.sam })).text()).replace(/<[^>]+>/g, '')
-    for (const text of ['Availability by entry', '85.7%', '89.3%', '60 overlapping min counted once', 'Source timeline', 'began before the period', 'still open', 'Degraded operation', 'Monday: 6:00 am to 10:00 pm', 'Unknown coverage']) assert.ok(page.includes(text), text)
+    for (const text of ['Availability by entry', '85.7%', '89.3%', '60 overlapping min counted once', 'Source timeline', 'began before the period', 'still open', 'Degraded operation', 'Production hours', '6:00 am to 10:00 pm', 'Unknown coverage']) assert.ok(page.includes(text), text)
     assert.equal((await h.raw('/app/availability', { cookie: cookie.max })).status, 403)
     assert.ok((await (await h.raw(`/app/work/${jobs.capper}`, { cookie: cookie.max })).text()).includes('Degraded operation'))
   })

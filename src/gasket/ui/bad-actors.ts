@@ -19,10 +19,10 @@ type Report = Awaited<ReturnType<typeof badActors>>
 const money = (cents: number | null, unknown: number, noun: string) => h`${cents === null ? h`<span class="gk-muted">Unknown</span>` : usd(cents)}${unknown ? h`<span class="gk-sub">${unknown} ${noun} unknown</span>` : ''}`
 
 function ranking(title: string, id: string, rows: Report['byAsset']) {
-  return card(title, rows.length ? table(['Ranked', 'Downtime', 'Share', 'Cumulative', 'Repeats', 'Repair cost', 'Lost production'], rows.map(row => [
-    h`<details class="gk-details"><summary>${row.label}</summary><ul class="gk-plain-list">${row.contributors.map(item => h`<li>${showLocal(item.started_on)} · ${item.asset.tag} · ${item.minutes} min${item.duplicateMinutes ? ` (${item.duplicateMinutes} duplicate min not counted)` : ''}${item.work ? h` · <a href="/app/work/${item.work.id}">${woNumber(item.work.number)}</a>` : ''}</li>`)}</ul></details>`,
-    `${row.minutes} min`, pct(row.percent), pct(row.cumulativePercent), String(row.repeats),
-    money(row.repairCents, row.repairUnknown, row.repairUnknown === 1 ? 'work order' : 'work orders'), money(row.lossCents, row.lossUnknownMinutes, 'min')]), title, { wrap: [0] }) : h`<p class="gk-muted">No failures in this period.</p>`, { id })
+  return card(title, rows.length ? table(['Ranked', 'Downtime', 'Cumulative', 'Repair cost', 'Lost production'], rows.map(row => [
+    h`<details class="gk-details"><summary>${row.label}${row.repeats ? ` · ${row.repeats} repeat${row.repeats === 1 ? '' : 's'}` : ''}</summary><ul class="gk-plain-list">${row.contributors.map(item => h`<li>${showLocal(item.started_on)} · ${item.asset.tag} · ${item.minutes} min${item.duplicateMinutes ? ` (${item.duplicateMinutes} duplicate min not counted)` : ''}${item.work ? h` · <a href="/app/work/${item.work.id}">${woNumber(item.work.number)}</a>` : ''}</li>`)}</ul></details>`,
+    h`${row.minutes} min<span class="gk-sub">${pct(row.percent)} share</span>`, pct(row.cumulativePercent),
+    money(row.repairCents, row.repairUnknown, row.repairUnknown === 1 ? 'work order' : 'work orders'), money(row.lossCents, row.lossUnknownMinutes, 'min')]), title, { wrap: [0, 3, 4] }) : h`<p class="gk-muted">No failures in this period.</p>`, { id })
 }
 
 export async function badActorsPage(env: Bindings, actor: Actor, url: URL) {
