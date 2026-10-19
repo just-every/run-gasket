@@ -1784,40 +1784,101 @@ try {
     await h.api('workorder.review', cookie.sam, { workOrder: job, version: kept.version, decision: 'approve' })
   })
 
-  await check('ASSET-008 inspection routes across assets', async () => {
-    // A lead writes a route across three cold rooms, each stop with its own checklist revision, and issues one run.
+  await check('ASSET-008 scheduled inspection routes across assets', async () => {
+    // A lead writes a weekly route across three cold rooms, each stop with its own checklist, needing a probe thermometer.
     const rooms = []
     for (const [tag, name] of [['CR-1', 'Cold room 1'], ['CR-2', 'Cold room 2'], ['CR-3', 'Cold room 3']]) rooms.push((await h.api('asset.create', cookie.lead, { tag, name, location: 'Cold store' })).id)
     const round = (await h.api('checklist.create', cookie.lead, { name: 'Cold room round', items: ['Door seal intact', 'Room temperature | number °C -25..-18'] })).id
     const stops = { asset: rooms, checklist: [round, round, round] }
     assert.equal((await h.api('route.create', cookie.lead, { name: 'Lonely', asset: [rooms[0]], checklist: [round] }, 400)).error, 'invalid_stops')
     await h.api('route.create', cookie.max, { name: 'Cold store round', ...stops }, 403)
-    await h.submit('route.create', cookie.lead, { name: 'Cold store round', ...stops }, '/app/schedules')
-    const route = (await h.api('routes', cookie.lead)).find(row => row.name === 'Cold store round')
-    assert.deepEqual(route.stops.map(stop => stop.asset_name), ['Cold room 1', 'Cold room 2', 'Cold room 3'])
-    const issued = await h.api('route.issue', cookie.lead, { route: route.id, due: today, assignee: ids.max })
+    await h.submit('route.create', cookie.lead, { name: 'Cold store round', ...stops, everyDays: '7', firstDue: today, assignee: ids.max, tool: 'Probe thermometer' }, '/app/schedules')
+    let route = (await h.api('routes', cookie.lead)).find(row => row.name === 'Cold store round')
+    assert.deepEqual([route.stops.map(stop => stop.asset_name), route.every_days, route.next_due_date, route.tools], [['Cold room 1', 'Cold room 2', 'Cold room 3'], 7, today, ['Probe thermometer']])
+    // The scheduler issues one run per occurrence within the seven-day lead time, however often it runs: today's and next week's.
+    for (let pass = 0; pass < 3; pass++) await h.scheduled('*/15 * * * *')
+    route = (await h.api('routes', cookie.lead)).find(row => row.id === route.id)
+    assert.deepEqual([route.runs.map(run => run.due_date), route.runs.map(run => run.occurrence), route.next_due_date], [[addDays(today, 7), today], [`${route.id}@${addDays(today, 7)}`, `${route.id}@${today}`], addDays(today, 14)])
+    const run = route.runs.find(row => row.due_date === today)
     await h.api('checklist.revise', cookie.lead, { checklist: round, note: 'Later', items: ['Door seal intact', 'Room temperature | number °C -24..-18', 'Floor clear'] })
-    const [first, second, third] = await Promise.all(issued.workOrders.map(id => wo('max', id)))
-    assert.deepEqual([first.asset_id, second.asset_id, third.asset_id, ...[first, second, third].map(stop => stop.checklist_revision)], [...rooms, 1, 1, 1], 'each stop records its asset and procedure revision')
+    const [first, second, third] = await Promise.all(run.stops.map(stop => wo('max', stop.id)))
+    assert.deepEqual([first.asset_id, second.asset_id, third.asset_id, ...[first, second, third].map(stop => stop.checklist_revision), first.assignee_id, first.created_by], [...rooms, 1, 1, 1, ids.max, 'scheduler'], 'each stop records its asset and procedure revision')
+    const extra = await h.api('route.issue', cookie.lead, { route: route.id, due: today })
+    assert.equal((await wo('lead', extra.workOrders[0])).checklist_revision, 2, 'a run issued later pins the current revision')
+    ids.roundStop = third.id
     // Stop 1 passes, stop 2 fails its reading and raises its own follow-up, stop 3 is missed and stays open.
     await h.api('workorder.results', cookie.max, { workOrder: first.id, outcome: ['pass', ''], value: ['', '-21'] })
     await h.api('workorder.results', cookie.max, { workOrder: second.id, outcome: ['pass', ''], value: ['', '-9'] })
     const follow = await h.api('finding.record', cookie.max, { workOrder: second.id, item: 1, severity: 'high', text: 'Room 2 at -9 °C: evaporator iced', followUp: true })
     assert.equal((await h.api('route.miss', cookie.nia, { workOrder: third.id, reason: 'x' }, 403)).error, 'forbidden')
     await h.submit('route.miss', cookie.max, { workOrder: third.id, reason: 'Room 3 locked for stocktake' }, `/app/work/${third.id}`)
+    // Each stop lists the required tool, and waits until the person doing it records which one they used.
+    assert.ok((await wo('max', first.id)).missing.includes('record which Probe thermometer was used'))
+    assert.deepEqual((await h.api('workorder.submit', cookie.max, { workOrder: first.id, version: (await wo('max', first.id)).version }, 409)).detail.missing, ['record which Probe thermometer was used'])
+    await h.api('workorder.tool', cookie.mo, { workOrder: first.id, tool: 0, identifier: 'PT-0042' }, 403)
+    await h.submit('workorder.tool', cookie.max, { workOrder: first.id, tool: '0', identifier: 'PT-0042' }, `/app/work/${first.id}`)
+    await h.api('workorder.tool', cookie.max, { workOrder: second.id, tool: 0, identifier: 'PT-0042' })
     for (const stop of [first, second]) {
       await h.api('workorder.submit', cookie.max, { workOrder: stop.id, version: (await wo('max', stop.id)).version })
       await h.api('workorder.review', cookie.sam, { workOrder: stop.id, version: (await wo('sam', stop.id)).version, decision: 'approve' })
     }
+    assert.deepEqual((await wo('sam', first.id)).tools.map(tool => [tool.name, tool.identifier, tool.recorded_by]), [['Probe thermometer', 'PT-0042', 'Max Ortiz']])
     // The run stays incomplete: the missed stop is open on its own, and signing the run cannot close it.
-    const run = (await h.api('routes', cookie.sam)).find(row => row.id === route.id).runs.find(row => row.id === issued.run)
-    assert.deepEqual([run.complete, run.stops.map(stop => [stop.state, stop.follow_ups]), run.stops[2].missed_reason], [false, [['done', 0], ['done', 1], ['missed', 0]], 'Room 3 locked for stocktake'])
-    const refused = await h.api('route.sign', cookie.sam, { run: issued.run }, 409)
+    const now = (await h.api('routes', cookie.sam)).find(row => row.id === route.id).runs.find(row => row.id === run.id)
+    assert.deepEqual([now.complete, now.stops.map(stop => [stop.state, stop.follow_ups]), now.stops[2].missed_reason], [false, [['done', 0], ['done', 1], ['missed', 0]], 'Room 3 locked for stocktake'])
+    const refused = await h.api('route.sign', cookie.sam, { run: run.id }, 409)
     assert.deepEqual([refused.error, refused.detail.open], ['route_incomplete', [third.number]])
     const still = await wo('lead', third.id)
     assert.deepEqual([still.status, still.missed_reason, (await wo('lead', follow.followUp)).follow_up_of], ['open', 'Room 3 locked for stocktake', second.id])
     const page = (await (await h.raw('/app/schedules', { cookie: cookie.lead })).text())
-    for (const text of ['Inspection routes', 'Cold store round', 'incomplete', 'Missed: Room 3 locked for stocktake', '1 follow-up']) assert.ok(page.includes(text), text)
+    for (const text of ['Inspection routes', 'Cold store round', 'Every 7 days', 'Tools: Probe thermometer', 'incomplete', 'Missed: Room 3 locked for stocktake', '1 follow-up']) assert.ok(page.includes(text), text)
+  })
+
+  await check('ASSET-008 gauge calibration with tolerances, tools and certificate versions', async () => {
+    // A calibration task on a pressure gauge: the procedure's limited number steps are its tolerances, two days' grace after due.
+    const gauge = (await h.api('asset.create', cookie.lead, { tag: 'PG-7', name: 'Ammonia line pressure gauge', location: 'Plant room A' })).id
+    const wipe = (await h.api('checklist.create', cookie.lead, { name: 'Gauge wipe', items: ['Face clean'] })).id
+    const procedure = (await h.api('checklist.create', cookie.lead, { name: 'Gauge calibration', items: ['Zero | number kPa -0.5..0.5', 'Mid scale 500 kPa | number kPa 497.5..502.5', 'Seal intact'] })).id
+    const task = { asset: gauge, checklist: procedure, title: 'Pressure gauge calibration', everyDays: 5, firstDue: addDays(today, -1), graceDays: 2, assignee: ids.max, tool: ['Deadweight tester'] }
+    assert.equal((await h.api('calibration.create', cookie.lead, { ...task, checklist: wipe }, 400)).error, 'tolerance_required')
+    await h.api('calibration.create', cookie.max, task, 403)
+    await h.submit('calibration.create', cookie.lead, task, '/app/schedules')
+    const calibration = async () => (await h.api('calibrations', cookie.sam)).find(row => row.asset_id === gauge)
+    let cal = await calibration()
+    assert.deepEqual([cal.state, cal.overdue_after, cal.tolerances.map(point => [Number(point.min), Number(point.max), point.unit]), cal.tools], ['due', addDays(today, 1), [[-0.5, 0.5, 'kPa'], [497.5, 502.5, 'kPa']], ['Deadweight tester']])
+    // Calibrate: the mid-scale reading is out of tolerance and needs its own follow-up; certificate and tool are owed before review.
+    const calibrate = async value => {
+      const job = (await h.api('workorders.generate', cookie.lead, {})).created.find(row => row.schedule === cal.id).id
+      await h.api('workorder.results', cookie.max, { workOrder: job, outcome: value.map(given => given ? '' : 'pass'), value })
+      return job
+    }
+    const first = await calibrate(['0.2', '503.1', ''])
+    assert.equal((await h.api('workorder.evidence', cookie.max, { workOrder: ids.roundStop, file: file('cert.pdf', '%PDF-1.4', 'application/pdf'), certificate: true }, 409)).error, 'not_calibration')
+    let job = await wo('max', first)
+    for (const owed of ['step 2 (Mid scale 500 kPa) is outside its limits and needs a linked finding with follow-up work', 'record which Deadweight tester was used', 'the calibration needs its certificate attached']) assert.ok(job.missing.includes(owed), owed)
+    const adjust = await h.api('finding.record', cookie.max, { workOrder: first, item: 1, severity: 'medium', text: 'Reads 503.1 kPa at 500: adjust the gauge', followUp: true })
+    await h.api('workorder.evidence', cookie.max, { workOrder: first, file: file('PG-7-cert-1.pdf', '%PDF-1.4 PG-7 as found', 'application/pdf'), certificate: true })
+    await h.api('workorder.tool', cookie.max, { workOrder: first, tool: 0, identifier: 'DWT-118' })
+    job = await wo('max', first)
+    assert.deepEqual([job.missing, job.calibration.certificate.filename, job.calibration.overdue_after], [[], 'PG-7-cert-1.pdf', addDays(today, 1)])
+    await h.api('workorder.submit', cookie.max, { workOrder: first, version: job.version })
+    await h.api('workorder.review', cookie.sam, { workOrder: first, version: (await wo('sam', first)).version, decision: 'approve' })
+    cal = await calibration()
+    assert.deepEqual(cal.certificates.map(cert => [cert.version, cert.result, cert.procedure_revision, cert.on_time, cert.calibrated_on, cert.tools]), [[1, 'out_of_tolerance', 1, true, today, [{ name: 'Deadweight tester', identifier: 'DWT-118' }]]])
+    assert.ok(cal.next_due_date >= addDays(today, 5) && cal.state === 'in_date', 'the next calibration runs from this one')
+    assert.equal((await wo('lead', adjust.followUp)).follow_up_of, first, 'the out-of-tolerance reading has its own follow-up')
+    assert.equal(await (await h.raw(`/app/evidence/${cal.certificates[0].evidence_id}`, { cookie: cookie.sam })).text(), '%PDF-1.4 PG-7 as found')
+    // After the adjustment the procedure gains a step; the next calibration passes and becomes version 2, version 1 kept.
+    await h.api('checklist.revise', cookie.lead, { checklist: procedure, note: 'Full scale point', items: ['Zero | number kPa -0.5..0.5', 'Mid scale 500 kPa | number kPa 497.5..502.5', 'Seal intact', 'Full scale 1000 kPa | number kPa 995..1005'] })
+    const second = await calibrate(['0.1', '500.4', '', '1001'])
+    await h.api('workorder.evidence', cookie.max, { workOrder: second, file: file('PG-7-cert-2.pdf', '%PDF-1.4 PG-7 as left', 'application/pdf'), certificate: true })
+    await h.api('workorder.tool', cookie.max, { workOrder: second, tool: 0, identifier: 'DWT-118' })
+    await h.api('workorder.submit', cookie.max, { workOrder: second, version: (await wo('max', second)).version })
+    await h.api('workorder.review', cookie.sam, { workOrder: second, version: (await wo('sam', second)).version, decision: 'approve' })
+    cal = await calibration()
+    assert.deepEqual(cal.certificates.map(cert => [cert.version, cert.result, cert.procedure_revision, cert.filename]), [[2, 'in_tolerance', 2, 'PG-7-cert-2.pdf'], [1, 'out_of_tolerance', 1, 'PG-7-cert-1.pdf']])
+    const page = (await (await h.raw('/app/schedules', { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Calibration', 'Ammonia line pressure gauge', 'Certificate v2: PG-7-cert-2.pdf', 'Certificate v1: PG-7-cert-1.pdf', 'Out of tolerance', 'Used: Deadweight tester DWT-118']) assert.ok(page.includes(text), text)
   })
 
   await check('GAS-11 rer export and rer import keep every record', async () => {

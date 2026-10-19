@@ -28,6 +28,12 @@ Gasket does this on its own every 15 minutes, issuing calendar work the site's l
 
 Gasket does not create work in the background; it creates work when a lead presses the button, or when an approved agent proposal does.
 
+## Inspection routes and calibration
+
+An **inspection route** under **Schedules** is two or more stops, each an asset and the checklist done there. Give it **Repeat every (days)** and a **First due** date and Gasket issues a run on its own once each date is within the site's lead time: one work order per stop, each pinned to its checklist's current revision. A failed reading raises its follow-up on that stop alone; a stop that cannot be done is recorded as missed with a reason and stays open, and a supervisor can sign the run off only once every stop is closed.
+
+A **calibration task** is a schedule on an instrument. Its procedure's number steps with limits are the tolerances, and its grace (days) is how long after the due date it still reads due rather than overdue. Routes and calibration tasks can name **required tools**: whoever does the work records which one they used (its serial or asset number) before submitting. Calibration work also needs its certificate, attached under **Inspection evidence** and marked as the certificate. When it is approved, the certificate becomes the instrument's next version, with the procedure revision, the tools used, and whether the readings were in tolerance. Gasket reads the readings against the limits; it does not certify the instrument.
+
 ## Assign and raise work
 
 A lead assigns or reassigns any open work order from its page, under **Assignment**. Each maintainer sees their own list under **Assigned to me**.

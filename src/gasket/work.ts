@@ -24,6 +24,7 @@ import { workCosts } from './bad-actors'
 import { chosenTemplate, priorityOf } from './templates'
 import { fieldsOf } from './work-fields'
 import { createsWork } from './site'
+import { toolsOf } from './tools'
 import { answer, applies, kindOf, stepSummary, type Answer, type ChecklistItem, type StepKind } from './steps'
 
 /** FIELD-009: the door a work order was created through: the web workspace's form door or the JSON API. */
@@ -41,7 +42,7 @@ export async function workOrder(env: Bindings, id: string) {
 }
 
 /** The assigned person or a collaborator (PLAN-002) may record on an open work order; the version they saw must still be current. */
-async function workable(env: Bindings, actor: Actor, input: Input) {
+export async function workable(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.do')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
   insist(order.assignee_id === actor.id || await isCollaborator(env, order.id, actor.id), 'not_your_work', 403)
@@ -213,9 +214,12 @@ export async function addEvidence(env: Bindings, actor: Actor, input: Input) {
     insist(item < steps.length, 'invalid_item')
     if (kindOf(steps[item]) === 'photo') insist(mediaType.startsWith('image/'), 'photo_required')
   }
+  // ASSET-008: a calibration's certificate is evidence marked as such, on calibration work only.
+  const certificate = input.flag('certificate')
+  if (certificate) insist(order.schedule_id && await one(env, 'SELECT 1 FROM gk_schedules WHERE id = ? AND calibration = 1', order.schedule_id), 'not_calibration', 409)
   const id = newId(), sha256 = await sha256Hex(file.bytes)
-  await commit(env, [...touch(env, order), stmt(env, 'INSERT INTO gk_evidence (id, work_order_id, item, filename, media_type, size, sha256, bytes, uploaded_by, uploaded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, item, file.filename, mediaType, file.bytes.length, sha256, file.bytes, actor.id, now())],
-    { actor: actor.id, action: 'workorder.evidence', subject: order.id, detail: { evidence: id, filename: file.filename, size: file.bytes.length, sha256, ...(item !== null ? { item } : {}) } })
+  await commit(env, [...touch(env, order), stmt(env, 'INSERT INTO gk_evidence (id, work_order_id, item, filename, media_type, size, sha256, bytes, uploaded_by, uploaded_at, certificate) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, item, file.filename, mediaType, file.bytes.length, sha256, file.bytes, actor.id, now(), certificate ? 1 : 0)],
+    { actor: actor.id, action: 'workorder.evidence', subject: order.id, detail: { evidence: id, filename: file.filename, size: file.bytes.length, sha256, ...(item !== null ? { item } : {}), ...(certificate ? { certificate } : {}) } })
   return { id: order.id, evidence: id }
 }
 
@@ -328,19 +332,19 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
 
 /** FIELD-004: a step of the pinned revision with its answer, whether it applies, its photos and a supervisor's exception. */
 export type Step = ChecklistItem & { index: number; kind: StepKind; summary: string; result: Row | null; applies: boolean; photos: number; exception: Row | null }
-export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: Step[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
+export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: Step[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; tools: Row[]; calibration: Row | null; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
   // Work at a location with no asset (PLAN-001) shows the location where an asset's name and place would be.
   const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
-    m.name AS assignee_name, cr.name AS created_by_name, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
+    m.name AS assignee_name, cr.name AS created_by_name, s.calibration AS calibration_task, s.grace_days, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
     FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_members cr ON cr.id = w.created_by LEFT JOIN gk_work_templates t ON t.id = w.template_id LEFT JOIN gk_work_statuses ws ON ws.id = w.waiting_status
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
     LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
   insist(order, 'work_order_not_found', 404)
   const results = new Map((await all(env, 'SELECT r.item, r.outcome, r.value, r.note, m.name AS recorded_by, r.recorded_at FROM gk_results r LEFT JOIN gk_members m ON m.id = r.recorded_by WHERE r.work_order_id = ?', id)).map(row => [row.item as number, row]))
-  const evidence = await all(env, 'SELECT e.id, e.item, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
+  const evidence = await all(env, 'SELECT e.id, e.item, e.certificate, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
   const exceptions = new Map((await all(env, 'SELECT x.item, x.reason, m.name AS granted_by, x.granted_at FROM gk_step_exceptions x LEFT JOIN gk_members m ON m.id = x.granted_by WHERE x.work_order_id = ?', id)).map(row => [row.item as number, row]))
   const steps = order.items_json ? JSON.parse(order.items_json) as ChecklistItem[] : []
   const items: Step[] = steps.map((step, index) => ({ ...step, index, kind: kindOf(step), summary: stepSummary(step, steps), result: results.get(index) ?? null, applies: applies(steps, index, results as Map<number, Answer>),
@@ -376,7 +380,10 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const comments = await thread(env, actor, 'work', id), costs = await workCosts(env, id)
   // PLAN-001: custom field values, and what the fields and the template require before review.
   const fields = await fieldsOf(env, order)
-  return { ...rest, trigger, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length }) }
+  // ASSET-008: the tools this work needs and which were used; a calibration's grace window and certificate.
+  const tools = await toolsOf(env, id)
+  const calibration = order.calibration_task ? { grace_days: order.grace_days, overdue_after: addDays(order.due_date, order.grace_days ?? 0), certificate: evidence.filter(file => file.certificate).at(-1) ?? null } : null
+  return { ...rest, trigger, tools, calibration, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length, tools, certificateRequired: Boolean(calibration && !calibration.certificate) }) }
 }
 
 /**
@@ -384,7 +391,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
  * excepted, block nothing; a photo step needs a photo; a failed or needs-attention step needs its own linked finding,
  * and a number outside its limits a linked finding with follow-up work (FIELD-004).
  */
-export function submitBlockers({ items, findings, downtime, unacknowledged = false, fields = [], evidenceRequired = false }: { items: Pick<Step, 'index' | 'text' | 'kind' | 'result' | 'applies' | 'photos' | 'exception'>[]; findings: { item: number | null; follow_up_id?: string | null }[]; downtime: { ended_on: string | null }[]; unacknowledged?: boolean; fields?: { label: string; value: string | null; required: boolean }[]; evidenceRequired?: boolean }) {
+export function submitBlockers({ items, findings, downtime, unacknowledged = false, fields = [], evidenceRequired = false, tools = [], certificateRequired = false }: { items: Pick<Step, 'index' | 'text' | 'kind' | 'result' | 'applies' | 'photos' | 'exception'>[]; findings: { item: number | null; follow_up_id?: string | null }[]; downtime: { ended_on: string | null }[]; unacknowledged?: boolean; fields?: { label: string; value: string | null; required: boolean }[]; evidenceRequired?: boolean; tools?: { name: string; identifier: string | null }[]; certificateRequired?: boolean }) {
   const blockers: string[] = []
   if (unacknowledged) blockers.push('the assignee has not acknowledged this correction')
   const owed = items.filter(item => item.applies && !item.exception)
@@ -401,6 +408,8 @@ export function submitBlockers({ items, findings, downtime, unacknowledged = fal
   if (downtime.some(row => !row.ended_on)) blockers.push('downtime is still open')
   for (const field of fields) if (field.required && field.value === null) blockers.push(`the required field ${field.label} has no value`)
   if (evidenceRequired) blockers.push('the template requires a photo or document as evidence')
+  for (const tool of tools) if (!tool.identifier) blockers.push(`record which ${tool.name} was used`)
+  if (certificateRequired) blockers.push('the calibration needs its certificate attached')
   return blockers
 }
 

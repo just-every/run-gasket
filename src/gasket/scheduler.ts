@@ -12,6 +12,7 @@ import { chase } from './chasing'
 import { all, newId, now, one, stmt } from './core'
 import { today } from './dates'
 import { DUE_SCHEDULES, issueDue } from './schedules'
+import { issueDueRoutes } from './routes'
 import { site } from './site'
 
 export const SCHEDULER = { id: 'scheduler', name: 'Gasket scheduler', cron: '*/15 * * * *', missedAfterMinutes: 45 }
@@ -22,11 +23,13 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
   const previous = await one<{ ran_at: number }>(env, 'SELECT ran_at FROM gk_scheduler_runs ORDER BY ran_at DESC LIMIT 1')
   const day = today(current.timezone, at)
   const { created } = await issueDue(env, { id: SCHEDULER.id, today: day }, await all(env, DUE_SCHEDULES), 'workorder.schedule', { automatic: true })
+  // ASSET-008: scheduled routes, one run per occurrence.
+  const runs = await issueDueRoutes(env, { id: SCHEDULER.id, today: day })
   // PM-006: then chase overdue work on the same clock.
   await chase(env, day)
   const gap = previous ? Math.round((at - previous.ran_at) / 60_000) : null
-  await env.DB.batch([stmt(env, 'INSERT INTO gk_scheduler_runs (id, cron, ran_at, created, gap_minutes, finished_at) VALUES (?, ?, ?, ?, ?, ?)', newId(), cron, at, created.length, gap !== null && gap > SCHEDULER.missedAfterMinutes ? gap : null, now())])
-  return { created: created.length }
+  await env.DB.batch([stmt(env, 'INSERT INTO gk_scheduler_runs (id, cron, ran_at, created, gap_minutes, finished_at) VALUES (?, ?, ?, ?, ?, ?)', newId(), cron, at, created.length + runs.reduce((sum, run) => sum + run.workOrders.length, 0), gap !== null && gap > SCHEDULER.missedAfterMinutes ? gap : null, now())])
+  return { created: created.length, runs: runs.length }
 }
 
 /** The scheduler's health: its recent runs, the gaps when it did not run, and calendar work it issued late. */

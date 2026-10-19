@@ -19,6 +19,8 @@ import type { Input } from './input'
 import { meterState } from './meters'
 import { addMeter, compareMeter, meterNumber } from './quantity'
 import { firingReading, triggerFields } from './triggers'
+import { issueDueRoutes } from './routes'
+import { toolNames, toolStatements } from './tools'
 
 /** A counter's normalized value now and its readings held back as stale or suspect. */
 const meterNow = async (env: Bindings, meterId: string | null) => {
@@ -71,14 +73,17 @@ export async function scheduleFields(env: Bindings, input: Input) {
 }
 
 export interface FromProposal { proposal?: string; also?: (id: string) => D1PreparedStatement[] }
+/** ASSET-008: a calibration task is a schedule with a grace window (days); its cadence runs from completion unless it says otherwise. */
+export interface ScheduleKind extends FromProposal { calibration?: number }
 
-export async function createSchedule(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
+export async function createSchedule(env: Bindings, actor: Actor, input: Input, { proposal, also, calibration }: ScheduleKind = {}) {
   requireCapability(actor, proposal ? 'proposal.decide' : 'register.manage')
-  const value = await scheduleFields(env, input), id = newId()
-  await commit(env, [stmt(env, 'INSERT INTO gk_schedules (id, asset_id, location, checklist_id, title, every_days, meter_id, every_units, next_due_date, next_due_meter, assignee_id, team_id, estimate_minutes, cadence, months, weekdays, observe_closures, max_defer_days, nominal_date, combine, trigger_when, trigger_value, reset_value, sustain_minutes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  const value = await scheduleFields(env, input), id = newId(), tools = toolNames(input)
+  if (calibration !== undefined && !input.has('cadence')) value.cadence = 'completion'
+  await commit(env, [stmt(env, 'INSERT INTO gk_schedules (id, asset_id, location, checklist_id, title, every_days, meter_id, every_units, next_due_date, next_due_meter, assignee_id, team_id, estimate_minutes, cadence, months, weekdays, observe_closures, max_defer_days, nominal_date, combine, trigger_when, trigger_value, reset_value, sustain_minutes, tools, calibration, grace_days, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     id, value.asset, value.location, value.checklist, value.title, value.everyDays, value.meterId, value.everyUnits, value.nextDueDate, value.nextDueMeter, value.assigneeId, value.teamId, value.estimateMinutes, value.cadence, value.months, value.weekdays, value.observeClosures ? 1 : 0, value.maxDeferDays, value.nominalDate,
-    value.combine, value.trigger?.when ?? null, value.trigger?.value ?? null, value.trigger?.reset ?? null, value.trigger?.sustainMinutes ?? 0, actor.id, now()), ...(also?.(id) ?? [])],
-  { actor: actor.id, action: 'schedule.create', subject: id, detail: { ...value, ...(proposal ? { proposal } : {}) } })
+    value.combine, value.trigger?.when ?? null, value.trigger?.value ?? null, value.trigger?.reset ?? null, value.trigger?.sustainMinutes ?? 0, tools, calibration !== undefined ? 1 : 0, calibration ?? null, actor.id, now()), ...(also?.(id) ?? [])],
+  { actor: actor.id, action: calibration !== undefined ? 'calibration.create' : 'schedule.create', subject: id, detail: { ...value, tools, ...(calibration !== undefined ? { graceDays: calibration } : {}), ...(proposal ? { proposal } : {}) } })
   return { id }
 }
 
@@ -109,6 +114,7 @@ export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>
       SELECT ?, ${NEXT_NUMBER}, ?, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, ?, (SELECT trade FROM gk_teams WHERE id = ?), ?, 'open', ?, ?
       WHERE NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE schedule_id = ? AND status NOT IN ('closed', 'cancelled'))`,
     id, schedule.asset_id, schedule.location, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, occurrence, schedule.assignee_id, schedule.team_id, schedule.team_id, schedule.estimate_minutes, actor.id, now(), schedule.id))
+    statements.push(...toolStatements(env, id, schedule.tools))
     if (fired) statements.push(stmt(env, 'UPDATE gk_schedules SET trigger_fired_on = ?, revision = revision + 1 WHERE id = ?', fired.taken_on, schedule.id))
     created.push({ id, schedule: schedule.id, due: dueDate, reason: byDate && byMeter ? 'both' : byDate ? 'date' : 'meter', occurrence, ...(byMeter && reading ? { reading } : {}) })
   }
@@ -116,10 +122,10 @@ export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>
   return { created, held }
 }
 
-/** Creates one work order for every schedule that is due. Repeating it creates nothing new. */
+/** Creates one work order for every schedule that is due, and one run for every scheduled route occurrence (ASSET-008). Repeating it creates nothing new. */
 export async function generateDue(env: Bindings, actor: Actor) {
   requireCapability(actor, 'work.assign')
-  return await issueDue(env, actor, await all(env, DUE_SCHEDULES), 'workorder.generate')
+  return { ...await issueDue(env, actor, await all(env, DUE_SCHEDULES), 'workorder.generate'), runs: await issueDueRoutes(env, actor) }
 }
 
 /** PM-002: every reading a door keeps evaluates the schedules on its meter at once, whoever sent it. */

@@ -16,7 +16,7 @@ import type { Input } from './input'
 
 const OPEN = "('open', 'in_progress', 'returned')"
 /** Every table that records work on a work order, with the column naming who recorded it. */
-export const RECORDERS = [['gk_result_log', 'recorded_by'], ['gk_readings', 'entered_by'], ['gk_part_moves', 'actor'], ['gk_downtime', 'recorded_by'], ['gk_findings', 'recorded_by'], ['gk_evidence', 'uploaded_by']]
+export const RECORDERS = [['gk_result_log', 'recorded_by'], ['gk_readings', 'entered_by'], ['gk_part_moves', 'actor'], ['gk_downtime', 'recorded_by'], ['gk_findings', 'recorded_by'], ['gk_evidence', 'uploaded_by'], ['gk_work_tools', 'recorded_by']]
 const ASSIGNABLE = "status = 'active' AND role IN ('owner', 'lead', 'maintainer')"
 
 async function team(env: Bindings, id: string) {

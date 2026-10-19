@@ -30,6 +30,8 @@ import { countPart, createPart, receivePart } from './parts'
 import { decide, prepare } from './proposals'
 import { exceptStep, review, submit } from './review'
 import { createRoute, issueRoute, missStop, signRun } from './routes'
+import { createCalibration } from './calibration'
+import { recordTool } from './tools'
 import { createSchedule, evaluateMeter, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole, setTechnicianWork } from './site'
 import { retireField, saveField, saveStatus, setFieldValue, setWaiting } from './work-fields'
@@ -126,6 +128,8 @@ export const actions: Record<string, Handler> = {
   'route.issue': (env, actor, input) => issueRoute(env, actor, input),
   'route.miss': (env, actor, input) => missStop(env, actor, input),
   'route.sign': (env, actor, input) => signRun(env, actor, input),
+  'calibration.create': (env, actor, input) => createCalibration(env, actor, input),
+  'workorder.tool': (env, actor, input) => recordTool(env, actor, input),
   'proposal.prepare': (env, actor, input) => prepare(env, actor, input),
   'proposal.decide': (env, actor, input) => decide(env, actor, input),
   'import.preview': (env, actor, input) => previewImport(env, actor, input),
