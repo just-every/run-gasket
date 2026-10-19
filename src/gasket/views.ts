@@ -15,6 +15,7 @@ import { reliability } from './reliability'
 import { availability } from './availability'
 import { badActors } from './bad-actors'
 import { templateList } from './templates'
+import { routeList } from './routes'
 import { fieldList, statusList } from './work-fields'
 import { kitList, substituteList } from './reservations'
 import { codeList, failureReport } from './codes'
@@ -62,6 +63,7 @@ export const views: Record<string, View> = {
   availability: (env, actor, _id, url) => availability(env, actor, url),
   badActors: (env, actor, _id, url) => badActors(env, actor, url),
   templates: env => templateList(env),
+  routes: env => routeList(env),
   workFields: async env => ({ fields: (await fieldList(env)).map(row => ({ ...row, options: row.options ? JSON.parse(row.options) : null, required: Boolean(row.required) })), statuses: await statusList(env) }),
   kits: async env => ({ kits: await kitList(env), substitutes: await substituteList(env) }),
   failures: (env, actor) => failureReport(env, actor),

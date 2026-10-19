@@ -4,7 +4,8 @@ import { can, type Actor } from '../actor'
 import { assetList } from '../assets'
 import { checklistDetail, checklistList } from '../checklists'
 import { lineOf, stepSummary } from '../steps'
-import { all } from '../core'
+import { routeList } from '../routes'
+import { all, type Row } from '../core'
 import { showDate, showInstant } from '../dates'
 import { showNumber } from '../quantity'
 import { closures } from '../calendar'
@@ -47,7 +48,15 @@ export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
   }
   const checklistCard = card('Checklists', h`${checklists.length ? table(['Checklist', 'Revision', 'Items'], checklists.map(item => [h`<a href="/app/checklists/${item.id}">${item.name}</a>`, `Revision ${item.revision.number}`, String(item.revision.items.length)]), 'Checklists', { wrap: [0] }) : h`<p class="gk-muted">No checklists yet.</p>`}
     ${manage ? form('checklist.create', '/app/checklists/{id}', h`${field('Checklist name', 'name')}${area('Steps, one per line', 'items', { hint: STEP_HINT })}`, 'Write checklist', { secondary: true }) : ''}`, { id: 'checklists' })
-  return page(env, 'Schedules', actor, h`<div class="gk-head"><div><h1>Schedules</h1><p class="gk-lede">Preventive work by calendar or meter, and the checklists it follows.</p></div>${generate}</div>${list}<div class="gk-columns"><div class="gk-col-main">${create}${exceptionsCard(schedules)}${changesCard(schedules, closed, actor)}</div><div class="gk-col-side">${can(actor, 'board.read') ? schedulerCard(await schedulerView(env, actor), actor) : ''}${checklistCard}</div></div>`, { url })
+  // ASSET-008: inspection routes across assets, their runs and each stop's state.
+  const routes = await routeList(env), people = can(actor, 'work.assign') ? await assignable(env) : [], assets = manage ? (await assetList(env, actor)).filter(asset => asset.status !== 'retired') : []
+  const STOP: Record<string, string> = { done: 'Done', open: 'Open', missed: 'Missed', cancelled: 'Cancelled' }
+  const routeCard = card('Inspection routes', h`${routes.length ? routes.map(route => h`<h3>${route.name}</h3><ol class="gk-plain-list">${route.stops.map((stop: Row) => h`<li>${stop.asset_tag} ${stop.asset_name}<span class="gk-sub">${stop.checklist_name}</span></li>`)}</ol>
+      ${route.runs.map((run: Row) => h`<p class="gk-sub">Run due ${showDate(run.due_date)}: ${run.signed_at ? `signed off by ${run.signed_by}` : run.complete ? 'every stop done' : 'incomplete'}</p><ul class="gk-files">${run.stops.map((stop: Row) => h`<li><a href="/app/work/${stop.id}">Stop ${stop.route_position + 1}: ${stop.asset_name}</a> ${tag(STOP[stop.state])}${stop.missed_reason ? h`<span class="gk-sub">Missed: ${stop.missed_reason}</span>` : ''}${stop.follow_ups ? h`<span class="gk-sub">${stop.follow_ups} follow-up${stop.follow_ups === 1 ? '' : 's'}</span>` : ''}</li>`)}</ul>
+        ${can(actor, 'work.review') && run.complete && !run.signed_at ? form('route.sign', '/app/schedules', hidden('run', run.id), 'Sign off run', { secondary: true }) : ''}`)}`) : h`<p class="gk-muted">No inspection routes yet.</p>`}
+    ${manage && assets.length && checklists.length ? form('route.create', '/app/schedules', h`${field('Route name', 'name')}${[0, 1, 2, 3, 4].map(index => h`<div class="gk-grid">${select(`Stop ${index + 1} asset`, 'asset', assets.map(asset => ({ value: asset.id, label: `${asset.tag} ${asset.name}` })), '', { required: index < 2, blank: 'No stop' })}${select(`Stop ${index + 1} checklist`, 'checklist', checklists.map(item => ({ value: item.id, label: item.name })), '', { required: index < 2, blank: 'No stop' })}</div>`)}`, 'Write route', { secondary: true }) : ''}
+    ${can(actor, 'work.assign') && routes.length ? form('route.issue', '/app/schedules', h`${select('Route', 'route', routes.map(route => ({ value: route.id, label: route.name })), '', { blank: 'Choose a route' })}${field('Due', 'due', { type: 'date' })}${select('Assign to', 'assignee', people.map(person => ({ value: person.id, label: person.name })), '', { required: false, blank: 'Leave for a lead' })}`, 'Issue route', { secondary: true }) : ''}`, { id: 'routes' })
+  return page(env, 'Schedules', actor, h`<div class="gk-head"><div><h1>Schedules</h1><p class="gk-lede">Preventive work by calendar or meter, and the checklists it follows.</p></div>${generate}</div>${list}<div class="gk-columns"><div class="gk-col-main">${create}${exceptionsCard(schedules)}${changesCard(schedules, closed, actor)}</div><div class="gk-col-side">${can(actor, 'board.read') ? schedulerCard(await schedulerView(env, actor), actor) : ''}${checklistCard}${routeCard}</div></div>`, { url })
 }
 
 export async function checklistPage(env: Bindings, actor: Actor, id: string, url: URL) {

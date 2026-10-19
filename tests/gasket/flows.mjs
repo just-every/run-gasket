@@ -1784,6 +1784,42 @@ try {
     await h.api('workorder.review', cookie.sam, { workOrder: job, version: kept.version, decision: 'approve' })
   })
 
+  await check('ASSET-008 inspection routes across assets', async () => {
+    // A lead writes a route across three cold rooms, each stop with its own checklist revision, and issues one run.
+    const rooms = []
+    for (const [tag, name] of [['CR-1', 'Cold room 1'], ['CR-2', 'Cold room 2'], ['CR-3', 'Cold room 3']]) rooms.push((await h.api('asset.create', cookie.lead, { tag, name, location: 'Cold store' })).id)
+    const round = (await h.api('checklist.create', cookie.lead, { name: 'Cold room round', items: ['Door seal intact', 'Room temperature | number °C -25..-18'] })).id
+    const stops = { asset: rooms, checklist: [round, round, round] }
+    assert.equal((await h.api('route.create', cookie.lead, { name: 'Lonely', asset: [rooms[0]], checklist: [round] }, 400)).error, 'invalid_stops')
+    await h.api('route.create', cookie.max, { name: 'Cold store round', ...stops }, 403)
+    await h.submit('route.create', cookie.lead, { name: 'Cold store round', ...stops }, '/app/schedules')
+    const route = (await h.api('routes', cookie.lead)).find(row => row.name === 'Cold store round')
+    assert.deepEqual(route.stops.map(stop => stop.asset_name), ['Cold room 1', 'Cold room 2', 'Cold room 3'])
+    const issued = await h.api('route.issue', cookie.lead, { route: route.id, due: today, assignee: ids.max })
+    await h.api('checklist.revise', cookie.lead, { checklist: round, note: 'Later', items: ['Door seal intact', 'Room temperature | number °C -24..-18', 'Floor clear'] })
+    const [first, second, third] = await Promise.all(issued.workOrders.map(id => wo('max', id)))
+    assert.deepEqual([first.asset_id, second.asset_id, third.asset_id, ...[first, second, third].map(stop => stop.checklist_revision)], [...rooms, 1, 1, 1], 'each stop records its asset and procedure revision')
+    // Stop 1 passes, stop 2 fails its reading and raises its own follow-up, stop 3 is missed and stays open.
+    await h.api('workorder.results', cookie.max, { workOrder: first.id, outcome: ['pass', ''], value: ['', '-21'] })
+    await h.api('workorder.results', cookie.max, { workOrder: second.id, outcome: ['pass', ''], value: ['', '-9'] })
+    const follow = await h.api('finding.record', cookie.max, { workOrder: second.id, item: 1, severity: 'high', text: 'Room 2 at -9 °C: evaporator iced', followUp: true })
+    assert.equal((await h.api('route.miss', cookie.nia, { workOrder: third.id, reason: 'x' }, 403)).error, 'forbidden')
+    await h.submit('route.miss', cookie.max, { workOrder: third.id, reason: 'Room 3 locked for stocktake' }, `/app/work/${third.id}`)
+    for (const stop of [first, second]) {
+      await h.api('workorder.submit', cookie.max, { workOrder: stop.id, version: (await wo('max', stop.id)).version })
+      await h.api('workorder.review', cookie.sam, { workOrder: stop.id, version: (await wo('sam', stop.id)).version, decision: 'approve' })
+    }
+    // The run stays incomplete: the missed stop is open on its own, and signing the run cannot close it.
+    const run = (await h.api('routes', cookie.sam)).find(row => row.id === route.id).runs.find(row => row.id === issued.run)
+    assert.deepEqual([run.complete, run.stops.map(stop => [stop.state, stop.follow_ups]), run.stops[2].missed_reason], [false, [['done', 0], ['done', 1], ['missed', 0]], 'Room 3 locked for stocktake'])
+    const refused = await h.api('route.sign', cookie.sam, { run: issued.run }, 409)
+    assert.deepEqual([refused.error, refused.detail.open], ['route_incomplete', [third.number]])
+    const still = await wo('lead', third.id)
+    assert.deepEqual([still.status, still.missed_reason, (await wo('lead', follow.followUp)).follow_up_of], ['open', 'Room 3 locked for stocktake', second.id])
+    const page = (await (await h.raw('/app/schedules', { cookie: cookie.lead })).text())
+    for (const text of ['Inspection routes', 'Cold store round', 'incomplete', 'Missed: Room 3 locked for stocktake', '1 follow-up']) assert.ok(page.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

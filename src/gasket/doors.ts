@@ -6,7 +6,7 @@ export const API_DOORS: [string, string][] = [
   ['^assets$', 'assets'], ['^assets/([\\w-]+)$', 'asset'], ['^assets/([\\w-]+)/history$', 'history'],
   ['^parts$', 'parts'], ['^parts/([\\w-]+)$', 'part'], ['^checklists$', 'checklists'], ['^checklists/([\\w-]+)$', 'checklist'],
   ['^schedules$', 'schedules'], ['^work$', 'work'], ['^work/([\\w-]+)$', 'workOrder'], ['^work/([\\w-]+)/comments$', 'workComments'], ['^assets/([\\w-]+)/comments$', 'assetComments'], ['^board$', 'board'],
-  ['^proposals$', 'proposals'], ['^imports$', 'imports'], ['^audit$', 'audit'], ['^codes$', 'codes'], ['^failures$', 'failures'], ['^closures$', 'closures'], ['^scheduler$', 'scheduler'], ['^notices$', 'notices'], ['^chase-rule$', 'chaseRule'], ['^teams$', 'teams'], ['^performance$', 'performance'], ['^reliability$', 'reliability'], ['^availability$', 'availability'], ['^bad-actors$', 'badActors'], ['^templates$', 'templates'], ['^work-fields$', 'workFields'], ['^kits$', 'kits'],
+  ['^proposals$', 'proposals'], ['^imports$', 'imports'], ['^audit$', 'audit'], ['^codes$', 'codes'], ['^failures$', 'failures'], ['^closures$', 'closures'], ['^scheduler$', 'scheduler'], ['^notices$', 'notices'], ['^chase-rule$', 'chaseRule'], ['^teams$', 'teams'], ['^performance$', 'performance'], ['^reliability$', 'reliability'], ['^availability$', 'availability'], ['^bad-actors$', 'badActors'], ['^templates$', 'templates'], ['^routes$', 'routes'], ['^work-fields$', 'workFields'], ['^kits$', 'kits'],
 ]
 
 export const PAGE_DOORS: [string, string][] = [
