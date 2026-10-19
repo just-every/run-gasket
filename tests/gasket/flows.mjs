@@ -11,6 +11,7 @@ import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
 import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, workCsv } from './fixtures.mjs'
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
+import { automationJourney } from './automation.mjs'
 import { purchasingJourney } from './purchasing.mjs'
 import { now, zone } from './clock.mjs'
 
@@ -2196,6 +2197,8 @@ try {
     for (const text of ['Compressor service manual', 'Revision 3: copeland-ae4-1418-c.pdf', 'Expired', 'Coolflow Refrigeration Supply']) assert.ok(page.includes(text), text)
   })
 
+  await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
+
   await check('BUY-001 vendor records and maintenance requisitions', async () => {
     await purchasingJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm })
   })
@@ -2219,7 +2222,7 @@ try {
         assert.equal(download.status, 200)
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
-      return { assets, orders, files, purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
+      return { assets, orders, files, automation: await h.api('automation/jobs', cookie.owner), purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
         histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam'), auditCsv: await download('/app/audit.csv', 'owner') }
     }
     const before = await read(h, cookie)

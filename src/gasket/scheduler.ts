@@ -10,29 +10,50 @@ import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { chase } from './chasing'
 import { remindExpiring } from './documents'
-import { all, newId, now, one, stmt } from './core'
+import { all, at as atInstant, newId, now, one, stmt } from './core'
 import { today } from './dates'
-import { DUE_SCHEDULES, issueDue } from './schedules'
+import { issueDue } from './schedules'
 import { issueDueRoutes } from './routes'
 import { site } from './site'
+import { automationAuthority } from './automation-context'
+import { automationInputs } from './automation-inputs'
+import { runJob, type AutomationRule, type Source } from './automation-jobs'
 
 export const SCHEDULER = { id: 'scheduler', name: 'Gasket scheduler', cron: '*/15 * * * *', missedAfterMinutes: 45 }
+
+/** A bounded current job; cron, explicit catch-up and reading-triggered PM share its grant. */
+export async function executeRule(env: Bindings, rule: AutomationRule, day: string, source: Source, { revision, instant = now() }: { revision?: number; instant?: number } = {}) {
+  const input = await automationInputs(env, rule, day)
+  return await runJob<{ created: any[]; runs: any[]; notices: any[] }>(env, rule, source, input, async () => {
+    if (rule === 'pm') return { ...await issueDue(env, { id: SCHEDULER.id, today: day }, input.schedules!, 'workorder.schedule', { automatic: true }), runs: [], notices: [] }
+    if (rule === 'routes') return { created: [], runs: await issueDueRoutes(env, { id: SCHEDULER.id, today: day }), notices: [] }
+    if (rule === 'chase') await chase(env, day)
+    else await remindExpiring(env, day)
+    return { created: [], runs: [], notices: await all(env, 'SELECT id,kind,recipient_id,work_order_id,asset_id FROM gk_notices WHERE automation_job_id=?', automationAuthority()!.job) }
+  }, { revision, instant })
+}
 
 export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.cron) {
   const current = await site(env)
   if (!current) return { created: 0 }
-  const previous = await one<{ ran_at: number }>(env, 'SELECT ran_at FROM gk_scheduler_runs ORDER BY ran_at DESC LIMIT 1')
-  const day = today(current.timezone, at)
-  const { created } = await issueDue(env, { id: SCHEDULER.id, today: day }, await all(env, DUE_SCHEDULES), 'workorder.schedule', { automatic: true })
-  // ASSET-008: scheduled routes, one run per occurrence.
-  const runs = await issueDueRoutes(env, { id: SCHEDULER.id, today: day })
-  // PM-006: then chase overdue work on the same clock.
-  await chase(env, day)
-  // ASSET-003: and remind each expiring document's owner.
-  await remindExpiring(env, day)
-  const gap = previous ? Math.round((at - previous.ran_at) / 60_000) : null
-  await env.DB.batch([stmt(env, 'INSERT INTO gk_scheduler_runs (id, cron, ran_at, created, gap_minutes, finished_at) VALUES (?, ?, ?, ?, ?, ?)', newId(), cron, at, created.length + runs.reduce((sum, run) => sum + run.workOrders.length, 0), gap !== null && gap > SCHEDULER.missedAfterMinutes ? gap : null, now())])
-  return { created: created.length, runs: runs.length }
+  return await atInstant(at, async () => {
+    const previous = await one<{ ran_at: number }>(env, 'SELECT ran_at FROM gk_scheduler_runs ORDER BY ran_at DESC LIMIT 1')
+    const day = today(current.timezone, at), id = newId(), gap = previous ? Math.round((at - previous.ran_at) / 60_000) : null
+    await env.DB.batch([stmt(env, "INSERT INTO gk_scheduler_runs (id,cron,ran_at,created,gap_minutes,finished_at,state) VALUES (?,?,?,0,?,?,'running')", id, cron, at, gap !== null && gap > SCHEDULER.missedAfterMinutes ? gap : null, at)])
+    try {
+      const pm = await executeRule(env, 'pm', day, 'cron', { instant: at })
+      const routes = await executeRule(env, 'routes', day, 'cron', { instant: at })
+      await executeRule(env, 'chase', day, 'cron', { instant: at })
+      await executeRule(env, 'expiry', day, 'cron', { instant: at })
+      const created = pm.output?.created.length ?? 0
+      const runs = routes.output && 'runs' in routes.output ? routes.output.runs : []
+      await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET created=?,finished_at=?,state='completed' WHERE id=?", created + runs.reduce((sum: number, run: any) => sum + run.workOrders.length, 0), now(), id)])
+      return { created, runs: runs.length }
+    } catch (error) {
+      await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET finished_at=?,state='failed',error='job_failed' WHERE id=?", now(), id)])
+      throw error
+    }
+  })
 }
 
 /** The scheduler's health: its recent runs, the gaps when it did not run, and calendar work it issued late. */

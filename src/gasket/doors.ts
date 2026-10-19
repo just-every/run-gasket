@@ -2,6 +2,7 @@
 // lists, so the access proof can crawl every one of them.
 // API patterns are relative to /api/gasket/; page patterns are absolute.
 export const API_DOORS: [string, string][] = [
+  ['^automation$', 'automation'], ['^automation/jobs$', 'automationLedger'], ['^automation/preview$', 'automationPreview'],
   ['^purchasing$', 'purchasing'], ['^suppliers/([\\w-]+)$', 'supplier'], ['^requisitions/([\\w-]+)$', 'requisition'],
   ['^me$', 'me'], ['^site$', 'site'], ['^members$', 'members'],
   ['^assets$', 'assets'], ['^assets/([\\w-]+)$', 'asset'], ['^assets/([\\w-]+)/history$', 'history'],
@@ -11,6 +12,7 @@ export const API_DOORS: [string, string][] = [
 ]
 
 export const PAGE_DOORS: [string, string][] = [
+  ['^/app/automation$', 'automation'],
   ['^/app/purchasing$', 'purchasing'], ['^/app/suppliers/([\\w-]+)$', 'supplier'], ['^/app/requisitions/([\\w-]+)$', 'requisition'],
   ['^/app$', 'work'], ['^/app/site$', 'site'], ['^/app/access$', 'access'],
   ['^/app/work/([\\w-]+)$', 'workOrder'], ['^/app/evidence/([\\w-]+)$', 'evidence'], ['^/app/signatures/([\\w-]+)$', 'signatureMark'], ['^/app/comment-photos/([\\w-]+)$', 'commentPhoto'], ['^/app/documents/([\\w-]+)$', 'documentFile'], ['^/app/work/([\\w-]+)/pack\\.zip$', 'jobPack'],

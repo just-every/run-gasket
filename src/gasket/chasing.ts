@@ -9,6 +9,7 @@
 // (email and push are PM-005) and each one is sent once per recipient and
 // occasion. Overdue age counts from the day the work first became overdue, which
 // reassignment or rescheduling never resets.
+import { automationAuthority } from './automation-context'
 import type { Bindings } from '../auth.server'
 import { can, requireCapability, type Actor } from './actor'
 import { all, commit, insist, newId, now, one, stmt, type Row } from './core'
@@ -95,8 +96,9 @@ export async function chase(env: Bindings, today: string) {
   const supervisors = members.filter(row => row.role === 'supervisor').map(row => row.id)
   const above = supervisors.length ? supervisors : members.filter(row => row.role === 'owner').map(row => row.id)
   const statements: D1PreparedStatement[] = []
+  const authority = automationAuthority()
   const notify = (recipients: string[], order: Row, kind: string, occasion: string, text: string) => {
-    for (const recipient of recipients) statements.push(stmt(env, 'INSERT OR IGNORE INTO gk_notices (id, recipient_id, work_order_id, kind, occasion, text, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', newId(), recipient, order.id, kind, `${order.id}:${occasion}`, text, now()))
+    for (const recipient of recipients) statements.push(stmt(env, 'INSERT OR IGNORE INTO gk_notices (id, recipient_id, work_order_id, kind, occasion, text, created_at, automation_job_id, automation_revision) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', newId(), recipient, order.id, kind, `${order.id}:${occasion}`, text, now(), authority?.job ?? null, authority?.revision ?? null))
   }
   const orders = await all(env, `SELECT w.*, (SELECT MAX(r.at) FROM gk_chase_responses r WHERE r.work_order_id = w.id) AS responded_at FROM gk_work_orders w WHERE w.status IN ${OPEN}`)
   for (const order of orders) {
@@ -114,7 +116,7 @@ export async function chase(env: Bindings, today: string) {
   }
   for (const blocker of await all(env, `SELECT b.*, w.number, w.title, w.id AS order_id FROM gk_blockers b JOIN gk_work_orders w ON w.id = b.work_order_id WHERE b.resolved_at IS NULL AND b.promised_on < ? AND w.status IN ${OPEN}`, today))
     notify([...new Set([blocker.owner_id, ...leads])], { id: blocker.order_id }, 'blocker_missed', `blocker:${blocker.id}`, `WO-${String(blocker.number).padStart(4, '0')} ${blocker.title}: the ${blocker.kind} blocker promised for ${blocker.promised_on} is not cleared (${blocker.next_action}).`)
-  if (statements.length) await env.DB.batch(statements)
+  if (statements.length) await commit(env, statements, [])
 }
 
 /** My notices, newest first; a mention (PLAN-006) links to its comment and stays unread until I have read that comment. */

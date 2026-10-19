@@ -1,6 +1,7 @@
 // Shared primitives: typed errors, ids, D1 helpers, audited atomic commits and
 // in-batch preconditions (gk_guard rows abort the whole batch when false).
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { automationAuthority } from './automation-context'
 import type { Bindings } from '../auth.server'
 
 export class GasketError extends Error {
@@ -44,11 +45,13 @@ export const AUDIT_INSERT = 'INSERT INTO gk_audit (at, actor, role, action, subj
 /** Runs the statements atomically with their audit entries. A failed guard raises its code. */
 export async function commit(env: Bindings, statements: D1PreparedStatement[], audit: Audit | Audit[]) {
   const events = Array.isArray(audit) ? audit : [audit]
+  const authority = automationAuthority()
   try {
     await env.DB.batch([
+      ...(authority ? [guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_automation_rules WHERE id=? AND revision=? AND paused=0)', authority.rule, authority.revision)] : []),
       ...statements,
       stmt(env, 'DELETE FROM gk_guard'),
-      ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(event.detail ?? {}))),
+      ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), automation: authority } : event.detail ?? {}))),
     ])
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

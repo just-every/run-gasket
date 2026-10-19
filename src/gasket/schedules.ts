@@ -6,11 +6,12 @@
 // calendar moves never drift it) or from completion (the day its work is
 // approved), and its due dates keep to the months, weekdays and closures it
 // observes (calendar.ts); skips and deferrals are approved exceptions.
+import { runJob } from './automation-jobs'
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { closures, nextAllowed, policyFields, policyOf } from './calendar'
 import { CURRENT_REVISION } from './checklists'
-import { NEXT_NUMBER, all, commit, insist, newId, now, one, stmt, type Row } from './core'
+import { NEXT_NUMBER, all, commit, guard, insist, newId, now, one, stmt, type Row } from './core'
 import { assigneeFits } from './crew'
 import { leadDays } from './site'
 import { addDays, isDate } from './dates'
@@ -92,9 +93,9 @@ export const DUE_SCHEDULES = `SELECT s.* FROM gk_schedules s LEFT JOIN gk_assets
 
 /** One work order for each given schedule that is due: by date within the site's lead time (PM-001), by its counter value or its
  * trigger (PM-002), on whichever comes first or, when it says both, only once both are due. */
-export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>, schedules: Row[], action: string, { automatic = false } = {}) {
+export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>, schedules: Row[], action: string, { automatic = false, preview = false } = {}) {
   const horizon = addDays(actor.today, await leadDays(env))
-  const created: { id: string; schedule: string; due: string; reason: string; occurrence: string; reading?: string }[] = []
+  const created: { id: string; schedule: string; revision: number; due: string; reason: string; occurrence: string; reading?: string }[] = []
   const held: { schedule: string; readings: number }[] = []
   const statements: D1PreparedStatement[] = []
   for (const schedule of schedules) {
@@ -110,15 +111,16 @@ export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>
     // PM-001: the occurrence's stable identity; the scheduler never issues one that already had work (a cancelled one stays owed).
     const occurrence = `${schedule.id}@${byDate ? schedule.next_due_date : fired ? `reading:${fired.id}` : `meter:${schedule.next_due_meter}`}`
     if (automatic && await one(env, 'SELECT 1 FROM gk_work_orders WHERE occurrence = ?', occurrence)) continue
+    statements.push(guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_schedules WHERE id=? AND active=1 AND revision=?)', schedule.id, schedule.revision))
     statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, occurrence, assignee_id, team_id, trade, estimate_minutes, status, created_by, created_at)
       SELECT ?, ${NEXT_NUMBER}, ?, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, ?, (SELECT trade FROM gk_teams WHERE id = ?), ?, 'open', ?, ?
       WHERE NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE schedule_id = ? AND status NOT IN ('closed', 'cancelled'))`,
     id, schedule.asset_id, schedule.location, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, occurrence, schedule.assignee_id, schedule.team_id, schedule.team_id, schedule.estimate_minutes, actor.id, now(), schedule.id))
     statements.push(...toolStatements(env, id, schedule.tools))
     if (fired) statements.push(stmt(env, 'UPDATE gk_schedules SET trigger_fired_on = ?, revision = revision + 1 WHERE id = ?', fired.taken_on, schedule.id))
-    created.push({ id, schedule: schedule.id, due: dueDate, reason: byDate && byMeter ? 'both' : byDate ? 'date' : 'meter', occurrence, ...(byMeter && reading ? { reading } : {}) })
+    created.push({ id, schedule: schedule.id, revision: schedule.revision, due: dueDate, reason: byDate && byMeter ? 'both' : byDate ? 'date' : 'meter', occurrence, ...(byMeter && reading ? { reading } : {}) })
   }
-  if (statements.length) await commit(env, statements, created.map(item => ({ actor: actor.id, action, subject: item.id, detail: item })))
+  if (statements.length && !preview) await commit(env, statements, created.map(item => ({ actor: actor.id, action, subject: item.id, detail: item })))
   return { created, held }
 }
 
@@ -130,7 +132,9 @@ export async function generateDue(env: Bindings, actor: Actor) {
 
 /** PM-002: every reading a door keeps evaluates the schedules on its meter at once, whoever sent it. */
 export async function evaluateMeter(env: Bindings, actor: Actor, meterId: string) {
-  return (await issueDue(env, actor, await all(env, `${DUE_SCHEDULES} AND s.meter_id = ?`, meterId), 'workorder.trigger')).created
+  const schedules = await all(env, `${DUE_SCHEDULES} AND s.meter_id = ?`, meterId)
+  const result = await runJob(env, 'pm', 'reading', { day: actor.today, meter: meterId, state: await meterState(env, meterId), schedules }, () => issueDue(env, actor, schedules, 'workorder.trigger'))
+  return result.output?.created ?? []
 }
 
 /** Moves a schedule on after its work order is approved (or its skip is): the calendar cadence from its nominal date (fixed) or from today (completion), each next date moved to an allowed day; meter cadence from the latest reading. */

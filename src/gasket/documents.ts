@@ -8,6 +8,7 @@
 // the one it was given. A document that expires names an owner, who gets an
 // in-app notice (email and push wait for PM-005) once it is within its reminder
 // days and again once it has expired; a new expiry date asks again.
+import { automationAuthority } from './automation-context'
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'
@@ -180,13 +181,14 @@ export async function jobPack(env: Bindings, actor: Actor, workOrderId: string, 
 
 /** The scheduler's daily pass: each expiring document's owner is told once when it is due and once when it has expired. */
 export async function remindExpiring(env: Bindings, today: string) {
+  const authority = automationAuthority()
   const rows = await all(env, `SELECT d.id, d.kind, d.title, d.expires_on, d.remind_days, d.owner_id, d.asset_id, a.tag, a.name AS asset_name FROM gk_documents d JOIN gk_assets a ON a.id = d.asset_id JOIN gk_members o ON o.id = d.owner_id
     WHERE d.expires_on IS NOT NULL AND o.status = 'active' AND a.retired_at IS NULL`)
   const statements = rows.flatMap(row => {
     const state = expiryState(row, today)
     if (state !== 'due' && state !== 'expired') return []
     const text = `${row.title} (${row.kind}) for ${row.tag} ${row.asset_name} ${state === 'expired' ? 'expired on' : 'expires on'} ${row.expires_on}.`
-    return [stmt(env, "INSERT OR IGNORE INTO gk_notices (id, recipient_id, asset_id, kind, occasion, text, created_at) VALUES (?, ?, ?, 'expiry', ?, ?, ?)", newId(), row.owner_id, row.asset_id, `document:${row.id}:${row.expires_on}:${state}`, text, now())]
+    return [stmt(env, "INSERT OR IGNORE INTO gk_notices (id, recipient_id, asset_id, kind, occasion, text, created_at, automation_job_id, automation_revision) VALUES (?, ?, ?, 'expiry', ?, ?, ?, ?, ?)", newId(), row.owner_id, row.asset_id, `document:${row.id}:${row.expires_on}:${state}`, text, now(), authority?.job ?? null, authority?.revision ?? null)]
   })
-  if (statements.length) await env.DB.batch(statements)
+  if (statements.length) await commit(env, statements, [])
 }

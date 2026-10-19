@@ -27,6 +27,7 @@ import { importJobs } from './movein/maintainx'
 import { partDetail, partList } from './parts'
 import { reconciliation } from './valuation'
 import { countDetail, countList } from './counts'
+import { automationHealth, ledgerView, previewAutomation } from './automation'
 import { purchasing, requisitionDetail } from './requisitions'
 import { supplierDetail } from './suppliers'
 import { storesReport } from './stores'
@@ -39,6 +40,9 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  automation: (env, actor) => automationHealth(env, actor),
+  automationLedger: (env, actor, _id, url) => ledgerView(env, actor, url),
+  automationPreview: (env, actor, _id, url) => previewAutomation(env, actor, url.searchParams.get('schedule') ?? ''),
   purchasing: env => purchasing(env),
   supplier: (env, _actor, id) => supplierDetail(env, id),
   requisition: (env, _actor, id) => requisitionDetail(env, id),

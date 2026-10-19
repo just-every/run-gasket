@@ -34,6 +34,7 @@ import { decide, prepare } from './proposals'
 import { exceptStep, review, submit } from './review'
 import { createRoute, issueRoute, missStop, signRun } from './routes'
 import { saveSupplier, saveCatalogItem, saveCostCenter } from './suppliers'
+import { controlAutomation, controlSchedule, catchUp } from './automation'
 import { requestPurchase } from './requisitions'
 import { createCalibration } from './calibration'
 import { recordTool } from './tools'
@@ -47,6 +48,9 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'automation.control': (env, actor, input) => controlAutomation(env, actor, input),
+  'automation.schedule': (env, actor, input) => controlSchedule(env, actor, input),
+  'automation.catchup': (env, actor, input) => catchUp(env, actor, input),
   'supplier.save': (env, actor, input) => saveSupplier(env, actor, input),
   'supplier.catalog': (env, actor, input) => saveCatalogItem(env, actor, input),
   'costcenter.save': (env, actor, input) => saveCostCenter(env, actor, input),

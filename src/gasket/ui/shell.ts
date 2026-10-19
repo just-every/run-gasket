@@ -29,6 +29,7 @@ export const NAV: Destination[] = [
   { href: '/app/reliability', label: 'Reliability', detail: 'MTBF, MTTR and MTTA with their definitions, failures by failure mode and repeat failures.', icon: ICON.board, show: actor => can(actor, 'board.read') },
 ]
 export const SETTINGS: Destination[] = [
+  { href: '/app/automation', label: 'Automation', detail: 'Execution health, rule previews, pause and catch-up controls.', icon: ICON.clock, show: actor => can(actor, 'board.read') },
   { href: '/app/purchasing', label: 'Purchasing', detail: 'Suppliers, catalogs, cost centers and maintenance requisitions awaiting approval.', icon: ICON.parts, show: () => true },
   { href: '/app/move-in', label: 'Move in from MaintainX', detail: 'Dry run, apply and undo an import of MaintainX exports.', icon: ICON.movein, show: actor => can(actor, 'import.run') },
   { href: '/app/access', label: 'People and access', detail: 'Give access with a role, change roles and end access.', icon: ICON.people, show: actor => can(actor, 'site.manage') },

@@ -26,6 +26,7 @@ import { page } from './ui/shell'
 import { moveInPage, previewPage } from './ui/movein'
 import { partPage, partsPage } from './ui/parts'
 import { countPage } from './ui/counts'
+import { automationPage } from './ui/automation'
 import { purchasingPage, supplierPage, requisitionPage } from './ui/purchasing'
 import { storesPage } from './ui/stores'
 import { storesMovementsCsv } from './stores'
@@ -97,7 +98,7 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
     const returnTo = safeReturnTo(input.text('returnTo', { optional: true, max: 300 }) || '/app', '/app')
     try {
       const result = await action(env, actor, input, request) as { id?: string; job?: string } | null
-      return redirect(returnTo.replace('{id}', encodeURIComponent(result?.id ?? '')), 'notice', name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.')
+      return redirect(returnTo.replace('{id}', encodeURIComponent(result?.id ?? '')), 'notice', name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.')
     } catch (error) {
       const { code, status } = failure(error)
       if (status >= 500) throw error
@@ -126,6 +127,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  automation: (env, actor, url) => automationPage(env, actor, url),
   purchasing: (env, actor, url) => purchasingPage(env, actor, url),
   supplier: (env, actor, url, id) => supplierPage(env, actor, id, url),
   requisition: (env, actor, url, id) => requisitionPage(env, actor, id, url),
