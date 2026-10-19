@@ -10,6 +10,8 @@ import { COUNTER_CHANGES } from '../meters'
 import { assignable } from '../site'
 import { STATUS, amount, area, assetMark, backLink, band as headerBand, card, details, field, form, h, hidden, select, table, tag, woNumber } from './html'
 import { machine } from './icons'
+import { bomCard, bomForm } from './bom'
+import { partList } from '../parts'
 import { page } from './shell'
 
 type Level = { key: string; label: string; retired: boolean }
@@ -59,7 +61,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(await codeList(env, 'criticality'), asset)}`, 'Save changes', { secondary: true })}
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
-  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${history}</div><div class="gk-col-side">${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
+  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${bomCard(asset.bom, actor.zone, manage ? bomForm(asset.bom, asset.id, back, await partList(env, actor)) : '')}${history}</div><div class="gk-col-side">${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
   return page(env, asset.name, actor, body, { url })
 }
 

@@ -1146,6 +1146,46 @@ try {
     for (const text of ['Reserve part', 'Reserve kit', 'Released']) assert.ok(work.includes(text), text)
   })
 
+  await check('ASSET-006 bill of materials and interchangeable spares', async () => {
+    const motor = (await h.api('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', location: 'Dock' })).id
+    const part = async (number, name, quantity) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each' })).id; if (quantity) await h.api('part.receive', cookie.lead, { part: id, quantity }); return id }
+    const open = await part('BRG-6306', 'Open bearing'), shielded = await part('BRG-6306-ZZ', 'Shielded bearing', '2'), c3 = await part('BRG-6306-C3', 'C3 clearance bearing', '2'), belt = await part('BELT-A42', 'Drive belt A42', '1'), other = await part('BRG-9999', 'Unrelated bearing', '1')
+    const revision = { asset: motor, part: [open, belt], quantity: ['2', '1'], serialFrom: ['', 'M-1000'], serialTo: ['', 'M-1999'], alternateFor: [open, open], alternate: [shielded, c3], alternateFrom: ['', 'M-2000'], alternateTo: ['', 'M-2999'], tool: ['Bearing puller', 'Torque wrench'], note: 'From the OEM manual' }
+    await h.api('bom.revise', cookie.max, revision, 403)
+    await h.api('bom.revise', cookie.lead, { ...revision, alternateFor: [belt, other] }, 400)
+    await h.api('bom.revise', cookie.lead, { ...revision, serialFrom: ['', 'M-2000'], serialTo: ['', 'M-1000'] }, 400)
+    assert.equal((await h.api('bom.revise', cookie.lead, revision)).number, 1)
+    await h.api('bom.revise', cookie.lead, { ...revision, revision: 0 }, 409)
+    // A second revision through the asset page's form; the first stays on record.
+    assert.equal((await h.submit('bom.revise', cookie.lead, { ...revision, quantity: ['2', '2'], note: 'Two belts per drive', revision: '1' }, `/app/assets/${motor}`)).searchParams.get('error'), null)
+    const bom = (await h.api(`assets/${motor}`, cookie.max)).bom
+    assert.deepEqual([bom.revision, bom.revisions.map(row => [row.number, row.note]), bom.tools], [2, [[2, 'Two belts per drive'], [1, 'From the OEM manual']], ['Bearing puller', 'Torque wrench']])
+    assert.deepEqual(bom.lines.map(line => [line.part.number, line.quantity, line.available, line.fits, line.short, line.alternates.map(alt => [alt.part.number, alt.available, alt.fits])]),
+      [['BRG-6306', '2', '0', true, true, [['BRG-6306-ZZ', '2', true], ['BRG-6306-C3', '2', false]]], ['BELT-A42', '2', '1', true, true, []]], 'the C3 bearing only fits serials M-2000 to M-2999')
+    // Plan the repair: the listed bearing is out of stock, so the planner takes the approved alternate that fits.
+    const repair = (await h.api('workorder.create', cookie.lead, { asset: motor, title: 'Replace drive-end bearings', due: addDays(today, 2), assignee: ids.max })).id
+    assert.deepEqual((await wo('max', repair)).bom.lines[0].alternates.map(alt => alt.part.number), ['BRG-6306-ZZ', 'BRG-6306-C3'])
+    await h.api('workorder.reserve', cookie.lead, { workOrder: repair, part: open, quantity: '2' }, 409)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: repair, part: c3, insteadOf: open, quantity: '2' }, 409)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: repair, part: other, insteadOf: open, quantity: '1' }, 409)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: repair, part: shielded, insteadOf: open, quantity: '2' })
+    const planned = await wo('lead', repair)
+    assert.deepEqual(planned.reservations.map(row => [row.part.number, row.insteadOf.number, row.quantity, row.state]), [['BRG-6306-ZZ', 'BRG-6306', '2', 'open']])
+    assert.deepEqual(planned.bom.lines[0].alternates.map(alt => [alt.part.number, alt.available]), [['BRG-6306-ZZ', '0'], ['BRG-6306-C3', '2']])
+    // A line restricted to other serials does not fit this motor's twin with a later serial.
+    const twin = (await h.api('asset.create', cookie.lead, { tag: 'HK-061', name: 'Conveyor drive motor 2', serial: 'M-2500', location: 'Dock' })).id
+    await h.api('bom.revise', cookie.lead, { asset: twin, part: [belt], quantity: ['1'], serialFrom: ['M-1000'], serialTo: ['M-1999'] })
+    const twinJob = (await h.api('workorder.create', cookie.lead, { asset: twin, title: 'Change the belt', due: addDays(today, 2), assignee: ids.max })).id
+    assert.equal((await wo('lead', twinJob)).bom.lines[0].fits, false)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: twinJob, part: belt, quantity: '1' }, 409)
+    assert.ok((await h.api(`assets/${motor}/history`, cookie.sam)).events.some(event => event.what === 'Bill of materials revision 2 saved: Two belts per drive'))
+    const page = await (await h.raw(`/app/assets/${motor}`, { cookie: cookie.lead })).text()
+    for (const text of ['Bill of materials', 'Revision 2', 'Out of stock', 'does not fit this serial', 'Bearing puller', 'Save new revision', 'From the OEM manual']) assert.ok(page.includes(text), text)
+    assert.ok(!(await (await h.raw(`/app/assets/${motor}`, { cookie: cookie.max })).text()).includes('Save new revision'))
+    const work = (await (await h.raw(`/app/work/${twinJob}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; this asset is M-2500']) assert.ok(work.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

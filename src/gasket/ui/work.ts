@@ -17,6 +17,7 @@ import { workList, workOrderDetail } from '../work'
 import { teamList } from '../crew'
 import { kitList, substituteList } from '../reservations'
 import { chaseCard } from './chasing'
+import { bomCard } from './bom'
 import { crewCard } from './crew'
 import { CODE_KIND } from './codes'
 import { OUTCOME, STATUS, amount, area, backLink, band as headerBand, card, checkbox, details, field, fileField, form, h, hidden, initials, raw, select, table, tag, woNumber, type Html } from './html'
@@ -238,7 +239,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     <form method="post" action="/app/do/workorder.review" class="gk-inline">${hidden('returnTo', back)}${ids}${hidden('decision', 'approve')}<button type="submit">Approve and close</button></form>`
 
   const body = h`${backLink('/app', 'Work orders')}${band}
-    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${findings}${reviews}${assign}${control}
+    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${w.bom ? bomCard(w.bom, actor.zone) : ''}${parts}${evidence}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${findings}${reviews}${assign}${control}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ...(w.trigger ? [['Raised by reading', `${w.trigger.meter} ${w.trigger.value}${w.trigger.unit === 'condition' ? '' : ` ${w.trigger.unit}`}, taken ${showLocal(w.trigger.taken_on)}${w.trigger.provenance === 'feed' ? ` (feed: ${w.trigger.source})` : ''}`] as [string, unknown]] : []), ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

@@ -5,6 +5,8 @@ import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { activeCode } from './codes'
 import { all, commit, guard, insist, newId, now, one, stmt } from './core'
+import { bomOf } from './bom'
+import { partList } from './parts'
 import type { Input } from './input'
 import { DEFAULT_FEED_WINDOW_HOURS, FEED_WINDOW_HOURS, meterView } from './meters'
 import { DECLARED_STATE, stateConflicts, stateHistory } from './states'
@@ -123,5 +125,6 @@ export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const sightings = await all(env, 'SELECT outcome, seen_location, note, recorded_by, recorded_at FROM gk_sightings WHERE asset_id = ? ORDER BY recorded_at DESC', id)
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
   const states = await stateHistory(env, id)
-  return { ...asset, states, conflicts: await stateConflicts(env, asset, states), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
+  const bom = await bomOf(env, { id: asset.id, serial: asset.serial }, await partList(env, actor))
+  return { ...asset, bom, states, conflicts: await stateConflicts(env, asset, states), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
 }

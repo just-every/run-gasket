@@ -48,6 +48,8 @@ const ERRORS: Record<string, string> = {
   parts_still_issued: 'return the issued parts first.',
   insufficient_available: 'not enough of that part is available; the rest is reserved for other work.',
   substitute_not_approved: 'that part is not an approved substitute. A lead approves substitutes on the part.',
+  substitute_not_compatible: 'that alternate does not fit this asset\'s serial number.',
+  part_not_compatible: 'that part does not fit this asset\'s serial number.',
   already_reserved: 'this work order already holds a reservation of that part. Release it first.',
   downtime_open: 'end the open downtime first.',
   not_overdue: 'this work order is no longer overdue.',

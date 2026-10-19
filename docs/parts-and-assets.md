@@ -28,6 +28,10 @@ A lead registers each asset on **Assets** and keeps its details up to date under
 
 Each asset can have meters: a **counter** that never goes down (run hours, miles, cycles), a **gauge** for a measured value (a temperature, a pressure), or a **condition** of good, fair or poor. Maintainers record readings on work orders, and counter meters can drive schedules.
 
+### Bill of materials
+
+On an asset's page, a lead keeps its **Bill of materials**: the parts a repair needs and how many, the serial numbers each line fits (leave the range empty for any serial), approved alternates for a line with the serials each fits, and the tools the work needs. **Save new revision** keeps the earlier revisions listed. Every work order on the asset shows the current revision with the stock available for each part and alternate, marks what is out of stock and what does not fit this asset's serial, and reserving refuses a part or alternate that does not fit.
+
 ### Sightings
 
 To reconcile the register with the floor, record a sighting on the asset's page: found at its recorded location, found somewhere else, or not found. The asset list shows the last sighting of each.

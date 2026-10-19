@@ -28,6 +28,7 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
       'workorder.create': 'Work order created', 'workorder.assign': 'Work order assigned', 'workorder.plan': `Overdue decision: ${detail.plan === 'keep' ? 'kept with the assignee' : detail.plan === 'as_is' ? 'kept as is' : 'reassigned'}`, 'workorder.cancel': `Work order cancelled: ${detail.reason ?? ''}`,
       'workorder.submit': 'Submitted for review', 'workorder.approve': 'Reviewed and closed', 'workorder.return': `Returned for more work: ${detail.reason ?? ''}`,
       'workorder.evidence': `Evidence attached: ${detail.filename ?? ''}`,
+      'bom.revise': `Bill of materials revision ${detail.revision} saved${detail.note ? `: ${detail.note}` : ''}`,
       'downtime.classify': `Stop reclassified from ${detail.from?.planned ? 'planned' : `failure${detail.from?.failureMode ? ` (${detail.from.failureMode})` : ''}`} to ${detail.to?.planned ? 'planned' : `failure${detail.to?.failureMode ? ` (${detail.to.failureMode})` : ''}`}: ${detail.reason ?? ''}`,
     }
     if (labels[row.action]) push(row.at, row.action.split('.')[0], row.subject === id ? null : row.subject, labels[row.action].trim(), name(row))

@@ -4,7 +4,8 @@
 //   and quantities.
 // - A planner (lead or owner) reserves a part, or every line of a kit at once,
 //   to open work. A line is filled by the part it names or by an approved
-//   substitute for it, never by an unapproved one. A work order holds at most
+//   substitute for it (site-wide here, or an alternate on the asset's bill of
+//   materials that fits its serial, ASSET-006), never by an unapproved one. A work order holds at most
 //   one open reservation per part.
 // - Reserved stock of a part is, over its open reservations, what each still
 //   needs: its quantity less what its work order has been issued of that part
@@ -23,6 +24,7 @@ import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, stmt, type Row } from './core'
 import type { Input } from './input'
 import { fromMilli, toMilli } from './quantity'
+import { substitutionRefusal } from './bom'
 
 const OPEN = "('open', 'in_progress', 'returned')"
 const ON_HAND_OF = '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE part_id = ?)'
@@ -92,7 +94,7 @@ export async function substituteList(env: Bindings) {
  */
 export async function reserve(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.assign')
-  const order = await one(env, `SELECT id, number FROM gk_work_orders WHERE id = ? AND status IN ${OPEN}`, input.text('workOrder', { max: 100 }))
+  const order = await one(env, `SELECT id, number, asset_id FROM gk_work_orders WHERE id = ? AND status IN ${OPEN}`, input.text('workOrder', { max: 100 }))
   insist(order, 'work_order_not_open', 409)
   const kitId = input.text('kit', { optional: true, max: 100 }) || null
   let lines: { requested: string; quantity: number }[]
@@ -113,7 +115,8 @@ export async function reserve(env: Bindings, actor: Actor, input: Input) {
   const rows: { id: string; part: Row; requested: Row; quantity: number }[] = []
   for (const line of lines) {
     const requested = await part(env, line.requested), chosen = await part(env, swaps.get(line.requested) ?? line.requested)
-    if (chosen.id !== requested.id) insist(await one(env, 'SELECT 1 FROM gk_part_substitutes WHERE part_id = ? AND substitute_id = ? AND withdrawn_at IS NULL', requested.id, chosen.id), 'substitute_not_approved', 409, { part: requested.number, substitute: chosen.number })
+    const refusal = await substitutionRefusal(env, order.asset_id, requested.id, chosen.id)
+    insist(!refusal, refusal!, 409, { part: requested.number, substitute: chosen.number })
     insist(!rows.some(row => row.part.id === chosen.id) && !await one(env, 'SELECT 1 FROM gk_reservations WHERE work_order_id = ? AND part_id = ? AND released_at IS NULL', order.id, chosen.id), 'already_reserved', 409, { part: chosen.number })
     const available = (await one<{ n: number }>(env, `SELECT ${ON_HAND_OF} - ${RESERVED_OF} AS n`, chosen.id, chosen.id))!.n
     insist(available >= line.quantity, 'insufficient_available', 409, { part: chosen.number, available: fromMilli(available) })
