@@ -39,3 +39,7 @@ The bar at the bottom of the page says what still blocks submission. You can sub
 If the supervisor returns the work, their reason appears under **Reviews**; record what is missing and submit again.
 
 Next: [Review and the board](review-and-board.md).
+
+## Priority and work templates
+
+Every work order has a priority: emergency, high, normal or low. A lead raising work from an asset can pick a template from **Work templates** (in the menu), which fills the title, instructions, priority and estimate; anything typed on the work wins. Editing a template saves its next revision and never changes work already made from it; the work order shows which template and revision it came from. A lead changes a work order's priority from its **Priority** card with a reason.

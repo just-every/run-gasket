@@ -1427,6 +1427,45 @@ try {
     for (const text of ['Repair cost', 'Half an hour was travel', 'Total $500.00']) assert.ok(work.includes(text), text)
   })
 
+  await check('PLAN-001 work priority and reusable templates', async () => {
+    const dock = (await h.api('asset.create', cookie.lead, { tag: 'DOCK-3', name: 'Dock 3 door', location: 'Dock 3' })).id
+    const fields = { name: 'Dock light out', title: 'Replace the dock light', instructions: 'Isolate at DB-4, swap the LED module, test the sensor.', priority: 'high', estimateHours: '1.5' }
+    await h.api('template.save', cookie.max, fields, 403)
+    await h.api('template.save', cookie.lead, { ...fields, name: 'Bad', priority: 'whenever' }, 400)
+    const template = (await h.submit('template.save', cookie.lead, fields, '/app/templates')).searchParams.get('error') === null && (await h.api('templates', cookie.max)).find(row => row.name === fields.name)
+    assert.deepEqual([template.title, template.priority, template.estimate_minutes, template.revision], [fields.title, 'high', 90, 1])
+    assert.equal((await h.api('template.save', cookie.lead, { ...fields, name: 'dock LIGHT out' }, 409)).error, 'template_name_taken')
+    // Work from the template takes its title, instructions, priority and estimate; given fields take precedence.
+    const fromTemplate = (await h.submit('workorder.create', cookie.lead, { asset: dock, template: template.id, title: '', priority: '', due: today }, '/app/work/{id}')).pathname.split('/').pop()
+    const urgent = (await h.api('workorder.create', cookie.lead, { asset: dock, template: template.id, priority: 'emergency', title: 'Dock light out, trailer waiting', due: today, assignee: ids.max })).id
+    await h.api('workorder.create', cookie.lead, { asset: dock, title: 'Paint the door', due: today, priority: 'soon' }, 400)
+    const plain = (await h.api('workorder.create', cookie.lead, { asset: dock, title: 'Paint the door', due: today })).id
+    const read = async id => { const w = await wo('lead', id); return [w.title, w.description, w.priority, w.estimate_minutes, w.template_id, w.template_revision] }
+    assert.deepEqual(await read(fromTemplate), [fields.title, fields.instructions, 'high', 90, template.id, 1])
+    assert.deepEqual(await read(urgent), ['Dock light out, trailer waiting', fields.instructions, 'emergency', 90, template.id, 1])
+    assert.deepEqual(await read(plain), ['Paint the door', null, 'normal', null, null, null])
+    const numbers = await Promise.all([fromTemplate, urgent, plain].map(async id => (await wo('lead', id)).number))
+    assert.deepEqual(numbers, [numbers[0], numbers[0] + 1, numbers[0] + 2], 'template work takes the next stable work numbers')
+    // A new revision changes only work made after it; a stale revision is refused; a retired template makes no work.
+    await h.api('template.save', cookie.lead, { ...fields, template: template.id, revision: 1, priority: 'normal', title: 'Replace the dock light and sensor' })
+    assert.equal((await h.api('template.save', cookie.lead, { ...fields, template: template.id, revision: 1 }, 409)).error, 'stale')
+    assert.deepEqual(await read(fromTemplate), [fields.title, fields.instructions, 'high', 90, template.id, 1])
+    const second = (await h.api('workorder.create', cookie.lead, { asset: dock, template: template.id, due: today })).id
+    assert.deepEqual((await read(second)).slice(0, 3).concat((await read(second)).slice(5)), ['Replace the dock light and sensor', fields.instructions, 'normal', 2])
+    await h.api('template.retire', cookie.lead, { template: template.id })
+    assert.equal((await h.api('workorder.create', cookie.lead, { asset: dock, template: template.id, due: today }, 409)).error, 'template_retired')
+    // A lead changes priority with a reason, kept in the audit; a maintainer cannot.
+    await h.api('workorder.priority', cookie.max, { workOrder: plain, priority: 'low', reason: 'Cosmetic' }, 403)
+    await h.api('workorder.priority', cookie.lead, { workOrder: plain, priority: 'normal', reason: 'Same' }, 409)
+    await h.api('workorder.priority', cookie.lead, { workOrder: plain, priority: 'low', reason: 'Cosmetic only' })
+    assert.equal((await wo('lead', plain)).priority, 'low')
+    assert.ok((await h.api('audit?action=workorder.priority', cookie.owner)).rows.some(row => row.subject === plain && JSON.parse(row.detail).reason === 'Cosmetic only'))
+    const page = (await (await h.raw(`/app/work/${urgent}`, { cookie: cookie.max })).text()).replace(/<[^>]+>/g, '')
+    assert.ok(page.includes('Emergency priority') && page.includes(`from template ${fields.name} (revision 1)`))
+    const templates = (await (await h.raw('/app/templates', { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Work templates', fields.name, 'revision 2', 'Retired']) assert.ok(templates.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

@@ -21,6 +21,7 @@ import { releaseWithWork, reservations } from './reservations'
 import { bomOf } from './bom'
 import { partList } from './parts'
 import { workCosts } from './bad-actors'
+import { chosenTemplate, priorityOf } from './templates'
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
@@ -53,16 +54,20 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   const asset = await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
   insist(asset, 'asset_not_found', 404)
   insist(!asset.retired_at, 'asset_retired', 409)
-  const title = input.text('title', { max: 160 }), description = input.text('description', { optional: true, max: 2000 }) || null
+  // PLAN-001: a template fills the title, instructions, priority and estimate that the work does not give itself.
+  const template = await chosenTemplate(env, input)
+  const title = input.text('title', { optional: Boolean(template), max: 160 }) || template!.title as string
+  const description = input.text('description', { optional: true, max: 2000 }) || (template?.instructions as string | null) || null
+  const priority = priorityOf(input) ?? (template?.priority as string | undefined) ?? 'normal'
   const due = input.text('due', { max: 10 })
   insist(isDate(due), 'invalid_due')
   const assignee = input.text('assignee', { optional: true, max: 100 }) || null
   const crew = await crewChoice(env, input, null)
   if (assignee) await assigneeFits(env, assignee, crew.team)
-  const estimateMinutes = estimate(input)
+  const estimateMinutes = estimate(input) ?? (template?.estimate_minutes as number | null) ?? null
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, actor.id, now()), ...(also?.(id) ?? [])],
-    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
   return { id }
 }
 
@@ -273,8 +278,8 @@ export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collabo
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
   const order = await one(env, `SELECT w.*, a.tag AS asset_tag, a.name AS asset_name, a.serial AS asset_serial, a.location AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
-    m.name AS assignee_name, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number
-    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id
+    m.name AS assignee_name, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
+    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_work_templates t ON t.id = w.template_id
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
     LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
   insist(order, 'work_order_not_found', 404)

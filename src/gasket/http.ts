@@ -30,6 +30,7 @@ import { reliabilityPage } from './ui/reliability'
 import { availabilityPage } from './ui/availability'
 import { badActorsPage } from './ui/bad-actors'
 import { badActorsCsv } from './bad-actors'
+import { templatesPage } from './ui/templates'
 import { accessPage, auditPage, morePage, sitePage } from './ui/settings'
 import { workOrderPage, workPage } from './ui/work'
 
@@ -139,6 +140,7 @@ const pages: Record<string, Page> = {
   availability: guarded(actor => can(actor, 'board.read'), (env, actor, url) => availabilityPage(env, actor, url)),
   badActors: guarded(actor => can(actor, 'board.read'), (env, actor, url) => badActorsPage(env, actor, url)),
   badActorsCsv: async (env, actor, url) => new Response(await badActorsCsv(env, actor, url), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="downtime-pareto.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
+  templates: (env, actor, url) => templatesPage(env, actor, url),
   more: (env, actor, url) => morePage(env, actor, url),
 }
 

@@ -20,6 +20,7 @@ import { declareState } from './states'
 import { classifyStop } from './reliability'
 import { addProductionHours, removeProductionHours } from './availability'
 import { documentLossRate, recordWorkCost } from './bad-actors'
+import { retireTemplate, saveTemplate, setPriority } from './templates'
 import { approveSubstitute, createKit, release, reserve } from './reservations'
 import { reviseBom } from './bom'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
@@ -101,6 +102,9 @@ export const actions: Record<string, Handler> = {
   'production.hours.remove': (env, actor, input) => removeProductionHours(env, actor, input),
   'work.cost': (env, actor, input) => recordWorkCost(env, actor, input),
   'loss.rate': (env, actor, input) => documentLossRate(env, actor, input),
+  'template.save': (env, actor, input) => saveTemplate(env, actor, input),
+  'template.retire': (env, actor, input) => retireTemplate(env, actor, input),
+  'workorder.priority': (env, actor, input) => setPriority(env, actor, input),
   'finding.record': (env, actor, input) => recordFinding(env, actor, input),
   'workorder.submit': (env, actor, input) => submit(env, actor, input),
   'workorder.review': (env, actor, input) => review(env, actor, input),
