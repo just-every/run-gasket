@@ -1881,6 +1881,65 @@ try {
     for (const text of ['Calibration', 'Ammonia line pressure gauge', 'Certificate v2: PG-7-cert-2.pdf', 'Certificate v1: PG-7-cert-1.pdf', 'Out of tolerance', 'Used: Deadweight tester DWT-118']) assert.ok(page.includes(text), text)
   })
 
+  await check('FIELD-005 photos, annotations and revision-bound signatures', async () => {
+    const job = (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title: 'Cracked mounting bracket', due: today, assignee: ids.max })).id
+    const sha = bytes => createHash('sha256').update(bytes).digest('hex')
+    // Two timestamped photos, before and after the work, through the JSON door; a capture time ahead of now is refused.
+    await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'before', takenOn: localAt(Date.now() + 120 * 60_000) }, 400)
+    await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'during' }, 400)
+    const before = (await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'before', takenOn: ago(40) })).evidence
+    const after = (await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('after.png', png, 'image/png'), phase: 'after' })).evidence
+    const report = (await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('weld-report.pdf', '%PDF-1.4 weld', 'application/pdf') })).evidence
+    // Annotate the damage on both photos; a document, a reversed box and another maintainer are refused.
+    await h.submit('workorder.annotate', cookie.max, { workOrder: job, evidence: before, shape: 'box', x1: '10', y1: '20.5', x2: '40', y2: '60', note: 'Crack along the weld' }, `/app/work/${job}`)
+    await h.api('workorder.annotate', cookie.max, { workOrder: job, evidence: after, shape: 'arrow', x1: '80', y1: '80', x2: '55.25', y2: '45', note: 'New bracket, weld ground flush' })
+    assert.equal((await h.api('workorder.annotate', cookie.max, { workOrder: job, evidence: report, shape: 'box', x1: '1', y1: '1', x2: '2', y2: '2', note: 'x' }, 400)).error, 'photo_required')
+    assert.equal((await h.api('workorder.annotate', cookie.max, { workOrder: job, evidence: before, shape: 'box', x1: '40', y1: '20', x2: '10', y2: '60', note: 'x' }, 400)).error, 'invalid_shape')
+    await h.api('workorder.annotate', cookie.mo, { workOrder: job, evidence: before, shape: 'box', x1: '1', y1: '1', x2: '2', y2: '2', note: 'x' }, 403)
+    let order = await wo('max', job)
+    const photo = id => order.evidence.find(row => row.id === id)
+    assert.deepEqual([photo(before).phase, photo(before).taken_on, photo(before).door, photo(before).width, photo(after).phase, photo(after).taken_on, photo(report).phase],
+      ['before', ago(40), 'api', 1, 'after', null, null])
+    assert.deepEqual(photo(before).annotations.map(note => [note.shape, note.x1, note.y1, note.x2, note.y2, note.note, note.created_by]), [['box', 10, 20.5, 40, 60, 'Crack along the weld', 'Max Ortiz']])
+    assert.deepEqual(photo(after).annotations.map(note => [note.shape, note.x2, note.note]), [['arrow', 55.25, 'New bracket, weld ground flush']])
+    // A named customer and the technician sign version N; a signature for an earlier version is refused as stale.
+    const customerMark = file('dana.png', png, 'image/png')
+    await h.api('workorder.sign', cookie.max, { workOrder: job, version: order.version - 1, role: 'technician' }, 409)
+    await h.api('workorder.sign', cookie.max, { workOrder: job, version: order.version, role: 'customer', name: 'Dana Reyes', mark: customerMark })
+    await h.submit('workorder.sign', cookie.max, { workOrder: job, version: String(order.version), role: 'technician' }, `/app/work/${job}`)
+    await h.api('workorder.sign', cookie.mo, { workOrder: job, version: order.version, role: 'technician' }, 403)
+    await h.api('workorder.sign', cookie.max, { workOrder: job, version: order.version, role: 'supervisor' }, 403)
+    const signedAt = order.version
+    order = await wo('max', job)
+    assert.deepEqual([order.version, order.signatures.map(row => [row.signer_name, row.role, row.version, row.state, row.door])], [signedAt, [['Dana Reyes', 'customer', signedAt, 'current', 'api'], ['Max Ortiz', 'technician', signedAt, 'current', 'web']]], 'signing does not change the work')
+    // Changing the work makes both signatures stale: submission waits until both sign the new version.
+    await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('torque.png', png, 'image/png'), phase: 'after' })
+    order = await wo('max', job)
+    assert.deepEqual(order.signatures.map(row => row.state), ['stale', 'stale'])
+    const refused = await h.api('workorder.submit', cookie.max, { workOrder: job, version: order.version }, 409)
+    assert.deepEqual(refused.detail.missing, [`Dana Reyes (customer) signed version ${signedAt} and must sign version ${order.version} again`, `Max Ortiz (technician) signed version ${signedAt} and must sign version ${order.version} again`])
+    await h.api('workorder.sign', cookie.max, { workOrder: job, version: order.version, role: 'customer', name: 'dana reyes' })
+    await h.api('workorder.sign', cookie.max, { workOrder: job, version: order.version, role: 'technician' })
+    const submitted = order.version
+    await h.api('workorder.submit', cookie.max, { workOrder: job, version: submitted })
+    // The supervisor signs the submitted version they review, then approves it.
+    await h.api('workorder.sign', cookie.sam, { workOrder: job, version: submitted + 1, role: 'supervisor' })
+    await h.api('workorder.review', cookie.sam, { workOrder: job, version: submitted + 1, decision: 'approve' })
+    order = await wo('sam', job)
+    assert.deepEqual(order.signatures.map(row => [row.signer_name, row.role, row.version, row.state]), [['Dana Reyes', 'customer', signedAt, 'superseded'], ['Max Ortiz', 'technician', signedAt, 'superseded'], ['dana reyes', 'customer', submitted, 'current'], ['Max Ortiz', 'technician', submitted, 'current'], ['Sam Ito', 'supervisor', submitted + 1, 'current']])
+    // Originals and their digests are unchanged by annotations and signing, and the drawn mark downloads as given.
+    for (const file of order.evidence) {
+      const bytes = Buffer.from(await (await h.raw(`/app/evidence/${file.id}`, { cookie: cookie.sam })).arrayBuffer())
+      assert.equal(sha(bytes), file.sha256, file.filename)
+    }
+    assert.equal(sha(Buffer.from(await (await h.raw(`/app/evidence/${before}`, { cookie: cookie.sam })).arrayBuffer())), sha(png))
+    const mark = order.signatures.find(row => row.mark_sha256)
+    assert.equal(sha(Buffer.from(await (await h.raw(`/app/signatures/${mark.id}`, { cookie: cookie.sam })).arrayBuffer())), mark.mark_sha256)
+    const page = (await (await h.raw(`/app/work/${job}`, { cookie: cookie.sam })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Before', 'After', 'Crack along the weld', 'Signed by Dana Reyes (customer)', 'not an equipment certification', 'name as given, not verified', 'Superseded', 'through api']) assert.ok(page.includes(text), text)
+    assert.ok((await (await h.raw(`/app/work/${job}`, { cookie: cookie.sam })).text()).includes(`<image href="/app/evidence/${before}"`), 'the annotation is drawn over the photo')
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

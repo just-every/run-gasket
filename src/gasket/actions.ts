@@ -32,6 +32,8 @@ import { exceptStep, review, submit } from './review'
 import { createRoute, issueRoute, missStop, signRun } from './routes'
 import { createCalibration } from './calibration'
 import { recordTool } from './tools'
+import { annotate } from './annotations'
+import { sign } from './signatures'
 import { createSchedule, evaluateMeter, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole, setTechnicianWork } from './site'
 import { retireField, saveField, saveStatus, setFieldValue, setWaiting } from './work-fields'
@@ -97,7 +99,9 @@ export const actions: Record<string, Handler> = {
   'workorder.reopen': (env, actor, input) => reopen(env, actor, input),
   'workorder.merge': (env, actor, input) => merge(env, actor, input),
   'workorder.results': (env, actor, input) => recordResults(env, actor, input),
-  'workorder.evidence': (env, actor, input) => addEvidence(env, actor, input),
+  'workorder.evidence': (env, actor, input, request) => addEvidence(env, actor, input, doorOf(request)),
+  'workorder.annotate': (env, actor, input) => annotate(env, actor, input),
+  'workorder.sign': (env, actor, input, request) => sign(env, actor, input, doorOf(request)),
   'comment.post': (env, actor, input) => postComment(env, actor, input),
   'comment.edit': (env, actor, input) => editComment(env, actor, input),
   'comment.read': (env, actor, input) => markRead(env, actor, input),

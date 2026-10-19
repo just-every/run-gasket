@@ -13,6 +13,7 @@ import { ledgerCsv } from './lifecycle'
 import { Input } from './input'
 import { site } from './site'
 import { evidenceFile } from './work'
+import { signatureMark } from './signatures'
 import { commentPhoto } from './comments'
 import { route } from './views'
 import { assetPage, assetsPage } from './ui/assets'
@@ -121,6 +122,7 @@ const pages: Record<string, Page> = {
   work: (env, actor, url) => workPage(env, actor, url),
   workOrder: (env, actor, url, id) => workOrderPage(env, actor, id, url),
   evidence: (env, actor, _url, id) => evidenceFile(env, actor, id),
+  signatureMark: (env, actor, _url, id) => signatureMark(env, actor, id),
   commentPhoto: (env, actor, _url, id) => commentPhoto(env, actor, id),
   assets: (env, actor, url) => assetsPage(env, actor, url),
   asset: (env, actor, url, id) => assetPage(env, actor, id, url),

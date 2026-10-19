@@ -24,7 +24,7 @@ export async function submit(env: Bindings, actor: Actor, input: Input) {
   await commit(env, [
     guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, version),
     guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', order.id),
-    stmt(env, "UPDATE gk_work_orders SET status = 'submitted', version = version + 1, submitted_at = ? WHERE id = ?", now(), order.id),
+    stmt(env, "UPDATE gk_work_orders SET status = 'submitted', version = version + 1, submitted_at = ?, submitted_version = ? WHERE id = ?", now(), version, order.id),
   ], { actor: actor.id, action: 'workorder.submit', subject: order.id, detail: { version } })
   return { id: order.id, version: version! + 1 }
 }
@@ -83,7 +83,7 @@ export async function exceptStep(env: Bindings, actor: Actor, input: Input) {
 
 /** Whether this person recorded anything on the work order, whoever it is assigned to now.
  * Every record bumps the work order's version, so the review's version guard covers a record made after this read. */
-async function didWork(env: Bindings, workOrderId: string, member: string) {
+export async function didWork(env: Bindings, workOrderId: string, member: string) {
   const found = await one<{ did: number }>(env, `SELECT ${RECORDERS.map(([table, column]) => `EXISTS(SELECT 1 FROM ${table} WHERE work_order_id = ? AND ${column} = ?)`).join(' OR ')} AS did`, ...RECORDERS.flatMap(() => [workOrderId, member]))
   return found!.did === 1
 }
