@@ -88,7 +88,7 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
     const returnTo = safeReturnTo(input.text('returnTo', { optional: true, max: 300 }) || '/app', '/app')
     try {
       const result = await action(env, actor, input, request) as { id?: string; job?: string } | null
-      return redirect(returnTo.replace('{id}', encodeURIComponent(result?.id ?? '')), 'notice', name === 'workorders.generate' ? created(result) : 'Saved.')
+      return redirect(returnTo.replace('{id}', encodeURIComponent(result?.id ?? '')), 'notice', name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.')
     } catch (error) {
       const { code, status } = failure(error)
       if (status >= 500) throw error
@@ -105,6 +105,9 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
   return await pages[found.name](env, actor, url, found.id)
 }
 
+/** PLAN-001: every asset's outcome of raising work from a template, in one line. */
+const raised = (result: unknown) => (result as { preview: boolean; rows: { tag: string | null; asset: string; outcome: string; number: number | null }[] }).rows
+  .map(row => `${row.tag ?? row.asset}: ${row.outcome === 'created' ? `raised WO-${String(row.number).padStart(4, '0')}` : row.outcome === 'would_create' ? 'would be raised' : row.outcome.replace(/_/g, ' ')}`).join('; ') + '.'
 const created = (result: unknown) => { const count = (result as { created?: unknown[] })?.created?.length ?? 0; return count ? `Created ${count} due work order${count === 1 ? '' : 's'}.` : 'No schedules are due yet.' }
 
 type Page = (env: Bindings, actor: Actor, url: URL, id: string) => Promise<Response>

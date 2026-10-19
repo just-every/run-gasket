@@ -1452,6 +1452,21 @@ try {
     assert.deepEqual(await read(fromTemplate), [fields.title, fields.instructions, 'high', 90, template.id, 1])
     const second = (await h.api('workorder.create', cookie.lead, { asset: dock, template: template.id, due: today })).id
     assert.deepEqual((await read(second)).slice(0, 3).concat((await read(second)).slice(5)), ['Replace the dock light and sensor', fields.instructions, 'normal', 2])
+    // Bulk creation from the template: a preview writes nothing; each asset reports its own outcome and keeps a stable number.
+    const gate = (await h.api('asset.create', cookie.lead, { tag: 'DOCK-4', name: 'Dock 4 door', location: 'Dock 4' })).id
+    const gone = (await h.api('asset.create', cookie.lead, { tag: 'DOCK-9', name: 'Old dock door', location: 'Dock 9' })).id
+    await h.api('asset.retire', cookie.lead, { asset: gone, reason: 'Bricked up' })
+    await h.api('workorders.fromTemplate', cookie.max, { template: template.id, asset: [dock, gate], due: today }, 403)
+    const count = async () => (await h.api('work', cookie.lead)).length
+    const before = await count()
+    const preview = await h.api('workorders.fromTemplate', cookie.lead, { template: template.id, asset: [dock, gone, gate], due: today, preview: true })
+    assert.deepEqual([preview.template.revision, preview.rows.map(row => [row.tag, row.outcome, row.id])], [2, [['DOCK-3', 'would_create', null], ['DOCK-9', 'asset_retired', null], ['DOCK-4', 'would_create', null]]])
+    assert.equal(await count(), before, 'a preview raises nothing')
+    const done = await h.submit('workorders.fromTemplate', cookie.lead, { template: template.id, asset: [dock, gone, gate], due: today }, '/app/templates')
+    const next = (await wo('lead', second)).number
+    assert.equal(done.searchParams.get('notice'), `DOCK-3: raised WO-${String(next + 1).padStart(4, '0')}; DOCK-9: asset retired; DOCK-4: raised WO-${String(next + 2).padStart(4, '0')}.`)
+    const raisedWork = (await h.api('work', cookie.lead)).filter(row => row.number > next)
+    assert.deepEqual(raisedWork.map(row => [row.number, row.asset_id, row.title, row.priority]).toSorted((x, y) => x[0] - y[0]), [[next + 1, dock, 'Replace the dock light and sensor', 'normal'], [next + 2, gate, 'Replace the dock light and sensor', 'normal']])
     await h.api('template.retire', cookie.lead, { template: template.id })
     assert.equal((await h.api('workorder.create', cookie.lead, { asset: dock, template: template.id, due: today }, 409)).error, 'template_retired')
     // A lead changes priority with a reason, kept in the audit; a maintainer cannot.

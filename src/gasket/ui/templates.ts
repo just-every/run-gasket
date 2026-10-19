@@ -3,7 +3,9 @@
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
 import { PRIORITIES, PRIORITY_LABELS, templateList, type Priority } from '../templates'
-import { area, card, field, form, h, hidden, select, tag } from './html'
+import { all } from '../core'
+import { addDays } from '../dates'
+import { area, card, checkbox, field, form, h, hidden, select, tag } from './html'
 import { page } from './shell'
 
 const priorities = (chosen: string) => select('Priority', 'priority', PRIORITIES.map(value => ({ value, label: PRIORITY_LABELS[value] })), chosen)
@@ -11,10 +13,14 @@ const hours = (minutes: number | null) => minutes === null ? '' : String(Math.ro
 
 export async function templatesPage(env: Bindings, actor: Actor, url: URL) {
   const templates = await templateList(env), lead = can(actor, 'work.assign')
+  const assets = lead ? await all(env, 'SELECT id, tag, name FROM gk_assets WHERE retired_at IS NULL ORDER BY tag') : []
+  // Raising one template's work for several assets: preview first, then raise.
+  const raise = (row: any) => form('workorders.fromTemplate', '/app/templates', h`${hidden('template', row.id)}<fieldset><legend>Assets</legend>${assets.map(asset => h`<label class="gk-check"><input type="checkbox" name="asset" value="${asset.id}"> ${asset.tag} ${asset.name}</label>`)}</fieldset>
+    <div class="gk-grid">${field('Due', 'due', { type: 'date', value: addDays(actor.today, 7) })}</div>${checkbox('Preview only', 'preview', true)}`, 'Raise work', { secondary: true })
   const fields = (row: any = {}) => h`${field('Name', 'name', { value: row.name ?? '' })}${field('Work title', 'title', { value: row.title ?? '' })}${area('Instructions', 'instructions', { value: row.instructions ?? '', required: false })}
     <div class="gk-grid">${priorities(row.priority ?? 'normal')}${field('Estimated hours', 'estimateHours', { value: hours(row.estimate_minutes ?? null), required: false })}</div>`
   const list = templates.length ? templates.map(row => card(row.name, h`<p>${row.title} · ${PRIORITY_LABELS[row.priority as Priority]} priority${row.estimate_minutes ? ` · ${hours(row.estimate_minutes)} h` : ''} · revision ${row.revision}${row.retired_at ? h` ${tag('Retired')}` : ''}</p>${row.instructions ? h`<p class="gk-muted">${row.instructions}</p>` : ''}
-    ${lead && !row.retired_at ? h`<details class="gk-details"><summary>Edit</summary>${form('template.save', '/app/templates', h`${hidden('template', row.id)}${hidden('revision', row.revision)}${fields(row)}`, 'Save revision', { secondary: true })}</details>${form('template.retire', '/app/templates', hidden('template', row.id), 'Retire', { secondary: true })}` : ''}`, { id: `template-${row.id}` }))
+    ${lead && !row.retired_at ? h`<details class="gk-details"><summary>Edit</summary>${form('template.save', '/app/templates', h`${hidden('template', row.id)}${hidden('revision', row.revision)}${fields(row)}`, 'Save revision', { secondary: true })}</details><details class="gk-details"><summary>Raise for several assets</summary>${raise(row)}</details>${form('template.retire', '/app/templates', hidden('template', row.id), 'Retire', { secondary: true })}` : ''}`, { id: `template-${row.id}` }))
     : [h`<p class="gk-muted">No work templates yet.</p>`]
   const add = lead ? card('New template', form('template.save', '/app/templates', fields(), 'Save template', { secondary: true }), { id: 'new' }) : ''
   return page(env, 'Work templates', actor, h`<h1>Work templates</h1><p class="gk-lede">Reusable work: a title, instructions, priority and estimate copied into each work order made from it. Editing a template never changes work already made.</p>
