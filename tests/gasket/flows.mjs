@@ -1253,6 +1253,55 @@ try {
     }
   })
 
+  await check('ASSET-001 asset and location hierarchy', async () => {
+    const add = async (tag, name, level, parent) => (await h.api('asset.create', cookie.lead, { tag, name, location: 'Plant 2', level, ...(parent ? { parent } : {}) })).id
+    const plant = await add('BLD-2', 'Plant 2', 'building')
+    const lineA = await add('LINE-A', 'Packing line A', 'line', plant), lineB = await add('LINE-B', 'Packing line B', 'line', plant)
+    assert.equal((await h.api('asset.create', cookie.lead, { tag: 'BAD-1', name: 'Building under a line', location: 'Plant 2', level: 'building', parent: lineA }, 409)).error, 'parent_level')
+    await h.api('asset.create', cookie.max, { tag: 'BAD-2', name: 'Not a lead', location: 'Plant 2', parent: lineA }, 403)
+    // A compressor under line A through the register form, with its motor and the motor's bearing below it.
+    const compressor = (await h.submit('asset.create', cookie.lead, { tag: 'CMP-7', name: 'Line A air compressor', location: 'Plant 2', criticality: 'normal', level: 'machine', parent: lineA }, '/app/assets/{id}')).pathname.split('/').pop()
+    const motor = await add('CMP-7-M', 'Compressor motor', 'component', compressor), bearing = await add('CMP-7-MB', 'Motor bearing', 'component', motor)
+    // The compressor and its motor were down at once for 30 of their 60 minutes each.
+    const base = Date.now(), at = minutes => localAt(base - minutes * 60_000)
+    for (const [asset, from, to] of [[compressor, 300, 240], [motor, 270, 210]]) {
+      const job = (await h.api('workorder.create', cookie.lead, { asset, title: 'Trip investigation', due: today, assignee: ids.max })).id
+      await h.api('downtime.start', cookie.max, { workOrder: job, startedOn: at(from), reason: 'Tripped' })
+      await h.api('downtime.end', cookie.max, { workOrder: job, endedOn: at(to) })
+    }
+    const place = async id => (await h.api(`assets/${id}`, cookie.sam)).hierarchy
+    const totals = row => [row.subtree.below, row.subtree.openWork, row.subtree.downtimeMinutes, row.subtree.downtimeOverlapMinutes]
+    let line = await place(lineA)
+    assert.deepEqual([line.level, line.parent.tag, line.children.map(row => row.tag), ...totals(line)], ['line', 'BLD-2', ['CMP-7'], ['CMP-7', 'CMP-7-M', 'CMP-7-MB'], 2, 90, 30])
+    // Moving the motor's subtree: not by a maintainer, not under itself or below it, not under a lower level, not from a stale read.
+    const spare = await add('CMP-8', 'Line B air compressor', 'machine', lineB)
+    const { revision } = await h.api(`assets/${motor}`, cookie.lead)
+    await h.api('asset.move', cookie.max, { asset: motor, parent: spare, revision }, 403)
+    for (const parent of [motor, bearing]) assert.equal((await h.api('asset.move', cookie.lead, { asset: motor, parent, revision }, 409)).error, 'cycle')
+    assert.equal((await h.api('asset.move', cookie.lead, { asset: compressor, parent: bearing, revision: (await h.api(`assets/${compressor}`, cookie.lead)).revision }, 409)).error, 'parent_level')
+    assert.equal((await h.submit('asset.move', cookie.lead, { asset: motor, parent: spare, revision: String(revision) }, `/app/assets/${motor}`)).searchParams.get('error'), null)
+    assert.equal((await h.api('asset.move', cookie.lead, { asset: motor, parent: compressor, revision }, 409)).error, 'stale')
+    // The subtree moved whole and kept its records; each line now counts its own outage and the building counts the overlap once.
+    assert.deepEqual(totals(await place(lineA)), [['CMP-7'], 1, 60, 0])
+    assert.deepEqual(totals(await place(lineB)), [['CMP-7-M', 'CMP-7-MB', 'CMP-8'], 1, 60, 0])
+    assert.deepEqual(totals(await place(plant)), [['CMP-7', 'CMP-7-M', 'CMP-7-MB', 'CMP-8', 'LINE-A', 'LINE-B'], 2, 90, 30])
+    assert.deepEqual((await place(bearing)).path.map(row => row.tag), ['BLD-2', 'LINE-B', 'CMP-8', 'CMP-7-M'])
+    assert.ok((await h.api('work', cookie.lead)).some(row => row.asset_id === motor && row.title === 'Trip investigation'))
+    const said = async id => (await h.api(`assets/${id}/history`, cookie.sam)).events.map(event => event.what)
+    assert.ok((await said(motor)).includes('Moved from CMP-7 to CMP-8'))
+    assert.ok((await said(compressor)).includes('CMP-7-M moved to CMP-8'))
+    assert.ok((await said(spare)).includes('CMP-7-M moved here from CMP-7'))
+    // Moved-in work cost (MIG-002) rolls up with the asset that carries it.
+    const costly = (await Promise.all((await h.api('assets', cookie.lead)).filter(row => row.status !== 'retired').map(row => h.api(`assets/${row.id}`, cookie.lead))))
+      .find(row => Object.values(row.hierarchy.subtree.movedInCostCents).some(Boolean))
+    await h.api('asset.move', cookie.lead, { asset: costly.id, parent: lineB, revision: costly.revision })
+    assert.deepEqual((await place(lineB)).subtree.movedInCostCents, costly.hierarchy.subtree.movedInCostCents)
+    assert.equal((await h.api('asset.retire', cookie.lead, { asset: lineA, reason: 'Line removed' }, 409)).error, 'active_children')
+    const page = (await (await h.raw(`/app/assets/${plant}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Hierarchy', 'Downtime, this and below', '90 minutes', 'Ended outages, overlapping ones counted once (30 shared minutes)']) assert.ok(page.includes(text), text)
+    assert.deepEqual(await Promise.all(['lead', 'max'].map(async who => (await (await h.raw(`/app/assets/${lineB}`, { cookie: cookie[who] })).text()).includes('Move with everything below'))), [true, false])
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

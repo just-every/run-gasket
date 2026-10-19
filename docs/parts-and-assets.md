@@ -28,6 +28,10 @@ A lead registers each asset on **Assets** and keeps its details up to date under
 
 Each asset can have meters: a **counter** that never goes down (run hours, miles, cycles), a **gauge** for a measured value (a temperature, a pressure), or a **condition** of good, fair or poor. Maintainers record readings on work orders, and counter meters can drive schedules.
 
+### Buildings, lines, machines and components
+
+Every entry in the register is a building, a line, a machine or a component. When you register one, choose its **Level** and what it sits **Under** (or the site itself). A building holds lines, a line holds machines and a machine holds components; a component can hold smaller components. On an asset's page, **Hierarchy** shows where it sits, what is directly below it and, for everything below it, the open work, the downtime (an outage two of them share counts once) and the cost moved in from MaintainX. A lead moves an asset with **Move with everything below**; its work and history stay with it, and the move shows in the history of the asset and both parents.
+
 ### Bill of materials
 
 On an asset's page, a lead keeps its **Bill of materials**: the parts a repair needs and how many, the serial numbers each line fits (leave the range empty for any serial), approved alternates for a line with the serials each fits, and the tools the work needs. **Save new revision** keeps the earlier revisions listed. Every work order on the asset shows the current revision with the stock available for each part and alternate, marks what is out of stock and what does not fit this asset's serial, and reserving refuses a part or alternate that does not fit.

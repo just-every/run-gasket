@@ -8,6 +8,7 @@ import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import { bomOf } from './bom'
 import { partList } from './parts'
 import { thread } from './comments'
+import { hierarchyOf, placement } from './hierarchy'
 import type { Input } from './input'
 import { DEFAULT_FEED_WINDOW_HOURS, FEED_WINDOW_HOURS, meterView } from './meters'
 import { DECLARED_STATE, stateConflicts, stateHistory } from './states'
@@ -42,8 +43,10 @@ export async function createAsset(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'register.manage')
   const value = identity(input), id = newId(), at = now()
   await checkCriticality(env, value.criticality)
-  await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, location, custodian, category, criticality, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, at, at)],
-    { actor: actor.id, action: 'asset.create', subject: id, detail: value })
+  // ASSET-001: its level and parent (none: directly under the site).
+  const place = await placement(env, input)
+  await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, location, custodian, category, criticality, notes, level, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, place.level, place.parent, at, at)],
+    { actor: actor.id, action: 'asset.create', subject: id, detail: { ...value, ...place } })
   return { id }
 }
 
@@ -71,8 +74,11 @@ export async function retireAsset(env: Bindings, actor: Actor, input: Input) {
   insist(asset, 'asset_not_found', 404)
   insist(!asset.retired_at, 'asset_retired', 409)
   const reason = input.text('reason', { max: 500 })
+  // ASSET-001: nothing active is left under a retired entry; the batch checks again.
+  insist(!await one(env, 'SELECT 1 FROM gk_assets WHERE parent_id = ? AND retired_at IS NULL', asset.id), 'active_children', 409)
   await commit(env, [
     guard(env, 'open_work_exists', "NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE asset_id = ? AND status NOT IN ('closed', 'cancelled'))", asset.id),
+    guard(env, 'active_children', 'NOT EXISTS(SELECT 1 FROM gk_assets WHERE parent_id = ? AND retired_at IS NULL)', asset.id),
     stmt(env, 'UPDATE gk_schedules SET active = 0, revision = revision + 1 WHERE asset_id = ?', asset.id),
     stmt(env, 'UPDATE gk_assets SET retired_at = ?, revision = revision + 1, updated_at = ? WHERE id = ?', now(), now(), asset.id),
   ], { actor: actor.id, action: 'asset.retire', subject: asset.id, detail: { reason } })
@@ -108,7 +114,7 @@ export async function recordSighting(env: Bindings, actor: Actor, input: Input) 
 }
 
 export async function assetList(env: Bindings, _actor: Actor) {
-  const rows = await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, ${CRITICALITY_LABEL}, a.origin, ${ASSET_STATUS} AS status,
+  const rows = await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, ${CRITICALITY_LABEL}, a.origin, ${ASSET_STATUS} AS status, a.level, a.parent_id, (SELECT p.tag FROM gk_assets p WHERE p.id = a.parent_id) AS parent_tag,
     (SELECT s.outcome || '|' || s.recorded_at FROM gk_sightings s WHERE s.asset_id = a.id ORDER BY s.recorded_at DESC LIMIT 1) AS last_sighting,
     (SELECT MIN(w.due_date) FROM gk_work_orders w WHERE w.asset_id = a.id AND w.status NOT IN ('closed', 'cancelled')) AS next_due
     FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)
@@ -127,5 +133,5 @@ export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
   const states = await stateHistory(env, id)
   const bom = await bomOf(env, { id: asset.id, serial: asset.serial }, await partList(env, actor))
-  return { ...asset, bom, states, conflicts: await stateConflicts(env, asset, states), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
+  return { ...asset, bom, states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
 }

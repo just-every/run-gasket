@@ -19,10 +19,12 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
   const events: Event[] = []
   const push = (at: number, kind: string, workOrder: string | null, what: string, who: string | null) => events.push({ when: showInstant(at, actor.zone), at, kind, workOrder: workOrder ? number.get(workOrder) ?? null : null, what, who })
   for (const row of await all(env, `SELECT a.at, a.action, a.subject, a.detail, m.name AS who FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
-    WHERE a.subject = ? OR a.subject IN (SELECT id FROM gk_work_orders WHERE asset_id = ?) ORDER BY a.seq`, id, id)) {
+    WHERE a.subject = ? OR a.subject IN (SELECT id FROM gk_work_orders WHERE asset_id = ?) OR (a.action = 'asset.move' AND ? IN (json_extract(a.detail, '$.from'), json_extract(a.detail, '$.to'))) ORDER BY a.seq`, id, id, id)) {
     const detail = JSON.parse(row.detail)
     const labels: Record<string, string> = {
-      'asset.create': 'Asset registered', 'asset.update': 'Asset details changed', 'asset.retire': `Asset retired: ${detail.reason ?? ''}`,
+      'asset.create': 'Asset registered',
+      // ASSET-001: a move shows on the entry and on the parents it left and joined.
+      'asset.move': row.subject === id ? `Moved from ${detail.fromTag ?? 'the site'} to ${detail.toTag ?? 'the site'}` : detail.to === id ? `${detail.tag} moved here from ${detail.fromTag ?? 'the site'}` : `${detail.tag} moved to ${detail.toTag ?? 'the site'}`, 'asset.update': 'Asset details changed', 'asset.retire': `Asset retired: ${detail.reason ?? ''}`,
       'asset.sighting': `Sighting: ${detail.outcome}${detail.seen ? ` at ${detail.seen}` : ''}`,
       'asset.state': `${detail.corrects ? `Reclassified ${String(detail.was).replace(/_/g, ' ')} as` : 'Declared'} ${String(detail.state).replace(/_/g, ' ')} from ${showLocal(detail.effectiveOn)}: ${detail.reason}`, 'workorder.generate': 'Work order created from its schedule',
       'workorder.create': 'Work order created', 'workorder.assign': 'Work order assigned', 'workorder.plan': `Overdue decision: ${detail.plan === 'keep' ? 'kept with the assignee' : detail.plan === 'as_is' ? 'kept as is' : 'reassigned'}`, 'workorder.cancel': `Work order cancelled: ${detail.reason ?? ''}`,

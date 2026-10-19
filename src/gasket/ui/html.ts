@@ -55,6 +55,10 @@ const ERRORS: Record<string, string> = {
   not_overdue: 'this work order is no longer overdue.',
   not_assigned: 'nobody holds this work order, so there is no one to keep it with.',
   plan_to_self: 'choose someone other than yourself; the work order page assigns anyone.',
+  cycle: 'an asset cannot sit under itself or anything below it.',
+  parent_level: 'that parent cannot hold this level: buildings hold lines, lines hold machines, machines hold components.',
+  active_children: 'move or retire the assets under this one first.',
+  parent_retired: 'the parent is retired.',
 }
 export const describeError = (code: string) => ERRORS[code] ?? code.replace(/_/g, ' ') + '.'
 

@@ -235,7 +235,7 @@ async function build(env: Bindings, actor: Actor, input: Input) {
         tagsSeen.set(tag.toLowerCase(), payload.row)
         acceptedAssets.add(targetId)
         const notes = [get('Description'), [get('Manufacturer'), get('Model'), get('Year')].filter(Boolean).join(' '), get('Parent') ? `Parent asset in MaintainX: ${get('Parent')}` : ''].filter(Boolean).join('\n') || null
-        if (get('Parent')) attention.push({ location: at(source), reason: `${name}: its MaintainX parent (${get('Parent')}) is kept as a note; Gasket has no asset hierarchy` })
+        if (get('Parent')) attention.push({ location: at(source), reason: `${name}: its MaintainX parent (${get('Parent')}) is kept as a note; a lead places it under its parent on the asset page` })
         if (/offline/i.test(get('Status'))) attention.push({ location: at(source), reason: `${name} was Offline in MaintainX: record its downtime in Gasket if it is still down` })
         const custodian = get('Teams Assigned to').split(',')[0]?.trim() || null
         counted('asset', targetId)
@@ -310,7 +310,7 @@ async function build(env: Bindings, actor: Actor, input: Input) {
   const preview: Preview = {
     fingerprint: plan.fingerprint, counts: plan.counts as unknown as Json, create, unchanged, rejected, attention,
     gaps: [
-      'MaintainX asset hierarchy, teams, vendors, costs, depreciation, attachments and custom fields are not carried; parents are kept as a note.',
+      'MaintainX asset hierarchy, teams, vendors, costs, depreciation, attachments and custom fields are not carried; parents are kept as a note for a lead to place on the asset page.',
       'The custodian is MaintainX\'s first assigned team; change it in Gasket where a named person is responsible.',
       ...(files.parts ? ['MaintainX parts have no unit column: every part arrives in "each". Change units before the first count if needed.', 'Opening stock is MaintainX\'s Quantity on the day of export: count the shelves in Gasket after moving in.'] : ['No part export: add parts in Gasket.']),
       ...(files.readings ? ['Meters whose unit is hours, kilometres, miles, cycles or starts are counters (they never go down); every other meter is a gauge.'] : ['No meter-reading export: add meters to assets in Gasket.']),
