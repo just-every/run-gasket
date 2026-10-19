@@ -27,6 +27,7 @@ import { createsWork } from './site'
 import { toolsOf } from './tools'
 import { annotationsOf, imageSize } from './annotations'
 import { resignBlockers, signaturesOf } from './signatures'
+import { workDocuments } from './documents'
 import { answer, applies, kindOf, stepSummary, type Answer, type ChecklistItem, type StepKind } from './steps'
 
 /** FIELD-009: the door a work order was created through: the web workspace's form door or the JSON API. */
@@ -340,7 +341,7 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
 
 /** FIELD-004: a step of the pinned revision with its answer, whether it applies, its photos and a supervisor's exception. */
 export type Step = ChecklistItem & { index: number; kind: StepKind; summary: string; result: Row | null; applies: boolean; photos: number; exception: Row | null }
-export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: Step[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; tools: Row[]; signatures: Awaited<ReturnType<typeof signaturesOf>>; calibration: Row | null; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
+export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: Step[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; tools: Row[]; signatures: Awaited<ReturnType<typeof signaturesOf>>; documents: Awaited<ReturnType<typeof workDocuments>>; calibration: Row | null; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
@@ -395,7 +396,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   for (const file of evidence) file.annotations = annotations.filter(note => note.evidence_id === file.id).map(({ evidence_id: _, ...note }) => note)
   const signatures = await signaturesOf(env, order)
   const calibration = order.calibration_task ? { grace_days: order.grace_days, overdue_after: addDays(order.due_date, order.grace_days ?? 0), certificate: evidence.filter(file => file.certificate).at(-1) ?? null } : null
-  return { ...rest, trigger, tools, signatures, calibration, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length, tools, certificateRequired: Boolean(calibration && !calibration.certificate), resign: resignBlockers(signatures, order.version) }) }
+  return { ...rest, trigger, tools, signatures, documents: await workDocuments(env, id), calibration, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length, tools, certificateRequired: Boolean(calibration && !calibration.certificate), resign: resignBlockers(signatures, order.version) }) }
 }
 
 /**

@@ -6,6 +6,7 @@ const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
+import { crc32 } from 'node:zlib'
 import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
 import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, workCsv } from './fixtures.mjs'
 import { file, harness } from './harness.mjs'
@@ -22,6 +23,18 @@ const localAt = instant => { const p = Object.fromEntries(new Intl.DateTimeForma
 const ago = minutes => localAt(now() - minutes * 60_000)
 const ids = {}, cookie = {}
 const wo = async (who, id) => await h.api(`work/${id}`, cookie[who])
+const sha = bytes => createHash('sha256').update(bytes).digest('hex')
+/** A stored ZIP's entries by path; each entry's CRC-32 must match its bytes. */
+const unzip = buffer => {
+  const bytes = Buffer.from(buffer), entries = {}
+  for (let at = 0; bytes.readUInt32LE(at) === 0x04034b50;) {
+    const size = bytes.readUInt32LE(at + 18), name = bytes.readUInt16LE(at + 26), start = at + 30 + name + bytes.readUInt16LE(at + 28)
+    const path = bytes.subarray(at + 30, at + 30 + name).toString(), content = bytes.subarray(start, start + size)
+    assert.equal(crc32(content), bytes.readUInt32LE(at + 14), `${path} CRC-32`)
+    entries[path] = content; at = start + size
+  }
+  return entries
+}
 
 try {
   await check('GAS-01 site and access', async () => {
@@ -1883,7 +1896,6 @@ try {
 
   await check('FIELD-005 photos, annotations and revision-bound signatures', async () => {
     const job = (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title: 'Cracked mounting bracket', due: today, assignee: ids.max })).id
-    const sha = bytes => createHash('sha256').update(bytes).digest('hex')
     // Two timestamped photos, before and after the work, through the JSON door; a capture time ahead of now is refused.
     await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'before', takenOn: localAt(now() + 120 * 60_000) }, 400)
     await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('before.png', png, 'image/png'), phase: 'during' }, 400)
@@ -1941,6 +1953,61 @@ try {
     assert.ok((await (await h.raw(`/app/work/${job}`, { cookie: cookie.sam })).text()).includes(`<image href="/app/evidence/${before}"`), 'the annotation is drawn over the photo')
   })
 
+  await check('ASSET-003 manuals, documents and warranties', async () => {
+    // The compressor's OEM manual in two revisions, a warranty that expires with Sam as its named owner, and the supplier.
+    const manual = [1, 2, 3].map(n => Buffer.from(`%PDF-1.4 Copeland AE4-1418 service manual, revision ${n}`))
+    const asset = ids.compressor, cron = '*/15 * * * *'
+    const add = { asset, kind: 'manual', title: 'Compressor service manual', source: 'Copeland AE4-1418 rev A', file: file('copeland-ae4-1418-a.pdf', manual[0], 'application/pdf') }
+    await h.api('document.add', cookie.max, add, 403)
+    await h.api('document.add', cookie.lead, { ...add, file: file('manual.exe', manual[0]) }, 400)
+    const first = await h.api('document.add', cookie.lead, add)
+    await h.api('document.revise', cookie.lead, { document: first.document, revision: 2, source: 'Copeland AE4-1418 rev B', file: file('copeland-ae4-1418-b.pdf', manual[1]) }, 409)
+    assert.equal((await h.api('document.revise', cookie.lead, { document: first.document, revision: 1, source: 'Copeland AE4-1418 rev B', note: 'New torque table', file: file('copeland-ae4-1418-b.pdf', manual[1]) })).revision, 2)
+    const terms = { asset, kind: 'warranty', title: 'Compressor warranty', source: 'Copeland warranty W-5521', file: file('warranty-w5521.pdf', Buffer.from('%PDF-1.4 warranty W-5521')), expiresOn: addDays(today, 10) }
+    await h.api('document.add', cookie.lead, terms, 400)
+    const warranty = (await h.api('document.add', cookie.lead, { ...terms, owner: ids.sam, remindDays: '30' })).document
+    await h.submit('asset.contact', cookie.lead, { asset, role: 'supplier', name: 'Priya Natarajan', company: 'Coolflow Refrigeration Supply', phone: '+1 614 555 0142', email: 'priya@coolflow.example' }, `/app/assets/${asset}`)
+    await h.api('asset.contact', cookie.lead, { asset, role: 'supplier', name: 'Nobody to call' }, 400)
+    // Revision 1 is linked to issued work; the warranty goes with it at its current revision.
+    const job = (await h.api('workorder.create', cookie.lead, { asset, title: 'Replace compressor contactor', due: addDays(today, 2), assignee: ids.max })).id
+    await h.api('document.link', cookie.max, { workOrder: job, document: first.document }, 403)
+    const elsewhere = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Fryer pilot light', due: addDays(today, 2), assignee: ids.max })).id
+    await h.api('document.link', cookie.lead, { workOrder: elsewhere, document: first.document }, 409)
+    await h.api('document.link', cookie.lead, { workOrder: job, document: first.document, revision: '1' })
+    await h.api('document.link', cookie.lead, { workOrder: job, document: warranty })
+    // The master changes: revision 3. The issued work and its job pack still carry revision 1, marked as superseded.
+    await h.api('document.revise', cookie.lead, { document: first.document, revision: 2, source: 'Copeland AE4-1418 rev C', file: file('copeland-ae4-1418-c.pdf', manual[2]) })
+    const pinned = (await wo('max', job)).documents.find(row => row.document_id === first.document)
+    assert.deepEqual([pinned.revision, pinned.current_revision, pinned.newer, pinned.source, pinned.added_by], [1, 3, true, 'Copeland AE4-1418 rev A', 'Lena Park'])
+    assert.ok((await (await h.raw(`/app/work/${job}`, { cookie: cookie.max })).text()).includes('Revision 3 is now current; this work keeps revision 1'))
+    const response = await h.raw(`/app/work/${job}/pack.zip`, { cookie: cookie.max })
+    assert.deepEqual([response.status, response.headers.get('content-type')], [200, 'application/zip'])
+    const pack = unzip(await response.arrayBuffer())
+    const packed = Object.keys(pack).filter(path => path.startsWith('documents/'))
+    assert.deepEqual(packed.map(path => sha(pack[path])).sort(), [sha(manual[0]), sha(Buffer.from('%PDF-1.4 warranty W-5521'))].sort(), 'the pack holds the revisions the work was given, unchanged')
+    const manifest = pack['MANIFEST.csv'].toString()
+    for (const text of ['Compressor service manual,manual,1,3,copeland-ae4-1418-a.pdf,Copeland AE4-1418 rev A', sha(manual[0]), 'Lena Park']) assert.ok(manifest.includes(text), text)
+    assert.match(pack['work-order.txt'].toString(), /Compressor service manual, revision 1 \(revision 3 is now current\)/)
+    // The asset keeps every revision with its source; each downloads as it was added.
+    const held = (await h.api(`assets/${asset}`, cookie.max)).documents
+    const series = held.documents.find(row => row.id === first.document)
+    assert.deepEqual(series.revisions.map(row => [row.revision, row.source]), [[3, 'Copeland AE4-1418 rev C'], [2, 'Copeland AE4-1418 rev B'], [1, 'Copeland AE4-1418 rev A']])
+    assert.equal(sha(Buffer.from(await (await h.raw(`/app/documents/${series.revisions[2].id}`, { cookie: cookie.max })).arrayBuffer())), sha(manual[0]))
+    assert.deepEqual(held.contacts.map(row => [row.role, row.name, row.company]), [['supplier', 'Priya Natarajan', 'Coolflow Refrigeration Supply']])
+    // The named owner's reminder: one in-app notice within the 30 days, none again; an expired date asks once more.
+    await h.api('document.expiry', cookie.max, { document: warranty, expiresOn: addDays(today, 5), owner: ids.sam }, 403)
+    await h.scheduled(cron)
+    await h.scheduled(cron)
+    const expiry = async () => (await h.api('notices', cookie.sam)).filter(row => row.kind === 'expiry')
+    assert.deepEqual((await expiry()).map(row => [row.text, row.link]), [[`Compressor warranty (warranty) for HK-001 Walk-in cooler compressor expires on ${addDays(today, 10)}.`, `/app/assets/${asset}#documents`]])
+    assert.equal((await h.api('notices', cookie.lead)).filter(row => row.kind === 'expiry').length, 0, 'only the named owner is reminded')
+    await h.api('document.expiry', cookie.lead, { document: warranty, expiresOn: addDays(today, -1), owner: ids.sam })
+    await h.scheduled(cron)
+    assert.deepEqual((await expiry()).map(row => row.text.split(' ').slice(-3, -1).join(' ')), ['expired on', 'expires on'])
+    const page = (await (await h.raw(`/app/assets/${asset}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Compressor service manual', 'Revision 3: copeland-ae4-1418-c.pdf', 'Expired', 'Coolflow Refrigeration Supply']) assert.ok(page.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
@@ -1948,6 +2015,12 @@ try {
       const assets = await h.api('assets', cookie.owner), work = [...await h.api('work', cookie.owner), ...await h.api('work?state=closed', cookie.owner)]
       const orders = await Promise.all(work.map(row => h.api(`work/${row.id}`, cookie.sam)))
       const files = []
+      // ASSET-003: every document revision is an attachment too.
+      for (const asset of assets) for (const document of (await h.api(`assets/${asset.id}`, cookie.sam)).documents.documents) for (const revision of document.revisions) {
+        const download = await h.raw(`/app/documents/${revision.id}`, { cookie: cookie.sam })
+        assert.equal(download.status, 200)
+        files.push({ id: revision.id, recorded: revision.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
+      }
       // PLAN-006: comment photos are attachments too.
       for (const evidence of [...orders.flatMap(order => order.evidence), ...orders.flatMap(order => order.comments.comments.flatMap(comment => comment.photos)).map(photo => ({ ...photo, path: 'comment-photos' }))]) {
         const download = await h.raw(`/app/${evidence.path ?? 'evidence'}/${evidence.id}`, { cookie: cookie.sam })

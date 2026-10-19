@@ -9,6 +9,7 @@
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { chase } from './chasing'
+import { remindExpiring } from './documents'
 import { all, newId, now, one, stmt } from './core'
 import { today } from './dates'
 import { DUE_SCHEDULES, issueDue } from './schedules'
@@ -27,6 +28,8 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
   const runs = await issueDueRoutes(env, { id: SCHEDULER.id, today: day })
   // PM-006: then chase overdue work on the same clock.
   await chase(env, day)
+  // ASSET-003: and remind each expiring document's owner.
+  await remindExpiring(env, day)
   const gap = previous ? Math.round((at - previous.ran_at) / 60_000) : null
   await env.DB.batch([stmt(env, 'INSERT INTO gk_scheduler_runs (id, cron, ran_at, created, gap_minutes, finished_at) VALUES (?, ?, ?, ?, ?, ?)', newId(), cron, at, created.length + runs.reduce((sum, run) => sum + run.workOrders.length, 0), gap !== null && gap > SCHEDULER.missedAfterMinutes ? gap : null, now())])
   return { created: created.length, runs: runs.length }

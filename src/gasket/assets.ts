@@ -13,6 +13,7 @@ import type { Input } from './input'
 import { DEFAULT_FEED_WINDOW_HOURS, FEED_WINDOW_HOURS, meterView } from './meters'
 import { DECLARED_STATE, stateConflicts, stateHistory } from './states'
 import { disposalStatements, lifecycleOf } from './lifecycle'
+import { documentsOf } from './documents'
 
 export const METER_KINDS = ['counter', 'gauge', 'condition']
 const IDENTITY = ['tag', 'name', 'serial', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
@@ -137,5 +138,5 @@ export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
   const states = await stateHistory(env, id)
   const bom = await bomOf(env, { id: asset.id, serial: asset.serial }, await partList(env, actor))
-  return { ...asset, bom, lifecycle: await lifecycleOf(env, actor, id), states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
+  return { ...asset, bom, lifecycle: await lifecycleOf(env, actor, id), documents: await documentsOf(env, actor, id), states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
 }

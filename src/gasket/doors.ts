@@ -11,7 +11,7 @@ export const API_DOORS: [string, string][] = [
 
 export const PAGE_DOORS: [string, string][] = [
   ['^/app$', 'work'], ['^/app/site$', 'site'], ['^/app/access$', 'access'],
-  ['^/app/work/([\\w-]+)$', 'workOrder'], ['^/app/evidence/([\\w-]+)$', 'evidence'], ['^/app/signatures/([\\w-]+)$', 'signatureMark'], ['^/app/comment-photos/([\\w-]+)$', 'commentPhoto'],
+  ['^/app/work/([\\w-]+)$', 'workOrder'], ['^/app/evidence/([\\w-]+)$', 'evidence'], ['^/app/signatures/([\\w-]+)$', 'signatureMark'], ['^/app/comment-photos/([\\w-]+)$', 'commentPhoto'], ['^/app/documents/([\\w-]+)$', 'documentFile'], ['^/app/work/([\\w-]+)/pack\\.zip$', 'jobPack'],
   ['^/app/assets$', 'assets'], ['^/app/assets/([\\w-]+)$', 'asset'], ['^/app/assets/([\\w-]+)/history\\.csv$', 'historyCsv'], ['^/app/assets/([\\w-]+)/ledger\\.csv$', 'ledgerCsv'],
   ['^/app/schedules$', 'schedules'], ['^/app/checklists/([\\w-]+)$', 'checklist'], ['^/app/parts$', 'parts'], ['^/app/parts/([\\w-]+)$', 'part'],
   ['^/app/board$', 'board'], ['^/app/proposals$', 'proposals'], ['^/app/move-in$', 'moveIn'], ['^/app/audit$', 'audit'], ['^/app/audit\\.csv$', 'auditCsv'], ['^/app/codes$', 'codes'], ['^/app/notices$', 'notices'], ['^/app/teams$', 'teams'], ['^/app/performance$', 'performance'], ['^/app/reliability$', 'reliability'], ['^/app/availability$', 'availability'], ['^/app/bad-actors$', 'badActors'], ['^/app/bad-actors\\.csv$', 'badActorsCsv'], ['^/app/templates$', 'templates'], ['^/app/more$', 'more'],

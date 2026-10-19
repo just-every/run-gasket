@@ -11,6 +11,8 @@ import { COUNTER_CHANGES } from '../meters'
 import { createsWork } from '../site'
 import { assignChoice, doneAlready } from './create-work'
 import { disposalFields, lifecycleCard } from './lifecycle'
+import { documentsCard } from './documents'
+import { assignable } from '../site'
 import { LEVELS, LEVEL_LABELS, parentChoices, type Level as Tier } from '../hierarchy'
 import { mentionable, readThread } from '../comments'
 import { commentsCard } from './comments'
@@ -73,7 +75,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(await codeList(env, 'criticality'), asset)}`, 'Save changes', { secondary: true })}
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}${disposalFields}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
-  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${lifecycleCard(asset, manage, can(actor, 'history.export'), back)}${bomCard(asset.bom, actor.zone, manage ? bomForm(asset.bom, asset.id, back, await partList(env, actor)) : '')}${history}${commentsCard(asset.comments, actor, { field: 'asset', id: asset.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${place}${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
+  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${lifecycleCard(asset, manage, can(actor, 'history.export'), back)}${documentsCard(asset, actor.zone, manage, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${bomCard(asset.bom, actor.zone, manage ? bomForm(asset.bom, asset.id, back, await partList(env, actor)) : '')}${history}${commentsCard(asset.comments, actor, { field: 'asset', id: asset.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${place}${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
   return page(env, asset.name, actor, body, { url })
 }
 

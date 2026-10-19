@@ -119,7 +119,7 @@ export async function commentPhoto(env: Bindings, _actor: Actor, id: string) {
 }
 
 /** Where a notice takes its reader: the comment it is about, or the work order. */
-export const noticeLink = (row: Row) => row.comment_id ? `/app/${row.work_order_id ? `work/${row.work_order_id}` : `assets/${row.asset_id}`}#comment-${row.comment_id}` : `/app/work/${row.work_order_id}`
+export const noticeLink = (row: Row) => row.comment_id ? `/app/${row.work_order_id ? `work/${row.work_order_id}` : `assets/${row.asset_id}`}#comment-${row.comment_id}` : row.work_order_id ? `/app/work/${row.work_order_id}` : `/app/assets/${row.asset_id}#documents`
 
 /** Whether a mention notice's comment is still unread by its recipient (SQL over gk_notices n). */
 export const NOTICE_UNREAD = `CASE WHEN n.comment_id IS NULL THEN 0 ELSE (SELECT c.seq > COALESCE((SELECT r.read_seq FROM gk_comment_reads r WHERE r.member_id = n.recipient_id

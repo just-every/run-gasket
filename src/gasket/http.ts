@@ -15,6 +15,8 @@ import { site } from './site'
 import { evidenceFile } from './work'
 import { signatureMark } from './signatures'
 import { commentPhoto } from './comments'
+import { documentFile, jobPack } from './documents'
+import { workOrderDetail } from './work'
 import { route } from './views'
 import { assetPage, assetsPage } from './ui/assets'
 import { boardPage } from './ui/board'
@@ -124,6 +126,8 @@ const pages: Record<string, Page> = {
   evidence: (env, actor, _url, id) => evidenceFile(env, actor, id),
   signatureMark: (env, actor, _url, id) => signatureMark(env, actor, id),
   commentPhoto: (env, actor, _url, id) => commentPhoto(env, actor, id),
+  documentFile: (env, actor, _url, id) => documentFile(env, actor, id),
+  jobPack: async (env, actor, _url, id) => jobPack(env, actor, id, await workOrderDetail(env, actor, id)),
   assets: (env, actor, url) => assetsPage(env, actor, url),
   asset: (env, actor, url, id) => assetPage(env, actor, id, url),
   historyCsv: async (env, actor, _url, id) => new Response(await assetHistoryCsv(env, actor, id), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="asset-history-${id.slice(0, 8)}.csv"`, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
