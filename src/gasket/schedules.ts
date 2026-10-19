@@ -1,16 +1,23 @@
 // Clause 5: preventive schedules and "Create due work orders". A schedule is
 // due by calendar (every N days from its due date) and/or by a counter meter
-// (every N units). At most one open work order exists per schedule.
+// (every N units, on its normalized value, ASSET-005). At most one open work
+// order exists per schedule. Stale or suspect readings never make one due.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { CURRENT_REVISION } from './checklists'
 import { NEXT_NUMBER, all, commit, insist, newId, now, one, stmt } from './core'
 import { addDays, isDate } from './dates'
 import type { Input } from './input'
+import { meterState } from './meters'
 import { addMeter, compareMeter, meterNumber } from './quantity'
 
 export const HORIZON_DAYS = 7
-const LATEST = (meter: string) => `(SELECT r.value FROM gk_readings r WHERE r.meter_id = ${meter} ORDER BY r.taken_on DESC, r.entered_at DESC LIMIT 1)`
+/** A counter's normalized value now and its readings held back as stale or suspect. */
+const meterNow = async (env: Bindings, meterId: string | null) => {
+  if (!meterId) return { now: null, held: 0 }
+  const state = await meterState(env, meterId)
+  return { now: state.now, held: state.held.length }
+}
 
 export async function scheduleFields(env: Bindings, input: Input) {
   const asset = await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
@@ -28,7 +35,7 @@ export async function scheduleFields(env: Bindings, input: Input) {
     insist(meter.kind === 'counter', 'meter_not_counter')
     everyUnits = meterNumber(input.text('everyUnits', { max: 20 }), 'everyUnits')
     insist(compareMeter(everyUnits, '0') > 0, 'invalid_everyUnits')
-    const latest = (await one<{ value: string | null }>(env, `SELECT ${LATEST('?')} AS value`, meter.id))!.value
+    const latest = (await meterNow(env, meter.id)).now
     nextDueMeter = input.has('firstDueMeter') ? meterNumber(input.text('firstDueMeter', { max: 20 }), 'firstDueMeter') : addMeter(latest ?? '0', everyUnits)
   }
   insist(everyDays || meterId, 'cadence_required')
@@ -54,13 +61,17 @@ export async function createSchedule(env: Bindings, actor: Actor, input: Input, 
 export async function generateDue(env: Bindings, actor: Actor) {
   requireCapability(actor, 'work.assign')
   const horizon = addDays(actor.today, HORIZON_DAYS)
-  const schedules = await all(env, `SELECT s.*, ${LATEST('s.meter_id')} AS meter_now FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id
+  const schedules = await all(env, `SELECT s.* FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id
     WHERE s.active = 1 AND a.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM gk_work_orders w WHERE w.schedule_id = s.id AND w.status NOT IN ('closed', 'cancelled'))`)
   const created: { id: string; schedule: string; due: string; reason: string }[] = []
+  const held: { schedule: string; readings: number }[] = []
   const statements: D1PreparedStatement[] = []
   for (const schedule of schedules) {
+    const meter = await meterNow(env, schedule.meter_id)
     const byDate = schedule.next_due_date && schedule.next_due_date <= horizon
-    const byMeter = schedule.meter_id && schedule.meter_now !== null && compareMeter(schedule.meter_now, schedule.next_due_meter) >= 0
+    const byMeter = schedule.meter_id && meter.now !== null && compareMeter(meter.now, schedule.next_due_meter) >= 0
+    // Not due on good readings, but flagged ones wait on the meter: say so rather than skip it silently.
+    if (!byDate && !byMeter && meter.held) held.push({ schedule: schedule.id, readings: meter.held })
     if (!byDate && !byMeter) continue
     const due = byDate ? schedule.next_due_date : actor.today
     const id = newId()
@@ -71,28 +82,31 @@ export async function generateDue(env: Bindings, actor: Actor) {
     created.push({ id, schedule: schedule.id, due, reason: byDate ? 'date' : 'meter' })
   }
   if (statements.length) await commit(env, statements, created.map(item => ({ actor: actor.id, action: 'workorder.generate', subject: item.id, detail: item })))
-  return { created }
+  return { created, held }
 }
 
 /** Moves a schedule on after its work order is approved: fixed calendar cadence, meter cadence from the latest reading. */
 export async function advanceStatements(env: Bindings, scheduleId: string, today: string) {
-  const schedule = await one(env, `SELECT s.*, ${LATEST('s.meter_id')} AS meter_now FROM gk_schedules s WHERE s.id = ?`, scheduleId)
+  const schedule = await one(env, 'SELECT s.* FROM gk_schedules s WHERE s.id = ?', scheduleId)
   if (!schedule) return []
+  const meterNowValue = (await meterNow(env, schedule.meter_id)).now
   let nextDate: string | null = schedule.next_due_date
   if (schedule.every_days && nextDate) {
     nextDate = addDays(nextDate, schedule.every_days)
     while (nextDate <= today) nextDate = addDays(nextDate, schedule.every_days)
   }
-  const nextMeter = schedule.meter_id ? addMeter(schedule.meter_now ?? schedule.next_due_meter ?? '0', schedule.every_units) : null
+  const nextMeter = schedule.meter_id ? addMeter(meterNowValue ?? schedule.next_due_meter ?? '0', schedule.every_units) : null
   return [stmt(env, 'UPDATE gk_schedules SET next_due_date = ?, next_due_meter = ?, revision = revision + 1 WHERE id = ?', nextDate, nextMeter, schedule.id)]
 }
 
 export async function scheduleList(env: Bindings, actor: Actor) {
   const rows = await all(env, `SELECT s.id, s.title, s.every_days, s.every_units, s.next_due_date, s.next_due_meter, s.active, s.revision,
-    a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, c.name AS checklist, m.name AS meter, m.unit AS meter_unit, ${LATEST('s.meter_id')} AS meter_now, mb.name AS assignee,
+    a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, c.name AS checklist, s.meter_id, m.name AS meter, m.unit AS meter_unit, mb.name AS assignee,
     (SELECT w.id FROM gk_work_orders w WHERE w.schedule_id = s.id AND w.status NOT IN ('closed', 'cancelled')) AS open_work
     FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id JOIN gk_checklists c ON c.id = s.checklist_id
     LEFT JOIN gk_meters m ON m.id = s.meter_id LEFT JOIN gk_members mb ON mb.id = s.assignee_id ORDER BY s.active DESC, COALESCE(s.next_due_date, '9999'), a.tag`)
   // A missed occurrence with no open work stays overdue until a lead issues it again or skips it (PLAN-007).
-  return rows.map(row => ({ ...row, overdue: Boolean(row.active && row.next_due_date && row.next_due_date < actor.today && !row.open_work) }))
+  const meters = new Map<string, { now: string | null; held: number }>()
+  for (const id of new Set(rows.map(row => row.meter_id).filter(Boolean))) meters.set(id, await meterNow(env, id))
+  return rows.map(({ meter_id, ...row }) => ({ ...row, meter_now: meters.get(meter_id)?.now ?? null, meter_held: meters.get(meter_id)?.held ?? 0, overdue: Boolean(row.active && row.next_due_date && row.next_due_date < actor.today && !row.open_work) }))
 }

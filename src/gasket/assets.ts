@@ -5,6 +5,7 @@ import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import type { Input } from './input'
+import { meterView } from './meters'
 
 const CRITICALITY = ['normal', 'important', 'critical']
 export const METER_KINDS = ['counter', 'gauge', 'condition']
@@ -101,13 +102,11 @@ export async function assetList(env: Bindings, _actor: Actor) {
     FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)
 }
 
-export async function assetDetail(env: Bindings, _actor: Actor, id: string) {
+export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const asset = await one(env, `SELECT a.*, ${ASSET_STATUS} AS status FROM gk_assets a WHERE a.id = ?`, id)
   insist(asset, 'asset_not_found', 404)
-  const meters = await all(env, `SELECT m.id, m.name, m.unit, m.kind, m.revision,
-    (SELECT r.value FROM gk_readings r WHERE r.meter_id = m.id ORDER BY r.taken_on DESC, r.entered_at DESC LIMIT 1) AS latest,
-    (SELECT r.taken_on FROM gk_readings r WHERE r.meter_id = m.id ORDER BY r.taken_on DESC, r.entered_at DESC LIMIT 1) AS latest_on
-    FROM gk_meters m WHERE m.asset_id = ? ORDER BY m.name`, id)
+  const meters = await Promise.all((await all(env, 'SELECT m.id, m.name, m.unit, m.kind, m.revision FROM gk_meters m WHERE m.asset_id = ? ORDER BY m.name', id))
+    .map(async meter => ({ ...meter, ...await meterView(env, actor, meter.id) })))
   const versions = await all(env, 'SELECT revision, value_json, changed_by, changed_at FROM gk_asset_versions WHERE asset_id = ? ORDER BY revision DESC', id)
   const sightings = await all(env, 'SELECT outcome, seen_location, note, recorded_by, recorded_at FROM gk_sightings WHERE asset_id = ? ORDER BY recorded_at DESC', id)
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)

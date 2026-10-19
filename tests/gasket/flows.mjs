@@ -538,6 +538,66 @@ try {
     assert.equal((await h.raw(`/app/checklists/${checklist}`, { cookie: cookie.lead })).status, 200)
   })
 
+  await check('ASSET-005 meters, units and counter corrections', async () => {
+    // A sheeter's hour meter: manual readings, then a replacement counter and a late, flagged and corrected feed.
+    const sheeter = (await h.api('asset.create', cookie.lead, { tag: 'HK-020', name: 'Dough sheeter', location: 'Bakery', criticality: 'important' })).id
+    const hours = (await h.api('meter.create', cookie.lead, { asset: sheeter, name: 'Hour meter', unit: 'h', kind: 'counter' })).id
+    const schedule = (await h.api('schedule.create', cookie.lead, { asset: sheeter, checklist: ids.checklist, title: '1000-hour sheeter service', meter: hours, everyUnits: '1000', firstDueMeter: '1000', assignee: ids.max })).id
+    const visit = (await h.api('workorder.create', cookie.lead, { asset: sheeter, title: 'Read the hour meter', due: addDays(today, 3), assignee: ids.max })).id
+    await h.api('workorder.readings', cookie.max, { workOrder: visit, takenOn: ago(300), meter: [hours], value: ['900'] })
+    // An unexplained backwards reading is refused at the work door and the feed door; a feed in another unit is refused too.
+    await h.api('workorder.readings', cookie.max, { workOrder: visit, takenOn: ago(280), meter: [hours], value: ['850'] }, 409)
+    const feed = { meter: hours, source: 'Bakery PLC gateway', unit: 'h' }
+    await h.api('meter.feed', cookie.lead, { ...feed, value: '850', takenOn: ago(270) }, 409)
+    await h.api('meter.feed', cookie.lead, { ...feed, value: '905', takenOn: ago(270), unit: 'min' }, 400)
+    await h.api('meter.feed', cookie.max, { ...feed, value: '905', takenOn: ago(270) }, 403)
+    // The display failed and the meter was replaced: the change needs a reason and carries 950 hours forward.
+    const replacement = { meter: hours, kind: 'replacement', effectiveOn: ago(240), lastValue: '950', startValue: '0' }
+    await h.api('meter.adjust', cookie.lead, replacement, 400)
+    await h.api('meter.adjust', cookie.max, { ...replacement, reason: 'Replaced' }, 403)
+    await h.api('meter.adjust', cookie.lead, { ...replacement, effectiveOn: ago(400), reason: 'Before a kept reading' }, 409)
+    await h.api('meter.adjust', cookie.lead, { ...replacement, lastValue: '890', reason: 'Below the last reading' }, 409)
+    await h.api('meter.adjust', cookie.lead, { ...replacement, reason: 'Display failed; new hour meter fitted at zero' })
+    const fresh = await h.api('meter.feed', cookie.lead, { ...feed, value: '30', takenOn: ago(120) })
+    assert.deepEqual([fresh.quality, fresh.normalized], ['good', '980'])
+    // A suspect reading and one that arrives a day late are kept and flagged; neither fires the service nor moves the counter.
+    const suspect = await h.api('meter.feed', cookie.lead, { ...feed, value: '120', takenOn: ago(90), quality: 'suspect' })
+    assert.deepEqual([suspect.quality, suspect.normalized], ['suspect', '1070'])
+    assert.equal((await h.api('meter.feed', cookie.lead, { ...feed, value: '990', takenOn: ago(26 * 60) })).quality, 'stale')
+    let generated = await h.api('workorders.generate', cookie.lead, {})
+    assert.ok(!generated.created.some(row => row.schedule === schedule), 'flagged readings never fire the service')
+    assert.deepEqual(generated.held.find(row => row.schedule === schedule), { schedule, readings: 1 })
+    let meter = (await h.api(`assets/${sheeter}`, cookie.max)).meters[0]
+    assert.deepEqual([meter.latest, meter.normalized, meter.held], ['30', '980', 1])
+    const byValue = Object.fromEntries(meter.readings.map(row => [row.recorded_value, row]))
+    assert.deepEqual(['900', '30', '120', '990'].map(value => [byValue[value].provenance, byValue[value].quality, byValue[value].unit, byValue[value].normalized]),
+      [['manual', 'good', 'h', '900'], ['feed', 'good', 'h', '980'], ['feed', 'suspect', 'h', '1070'], ['feed', 'stale', 'h', '990']])
+    assert.deepEqual([byValue['900'].entered_by, byValue['30'].source], ['Max Ortiz', 'Bakery PLC gateway'])
+    assert.ok(byValue['990'].taken_on < byValue['900'].taken_on && byValue['990'].received_on >= byValue['30'].taken_on, 'source time and receipt time are both kept')
+    // The gateway scaled the register: the lead corrects the suspect reading with a reason, and the recorded value stays.
+    await h.api('meter.adjust', cookie.lead, { kind: 'correction', reading: suspect.id, value: '72' }, 400)
+    await h.api('meter.adjust', cookie.lead, { kind: 'correction', reading: suspect.id, value: '20', reason: 'Would go backwards' }, 409)
+    assert.equal((await h.api('meter.adjust', cookie.lead, { kind: 'correction', reading: suspect.id, value: '72', reason: 'Gateway scaled the register; 72 h on the display' })).normalized, '1022')
+    generated = await h.api('workorders.generate', cookie.lead, {})
+    const service = generated.created.find(row => row.schedule === schedule)
+    assert.equal(service?.reason, 'meter')
+    assert.equal((await wo('max', service.id)).due_meter, '1000')
+    // A rollover, through the form door, carries the register's span forward the same way.
+    assert.equal((await h.submit('meter.adjust', cookie.lead, { meter: hours, kind: 'rollover', effectiveOn: ago(20), lastValue: '100', startValue: '0', reason: 'Register rolled over at 100' }, `/app/assets/${sheeter}`)).searchParams.get('notice'), 'Saved.')
+    assert.equal((await h.api('meter.feed', cookie.lead, { ...feed, value: '5', takenOn: ago(10) })).normalized, '1055')
+    assert.equal((await h.api('schedules', cookie.max)).find(row => row.id === schedule).meter_now, '1055')
+    meter = (await h.api(`assets/${sheeter}`, cookie.max)).meters[0]
+    const kept = meter.readings.find(row => row.id === suspect.id)
+    assert.deepEqual([kept.recorded_value, kept.value, kept.quality, kept.standing, kept.normalized, kept.correction.reason], ['120', '72', 'suspect', 'good', '1022', 'Gateway scaled the register; 72 h on the display'])
+    assert.deepEqual([meter.normalized, meter.held], ['1055', 0])
+    assert.deepEqual(meter.adjustments.map(row => [row.kind, row.reading]), [['rollover', null], ['correction', suspect.id], ['replacement', null]])
+    assert.equal((await h.api('audit?action=meter.adjust', cookie.sam)).rows.length, 3)
+    const page = await (await h.raw(`/app/assets/${sheeter}`, { cookie: cookie.lead })).text()
+    for (const text of ['Stale (late)', 'Corrected', 'Replacement', 'Rollover', 'Feed: Bakery PLC gateway', 'Display failed; new hour meter fitted at zero']) assert.ok(page.includes(text), text)
+    const history = (await h.api(`assets/${sheeter}/history`, cookie.sam)).events.map(event => event.what)
+    assert.ok(history.some(what => /counter replacement/.test(what)) && history.some(what => /corrected to 72/.test(what)) && history.some(what => /feed: Bakery PLC gateway, stale/.test(what)), 'the history explains each change')
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

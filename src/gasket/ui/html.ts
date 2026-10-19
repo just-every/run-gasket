@@ -29,7 +29,9 @@ const ERRORS: Record<string, string> = {
   own_work: 'you cannot review work you did yourself.',
   own_proposal: 'someone other than the person who prepared it must decide.',
   not_ready_for_review: 'the work order is not complete yet.',
-  meter_went_backwards: 'a counter reading cannot be lower than an earlier one.',
+  meter_went_backwards: 'a counter reading cannot be lower than an earlier one. Record the reset, replacement or rollover first.',
+  readings_after_change: 'readings are already kept at or after that time. A counter change only follows the latest reading.',
+  unit_mismatch: 'the reading is in a different unit from the meter.',
   downtime_already_open: 'this asset already has open downtime.',
   downtime_overlaps: 'the asset was already down then. Start the downtime after the earlier one ended.',
   open_work_exists: 'this asset still has open work orders.',
@@ -93,7 +95,7 @@ export const amount = (value: unknown, unit: string) => `${showNumber(value)}\u0
 const TONES: Record<string, 'ok' | 'warn' | 'bad' | 'info'> = {
   pass: 'ok', 'in service': 'ok', closed: 'ok', approved: 'ok', found: 'ok', completed: 'ok', 'reviewed and closed': 'ok', active: 'ok',
   'in progress': 'info', submitted: 'info', 'waiting for review': 'info', medium: 'info', current: 'info',
-  open: 'warn', pending: 'warn', 'due today': 'warn', 'needs attention': 'warn', returned: 'warn', 'found elsewhere': 'warn', 'below minimum': 'warn', due: 'warn',
+  open: 'warn', pending: 'warn', 'due today': 'warn', 'needs attention': 'warn', returned: 'warn', 'found elsewhere': 'warn', 'below minimum': 'warn', due: 'warn', suspect: 'warn', 'stale (late)': 'warn',
   fail: 'bad', down: 'bad', overdue: 'bad', missing: 'bad', high: 'bad', cancelled: 'bad', rejected: 'bad', retired: 'bad', ended: 'bad',
 }
 export const tag = (text: unknown) => { const tone = TONES[String(text ?? '').toLowerCase()]; return h`<span class="gk-tag${tone ? ` gk-tone-${tone}` : ''}">${text}</span>` }

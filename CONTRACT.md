@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007 and PM-004 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004 and ASSET-005 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 2 | 42 | 78 | 122 |
-| All | 16 | 42 | 78 | 136 |
+| Target and push further | 3 | 41 | 78 | 122 |
+| All | 17 | 41 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -398,7 +398,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `ASSET-002` | QR and barcode identification | target | missing |  | No label generation, scan workflow or scoped QR routes. |
 | `ASSET-003` | Manuals, documents and warranties | target | missing |  | Evidence uploads attach to work only; no asset manuals, warranties, document revisions or expiry workflow. |
 | `ASSET-004` | Status, criticality and failure taxonomy | target | partial | `src/gasket/assets.ts`; `src/gasket/work.ts` | Criticality, active/down/retired state and findings exist; degraded/out-of-service states and failure-code taxonomy do not. |
-| `ASSET-005` | Meters, units and counter corrections | target | partial | `src/gasket/quantity.ts`; `src/gasket/work.ts` | Dated readings and counter checks exist; source quality, reset/rollover, correction linkage and dual timestamps are missing. |
+| `ASSET-005` | Meters, units and counter corrections | target | done | `src/gasket/meters.ts`; `src/gasket/schedules.ts`; `src/gasket/work.ts`; `migrations/core/0021_meter_quality.sql`; `tests/gasket/flows.mjs` |  |
 | `ASSET-006` | Bill of materials and interchangeable spares | target | missing |  | No equipment BOM, substitute compatibility or tool list. |
 | `ASSET-007` | Asset lifecycle and replacement decision | target | partial | `src/gasket/assets.ts` | Register identity and retirement exist; acquisition, warranty/service agreements, replacement economics and disposal details do not. |
 | `ASSET-008` | Inspections, rounds and calibration | target | missing |  | Single-asset checklists exist; no rounds, calibration standards, certificates or stop-level closure. |

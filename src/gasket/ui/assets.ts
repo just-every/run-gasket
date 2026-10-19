@@ -5,6 +5,7 @@ import { can, type Actor } from '../actor'
 import { assetList } from '../assets'
 import { addDays, showDate, showInstant, showLocal } from '../dates'
 import { assetHistory } from '../history'
+import { COUNTER_CHANGES } from '../meters'
 import { assignable } from '../site'
 import { STATUS, amount, area, assetMark, backLink, band as headerBand, card, details, field, form, h, hidden, select, table, tag, woNumber } from './html'
 import { machine } from './icons'
@@ -39,8 +40,9 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
     meta: [{ label: 'Criticality', value: asset.criticality === 'normal' ? 'Normal' : asset.criticality === 'important' ? 'Important' : 'Critical' }, { label: 'Downtime recorded', value: `${downtimeMinutes} minutes` }],
     art: machine(asset, 'band') })
   const meters = card('Meters', h`${asset.meters.length ? table(['Meter', 'Latest'], asset.meters.map((meter: any) => [h`${meter.name}<span class="gk-sub">${meter.kind === 'counter' ? 'Counter' : meter.kind === 'gauge' ? 'Gauge' : 'Condition'}</span>`,
-      meter.latest ? h`${meter.kind === 'condition' ? meter.latest.charAt(0).toUpperCase() + meter.latest.slice(1) : amount(meter.latest, meter.unit)}<span class="gk-sub">Taken ${showLocal(meter.latest_on)}</span>` : '—']), 'Meters', { wrap: [0] }) : h`<p class="gk-muted">No meters yet.</p>`}
+      meter.latest ? h`${meter.kind === 'condition' ? meter.latest.charAt(0).toUpperCase() + meter.latest.slice(1) : amount(meter.latest, meter.unit)}<span class="gk-sub">Taken ${showLocal(meter.latest_on)}</span>${meter.kind === 'counter' && meter.normalized !== meter.latest ? h`<span class="gk-sub">Total across counter changes ${amount(meter.normalized, meter.unit)}</span>` : ''}${meter.held ? h`<span class="gk-sub">${tag('Suspect')} ${meter.held} flagged reading${meter.held === 1 ? '' : 's'} held back</span>` : ''}` : '—']), 'Meters', { wrap: [0] }) : h`<p class="gk-muted">No meters yet.</p>`}
     ${manage ? form('meter.create', back, h`${hidden('asset', asset.id)}<div class="gk-grid">${field('Meter name', 'name', { hint: 'For example Run hours or Oil condition.' })}${field('Unit', 'unit', { hint: 'hrs, °F, psi, mi… use "condition" for good/fair/poor.' })}${select('Kind', 'kind', [{ value: 'counter', label: 'Counter (never goes down)' }, { value: 'gauge', label: 'Gauge (a measured value)' }, { value: 'condition', label: 'Condition (good, fair or poor)' }], 'counter')}</div>`, 'Add meter', { secondary: true }) : ''}`, { id: 'meters' })
+  const readings = meterReadings(asset, manage, back)
   const work = card('Work orders', orders.length ? table(['Work order', 'Due', 'Status'], orders.map(order => [h`<a href="/app/work/${order.id}"><span class="gk-nowrap">${woNumber(order.number)}</span> · ${order.title}</a>${order.checklist ? h`<span class="gk-sub">${order.checklist}, revision ${order.revision}</span>` : ''}`, showDate(order.due_date), tag(STATUS[order.status])]), 'Work orders', { wrap: [0] }) : h`<p class="gk-muted">No work orders yet.</p>`, { id: 'work' })
   const corrective = can(actor, 'work.assign') && !asset.retired_at ? card('Raise corrective work', form('workorder.create', '/app/work/{id}', h`${hidden('asset', asset.id)}${field('What needs doing', 'title')}${area('Details', 'description', { required: false })}<div class="gk-grid">${field('Due', 'due', { type: 'date', value: addDays(actor.today, 7) })}${select('Assign to', 'assignee', (await assignable(env)).map(person => ({ value: person.id, label: person.name })), '', { required: false, blank: 'Not yet' })}</div>`, 'Raise work order', { secondary: true }), { id: 'corrective' }) : ''
   const sightings = card('Sightings', h`${asset.sightings.length ? table(['Outcome', 'Seen at', 'Note'], asset.sightings.map((row: any) => [h`${tag(row.outcome === 'found' ? 'Found' : row.outcome === 'elsewhere' ? 'Found elsewhere' : 'Missing')}<span class="gk-sub">${showInstant(row.recorded_at, actor.zone)}</span>`, row.seen_location ?? '—', row.note ?? '']), 'Sightings', { wrap: [1, 2] }) : h`<p class="gk-muted">Not physically checked yet.</p>`}
@@ -50,6 +52,29 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(asset)}`, 'Save changes', { secondary: true })}
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
-  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${history}</div><div class="gk-col-side">${meters}${sightings}${corrective}${edit}${earlier}</div></div>`
+  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${history}</div><div class="gk-col-side">${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
   return page(env, asset.name, actor, body, { url })
+}
+
+const QUALITY: Record<string, string> = { good: 'Good', suspect: 'Suspect', stale: 'Stale (late)' }
+const CHANGE: Record<string, string> = { reset: 'Reset', replacement: 'Replacement', rollover: 'Rollover', correction: 'Correction' }
+const shown = (meter: any, value: string) => meter.kind === 'condition' ? value.charAt(0).toUpperCase() + value.slice(1) : amount(value, meter.unit)
+
+/** ASSET-005: every reading with its source and receipt times, where it came from and its quality; counter changes and corrections, each with its reason. */
+function meterReadings(asset: any, manage: boolean, back: string) {
+  const rows = asset.meters.flatMap((meter: any) => meter.readings.map((row: any) => ({ meter, row }))).toSorted((a: any, b: any) => b.row.taken_on.localeCompare(a.row.taken_on))
+  const changes = asset.meters.flatMap((meter: any) => meter.adjustments.map((row: any) => ({ meter, row })))
+  if (!rows.length && !changes.length && !manage) return ''
+  const counters = asset.meters.filter((meter: any) => meter.kind === 'counter')
+  const list = rows.length ? table(['Reading', 'Taken · received', 'From', 'Quality'], rows.map(({ meter, row }: any) => [
+    h`${meter.name}: ${shown(meter, row.value)}${row.correction ? h`<span class="gk-sub">Recorded as ${shown(meter, row.recorded_value)}; corrected: ${row.correction.reason}</span>` : ''}${meter.kind === 'counter' && row.normalized !== row.value ? h`<span class="gk-sub">Total ${amount(row.normalized, meter.unit)}</span>` : ''}`,
+    h`${showLocal(row.taken_on)}<span class="gk-sub">Received ${showLocal(row.received_on)}</span>`,
+    row.provenance === 'feed' ? `Feed: ${row.source}` : row.provenance === 'import' ? 'Moved in' : row.entered_by ?? 'Manual',
+    row.correction ? tag('Corrected') : tag(QUALITY[row.quality])]), 'Meter readings', { wrap: [0, 2] }) : h`<p class="gk-muted">No readings yet.</p>`
+  const history = changes.length ? table(['Change', 'Reason'], changes.map(({ meter, row }: any) => [
+    h`${meter.name}: ${CHANGE[row.kind]}<span class="gk-sub">${row.kind === 'correction' ? `To ${row.value}` : `At ${showLocal(row.effective_on)}: last ${row.last_value}, new counter from ${row.start_value}`}</span>`, h`${row.reason}<span class="gk-sub">${row.recorded_by ?? ''}, ${showLocal(row.recorded_on)}</span>`]), 'Meter changes', { wrap: [0, 1] }) : ''
+  const forms = manage ? h`${counters.length ? form('meter.adjust', back, h`<div class="gk-grid">${select('Counter', 'meter', counters.map((meter: any) => ({ value: meter.id, label: meter.name })))}${select('What happened', 'kind', COUNTER_CHANGES.map(kind => ({ value: kind, label: CHANGE[kind] })))}
+      ${field('When', 'effectiveOn', { type: 'datetime-local' })}${field('Last value on the old count', 'lastValue', { attrs: 'inputmode="decimal"' })}${field('New counter starts at', 'startValue', { value: '0', attrs: 'inputmode="decimal"' })}</div>${field('Reason', 'reason', { hint: 'Kept with the change; readings already kept are never rewritten.' })}`, 'Record counter change', { secondary: true }) : ''}
+    ${rows.length ? form('meter.adjust', back, h`${hidden('kind', 'correction')}<div class="gk-grid">${select('Reading to correct', 'reading', rows.map(({ meter, row }: any) => ({ value: row.id, label: `${meter.name} ${row.value}, taken ${showLocal(row.taken_on)}` })))}${field('Correct value', 'value', { attrs: 'inputmode="decimal"' })}</div>${field('Reason', 'reason')}`, 'Correct reading', { secondary: true }) : ''}` : ''
+  return card('Meter readings', h`${list}${history}${forms}`, { id: 'readings' })
 }

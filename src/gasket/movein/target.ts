@@ -28,7 +28,8 @@ const free = (expression: string, id: string) => ({ text: `${expression} = 0`, p
 // Later Gasket records that rely on an imported row.
 const ASSET_DEPENDENTS = `((SELECT COUNT(*) FROM gk_work_orders WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_schedules WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_meters WHERE asset_id = ? AND origin = 'native')
   + (SELECT COUNT(*) FROM gk_sightings WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_asset_versions WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_downtime WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_assets WHERE id = ? AND retired_at IS NOT NULL))`
-const METER_DEPENDENTS = "((SELECT COUNT(*) FROM gk_readings WHERE meter_id = ? AND origin = 'native') + (SELECT COUNT(*) FROM gk_schedules WHERE meter_id = ?))"
+const METER_DEPENDENTS = "((SELECT COUNT(*) FROM gk_readings WHERE meter_id = ? AND origin = 'native') + (SELECT COUNT(*) FROM gk_schedules WHERE meter_id = ?) + (SELECT COUNT(*) FROM gk_meter_adjustments WHERE meter_id = ?))"
+const READING_DEPENDENTS = '(SELECT COUNT(*) FROM gk_meter_adjustments WHERE reading_id = ?)'
 const PART_DEPENDENTS = "(SELECT COUNT(*) FROM gk_part_moves WHERE part_id = ? AND origin = 'native')"
 const ASSET_FIELDS = ['tag', 'name', 'serial', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
 
@@ -67,11 +68,11 @@ const meter: Kind = {
 const reading: Kind = {
   async read(db, id) {
     const row = await db.prepare("SELECT * FROM gk_readings WHERE id = ? AND origin = 'import'").bind(id).first<any>()
-    return row ? { value: { meter: row.meter_id, asset: row.asset_id, value: row.value, takenOn: row.taken_on, enteredBy: row.entered_by }, revision: row.import_revision } : undefined
+    return row ? { value: withDependents({ meter: row.meter_id, asset: row.asset_id, value: row.value, takenOn: row.taken_on, enteredBy: row.entered_by }, await dependents(db, READING_DEPENDENTS, id)), revision: row.import_revision } : undefined
   },
   matches(value, id, revision) {
-    const main = eq([['meter_id', value.meter], ['asset_id', value.asset], ['value', value.value], ['taken_on', value.takenOn], ['entered_by', value.enteredBy], ['import_revision', revision]])
-    return sql(`EXISTS(SELECT 1 FROM gk_readings WHERE id = ? AND origin = 'import' AND ${main.text})`, id, ...main.params)
+    const main = eq([['meter_id', value.meter], ['asset_id', value.asset], ['value', value.value], ['taken_on', value.takenOn], ['entered_by', value.enteredBy], ['import_revision', revision]]), rest = free(READING_DEPENDENTS, id)
+    return sql(`EXISTS(SELECT 1 FROM gk_readings WHERE id = ? AND origin = 'import' AND ${main.text}) AND ${rest.text}`, id, ...main.params, ...rest.params)
   },
   absent: id => sql('NOT EXISTS(SELECT 1 FROM gk_readings WHERE id = ?)', id),
   write: (value, id, revision) => [sql("INSERT INTO gk_readings (id, meter_id, asset_id, value, taken_on, entered_by, entered_at, origin, import_revision) VALUES (?, ?, ?, ?, ?, ?, ?, 'import', ?)", id, value.meter, value.asset, value.value, value.takenOn, value.enteredBy, Date.now(), revision)],

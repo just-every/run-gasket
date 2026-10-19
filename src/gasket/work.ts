@@ -9,7 +9,8 @@ import { correctionOrigin, correctionStatements, obligation } from './correction
 import type { Input } from './input'
 import { issuePart, returnPart } from './parts'
 import type { FromProposal } from './schedules'
-import { compareMeter, fromMilli, meterNumber } from './quantity'
+import { readingStatements } from './meters'
+import { fromMilli } from './quantity'
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
@@ -152,7 +153,7 @@ export async function addEvidence(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, evidence: id }
 }
 
-/** Dated readings for the asset's meters. A counter never goes below an earlier reading. */
+/** Dated readings for the asset's meters, taken by the assigned person (ASSET-005 keeps their unit, source and quality). */
 export async function recordReadings(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
   const takenOn = input.text('takenOn', { max: 16 })
@@ -166,21 +167,9 @@ export async function recordReadings(env: Bindings, actor: Actor, input: Input) 
     if (!raw) continue
     const meter = await one(env, 'SELECT * FROM gk_meters WHERE id = ? AND asset_id = ?', meterId, order.asset_id)
     insist(meter, 'meter_not_found', 404)
-    let value: string
-    if (meter.kind === 'condition') {
-      insist(['good', 'fair', 'poor'].includes(raw), 'invalid_value')
-      value = raw
-    } else value = meterNumber(raw)
-    if (meter.kind === 'counter') {
-      // The checks below read outside the batch: bumping the meter's revision in the batch makes a concurrent reading on it stale.
-      statements.push(guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_meters WHERE id = ? AND revision = ?)', meter.id, meter.revision), stmt(env, 'UPDATE gk_meters SET revision = revision + 1 WHERE id = ?', meter.id))
-      const earlier = await one<{ value: string }>(env, 'SELECT value FROM gk_readings WHERE meter_id = ? AND taken_on <= ? ORDER BY taken_on DESC, entered_at DESC LIMIT 1', meter.id, takenOn)
-      insist(!earlier || compareMeter(value, earlier.value) >= 0, 'meter_went_backwards', 409, { meter: meter.name, earlier: earlier?.value })
-      const later = await one<{ value: string }>(env, 'SELECT value FROM gk_readings WHERE meter_id = ? AND taken_on > ? ORDER BY taken_on ASC LIMIT 1', meter.id, takenOn)
-      insist(!later || compareMeter(value, later.value) <= 0, 'meter_went_backwards', 409, { meter: meter.name, later: later?.value })
-    }
-    statements.push(stmt(env, 'INSERT INTO gk_readings (id, meter_id, asset_id, work_order_id, value, taken_on, entered_by, entered_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', newId(), meter.id, order.asset_id, order.id, value, takenOn, actor.id, now()))
-    recorded.push({ meter: meter.name, value })
+    const kept = await readingStatements(env, actor, meter, raw, { takenOn, workOrder: order.id, provenance: 'manual', source: null, quality: 'good' })
+    statements.push(...kept.statements)
+    recorded.push({ meter: meter.name, value: kept.value })
   }
   insist(recorded.length, 'invalid_value')
   await commit(env, [...touch(env, order), ...statements], { actor: actor.id, action: 'workorder.readings', subject: order.id, detail: { takenOn, recorded } })
