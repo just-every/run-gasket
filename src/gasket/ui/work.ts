@@ -171,10 +171,10 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const done = w.items.filter(item => item.result).length
   const checklist = !w.items.length ? '' : card(`${w.checklist_name}, revision ${w.checklist_revision}`, recording
     ? h`<form method="post" action="/app/do/workorder.results" class="gk-form">${hidden('returnTo', back)}${ids}<ol class="gk-checklist">${w.items.map(item => h`<li>
-        <fieldset class="gk-item"><legend>${item.text}</legend><div class="gk-segmented">${['pass', 'attention', 'fail'].map(outcome => h`<label><input type="radio" name="outcome-${item.index}" value="${outcome}"${item.result?.outcome === outcome ? raw(' checked') : ''}><span>${OUTCOME[outcome]}</span></label>`)}</div>
+        <fieldset class="gk-item"><legend>${item.text}</legend>${item.result?.recorded_by ? h`<p class="gk-sub">Signed off by ${item.result.recorded_by}</p>` : ''}<div class="gk-segmented">${['pass', 'attention', 'fail'].map(outcome => h`<label><input type="radio" name="outcome-${item.index}" value="${outcome}"${item.result?.outcome === outcome ? raw(' checked') : ''}><span>${OUTCOME[outcome]}</span></label>`)}</div>
         ${field('Note', `note-${item.index}`, { value: item.result?.note ?? '', required: false })}</fieldset></li>`)}</ol>
       <div class="gk-actions"><button type="submit" class="gk-secondary">Save results</button></div></form>`
-    : table(['Item', 'Result', 'Note'], w.items.map(item => [item.text, item.result ? tag(OUTCOME[item.result.outcome]) : h`<span class="gk-muted">No result yet</span>`, item.result?.note ?? '']), 'Checklist results', { wrap: [0, 2] }),
+    : table(['Item', 'Result', 'Note', 'Signed off by'], w.items.map(item => [item.text, item.result ? tag(OUTCOME[item.result.outcome]) : h`<span class="gk-muted">No result yet</span>`, item.result?.note ?? '', item.result?.recorded_by ?? '']), 'Checklist results', { wrap: [0, 2] }),
   { id: 'checklist', extra: h`<span class="gk-count">${done} of ${w.items.length} complete</span>` })
 
   const meters = w.meters

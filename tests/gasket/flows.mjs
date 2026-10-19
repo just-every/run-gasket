@@ -1636,6 +1636,43 @@ try {
     }
   })
 
+  await check('FIELD-007 crew completion and independent review', async () => {
+    // A repair with a checklist, done by two technicians with the owner helping, then reassigned to a third.
+    const seal = (await h.api('templates', cookie.lead)).find(row => row.name === 'Pump seal repair')
+    const press = (await h.api('asset.create', cookie.lead, { tag: 'PRS-2', name: 'Bale press', location: 'Recycling' })).id
+    const job = (await h.api('workorder.create', cookie.lead, { asset: press, template: seal.id, due: today, assignee: ids.max })).id
+    for (const member of [ids.nia, (await h.api('me', cookie.owner)).id]) await h.api('workorder.collaborate', cookie.lead, { workOrder: job, member })
+    const steps = (await wo('max', job)).items.length
+    const only = (index, outcome) => Array.from({ length: steps }, (_, item) => item === index ? outcome : '')
+    await h.api('workorder.results', cookie.max, { workOrder: job, outcome: only(0, 'pass'), note: only(0, 'Isolated and locked out') })
+    for (let index = 1; index < steps; index++) await h.api('workorder.results', cookie.nia, { workOrder: job, outcome: only(index, 'pass'), note: only(index, '') })
+    await h.api('workorder.evidence', cookie.owner, { workOrder: job, file: file('press-seal.png', png, 'image/png') })
+    // Blocked while a part is awaited, then in progress again; the work stays in progress throughout.
+    await h.api('blocker.raise', cookie.max, { workOrder: job, kind: 'parts', nextAction: 'Seal kit on order', promisedOn: addDays(today, 2) })
+    const blocked = await wo('lead', job)
+    assert.deepEqual([blocked.status, blocked.chase.blockers.map(row => [row.kind, Boolean(row.resolved_at)])], ['in_progress', [['parts', false]]])
+    await h.api('blocker.resolve', cookie.lead, { blocker: blocked.chase.blockers[0].id, resolution: 'Seal kit arrived' })
+    await h.api('workorder.assign', cookie.lead, { workOrder: job, assignee: ids.uma, note: 'Max is off shift; finish and submit' })
+    const handed = await wo('uma', job)
+    assert.deepEqual([handed.assignee_id, handed.items.map(item => item.result.recorded_by)], [ids.uma, ['Max Ortiz', ...Array(steps - 1).fill('Nia Okafor')]], 'each step keeps who signed it off')
+    assert.ok(['Max Ortiz', 'Nia Okafor', 'Olive Owner'].every(name => handed.crew.contributors.some(row => row.name === name)), 'reassignment keeps every contributor')
+    assert.ok((await (await h.raw(`/app/work/${job}`, { cookie: cookie.sam })).text()).replace(/<[^>]+>/g, '').includes('Signed off by'))
+    await h.api('workorder.submit', cookie.uma, { workOrder: job, version: handed.version })
+    // Every contributor is refused review: the technicians hold no review right, and the owner helped.
+    for (const who of ['max', 'nia', 'uma']) await h.api('workorder.review', cookie[who], { workOrder: job, version: (await wo('sam', job)).version, decision: 'approve' }, 403)
+    assert.equal((await h.api('workorder.review', cookie.owner, { workOrder: job, version: (await wo('sam', job)).version, decision: 'approve' }, 403)).error, 'own_work')
+    // An independent supervisor returns it; the rework makes a new revision, and only that exact revision is approved.
+    const first = (await wo('sam', job)).version
+    await h.api('workorder.review', cookie.sam, { workOrder: job, version: first, decision: 'return', reason: 'Record the gland torque' })
+    await h.api('finding.record', cookie.uma, { workOrder: job, severity: 'low', text: 'Gland torqued to 40 Nm' })
+    await h.api('workorder.submit', cookie.uma, { workOrder: job, version: (await wo('uma', job)).version })
+    assert.equal((await h.api('workorder.review', cookie.sam, { workOrder: job, version: first, decision: 'approve' }, 409)).error, 'stale')
+    const final = (await wo('sam', job)).version
+    await h.api('workorder.review', cookie.sam, { workOrder: job, version: final, decision: 'approve' })
+    const closed = await wo('sam', job)
+    assert.deepEqual([closed.status, closed.reviews.map(row => [row.version, row.decision, row.reason, row.reviewer])], ['closed', [[first, 'returned', 'Record the gland torque', 'Sam Ito'], [final, 'approved', null, 'Sam Ito']]])
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
