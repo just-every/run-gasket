@@ -9,6 +9,7 @@ import { correctionOrigin, correctionStatements, obligation } from './correction
 import type { Input } from './input'
 import { issuePart, returnPart } from './parts'
 import type { FromProposal } from './schedules'
+import { chaseOf } from './chasing'
 import { activeCode } from './codes'
 import { readingStatements } from './meters'
 import { fromMilli } from './quantity'
@@ -287,8 +288,9 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const origin = await correctionOrigin(env, id)
   // PM-002: the reading that raised this preventive work, as evidence.
   const trigger = order.trigger_reading_id ? await one(env, 'SELECT r.id, r.value, r.taken_on, r.provenance, r.source, r.quality, g.name AS meter, g.unit FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id WHERE r.id = ?', order.trigger_reading_id) : null
+  const chase = await chaseOf(env, order, actor.today)
   const { items_json: _items, ...rest } = order
-  return { ...rest, trigger, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
+  return { ...rest, trigger, chase, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */

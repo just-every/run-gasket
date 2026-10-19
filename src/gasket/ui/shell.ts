@@ -27,6 +27,7 @@ export const SETTINGS: Destination[] = [
   { href: '/app/move-in', label: 'Move in from MaintainX', detail: 'Dry run, apply and undo an import of MaintainX exports.', icon: ICON.movein, show: actor => can(actor, 'import.run') },
   { href: '/app/access', label: 'People and access', detail: 'Give access with a role, change roles and end access.', icon: ICON.people, show: actor => can(actor, 'site.manage') },
   { href: '/app/site', label: 'Site', detail: 'The site name and its time zone.', icon: ICON.site, show: actor => can(actor, 'site.manage') },
+  { href: '/app/notices', label: 'Notices', detail: 'Reminders and escalations about overdue work, and the chase rule.', icon: ICON.clock, show: () => true },
   { href: '/app/codes', label: 'Codes and failures', detail: 'Criticality levels, failure mode, cause, remedy and risk codes, and failures by code.', icon: ICON.board, show: () => true },
   { href: '/app/audit', label: 'Audit trail', detail: 'Every change, who made it and when.', icon: ICON.audit, show: actor => can(actor, 'audit.read') },
 ]

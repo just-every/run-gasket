@@ -7,6 +7,7 @@ import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from 
 import { createChecklist, reviseChecklist } from './checklists'
 import { bulk, merge, reopen } from './control'
 import { addClosure, removeClosure } from './calendar'
+import { raiseBlocker, resolveBlocker, respond, setChaseRule } from './chasing'
 import { decideException, editSchedule, requestDeferral, requestSkip } from './exceptions'
 import { acknowledge, setRule } from './corrections'
 import type { Input } from './input'
@@ -56,6 +57,10 @@ export const actions: Record<string, Handler> = {
   'schedule.exception': (env, actor, input) => decideException(env, actor, input),
   'schedule.edit': (env, actor, input) => editSchedule(env, actor, input),
   'closure.add': (env, actor, input) => addClosure(env, actor, input),
+  'chase.rule': (env, actor, input) => setChaseRule(env, actor, input),
+  'workorder.respond': (env, actor, input) => respond(env, actor, input),
+  'blocker.raise': (env, actor, input) => raiseBlocker(env, actor, input),
+  'blocker.resolve': (env, actor, input) => resolveBlocker(env, actor, input),
   'closure.remove': (env, actor, input) => removeClosure(env, actor, input),
   'workorder.create': (env, actor, input) => createCorrective(env, actor, input),
   'workorder.assign': (env, actor, input) => assign(env, actor, input),

@@ -45,3 +45,7 @@ A calendar schedule can run on fixed dates or count from completion (the day its
 Through the JSON door (`workorders.bulk`), a lead can assign, reschedule or cancel many work orders at once: a preview first lists each one's outcome and what else it touches, such as a schedule or open follow-up work, without changing anything, then each work order succeeds or fails on its own.
 
 Next: [Doing the work](doing-the-work.md).
+
+## Reminders, blockers and escalation
+
+Gasket reminds the assignee a day before work is due and again once it is overdue, under **More → Notices** and on the work order. The assignee answers **I am on it** or **Report a blocker**: parts, access, skill or production, with who owns it, the next action and when it is promised. If nobody answers, or the work stays overdue, the leads are told, and after longer the supervisors; a blocker that misses its promised date is chased too. A lead sets these days under **Chase rule**. Handing overdue work to someone else is a lead's decision and keeps its overdue age. Email and push are not sent yet: the notices are in Gasket.

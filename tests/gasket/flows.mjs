@@ -850,6 +850,38 @@ try {
     assert.equal((await h.raw('/app/codes', { cookie: cookie.max })).status, 200)
   })
 
+  await check('PM-006 overdue escalation and blocker chasing', async () => {
+    const cron = '*/15 * * * *', days = n => Date.now() + n * 86_400_000
+    await h.api('chase.rule', cookie.max, { remindBeforeDays: 1, responseWithinDays: 1, leadAfterDays: 3, supervisorAfterDays: 3 }, 403)
+    await h.api('chase.rule', cookie.lead, { remindBeforeDays: 1, responseWithinDays: 1, leadAfterDays: 3, supervisorAfterDays: 2 }, 400)
+    await h.api('chase.rule', cookie.lead, { remindBeforeDays: 1, responseWithinDays: 1, leadAfterDays: 3, supervisorAfterDays: 3 })
+    const soon = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Fryer gas hose inspection', due: addDays(today, 1), assignee: ids.max })).id
+    const urgent = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Fryer pilot keeps dropping out', due: addDays(today, -1), assignee: ids.max })).id
+    const mine = async (who, id) => (await h.api('notices', cookie[who])).filter(row => row.work_order_id === id).map(row => row.kind)
+    await h.scheduled(cron)
+    assert.deepEqual([await mine('max', soon), await mine('max', urgent), await mine('lead', urgent)], [['reminder'], ['overdue'], []])
+    // A day later with no answer: the lead hears of it, though the work is only two days overdue.
+    await h.scheduled(cron, days(1))
+    assert.deepEqual(await mine('lead', urgent), ['escalation_lead'])
+    assert.match((await h.api('notices', cookie.lead)).find(row => row.work_order_id === urgent).text, /no response/)
+    // The assignee reports a parts blocker with a promised date, then misses it; the supervisor hears of the age.
+    await h.api('workorder.respond', cookie.max, { workOrder: urgent, response: 'blocked', kind: 'parts', nextAction: 'Thermocouple ordered from the supplier', promisedOn: today })
+    await h.api('workorder.respond', cookie.mo, { workOrder: urgent, response: 'on_it' }, 403)
+    await h.scheduled(cron, days(2))
+    await h.scheduled(cron, days(2))
+    assert.deepEqual([(await mine('max', urgent)).toSorted(), (await mine('lead', urgent)).toSorted(), await mine('sam', urgent)], [['blocker_missed', 'overdue'], ['blocker_missed', 'escalation_lead'], ['escalation_supervisor']], 'each notice once')
+    // Reassigning is a lead's decision and keeps the overdue age.
+    await h.api('workorder.plan', cookie.max, { workOrder: urgent, plan: `to:${ids.mo}` }, 403)
+    await h.api('workorder.plan', cookie.lead, { workOrder: urgent, plan: `to:${ids.mo}` })
+    const chased = await wo('lead', urgent)
+    assert.deepEqual([chased.assignee_id, chased.chase.overdue_since, chased.chase.overdue_days, chased.chase.blockers.map(row => [row.kind, row.owner, Boolean(row.resolved_at)])], [ids.mo, addDays(today, -1), 1, [['parts', 'Max Ortiz', false]]])
+    await h.api('blocker.resolve', cookie.lead, { blocker: chased.chase.blockers[0].id, resolution: 'Thermocouple fitted' })
+    assert.ok((await wo('lead', urgent)).chase.blockers[0].resolved_at)
+    const page = await (await h.raw(`/app/work/${urgent}`, { cookie: cookie.lead })).text()
+    for (const text of ['Chasing', 'Thermocouple ordered from the supplier', 'Escalated to supervisors']) assert.ok(page.includes(text), text)
+    assert.equal((await h.raw('/app/notices', { cookie: cookie.max })).status, 200)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

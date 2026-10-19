@@ -8,6 +8,7 @@
 // after its due date is listed as issued late, so missed runs stay visible.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
+import { chase } from './chasing'
 import { all, newId, now, one, stmt } from './core'
 import { today } from './dates'
 import { DUE_SCHEDULES, issueDue } from './schedules'
@@ -19,7 +20,10 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
   const current = await site(env)
   if (!current) return { created: 0 }
   const previous = await one<{ ran_at: number }>(env, 'SELECT ran_at FROM gk_scheduler_runs ORDER BY ran_at DESC LIMIT 1')
-  const { created } = await issueDue(env, { id: SCHEDULER.id, today: today(current.timezone, at) }, await all(env, DUE_SCHEDULES), 'workorder.schedule', { automatic: true })
+  const day = today(current.timezone, at)
+  const { created } = await issueDue(env, { id: SCHEDULER.id, today: day }, await all(env, DUE_SCHEDULES), 'workorder.schedule', { automatic: true })
+  // PM-006: then chase overdue work on the same clock.
+  await chase(env, day)
   const gap = previous ? Math.round((at - previous.ran_at) / 60_000) : null
   await env.DB.batch([stmt(env, 'INSERT INTO gk_scheduler_runs (id, cron, ran_at, created, gap_minutes, finished_at) VALUES (?, ?, ?, ?, ?, ?)', newId(), cron, at, created.length, gap !== null && gap > SCHEDULER.missedAfterMinutes ? gap : null, now())])
   return { created: created.length }
