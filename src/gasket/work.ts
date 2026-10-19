@@ -361,9 +361,11 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const meters = await all(env, 'SELECT id, name, unit, kind FROM gk_meters WHERE asset_id = ? ORDER BY name', order.asset_id)
   const readings = await all(env, 'SELECT r.value, r.taken_on, g.name AS meter, g.unit, g.kind, m.name AS entered_by FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id LEFT JOIN gk_members m ON m.id = r.entered_by WHERE r.work_order_id = ? ORDER BY r.taken_on, g.name', id)
   const parts = (await all(env, `SELECT p.id, p.number, p.name, p.unit,
-    -SUM(CASE WHEN mv.kind = 'issue' THEN mv.quantity_milli ELSE 0 END) AS issued, SUM(CASE WHEN mv.kind = 'return' THEN mv.quantity_milli ELSE 0 END) AS returned
+    -SUM(CASE WHEN mv.kind = 'issue' THEN mv.quantity_milli ELSE 0 END) AS issued, SUM(CASE WHEN mv.kind = 'return' THEN mv.quantity_milli ELSE 0 END) AS returned,
+    -SUM(CASE WHEN mv.kind = 'issue' THEN mv.value_cents ELSE 0 END) AS issued_cents, SUM(CASE WHEN mv.kind = 'return' THEN mv.value_cents ELSE 0 END) AS returned_cents, SUM(mv.value_cents IS NULL) AS unpriced
     FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
-    .map(row => ({ ...row, issued: fromMilli(row.issued), returned: fromMilli(row.returned), used: fromMilli(row.issued - row.returned) }))
+    // PART-007: each issue keeps the value it was taken at and each return credits that value, so later prices and returns never rewrite this cost.
+    .map(row => ({ ...row, issued: fromMilli(row.issued), returned: fromMilli(row.returned), used: fromMilli(row.issued - row.returned), usedCents: row.unpriced ? null : row.issued_cents - row.returned_cents }))
   const downtime = (await classifiedStops(env, 'd.work_order_id = ?', id)).map(row => ({ id: row.id, started_on: row.started_on, ended_on: row.ended_on, minutes: row.minutes, reason: row.reason, planned: row.planned, degraded: Boolean(row.degraded), failure_mode: row.failureMode, reclassified: row.reclassified, classifications: row.classifications }))
   const findings = (await all(env, 'SELECT f.id, f.item, f.severity, f.text, f.follow_up_id, f.rule_id, (SELECT group_concat(c.label, \' · \') FROM gk_codes c WHERE c.id IN (f.failure_mode, f.cause, f.remedy, f.risk)) AS codes, f.failure_mode, f.cause, f.remedy, f.risk, w.number AS follow_up_number, w.status AS follow_up_status, w.acknowledged_at AS follow_up_acknowledged, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at, f.item', id))
     .map(row => ({ ...row, obligation: obligation(row) }))

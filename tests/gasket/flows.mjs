@@ -1159,6 +1159,71 @@ try {
     for (const text of ['Reserve part', 'Reserve kit', 'Released']) assert.ok(work.includes(text), text)
   })
 
+  await check('PART-007 inventory valuation and transaction history', async () => {
+    const bearing = (await h.api('part.create', cookie.lead, { number: 'BRG-6310', name: 'Motor bearing', unit: 'each' })).id
+    const value = async () => { const row = await h.api(`parts/${bearing}`, cookie.lead); return [row.onHand, row.valueCents, row.averageCents] }
+    await h.api('part.price', cookie.max, { part: bearing, price: '12.00' }, 403)
+    await h.api('part.price', cookie.lead, { part: bearing, price: '12.005' }, 400)
+    await h.api('part.price', cookie.lead, { part: bearing, price: '$12.00' })
+    // Two differently priced lots, each landing its own freight and sales tax: 10 x $12.00 + $5.00 + $7.92, then 6 x $13.10 + $3.00 + $4.97 through the form.
+    await h.api('part.receive', cookie.lead, { part: bearing, quantity: '10', unitPrice: '12.00', freight: '5.00', tax: '7.92', note: 'PO 5512' })
+    await h.api('part.receive', cookie.lead, { part: bearing, quantity: '1', unitPrice: '-1' }, 400)
+    assert.equal((await h.submit('part.receive', cookie.lead, { part: bearing, quantity: '6', unitPrice: '13.10', freight: '3.00', tax: '4.97' }, `/app/parts/${bearing}`)).searchParams.get('error'), null)
+    assert.deepEqual(await value(), ['16', 21949, 1372], 'stock is valued at landed cost: $132.92 + $86.57, averaging $13.72')
+    // Work consumes at the moving average; the work keeps that value.
+    const job = async title => (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title, due: addDays(today, 2), assignee: ids.max })).id
+    const first = await job('Replace the motor bearings'), second = await job('Replace the fan bearings')
+    await h.api('workorder.issue', cookie.max, { workOrder: first, part: bearing, quantity: '3' })
+    const cost = async id => (await wo('lead', id)).parts.map(row => [row.number, row.used, row.usedCents])
+    assert.deepEqual(await cost(first), [['BRG-6310', '3', 4115]], '3 x 21,949 / 16 = 4,115.44 cents, rounded half up')
+    // A vendor price change revalues neither stock nor work; a later lot without a unit price takes the new vendor price.
+    await h.api('part.price', cookie.lead, { part: bearing, price: '15.00' })
+    assert.deepEqual([await value(), await cost(first)], [['13', 17834, 1372], [['BRG-6310', '3', 4115]]])
+    await h.api('part.receive', cookie.lead, { part: bearing, quantity: '2' })
+    assert.deepEqual(await value(), ['15', 20834, 1389])
+    // A return credits the work's own issue value ($41.15 / 3), not today's average ($13.89).
+    await h.api('workorder.return', cookie.max, { workOrder: first, part: bearing, quantity: '1' })
+    assert.deepEqual([await value(), await cost(first)], [['16', 22206, 1388], [['BRG-6310', '2', 2743]]])
+    await h.api('workorder.issue', cookie.max, { workOrder: second, part: bearing, quantity: '4' })
+    assert.deepEqual([await cost(second), await cost(first)], [[['BRG-6310', '4', 5552]], [['BRG-6310', '2', 2743]]], 'later movements never rewrite earlier work cost')
+    const count = await h.api(`parts/${bearing}`, cookie.lead)
+    await h.api('part.count', cookie.lead, { part: bearing, counted: '11.5', seen: count.seen })
+    assert.deepEqual(await value(), ['11.5', 15960, 1388], 'the half-unit loss is valued at the average: 16,654 x 0.5 / 12 = 693.92 cents')
+    const moves = (await h.api(`parts/${bearing}`, cookie.lead)).moves.reverse().map(move => [move.kind, move.quantity, move.value_cents, move.unit_price_cents, move.freight_cents, move.tax_cents])
+    assert.deepEqual(moves, [['receive', '10', 13292, 1200, 500, 792], ['receive', '6', 8657, 1310, 300, 497], ['issue', '-3', -4115, null, null, null], ['receive', '2', 3000, 1500, 0, 0], ['return', '1', 1372, null, null, null], ['issue', '-4', -5552, null, null, null], ['count', '-0.5', -694, null, null, null]])
+    // The asset's history carries the values its work consumed and returned.
+    const history = (await h.api(`assets/${ids.compressor}/history`, cookie.sam)).events.map(event => event.what)
+    for (const line of [/Issued 3\seach of BRG-6310 Motor bearing at \$41\.15/, /Returned 1\seach of BRG-6310 Motor bearing at \$13\.72/, /Issued 4\seach of BRG-6310 Motor bearing at \$55\.52/]) assert.ok(history.some(what => line.test(what)), String(line))
+    // The period reconciliation: opening + received + issued + returned + counted = closing, in quantity and exact value, for every part.
+    await h.api(`valuation?from=${today}&to=${today}`, cookie.max, undefined, 403)
+    await h.api(`valuation?from=${addDays(today, 1)}&to=${today}`, cookie.owner, undefined, 400)
+    const period = await h.api(`valuation?from=${today}&to=${today}`, cookie.owner)
+    assert.match(period.policy, /Moving-average/)
+    const row = period.parts.find(part => part.id === bearing)
+    assert.deepEqual(['opening', 'received', 'issued', 'returned', 'counted', 'closing'].map(key => [row[key].quantity, row[key].valueCents]), [['0', 0], ['18', 24949], ['-7', -9667], ['1', 1372], ['-0.5', -694], ['11.5', 15960]])
+    assert.deepEqual([row.averageCents, row.unpriced], [1388, 0])
+    const milli = text => Math.round(Number(text) * 1000)
+    for (const part of period.parts) for (const unit of [entry => milli(entry.quantity), entry => entry.valueCents]) assert.equal(unit(part.opening) + unit(part.received) + unit(part.issued) + unit(part.returned) + unit(part.counted), unit(part.closing), part.number)
+    assert.ok(period.parts.some(part => part.unpriced > 0), 'stock received without a price is reported unpriced, never costed')
+    const later = (await h.api(`valuation?from=${addDays(today, 1)}&to=${addDays(today, 1)}`, cookie.lead)).parts.find(part => part.id === bearing)
+    assert.deepEqual([later.opening, later.received.quantity, later.closing], [{ quantity: '11.5', valueCents: 15960 }, '0', { quantity: '11.5', valueCents: 15960 }])
+    assert.equal((await h.raw(`/app/parts/valuation.csv?from=${today}&to=${today}`, { cookie: cookie.max })).status, 403)
+    const csv = await h.raw(`/app/parts/valuation.csv?from=${today}&to=${today}`, { cookie: cookie.sam })
+    assert.match(csv.headers.get('content-type'), /^text\/csv/)
+    const lines = (await csv.text()).trim().split('\r\n')
+    assert.match(lines[0], /^From,To,Part number,Part,Unit,Opening quantity,Opening value \(USD\),Received quantity,Received value \(USD\)/)
+    assert.equal(lines.find(line => line.includes('BRG-6310')), `${today},${today},BRG-6310,Motor bearing,each,0,0.00,18,249.49,-7,-96.67,1,13.72,-0.5,-6.94,11.5,159.60,13.88,0`)
+    assert.match(lines.at(-1), /,Total,/)
+    // Pages: the value, average, vendor price, lot prices and the work's parts cost.
+    const partPage = await (await h.raw(`/app/parts/${bearing}`, { cookie: cookie.lead })).text()
+    for (const text of ['Stock value', '$159.60', 'Average cost', '$13.88 per each', 'Vendor price', '$15.00', '$132.92', '$12.00 each · freight $5.00 · tax $7.92', 'Unit price (USD per each)', 'Save price']) assert.ok(partPage.includes(text), text)
+    const list = await (await h.raw('/app/parts', { cookie: cookie.sam })).text()
+    for (const text of ['Stock value', 'Moving-average cost', 'Download reconciliation']) assert.ok(list.includes(text), text)
+    assert.ok(!(await (await h.raw('/app/parts', { cookie: cookie.max })).text()).includes('Download reconciliation'))
+    const workPage = await (await h.raw(`/app/work/${first}`, { cookie: cookie.max })).text()
+    for (const text of ['Parts cost', '$27.43']) assert.ok(workPage.includes(text), text)
+  })
+
   await check('ASSET-006 bill of materials and interchangeable spares', async () => {
     const motor = (await h.api('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', location: 'Dock' })).id
     const part = async (number, name, quantity) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each' })).id; if (quantity) await h.api('part.receive', cookie.lead, { part: id, quantity }); return id }

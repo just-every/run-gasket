@@ -25,6 +25,7 @@ import { API_DOORS, match } from './doors'
 import { assetHistory } from './history'
 import { importJobs } from './movein/maintainx'
 import { partDetail, partList } from './parts'
+import { reconciliation } from './valuation'
 import { proposalList } from './proposals'
 import { scheduleList } from './schedules'
 import { schedulerView } from './scheduler'
@@ -42,6 +43,7 @@ export const views: Record<string, View> = {
   history: (env, actor, id) => assetHistory(env, actor, id),
   parts: (env, actor) => partList(env, actor),
   part: (env, actor, id) => partDetail(env, actor, id),
+  valuation: (env, actor, _id, url) => reconciliation(env, actor, url),
   checklists: (env, actor) => checklistList(env, actor),
   checklist: (env, actor, id) => checklistDetail(env, actor, id),
   schedules: (env, actor) => scheduleList(env, actor),

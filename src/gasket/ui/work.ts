@@ -10,6 +10,7 @@ import { can, type Actor } from '../actor'
 import { codeList } from '../codes'
 import { daysBetween, localNow, showClock, showDate, showDay, showInstant, showLocal, showTime } from '../dates'
 import { partList } from '../parts'
+import { usd } from '../bad-actors'
 import { assignable, site } from '../site'
 import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../today'
 import { woDigits } from '../quantity'
@@ -213,7 +214,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     ${kits.length ? post('workorder.reserve', h`${select('Repair kit', 'kit', kits.map(kit => ({ value: kit.id, label: `${kit.name}: ${kit.lines.map(line => `${line.quantity} ${line.number}`).join(', ')}` })), '', { blank: 'Choose a kit' })}
       ${swaps.length ? select('Use a substitute', 'swap', swaps.map(row => ({ value: `${row.part_id}:${row.substitute_id}`, label: `${row.substitute_number} for ${row.part_number}` })), '', { required: false, blank: 'No substitute' }) : ''}`, 'Reserve kit', { secondary: true }) : ''}</div>
     ${w.reservations.some(row => row.state === 'open') ? post('reservation.release', h`${select('Reservation', 'reservation', w.reservations.filter(row => row.state === 'open').map(row => ({ value: row.id, label: `${row.part.number} ${row.part.name}` })), '', { blank: 'Choose a reservation' })}${field('Reason', 'reason')}`, 'Release reservation', { secondary: true }) : ''}` : ''
-  const parts = card('Parts issued and returned', h`${held}${w.parts.length ? table(['Part', 'Issued', 'Returned', 'Used'], w.parts.map(row => [h`${row.name}<span class="gk-sub">${row.number}</span>`, amount(row.issued, row.unit), amount(row.returned, row.unit), amount(row.used, row.unit)]), 'Parts', { wrap: [0] }) : h`<p class="gk-muted">No parts issued.</p>`}
+  const parts = card('Parts issued and returned', h`${held}${w.parts.length ? table(['Part', 'Issued', 'Returned', 'Used', 'Parts cost'], w.parts.map(row => [h`${row.name}<span class="gk-sub">${row.number}</span>`, amount(row.issued, row.unit), amount(row.returned, row.unit), amount(row.used, row.unit), row.usedCents === null ? 'Unpriced' : usd(row.usedCents)]), 'Parts', { wrap: [0] }) : h`<p class="gk-muted">No parts issued.</p>`}
     ${recording && stock.length ? h`<div class="gk-split">${post('workorder.issue', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.onHand, part.unit)} on hand)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Issue part', { secondary: true })}
       ${w.parts.length ? post('workorder.return', h`${select('Part', 'part', w.parts.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.used, part.unit)} held)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Return unused', { secondary: true }) : ''}</div>` : ''}${reserveForms}`, { id: 'parts' })
 

@@ -6,6 +6,7 @@ import { all, insist, one } from './core'
 import { showInstant, showLocal, zonedInstant } from './dates'
 import { assetDetail } from './assets'
 import { fromMilli, showNumber } from './quantity'
+import { usd } from './bad-actors'
 
 export interface Event { when: string; at: number; kind: string; workOrder: string | null; what: string; who: string | null }
 
@@ -47,8 +48,8 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
     const what = row.kind === 'correction' ? `reading of ${row.was} taken ${showLocal(row.effective_on)} corrected to ${row.value}` : `counter ${row.kind} at ${showLocal(row.effective_on)}: last ${showNumber(row.last_value)}, new counter starts at ${showNumber(row.start_value)}`
     push(row.recorded_at, 'meter', null, `${row.meter}: ${what} (${row.reason})`, name(row))
   }
-  for (const row of await all(env, "SELECT mv.work_order_id, mv.kind, mv.quantity_milli, mv.at, p.number, p.name, p.unit, m.name AS who FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id LEFT JOIN gk_members m ON m.id = mv.actor WHERE mv.work_order_id IN (SELECT id FROM gk_work_orders WHERE asset_id = ?) ORDER BY mv.seq", id)) {
-    push(row.at, 'part', row.work_order_id, `${row.kind === 'issue' ? 'Issued' : 'Returned'} ${showNumber(fromMilli(Math.abs(row.quantity_milli)))}\u00a0${row.unit} of ${row.number} ${row.name}`, name(row))
+  for (const row of await all(env, "SELECT mv.work_order_id, mv.kind, mv.quantity_milli, mv.value_cents, mv.at, p.number, p.name, p.unit, m.name AS who FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id LEFT JOIN gk_members m ON m.id = mv.actor WHERE mv.work_order_id IN (SELECT id FROM gk_work_orders WHERE asset_id = ?) ORDER BY mv.seq", id)) {
+    push(row.at, 'part', row.work_order_id, `${row.kind === 'issue' ? 'Issued' : 'Returned'} ${showNumber(fromMilli(Math.abs(row.quantity_milli)))}\u00a0${row.unit} of ${row.number} ${row.name}${row.value_cents === null ? '' : ` at ${usd(Math.abs(row.value_cents))}`}`, name(row))
   }
   for (const row of await all(env, 'SELECT d.work_order_id, d.started_on, d.ended_on, d.minutes, d.reason, d.recorded_at, m.name AS who FROM gk_downtime d LEFT JOIN gk_members m ON m.id = d.recorded_by WHERE d.asset_id = ? ORDER BY d.started_on, d.id', id)) {
     push(row.recorded_at, 'downtime', row.work_order_id, `Down from ${showLocal(row.started_on)}${row.ended_on ? ` to ${showLocal(row.ended_on)} (${row.minutes} min)` : ' (still down)'}: ${row.reason}`, name(row))

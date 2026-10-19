@@ -28,6 +28,7 @@ import { approveSubstitute, createKit, release, reserve } from './reservations'
 import { reviseBom } from './bom'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
+import { setVendorPrice } from './valuation'
 import { decide, prepare } from './proposals'
 import { exceptStep, review, submit } from './review'
 import { createRoute, issueRoute, missStop, signRun } from './routes'
@@ -72,6 +73,7 @@ export const actions: Record<string, Handler> = {
   'part.create': (env, actor, input) => createPart(env, actor, input),
   'part.receive': (env, actor, input) => receivePart(env, actor, input),
   'part.count': (env, actor, input) => countPart(env, actor, input),
+  'part.price': (env, actor, input) => setVendorPrice(env, actor, input),
   'part.substitute': (env, actor, input) => approveSubstitute(env, actor, input),
   'kit.create': (env, actor, input) => createKit(env, actor, input),
   'bom.revise': (env, actor, input) => reviseBom(env, actor, input),
