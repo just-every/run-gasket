@@ -97,6 +97,7 @@ export async function reopen(env: Bindings, actor: Actor, input: Input) {
   const reason = input.text('reason', { max: 500 })
   insist(order.status === 'cancelled' || (order.status === 'closed' && order.kind === 'corrective'), 'not_reopenable', 409)
   insist(!order.merged_into, 'merged', 409)
+  insist(!await one(env, 'SELECT 1 FROM gk_nested_satisfaction WHERE lower_work=?', order.id), 'satisfied_by_equivalent', 409)
   const to = order.status === 'cancelled' ? 'open' : 'returned'
   // A preventive occurrence reopens only while its schedule has no other open work (gk_work_orders_one_open).
   await commit(env, [

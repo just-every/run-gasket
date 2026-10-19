@@ -96,3 +96,7 @@ Kinds and their payload fields (all strings):
 - `count`: `part`, `counted`, optional `note`.
 
 The answer carries the proposal `id` and the SHA-256 `hash` of its exact payload. The payload is validated when prepared. A lead or the owner who did not prepare it decides on the Proposals screen or with `proposal.decide` (`proposal`, `decision` `approve` with the `hash`, or `reject` with a `note`). Approval runs the normal command as that person in the same atomic batch and answers `409 proposal_stale` if the asset or part the proposal relied on changed in the meantime.
+
+## PM-009 nested preventive programs
+
+`GET /api/gasket/programs` lists immutable task mappings and occurrence satisfaction evidence. `POST nested.map` (lead/owner) takes `higher`, `lower` schedule ids, `tasks` (lines such as `1 = 2`, lower task = higher task) and `reason`. Every lower task must map to a compatible higher step, with both current procedure revisions pinned. `POST nested.satisfy` (lead/owner) takes `higherWork`, `lowerWork` and optional `preview: true`; preview and missing tasks write nothing. Closed independently approved higher work can satisfy untouched lower work on the same due day only when all mapped tasks have passing original evidence. `/app/programs` serves mapping, preview/apply and retained evidence. The lower work is retained as cancelled with an explicit equivalent-work link, never recorded as performed.

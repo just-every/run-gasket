@@ -1,6 +1,7 @@
 // Gasket's public doors: /app pages, /app/do/ACTION form posts, /api/gasket
 // JSON and evidence downloads. Every request resolves the signed-in member
 // first; nothing is served to a signed-out request.
+import { nestedPage } from './ui/nested'
 import { runtimeBindings, type Bindings } from '../auth.server'
 import { AuthError, safeReturnTo } from '../modules/operator-auth/index.mjs'
 import { actions } from './actions'
@@ -127,6 +128,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  nested: (env, actor, url) => nestedPage(env, actor, url),
   automation: (env, actor, url) => automationPage(env, actor, url),
   purchasing: (env, actor, url) => purchasingPage(env, actor, url),
   supplier: (env, actor, url, id) => supplierPage(env, actor, id, url),

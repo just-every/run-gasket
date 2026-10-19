@@ -12,6 +12,7 @@ import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, 
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney } from './automation.mjs'
+import { nestedJourney } from './nested.mjs'
 import { purchasingJourney } from './purchasing.mjs'
 import { now, zone } from './clock.mjs'
 
@@ -2197,6 +2198,7 @@ try {
     for (const text of ['Compressor service manual', 'Revision 3: copeland-ae4-1418-c.pdf', 'Expired', 'Coolflow Refrigeration Supply']) assert.ok(page.includes(text), text)
   })
 
+  await check('PM-009 nested programs', nestedJourney)
   await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
 
   await check('BUY-001 vendor records and maintenance requisitions', async () => {

@@ -1,5 +1,6 @@
 // Read models served at GET /api/gasket/... Every view applies the same role
 // checks as the page that renders it.
+import { nestedPrograms } from './nested'
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { assetDetail, assetList } from './assets'
@@ -40,6 +41,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  nested: env => nestedPrograms(env),
   automation: (env, actor) => automationHealth(env, actor),
   automationLedger: (env, actor, _id, url) => ledgerView(env, actor, url),
   automationPreview: (env, actor, _id, url) => previewAutomation(env, actor, url.searchParams.get('schedule') ?? ''),

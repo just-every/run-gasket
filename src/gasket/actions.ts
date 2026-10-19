@@ -1,6 +1,7 @@
 // Every state change in Gasket, by name. The same handler serves the HTML form
 // door (/app/do/NAME) and the JSON door (/api/gasket/NAME) agents use. Each
 // handler checks the actor's role itself.
+import { saveEquivalence, satisfyNested } from './nested'
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
 import { collaborate, createTeam, decline, teamMember } from './crew'
@@ -48,6 +49,8 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'nested.map': (env, actor, input) => saveEquivalence(env, actor, input),
+  'nested.satisfy': (env, actor, input) => satisfyNested(env, actor, input),
   'automation.control': (env, actor, input) => controlAutomation(env, actor, input),
   'automation.schedule': (env, actor, input) => controlSchedule(env, actor, input),
   'automation.catchup': (env, actor, input) => catchUp(env, actor, input),
