@@ -22,6 +22,7 @@ export const NAV: Destination[] = [
   { href: '/app/parts', label: 'Parts', detail: 'Spares on the shelf.', icon: ICON.parts, show: () => true },
   { href: '/app/proposals', label: 'Proposals', detail: 'Schedules, corrective work and counts an agent prepared for approval.', icon: ICON.proposals, show: actor => can(actor, 'proposal.prepare') || can(actor, 'proposal.decide'), count: 'proposals' },
   { href: '/app/board', label: 'Overdue and downtime', detail: 'Overdue work, work waiting for review, follow-ups, assets down and low parts.', icon: ICON.board, show: actor => can(actor, 'board.read') },
+  { href: '/app/stores', label: 'Stores', detail: 'Stockouts, parts demand by asset and work, slow and dead stock, turns and count accuracy.', icon: ICON.board, show: actor => can(actor, 'board.read') },
   { href: '/app/performance', label: 'Performance', detail: 'Backlog hours and age, PM compliance, planned and reactive work, schedule attainment.', icon: ICON.board, show: actor => can(actor, 'board.read') },
   { href: '/app/availability', label: 'Availability', detail: 'Production time, planned and down time, availability and unknown coverage by line and asset, with each outage.', icon: ICON.board, show: actor => can(actor, 'board.read') },
   { href: '/app/bad-actors', label: 'Downtime Pareto', detail: 'Downtime ranked by asset, line, failure mode and reason, with repeats, repair cost and documented lost production.', icon: ICON.board, show: actor => can(actor, 'board.read') },

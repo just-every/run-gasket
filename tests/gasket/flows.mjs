@@ -1290,6 +1290,62 @@ try {
     assert.ok((await (await h.raw('/app/site', { cookie: cookie.owner })).text()).includes('Cycle count approval'))
   })
 
+  await check('PART-009 stock performance and inventory history', async () => {
+    const part = async (number, name, quantity, unitPrice) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each', location: 'Panel cage' })).id; await h.api('part.receive', cookie.lead, { part: id, quantity, unitPrice }); return id }
+    const fuse = await part('SPR-1', 'Control fuse', '4', '3.00'), relay = await part('SPR-2', 'Safety relay', '2', '40.00'), contactor = await part('SPR-3', 'Spare contactor', '1', '90.00')
+    const asset = async (tag, name) => (await h.api('asset.create', cookie.lead, { tag, name, location: 'Line 2' })).id
+    const panel = await asset('HK-091', 'Line 2 control panel'), press = await asset('HK-092', 'Line 2 press')
+    const job = async (on, title) => (await h.api('workorder.create', cookie.lead, { asset: on, title, due: addDays(today, 1), assignee: ids.max })).id
+    const a = await job(panel, 'Replace blown control fuses'), b = await job(press, 'Replace the press safety relay')
+    // Reserve, issue, return and count: the fuse and the relay run out, the contactor never moves.
+    await h.api('workorder.reserve', cookie.lead, { workOrder: b, part: relay, quantity: '1' })
+    await h.api('workorder.issue', cookie.max, { workOrder: a, part: fuse, quantity: '4' })
+    await h.api('workorder.return', cookie.max, { workOrder: a, part: fuse, quantity: '1' })
+    await h.api('workorder.issue', cookie.max, { workOrder: b, part: relay, quantity: '2' })
+    await h.api('part.count', cookie.lead, { part: fuse, counted: '1', seen: (await h.api(`parts/${fuse}`, cookie.lead)).seen })
+    await h.api('stores', cookie.max, undefined, 403)
+    await h.api(`stores?from=${today}&to=${addDays(today, -1)}`, cookie.sam, undefined, 400)
+    await h.api(`stores?site=Elsewhere`, cookie.sam, undefined, 404)
+    const site = (await h.api('site', cookie.sam)).name
+    const r = await h.api(`stores?from=${today}&to=${today}&site=${encodeURIComponent(site)}`, cookie.sam)
+    const mine = [fuse, relay, contactor]
+    // Stockouts: each event names the movement that emptied the shelf; the share's denominator is every stocked part.
+    assert.deepEqual(r.stockouts.events.filter(event => mine.includes(event.part.id)).map(event => [event.part.number, event.kind, event.workOrder]), [['SPR-1', 'issue', (await wo('lead', a)).number], ['SPR-2', 'issue', (await wo('lead', b)).number]])
+    assert.equal(r.stockouts.percent, Math.round(r.stockouts.withStockout / r.stockouts.stocked * 1000) / 10)
+    assert.deepEqual(r.stockouts.outNow.filter(row => mine.includes(row.id)).map(row => row.number), ['SPR-2'])
+    // Demand by work order and asset, at the values the work kept; the open reservation was issued, so nothing stays committed for it.
+    assert.deepEqual(r.demand.byWorkOrder.filter(row => [a, b].includes(row.id)).map(row => [row.asset, row.parts, row.valueCents]), [['HK-092', [{ number: 'SPR-2', name: 'Safety relay', unit: 'each', quantity: '2' }], 8000], ['HK-091', [{ number: 'SPR-1', name: 'Control fuse', unit: 'each', quantity: '3' }], 900]])
+    assert.deepEqual(r.demand.byAsset.filter(row => [panel, press].includes(row.id)).map(row => [row.tag, row.valueCents]), [['HK-092', 8000], ['HK-091', 900]])
+    assert.ok(!r.demand.committed.some(row => row.id === relay))
+    // Count accuracy: the fuse count matched; the totals are the sum of every counted part.
+    assert.deepEqual(r.counts.parts.find(row => row.id === fuse), { id: fuse, number: 'SPR-1', counted: 1, hits: 1 })
+    assert.deepEqual([r.counts.counted, r.counts.hits], [r.counts.parts.reduce((sum, row) => sum + row.counted, 0), r.counts.parts.reduce((sum, row) => sum + row.hits, 0)])
+    // Value and turns reconcile with the PART-007 reconciliation of the same period.
+    const valuation = await h.api(`valuation?from=${today}&to=${today}`, cookie.sam)
+    assert.deepEqual([r.value.openingCents, r.value.closingCents, r.value.netIssuedCents], [valuation.totals.opening, valuation.totals.closing, -(valuation.totals.issued + valuation.totals.returned)])
+    assert.equal(r.value.turns, Math.round(r.value.netIssuedCents / r.value.averageCents * 100) / 100)
+    // Today nothing is slow that was issued; the contactor sits. Aged a month, the fuse is slow; aged past a year, it is dead.
+    assert.deepEqual(r.slow.filter(row => mine.includes(row.id)).map(row => row.number), ['SPR-3'])
+    const month = await h.api(`stores?from=${addDays(today, 1)}&to=${addDays(today, 30)}`, cookie.lead)
+    assert.deepEqual([month.slow.filter(row => mine.includes(row.id)).map(row => row.number), month.dead.filter(row => mine.includes(row.id)).map(row => row.number), month.stockouts.events.filter(event => mine.includes(event.part.id))], [['SPR-1', 'SPR-3'], ['SPR-3'], []])
+    const year = await h.api(`stores?from=${addDays(today, 370)}&to=${addDays(today, 370)}`, cookie.lead)
+    assert.deepEqual(year.dead.filter(row => mine.includes(row.id)).map(row => row.number), ['SPR-1', 'SPR-3'])
+    // Moved-in opening stock is shown apart from native receipts.
+    assert.deepEqual(r.movedIn.find(row => row.number === 'GSK-BC20')?.openingQuantity, '2')
+    assert.ok(!r.movedIn.some(row => mine.includes(row.id)))
+    // Source movements for the period, with origin, value, reason, work order and asset.
+    assert.equal((await h.raw(`/app/stores/movements.csv?from=${today}&to=${today}`, { cookie: cookie.max })).status, 403)
+    const csv = (await (await h.raw(`/app/stores/movements.csv?from=${today}&to=${today}`, { cookie: cookie.sam })).text()).trim().split('\r\n')
+    assert.equal(csv[0], 'When (site time),Part number,Part,Unit,Movement,Quantity,Value (USD),Reason,Work order,Asset tag,Origin,By')
+    const fuseRows = csv.filter(line => line.includes(',SPR-1,')).map(line => line.split(',').slice(4))
+    assert.deepEqual(fuseRows, [['Received', '4', '12.00', '', '', '', 'native', 'Lena Park'], ['Issued', '-4', '-12.00', '', `WO-${String((await wo('lead', a)).number).padStart(4, '0')}`, 'HK-091', 'native', 'Max Ortiz'], ['Returned', '1', '3.00', '', `WO-${String((await wo('lead', a)).number).padStart(4, '0')}`, 'HK-091', 'native', 'Max Ortiz'], ['Count adjustment', '0', '0.00', '', '', '', 'native', 'Lena Park']])
+    const wide = (await (await h.raw(`/app/stores/movements.csv?from=${addDays(today, -365)}&to=${today}`, { cookie: cookie.sam })).text())
+    assert.ok(wide.split('\r\n').some(line => line.includes(',GSK-BC20,') && line.includes(',moved in,')), 'moved-in opening stock is marked in the source movements')
+    const html = await (await h.raw(`/app/stores?from=${today}&to=${today}`, { cookie: cookie.lead })).text()
+    for (const text of ['Stockouts', 'Demand', 'Line 2 control panel', 'Slow stock', 'Dead stock', 'Count accuracy', 'Moved in from MaintainX', 'Download source movements', 'Turns']) assert.ok(html.includes(text), text)
+    assert.equal((await h.raw('/app/stores', { cookie: cookie.max })).status, 403)
+  })
+
   await check('ASSET-006 bill of materials and interchangeable spares', async () => {
     const motor = (await h.api('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', location: 'Dock' })).id
     const part = async (number, name, quantity) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each' })).id; if (quantity) await h.api('part.receive', cookie.lead, { part: id, quantity }); return id }

@@ -26,6 +26,8 @@ import { page } from './ui/shell'
 import { moveInPage, previewPage } from './ui/movein'
 import { partPage, partsPage } from './ui/parts'
 import { countPage } from './ui/counts'
+import { storesPage } from './ui/stores'
+import { storesMovementsCsv } from './stores'
 import { proposalsPage } from './ui/proposals'
 import { checklistPage, schedulesPage } from './ui/schedules'
 import { codesPage } from './ui/codes'
@@ -139,6 +141,8 @@ const pages: Record<string, Page> = {
   parts: (env, actor, url) => partsPage(env, actor, url),
   part: (env, actor, url, id) => partPage(env, actor, id, url),
   count: (env, actor, url, id) => countPage(env, actor, id, url),
+  stores: guarded(actor => can(actor, 'board.read'), (env, actor, url) => storesPage(env, actor, url)),
+  storesCsv: async (env, actor, url) => new Response(await storesMovementsCsv(env, actor, url), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="stores-movements.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   valuationCsv: async (env, actor, url) => new Response(await reconciliationCsv(env, actor, url), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="parts-valuation.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   board: guarded(actor => can(actor, 'board.read'), (env, actor, url) => boardPage(env, actor, url)),
   proposals: (env, actor, url) => proposalsPage(env, actor, url),

@@ -27,6 +27,7 @@ import { importJobs } from './movein/maintainx'
 import { partDetail, partList } from './parts'
 import { reconciliation } from './valuation'
 import { countDetail, countList } from './counts'
+import { storesReport } from './stores'
 import { proposalList } from './proposals'
 import { scheduleList } from './schedules'
 import { schedulerView } from './scheduler'
@@ -47,6 +48,7 @@ export const views: Record<string, View> = {
   valuation: (env, actor, _id, url) => reconciliation(env, actor, url),
   counts: (env, actor) => countList(env, actor),
   count: (env, actor, id) => countDetail(env, actor, id),
+  stores: (env, actor, _id, url) => storesReport(env, actor, url),
   checklists: (env, actor) => checklistList(env, actor),
   checklist: (env, actor, id) => checklistDetail(env, actor, id),
   schedules: (env, actor) => scheduleList(env, actor),
