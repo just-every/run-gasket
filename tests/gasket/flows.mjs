@@ -7,7 +7,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { join } from 'node:path'
 import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
-import { assetsCsv, partsCsv, png, readingsCsv } from './fixtures.mjs'
+import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, workCsv } from './fixtures.mjs'
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 
@@ -318,7 +318,7 @@ try {
     await h.api('import.preview', cookie.max, files, 403)
     const before = (await h.api('assets', cookie.lead)).length
     const preview = await h.api('import.preview', cookie.lead, files)
-    assert.deepEqual(preview.create, { assets: 3, meters: 2, readings: 3, parts: 3 })
+    assert.deepEqual(preview.create, { assets: 3, meters: 2, readings: 3, parts: 3, work: 0 })
     const reasons = preview.rejected.map(row => row.reason).join(' | ')
     for (const expected of ['duplicate of row 3', 'no location', 'criticality "Urgent"', 'quantity "lots"', 'lower than the earlier 8655', 'asset "Salamander grill" is not in this move-in', 'its meter (Core probe) was not moved in']) assert.ok(reasons.includes(expected), `rejected: ${expected}\n${reasons}`)
     assert.ok(preview.attention.some(row => /Offline in MaintainX/.test(row.reason)))
@@ -338,7 +338,7 @@ try {
     assert.equal(seal.onHand, '3.5')
     // A dry run of the same files after the apply would create nothing, and says so.
     const repeat = await h.api('import.preview', cookie.lead, files)
-    assert.deepEqual(repeat.create, { assets: 0, meters: 0, readings: 0, parts: 0 })
+    assert.deepEqual(repeat.create, { assets: 0, meters: 0, readings: 0, parts: 0, work: 0 })
     assert.equal(repeat.unchanged, 11)
     // Applying the same reviewed files again adds nothing.
     assert.equal((await h.api('import.apply', cookie.lead, { ...files, fingerprint: preview.fingerprint })).job, applied.job)
@@ -357,6 +357,36 @@ try {
     const jobs = await h.api('imports', cookie.lead)
     assert.deepEqual(jobs.map(job => job.state), ['completed', 'undone'])
     assert.equal(jobs[0].blockers.length, 1)
+  })
+
+  await check('MIG-002 MaintainX completed work history across date ranges', async () => {
+    const first = { assets: file('maintainx-assets-2.csv', historyAssetsCsv), work: file('maintainx-work-orders-q1.csv', workCsv) }
+    const preview = await h.api('import.preview', cookie.lead, first)
+    assert.deepEqual(preview.create, { assets: 2, meters: 0, readings: 0, parts: 0, work: 2 })
+    const reasons = preview.rejected.map(row => row.reason).join(' | ')
+    for (const expected of ['work order 7003 is Open in MaintainX', 'duplicate of row 2', 'asset "Salamander grill" is not in this move-in', 'Total Parts Cost "lots"', 'completion is dated in the future']) assert.ok(reasons.includes(expected), `rejected: ${expected}\n${reasons}`)
+    const one = await h.api('import.apply', cookie.lead, { ...first, fingerprint: preview.fingerprint })
+    const freezer = (await h.api('assets', cookie.lead)).find(row => row.tag === 'HK-201')
+    let events = (await h.api(`assets/${freezer.id}/history`, cookie.sam)).events
+    const service = events.find(event => event.what.includes('#7001'))
+    assert.deepEqual([service?.who, /preventive/.test(service?.what), /repeats Every 3 months/.test(service?.what), /parts \$86\.00, labor \$120\.00/.test(service?.what)], ['MaintainX: Dana Reyes', true, true, true], service?.what)
+    // History only: no Gasket work order or schedule comes from it.
+    assert.ok(events.every(event => !event.workOrder), 'moved-in history raises no work')
+    assert.equal((await h.api(`assets/${freezer.id}`, cookie.lead)).schedules.length, 0)
+    // The next date range: the overlapping completed order is recognised by its MaintainX ID; only the new one moves in.
+    const second = { ...first, work: file('maintainx-work-orders-q2.csv', laterWorkCsv) }
+    const later = await h.api('import.preview', cookie.lead, second)
+    assert.deepEqual([later.create, later.unchanged, later.rejected.length], [{ assets: 0, meters: 0, readings: 0, parts: 0, work: 1 }, 3, 0])
+    const two = await h.api('import.apply', cookie.lead, { ...second, fingerprint: later.fingerprint })
+    events = (await h.api(`assets/${freezer.id}/history`, cookie.sam)).events
+    assert.deepEqual(events.filter(event => event.kind === 'history').map(event => event.what.match(/#\d+/)[0]), ['#7001', '#7008'])
+    assert.ok((await (await h.raw(`/app/assets/${freezer.id}/history.csv`, { cookie: cookie.sam })).text()).includes('Completed in MaintainX (#7008'))
+    // The later range builds on the first range's asset: undo the later one first.
+    assert.equal((await h.api('import.job', cookie.lead, { job: one.job, action: 'undo' }, 409)).error, 'undo_blocked')
+    await h.api('import.job', cookie.lead, { job: two.job, action: 'undo' })
+    assert.deepEqual((await h.api(`assets/${freezer.id}/history`, cookie.sam)).events.filter(event => event.kind === 'history').length, 1)
+    await h.api('import.job', cookie.lead, { job: one.job, action: 'undo' })
+    assert.ok(!(await h.api('assets', cookie.lead)).some(row => row.tag === 'HK-201'))
   })
 
   await check('GAS-13 agent prepares, a person approves', async () => {

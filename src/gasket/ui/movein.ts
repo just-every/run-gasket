@@ -16,7 +16,8 @@ export async function moveInPage(env: Bindings, actor: Actor, url: URL) {
     ${fileField('Asset export (CSV)', 'assets', { required: true, accept: '.csv', hint: 'Reporting → Export Data → Assets, all columns.' })}
     ${fileField('Part export (CSV)', 'parts', { accept: '.csv', hint: 'Optional. Reporting → Export Data → Parts.' })}
     ${fileField('Meter reading export (CSV)', 'readings', { accept: '.csv', hint: 'Optional. Reporting → Export Data → Meter Readings, manual meters.' })}
-    ${select('Dates in the reading export', 'dateFormat', [{ value: 'MDY', label: 'Month first (MaintainX default, 04/28/2026)' }, { value: 'DMY', label: 'Day first (28/04/2026)' }], 'MDY')}
+    ${fileField('Work order export (CSV)', 'work', { accept: '.csv', hint: 'Optional. Work Orders → Export → CSV, all columns, for each date range. Completed work moves in as asset history.' })}
+    ${select('Dates in the exports', 'dateFormat', [{ value: 'MDY', label: 'Month first (MaintainX default, 04/28/2026)' }, { value: 'DMY', label: 'Day first (28/04/2026)' }], 'MDY')}
     <div class="gk-actions"><button type="submit">Dry run</button></div></form><p class="gk-hint">A dry run reads the files and writes nothing.</p>`, { id: 'upload' })
   const journal = card('Move-in journal', jobs.length ? table(['Applied', 'State'], jobs.map(job => [h`${showInstant(job.appliedAt, actor.zone)}<span class="gk-sub">${job.by ?? '—'} · ${showNumber(job.effects)} record${job.effects === 1 ? '' : 's'}</span>`,
     h`${tag(STATE[job.state] ?? job.state)}${job.state === 'completed' ? (job.blockers.length ? h`<span class="gk-sub">Undo blocked: ${job.blockers.length} record(s) were edited or built on since</span>` : form('import.job', '/app/move-in', h`${hidden('job', job.id)}${hidden('action', 'undo')}`, 'Undo this move-in', { secondary: true, layout: 'gk-inline' })) : ''}`]), 'Move-ins', { wrap: [1] }) : h`<p class="gk-muted">Nothing moved in yet.</p>`, { id: 'journal' })
@@ -26,7 +27,7 @@ export async function moveInPage(env: Bindings, actor: Actor, url: URL) {
 export async function previewPage(env: Bindings, actor: Actor, input: Input, url: URL) {
   const preview = await previewImport(env, actor, input)
   const counts = preview.create
-  const summary = h`<ul class="gk-tiles" aria-label="Would create">${[['Assets', counts.assets], ['Meters', counts.meters], ['Readings', counts.readings], ['Parts', counts.parts], ['Rejected rows', preview.rejected.length]].map(([label, n]) => h`<li><span class="gk-tile-n">${showNumber(n)}</span><span>${label}</span></li>`)}</ul>`
+  const summary = h`<ul class="gk-tiles" aria-label="Would create">${[['Assets', counts.assets], ['Meters', counts.meters], ['Readings', counts.readings], ['Parts', counts.parts], ['Completed work', counts.work], ['Rejected rows', preview.rejected.length]].map(([label, n]) => h`<li><span class="gk-tile-n">${showNumber(n)}</span><span>${label}</span></li>`)}</ul>`
   const apply = form('import.apply', '/app/move-in', h`${hidden('fingerprint', preview.fingerprint)}${Object.entries(preview.carry).map(([key, value]) => hidden(key, value))}`, 'Apply this move-in')
   return page(env, 'Dry run', actor, h`${backLink('/app/move-in', 'Move in')}<h1>Dry run: nothing has been written</h1>${summary}${preview.unchanged ? h`<p class="gk-muted">Already moved in, unchanged: ${preview.unchanged} row${preview.unchanged === 1 ? '' : 's'}. Applying again leaves them as they are.</p>` : ''}
     ${card('Rejected rows', preview.rejected.length ? table(['Where', 'Why'], preview.rejected.map(row => [row.location, row.reason]), 'Rejected rows', { wrap: [1] }) : h`<p class="gk-muted">No rows rejected.</p>`, { id: 'rejected' })}

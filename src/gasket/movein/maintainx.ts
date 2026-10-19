@@ -1,5 +1,5 @@
-// Move-in kit 1: MaintainX. Reads MaintainX's asset export, part export and
-// manual meter-reading export (CSV, MaintainX's documented column names)
+// Move-in kit 1: MaintainX. Reads MaintainX's asset export, part export,
+// manual meter-reading export and work-order export (MIG-002 history) (CSV, MaintainX's documented column names)
 // through Base's import kit: a dry run that writes nothing, apply bound to the
 // reviewed fingerprint, a durable journal with retained originals, re-import
 // that adds nothing, and strict undo that removes only an untouched import.
@@ -12,16 +12,18 @@ import { isDate, localNow } from '../dates'
 import type { Input } from '../input'
 import { compareMeter, meterNumber, toMilli } from '../quantity'
 import { columns, readCsv } from './csv'
+import { WORK_NEEDS, mapWork } from './maintainx-work'
 import { KINDS, gasketTargets } from './target'
 
 const namespace = 'maintainx', mappingVersion = 'maintainx-csv-1', destination = 'register'
 const FILE_BYTES = 4_000_000
-const FILES = ['assets', 'parts', 'readings'] as const
+const FILES = ['assets', 'parts', 'readings', 'work'] as const
 type FileName = typeof FILES[number]
 const NEEDS: Record<FileName, string[]> = {
   assets: ['ID', 'Name'],
   parts: ['ID', 'Name', 'Quantity'],
   readings: ['Meter ID', 'Meter Name', 'Asset Name', 'Unit of Measure (U/M)', 'Reading', 'Entered On'],
+  work: WORK_NEEDS,
 }
 const COUNTER_UNITS = /^(h|hr|hrs|hour|hours|km|kms|kilometres|kilometers|mi|mile|miles|cycle|cycles|count|counts|start|starts)$/i
 
@@ -61,12 +63,13 @@ export const targetIds = {
   meter: (id: string) => hex(`gasket:maintainx:meter:${id}`),
   reading: (meter: string, row: string) => hex(`gasket:maintainx:reading:${meter}:${row}`),
   part: (id: string) => hex(`gasket:maintainx:part:${id}`),
+  work: (id: string) => hex(`gasket:maintainx:work:${id}`),
 }
 
 export interface Preview {
   fingerprint: string
   counts: Json
-  create: { assets: number; meters: number; readings: number; parts: number }
+  create: { assets: number; meters: number; readings: number; parts: number; work: number }
   /** Rows an earlier apply already moved in with the same values: applying again leaves them as they are. */
   unchanged: number
   rejected: { location: string; reason: string }[]
@@ -159,6 +162,13 @@ async function build(env: Bindings, actor: Actor, input: Input) {
       record('reading', count === 1 ? key : `${key}:${count}`, { row: row.row, cells: cellsOf(readings, row.cells) }, readings, row.row)
     }
   }
+  // Work history last, so an undo removes it before the assets it names.
+  const work = tables.work, workSeen = new Set<string>()
+  if (work) for (const row of work.rows) {
+    const id = work.read.get(row.cells, 'ID')
+    record('work', id && !workSeen.has(id) ? `work:${id}` : `work:${id || 'no-id'}:row-${row.row}`, { row: row.row, cells: cellsOf(work, row.cells) }, work, row.row)
+    if (id) workSeen.add(id)
+  }
 
   // What Gasket already holds, so duplicates are refused rather than merged.
   const nativeTags = new Set((await all<{ tag: string }>(env, "SELECT tag FROM gk_assets WHERE origin = 'native'")).map(row => row.tag.toLowerCase()))
@@ -168,10 +178,11 @@ async function build(env: Bindings, actor: Actor, input: Input) {
   const claimed = new Map((await all(env, 'SELECT target_kind, target_id, record_json FROM ik_provenance WHERE destination = ? AND reversed = 0', destination)).map(row => [`${row.target_kind}:${row.target_id}`, JSON.parse(row.record_json).sourceIdentity as string]))
 
   const rejected: Preview['rejected'] = [], attention: Preview['attention'] = []
-  const create = { assets: 0, meters: 0, readings: 0, parts: 0 }
+  const create = { assets: 0, meters: 0, readings: 0, parts: 0, work: 0 }
   let unchanged = 0
   // Counts what the apply would write: a row an earlier apply already holds is unchanged, not created again.
-  const counted = (kind: 'asset' | 'meter' | 'reading' | 'part', targetId: string) => { if (claimed.has(`${kind}:${targetId}`)) unchanged++; else create[`${kind}s`]++ }
+  const tally = { asset: 'assets', meter: 'meters', reading: 'readings', part: 'parts', work: 'work' } as const
+  const counted = (kind: keyof typeof tally, targetId: string) => { if (claimed.has(`${kind}:${targetId}`)) unchanged++; else create[tally[kind]]++ }
   const at = (source: SourceRecord) => `${source.location.artifact} row ${source.location.row}`
   const reject = (source: SourceRecord, reason: string) => { rejected.push({ location: at(source), reason }); return { effects: [], rejection: reason } }
   const conflict = (kind: string, id: string, source: SourceRecord) => { const owner = claimed.get(`${kind}:${id}`); return owner !== undefined && owner !== sourceIdentity(destination, namespace, source.kind, source.sourceId) }
@@ -190,6 +201,8 @@ async function build(env: Bindings, actor: Actor, input: Input) {
   }
   const partRows = new Map<string, number>()
   for (const row of tables.parts?.rows ?? []) { const id = tables.parts!.read.get(row.cells, 'ID'); if (id && !partRows.has(id)) partRows.set(id, row.row) }
+  const workRows = new Map<string, number>()
+  for (const row of tables.work?.rows ?? []) { const id = tables.work!.read.get(row.cells, 'ID'); if (id && !workRows.has(id)) workRows.set(id, row.row) }
   // Assets an earlier apply of this same export created are the same assets, not a second match.
   for (const asset of existingAssets) { const ids = assetsByName.get(asset.name.toLowerCase()) ?? []; if (!ids.includes(asset.id)) assetsByName.set(asset.name.toLowerCase(), [...ids, asset.id]) }
   const acceptedAssets = new Set<string>()
@@ -240,6 +253,24 @@ async function build(env: Bindings, actor: Actor, input: Input) {
         counted('part', targetId)
         return { effects: [effect('part', targetId, { number, name, unit: 'each', minimumMilli: minimum, location: get('Location') || null, openingMilli: opening })] }
       }
+      if (source.kind === 'work') {
+        const id = get('ID')
+        if (!id) return reject(source, 'no MaintainX ID')
+        if (workRows.get(id) !== payload.row) return reject(source, `duplicate of row ${workRows.get(id)} (same MaintainX ID)`)
+        const mapped = mapWork(get, { parse: text => parseEnteredOn(text, order), today, assetFor: (assetId, assetName) => {
+          // By MaintainX asset ID when the export carries it, else by exact name, as meters are.
+          const byId = assetId ? targetIds.asset(assetId) : null
+          if (byId) return acceptedAssets.has(byId) || existingAssets.some(asset => asset.id === byId) ? { id: byId } : { refused: `asset ${assetId} (${assetName || 'no name'}) is not in this move-in or in Gasket` }
+          if (!assetName) return { refused: 'no asset: work on a location alone is not carried' }
+          const matches = (assetsByName.get(assetName.toLowerCase()) ?? []).filter(candidate => acceptedAssets.has(candidate) || existingAssets.some(asset => asset.id === candidate))
+          return matches.length === 1 ? { id: matches[0] } : { refused: matches.length ? `asset name "${assetName}" matches more than one asset` : `asset "${assetName}" is not in this move-in or in Gasket` }
+        } })
+        if ('refused' in mapped) return reject(source, mapped.refused)
+        const targetId = targetIds.work(id)
+        if (conflict('work', targetId, source)) return reject(source, 'already moved in earlier with different values')
+        counted('work', targetId)
+        return { effects: [effect('work', targetId, mapped.value)] }
+      }
       if (source.kind === 'meter') {
         const id = get('Meter ID'), assetName = get('Asset Name').toLowerCase()
         const matches = (assetsByName.get(assetName) ?? []).filter(candidate => acceptedAssets.has(candidate) || existingAssets.some(asset => asset.id === candidate))
@@ -275,7 +306,8 @@ async function build(env: Bindings, actor: Actor, input: Input) {
       'The custodian is MaintainX\'s first assigned team; change it in Gasket where a named person is responsible.',
       ...(files.parts ? ['MaintainX parts have no unit column: every part arrives in "each". Change units before the first count if needed.', 'Opening stock is MaintainX\'s Quantity on the day of export: count the shelves in Gasket after moving in.'] : ['No part export: add parts in Gasket.']),
       ...(files.readings ? ['Meters whose unit is hours, kilometres, miles, cycles or starts are counters (they never go down); every other meter is a gauge.'] : ['No meter-reading export: add meters to assets in Gasket.']),
-      'MaintainX work orders, procedures and PM schedules are not moved in: write checklists and schedules in Gasket.',
+      ...(files.work ? ['Completed MaintainX work orders move in as asset history, with their recurrence kept as text: history never raises work or moves a schedule. Open work orders, procedure answers, time entries, attachments and custom fields are not carried.'] : ['No work-order export: MaintainX work history is not moved in.']),
+      'MaintainX procedures and PM schedules are not moved in: write checklists and schedules in Gasket.',
       'Keep MaintainX read-only until a lead has run one full preventive cycle in Gasket.',
     ],
     carry,

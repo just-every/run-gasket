@@ -1,5 +1,5 @@
-// The import kit's native targets: assets, meters, readings and parts (with
-// their opening stock), written into Gasket's own tables with origin 'import'.
+// The import kit's native targets: assets, meters, readings, parts (with
+// their opening stock) and completed work history (MIG-002), written into Gasket's own tables with origin 'import'.
 // A row that a person has since edited or built on carries `dependents`, so
 // undo refuses to remove it: reverse that work in Gasket first.
 import type { D1Database, D1Sql, D1TargetAdapter, Json, TargetRow } from '../../modules/import-kit/src/d1/index'
@@ -26,8 +26,10 @@ async function dependents(db: D1Database, expression: string, id: string) {
 const free = (expression: string, id: string) => ({ text: `${expression} = 0`, params: repeat(expression, id) })
 
 // Later Gasket records that rely on an imported row.
+// Work history moved in by a later move-in (another date range) depends on the asset; its own move-in's history does not.
 const ASSET_DEPENDENTS = `((SELECT COUNT(*) FROM gk_work_orders WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_schedules WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_meters WHERE asset_id = ? AND origin = 'native')
-  + (SELECT COUNT(*) FROM gk_sightings WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_asset_versions WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_downtime WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_assets WHERE id = ? AND retired_at IS NOT NULL))`
+  + (SELECT COUNT(*) FROM gk_sightings WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_asset_versions WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_downtime WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_assets WHERE id = ? AND retired_at IS NOT NULL)
+  + (SELECT COUNT(*) FROM gk_work_history h WHERE h.asset_id = ? AND NOT EXISTS(SELECT 1 FROM ik_provenance pw JOIN ik_provenance pa ON pa.job_id = pw.job_id AND pa.target_kind = 'asset' AND pa.target_id = h.asset_id AND pa.reversed = 0 WHERE pw.target_kind = 'work' AND pw.target_id = h.id AND pw.reversed = 0)))`
 const METER_DEPENDENTS = "((SELECT COUNT(*) FROM gk_readings WHERE meter_id = ? AND origin = 'native') + (SELECT COUNT(*) FROM gk_schedules WHERE meter_id = ?) + (SELECT COUNT(*) FROM gk_meter_adjustments WHERE meter_id = ?))"
 const READING_DEPENDENTS = '(SELECT COUNT(*) FROM gk_meter_adjustments WHERE reading_id = ?)'
 const PART_DEPENDENTS = "(SELECT COUNT(*) FROM gk_part_moves WHERE part_id = ? AND origin = 'native')"
@@ -100,7 +102,27 @@ const part: Kind = {
   count: "(SELECT COUNT(*) FROM gk_parts WHERE origin = 'import')",
 }
 
-export const KINDS: Record<string, Kind> = { asset, meter, reading, part }
+const WORK_FIELDS: [string, string][] = [['asset', 'asset_id'], ['sourceRef', 'source_ref'], ['title', 'title'], ['kind', 'kind'], ['description', 'description'], ['completedOn', 'completed_on'], ['completedBy', 'completed_by'],
+  ['assignedTo', 'assigned_to'], ['categories', 'categories'], ['recurrence', 'recurrence'], ['partsCents', 'parts_cents'], ['laborCents', 'labor_cents'], ['otherCents', 'other_cents']]
+
+const work: Kind = {
+  async read(db, id) {
+    const row = await db.prepare('SELECT * FROM gk_work_history WHERE id = ?').bind(id).first<any>()
+    return row ? { value: Object.fromEntries(WORK_FIELDS.map(([key, column]) => [key, row[column]])), revision: row.import_revision } : undefined
+  },
+  matches(value, id, revision) {
+    const main = eq([...WORK_FIELDS.map(([key, column]) => [column, value[key]] as [string, unknown]), ['import_revision', revision]])
+    return sql(`EXISTS(SELECT 1 FROM gk_work_history WHERE id = ? AND ${main.text})`, id, ...main.params)
+  },
+  absent: id => sql('NOT EXISTS(SELECT 1 FROM gk_work_history WHERE id = ?)', id),
+  write: (value, id, revision) => [sql(`INSERT INTO gk_work_history (id, ${WORK_FIELDS.map(([, column]) => column).join(', ')}, import_revision, created_at) VALUES (?, ${WORK_FIELDS.map(() => '?').join(', ')}, ?, ?)`,
+    id, ...WORK_FIELDS.map(([key]) => value[key] ?? null), revision, Date.now())],
+  remove: id => [sql('DELETE FROM gk_work_history WHERE id = ?', id)],
+  ids: db => idsOf(db, 'gk_work_history'),
+  count: '(SELECT COUNT(*) FROM gk_work_history)',
+}
+
+export const KINDS: Record<string, Kind> = { asset, meter, reading, part, work }
 const kindOf = (name: string) => { const kind = KINDS[name]; if (!kind) throw new Error(`TARGET_KIND_UNKNOWN: ${name}`); return kind }
 
 export const gasketTargets: D1TargetAdapter = {

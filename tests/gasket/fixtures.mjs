@@ -37,5 +37,29 @@ export const readingsCsv = csv([READING_COLUMNS,
   reading({ 'Meter Name': 'Core probe', 'Meter ID': 'M-9003', 'Asset Name': 'Salamander grill', 'Location Name': 'Hot line', 'Unit of Measure (U/M)': '°C', Reading: '75', 'Entered On': '04/02/2026 12:00 PM', 'Entered By': 'Dana Reyes' }),
 ])
 
+// MIG-002: two assets and MaintainX's work-order export (columns from MaintainX's "Work Order Exports" list), in two date ranges.
+export const historyAssetsCsv = csv([ASSET_COLUMNS,
+  asset({ Name: 'Walk-in freezer', ID: '82001', Status: 'Online', Location: 'Back of house', 'QR/Barcode': 'HK-201', Criticality: 'Critical' }),
+  asset({ Name: 'Twin-basket fryer', ID: '82002', Status: 'Online', Location: 'Hot line', 'QR/Barcode': 'HK-202', Criticality: 'Important' }),
+])
+
+const WORK_COLUMNS = ['ID', 'Title', 'Status', 'Priority', 'Work Type', 'Description', 'URL', 'Global ID', 'Assigned to', 'Teams Assigned to', 'Requested by', 'Requested on', 'Created by', 'Created on', 'Planned Start Date', 'Estimated Time', 'Due Date', 'Started on', 'Completed on', 'Completed by', 'Last updated', 'Recurrence', 'Location', 'Location ID', 'Asset', 'Asset ID', 'Categories', 'Vendors', 'Vendor IDs', 'Procedure Name', 'Procedure Template ID', 'Procedure Passes', 'Procedure Flags', 'Procedure Failures', 'Procedure Score', 'Additional Costs', 'Total Parts Cost', 'Total Time Cost', 'Total Reported Time', 'Time to Complete', 'Request ID', 'Attachments']
+const work = values => WORK_COLUMNS.map(column => values[column] ?? '')
+const quarterly = work({ ID: '7001', Title: 'Quarterly freezer service', Status: 'Done', 'Work Type': 'Preventive', Asset: 'Walk-in freezer', 'Asset ID': '82001', 'Completed on': '02/10/2026 03:30 PM', 'Completed by': 'Dana Reyes', 'Assigned to': 'Dana Reyes', Categories: 'Refrigeration', Recurrence: 'Every 3 months', 'Total Parts Cost': '$86.00', 'Total Time Cost': '120' })
+
+export const workCsv = csv([WORK_COLUMNS, quarterly,
+  work({ ID: '7002', Title: 'Fryer will not heat', Status: 'Done', 'Work Type': 'Reactive', Asset: 'Twin-basket fryer', 'Asset ID': '82002', 'Completed on': '03/04/2026 10:15 AM', 'Completed by': 'Sam Ito', Categories: 'Electrical, Damage', 'Total Parts Cost': '$1,234.50' }),
+  work({ ID: '7003', Title: 'Replace freezer door strip', Status: 'Open', 'Work Type': 'Reactive', Asset: 'Walk-in freezer', 'Asset ID': '82001' }),
+  work({ ID: '7001', Title: 'Quarterly freezer service (copy)', Status: 'Done', Asset: 'Walk-in freezer', 'Asset ID': '82001', 'Completed on': '02/10/2026 03:30 PM' }),
+  work({ ID: '7005', Title: 'Grill element', Status: 'Done', Asset: 'Salamander grill', 'Completed on': '03/05/2026 09:00 AM' }),
+  work({ ID: '7006', Title: 'Fryer basket', Status: 'Done', Asset: 'Twin-basket fryer', 'Asset ID': '82002', 'Completed on': '03/06/2026 09:00 AM', 'Total Parts Cost': 'lots' }),
+  work({ ID: '7007', Title: 'Booked ahead', Status: 'Done', Asset: 'Twin-basket fryer', 'Asset ID': '82002', 'Completed on': '12/31/2099 09:00 AM' }),
+])
+
+// The next date range overlaps the first by one completed work order.
+export const laterWorkCsv = csv([WORK_COLUMNS, quarterly,
+  work({ ID: '7008', Title: 'Quarterly freezer service', Status: 'Done', 'Work Type': 'Preventive', Asset: 'Walk-in freezer', 'Asset ID': '82001', 'Completed on': '05/12/2026 02:00 PM', 'Completed by': 'Dana Reyes', Recurrence: 'Every 3 months' }),
+])
+
 /** A small real PNG (1×1, grey) as inspection evidence. */
 export const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNoAAAAggCBd81ytgAAAABJRU5ErkJggg==', 'base64')
