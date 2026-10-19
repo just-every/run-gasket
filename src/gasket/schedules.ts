@@ -28,9 +28,14 @@ const meterNow = async (env: Bindings, meterId: string | null) => {
 }
 
 export async function scheduleFields(env: Bindings, input: Input) {
-  const asset = await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', input.text('asset', { max: 100 }))
-  insist(asset, 'asset_not_found', 404)
-  insist(!asset.retired_at, 'asset_retired', 409)
+  // PLAN-001: a schedule names an asset or, with no asset, a location (by calendar only: meters belong to assets).
+  const assetId = input.text('asset', { optional: true, max: 100 }) || null, location = input.text('location', { optional: true, max: 160 }) || null
+  insist(Boolean(assetId) !== Boolean(location), 'asset_or_location')
+  const asset = assetId ? await one(env, 'SELECT id, retired_at FROM gk_assets WHERE id = ?', assetId) : null
+  if (assetId) {
+    insist(asset, 'asset_not_found', 404)
+    insist(!asset.retired_at, 'asset_retired', 409)
+  }
   const checklist = await one(env, 'SELECT id FROM gk_checklists WHERE id = ?', input.text('checklist', { max: 100 }))
   insist(checklist, 'checklist_not_found', 404)
   const title = input.text('title', { max: 160 })
@@ -39,7 +44,7 @@ export async function scheduleFields(env: Bindings, input: Input) {
   let everyUnits: string | null = null, nextDueMeter: string | null = null, trigger: ReturnType<typeof triggerFields> | null = null
   if (meterId) {
     const meter = await one(env, 'SELECT id, kind, asset_id FROM gk_meters WHERE id = ?', meterId)
-    insist(meter && meter.asset_id === asset.id, 'meter_not_found', 404)
+    insist(meter && asset && meter.asset_id === asset.id, 'meter_not_found', 404)
     if (meter.kind === 'counter') {
       everyUnits = meterNumber(input.text('everyUnits', { max: 20 }), 'everyUnits')
       insist(compareMeter(everyUnits, '0') > 0, 'invalid_everyUnits')
@@ -62,7 +67,7 @@ export async function scheduleFields(env: Bindings, input: Input) {
   if (teamId) insist(await one(env, 'SELECT 1 FROM gk_teams WHERE id = ?', teamId), 'team_not_found', 404)
   if (assigneeId) await assigneeFits(env, assigneeId, teamId)
   const estimateMinutes = estimate(input)
-  return { teamId, estimateMinutes, asset: asset.id, checklist: checklist.id, title, everyDays, meterId, everyUnits, nominalDate: everyDays ? firstDue : null, nextDueDate, nextDueMeter, assigneeId, combine, trigger, cadence, months: policy.months, weekdays: policy.weekdays, observeClosures: policy.observeClosures, maxDeferDays }
+  return { teamId, estimateMinutes, asset: asset?.id ?? null, location, checklist: checklist.id, title, everyDays, meterId, everyUnits, nominalDate: everyDays ? firstDue : null, nextDueDate, nextDueMeter, assigneeId, combine, trigger, cadence, months: policy.months, weekdays: policy.weekdays, observeClosures: policy.observeClosures, maxDeferDays }
 }
 
 export interface FromProposal { proposal?: string; also?: (id: string) => D1PreparedStatement[] }
@@ -70,14 +75,14 @@ export interface FromProposal { proposal?: string; also?: (id: string) => D1Prep
 export async function createSchedule(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
   requireCapability(actor, proposal ? 'proposal.decide' : 'register.manage')
   const value = await scheduleFields(env, input), id = newId()
-  await commit(env, [stmt(env, 'INSERT INTO gk_schedules (id, asset_id, checklist_id, title, every_days, meter_id, every_units, next_due_date, next_due_meter, assignee_id, team_id, estimate_minutes, cadence, months, weekdays, observe_closures, max_defer_days, nominal_date, combine, trigger_when, trigger_value, reset_value, sustain_minutes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    id, value.asset, value.checklist, value.title, value.everyDays, value.meterId, value.everyUnits, value.nextDueDate, value.nextDueMeter, value.assigneeId, value.teamId, value.estimateMinutes, value.cadence, value.months, value.weekdays, value.observeClosures ? 1 : 0, value.maxDeferDays, value.nominalDate,
+  await commit(env, [stmt(env, 'INSERT INTO gk_schedules (id, asset_id, location, checklist_id, title, every_days, meter_id, every_units, next_due_date, next_due_meter, assignee_id, team_id, estimate_minutes, cadence, months, weekdays, observe_closures, max_defer_days, nominal_date, combine, trigger_when, trigger_value, reset_value, sustain_minutes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    id, value.asset, value.location, value.checklist, value.title, value.everyDays, value.meterId, value.everyUnits, value.nextDueDate, value.nextDueMeter, value.assigneeId, value.teamId, value.estimateMinutes, value.cadence, value.months, value.weekdays, value.observeClosures ? 1 : 0, value.maxDeferDays, value.nominalDate,
     value.combine, value.trigger?.when ?? null, value.trigger?.value ?? null, value.trigger?.reset ?? null, value.trigger?.sustainMinutes ?? 0, actor.id, now()), ...(also?.(id) ?? [])],
   { actor: actor.id, action: 'schedule.create', subject: id, detail: { ...value, ...(proposal ? { proposal } : {}) } })
   return { id }
 }
 
-export const DUE_SCHEDULES = `SELECT s.* FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id
+export const DUE_SCHEDULES = `SELECT s.* FROM gk_schedules s LEFT JOIN gk_assets a ON a.id = s.asset_id
     WHERE s.active = 1 AND a.retired_at IS NULL AND NOT EXISTS(SELECT 1 FROM gk_work_orders w WHERE w.schedule_id = s.id AND w.status NOT IN ('closed', 'cancelled'))`
 
 /** One work order for each given schedule that is due: by date within the site's lead time (PM-001), by its counter value or its
@@ -100,10 +105,10 @@ export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>
     // PM-001: the occurrence's stable identity; the scheduler never issues one that already had work (a cancelled one stays owed).
     const occurrence = `${schedule.id}@${byDate ? schedule.next_due_date : fired ? `reading:${fired.id}` : `meter:${schedule.next_due_meter}`}`
     if (automatic && await one(env, 'SELECT 1 FROM gk_work_orders WHERE occurrence = ?', occurrence)) continue
-    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, occurrence, assignee_id, team_id, trade, estimate_minutes, status, created_by, created_at)
-      SELECT ?, ${NEXT_NUMBER}, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, ?, (SELECT trade FROM gk_teams WHERE id = ?), ?, 'open', ?, ?
+    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, occurrence, assignee_id, team_id, trade, estimate_minutes, status, created_by, created_at)
+      SELECT ?, ${NEXT_NUMBER}, ?, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, ?, (SELECT trade FROM gk_teams WHERE id = ?), ?, 'open', ?, ?
       WHERE NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE schedule_id = ? AND status NOT IN ('closed', 'cancelled'))`,
-    id, schedule.asset_id, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, occurrence, schedule.assignee_id, schedule.team_id, schedule.team_id, schedule.estimate_minutes, actor.id, now(), schedule.id))
+    id, schedule.asset_id, schedule.location, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, occurrence, schedule.assignee_id, schedule.team_id, schedule.team_id, schedule.estimate_minutes, actor.id, now(), schedule.id))
     if (fired) statements.push(stmt(env, 'UPDATE gk_schedules SET trigger_fired_on = ?, revision = revision + 1 WHERE id = ?', fired.taken_on, schedule.id))
     created.push({ id, schedule: schedule.id, due: dueDate, reason: byDate && byMeter ? 'both' : byDate ? 'date' : 'meter', occurrence, ...(byMeter && reading ? { reading } : {}) })
   }
@@ -143,10 +148,10 @@ export async function advanceStatements(env: Bindings, scheduleId: string, today
 
 export async function scheduleList(env: Bindings, actor: Actor) {
   const rows = await all(env, `SELECT s.id, s.title, s.every_days, s.every_units, s.next_due_date, s.next_due_meter, s.active, s.revision, s.cadence, s.months, s.weekdays, s.observe_closures, s.max_defer_days, s.nominal_date, s.combine, s.trigger_when, s.trigger_value, s.reset_value, s.sustain_minutes, s.trigger_fired_on, m.kind AS meter_kind,
-    a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, c.name AS checklist, s.meter_id, m.name AS meter, m.unit AS meter_unit, mb.name AS assignee,
+    s.asset_id, a.tag AS asset_tag, COALESCE(a.name, s.location) AS asset_name, s.location, c.name AS checklist, s.meter_id, m.name AS meter, m.unit AS meter_unit, mb.name AS assignee,
     (SELECT w.id FROM gk_work_orders w WHERE w.schedule_id = s.id AND w.status NOT IN ('closed', 'cancelled')) AS open_work
-    FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id JOIN gk_checklists c ON c.id = s.checklist_id
-    LEFT JOIN gk_meters m ON m.id = s.meter_id LEFT JOIN gk_members mb ON mb.id = s.assignee_id ORDER BY s.active DESC, COALESCE(s.next_due_date, '9999'), a.tag, s.title, s.id`)
+    FROM gk_schedules s LEFT JOIN gk_assets a ON a.id = s.asset_id JOIN gk_checklists c ON c.id = s.checklist_id
+    LEFT JOIN gk_meters m ON m.id = s.meter_id LEFT JOIN gk_members mb ON mb.id = s.assignee_id ORDER BY s.active DESC, COALESCE(s.next_due_date, '9999'), COALESCE(a.tag, s.location), s.title, s.id`)
   // A missed occurrence with no open work stays overdue until a lead issues it again or skips it (PLAN-007).
   const meters = new Map<string, { now: string | null; held: number }>()
   for (const id of new Set(rows.map(row => row.meter_id).filter(Boolean))) meters.set(id, await meterNow(env, id))

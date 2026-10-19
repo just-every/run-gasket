@@ -1548,6 +1548,27 @@ try {
     // A retired field stops being required; the template's own requirement stays with its work.
     await h.api('workfield.retire', cookie.lead, { field: faultCode.id })
     assert.deepEqual(await refused('lead', ownJob), [owed[0], owed[2]])
+    // Bulk creation keeps the template's requirements; the technician's own work still goes to independent review.
+    const bulk = await h.api('workorders.fromTemplate', cookie.lead, { template: check.id, asset: [dock, gate], due: today })
+    for (const row of bulk.rows) assert.deepEqual([(await wo('lead', row.id)).requires_evidence, JSON.parse((await wo('lead', row.id)).required_fields)], [1, [lamp]])
+    await h.api('workorder.field', cookie.max, { workOrder: techJob, field: lamp, value: 'Sodium' })
+    await h.api('workorder.evidence', cookie.max, { workOrder: techJob, file: file('dock-5.png', png, 'image/png') })
+    await h.api('workorder.submit', cookie.max, { workOrder: techJob, version: (await wo('max', techJob)).version })
+    await h.api('workorder.review', cookie.max, { workOrder: techJob, version: (await wo('max', techJob)).version, decision: 'approve' }, 403)
+    await h.api('workorder.review', cookie.sam, { workOrder: techJob, version: (await wo('sam', techJob)).version, decision: 'approve' })
+    assert.equal((await wo('max', techJob)).status, 'closed')
+    // Preventive work at a location: a calendar schedule for a restroom door issues work there; a meter needs an asset.
+    const door = { checklist: ids.checklist, title: 'Restroom 2 door closer check', everyDays: 30, firstDue: today, assignee: ids.max }
+    assert.equal((await h.api('schedule.create', cookie.lead, door, 400)).error, 'asset_or_location')
+    assert.equal((await h.api('schedule.create', cookie.lead, { ...door, location: 'Restroom 2 door', meter: ids.runHours, everyUnits: '100' }, 404)).error, 'meter_not_found')
+    await h.submit('schedule.create', cookie.lead, { ...door, location: 'Restroom 2 door', asset: '' }, '/app/schedules')
+    const doorSchedule = (await h.api('schedules', cookie.lead)).find(row => row.title === door.title)
+    assert.deepEqual([doorSchedule.asset_id, doorSchedule.location], [null, 'Restroom 2 door'])
+    await h.api('workorders.generate', cookie.lead, {})
+    const doorWork = (await h.api('work', cookie.lead)).find(row => row.title === door.title)
+    const doorOrder = await wo('max', doorWork.id)
+    assert.deepEqual([doorOrder.kind, doorOrder.asset_id, doorOrder.location, doorOrder.schedule_id, doorOrder.assignee_id, doorOrder.items.length > 0], ['preventive', null, 'Restroom 2 door', doorSchedule.id, ids.max, true])
+    assert.ok((await (await h.raw('/app/schedules', { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '').includes('Restroom 2 doorLocation, no asset'))
   })
 
   await check('GAS-11 rer export and rer import keep every record', async () => {
