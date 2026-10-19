@@ -38,6 +38,9 @@ export const guard = (env: Bindings, code: string, condition: string, ...params:
 
 export interface Audit { actor: string; action: string; subject: string; detail?: unknown }
 
+/** An audit entry with the role its actor holds now, read inside the same statement (ADMIN-006). Binds at, actor, actor, action, subject, detail. */
+export const AUDIT_INSERT = 'INSERT INTO gk_audit (at, actor, role, action, subject, detail) VALUES (?, ?, (SELECT role FROM gk_members WHERE id = ?), ?, ?, ?)'
+
 /** Runs the statements atomically with their audit entries. A failed guard raises its code. */
 export async function commit(env: Bindings, statements: D1PreparedStatement[], audit: Audit | Audit[]) {
   const events = Array.isArray(audit) ? audit : [audit]
@@ -45,7 +48,7 @@ export async function commit(env: Bindings, statements: D1PreparedStatement[], a
     await env.DB.batch([
       ...statements,
       stmt(env, 'DELETE FROM gk_guard'),
-      ...events.map(event => stmt(env, 'INSERT INTO gk_audit (at, actor, action, subject, detail) VALUES (?, ?, ?, ?, ?)', now(), event.actor, event.action, event.subject, JSON.stringify(event.detail ?? {}))),
+      ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(event.detail ?? {}))),
     ])
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)

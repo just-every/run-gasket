@@ -4,7 +4,7 @@
 // normal command as the approver and records the exact payload hash.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
-import { all, commit, guard, insist, newId, now, one, sha256Hex, stmt } from './core'
+import { AUDIT_INSERT, all, commit, guard, insist, newId, now, one, sha256Hex, stmt } from './core'
 import { Input } from './input'
 import { countPart } from './parts'
 import { createSchedule, scheduleFields } from './schedules'
@@ -82,7 +82,7 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   const also = (resultId: string) => [
     guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id = ? AND status = 'pending')", proposal.id),
     stmt(env, "UPDATE gk_proposals SET status = 'approved', decided_by = ?, decided_at = ?, decision_note = ?, result_id = ? WHERE id = ?", actor.id, now(), note, resultId, proposal.id),
-    stmt(env, 'INSERT INTO gk_audit (at, actor, action, subject, detail) VALUES (?, ?, ?, ?, ?)', now(), actor.id, 'proposal.approve', proposal.id, JSON.stringify({ hash: proposal.payload_hash, result: resultId })),
+    stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.approve', proposal.id, JSON.stringify({ hash: proposal.payload_hash, result: resultId })),
   ]
   const options = { proposal: proposal.id, also }
   const result = proposal.kind === 'schedule' ? await createSchedule(env, actor, command, options)

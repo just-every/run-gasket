@@ -3,7 +3,7 @@ import type { Bindings } from '../../auth.server'
 import { ROLE_LABELS, ROLES, type Actor } from '../actor'
 import { showInstant } from '../dates'
 import { members, site } from '../site'
-import { audit } from '../views'
+import { audit } from '../audit'
 import { all } from '../core'
 import { card, field, form, h, hidden, raw, select, table, tag, woNumber, type Html } from './html'
 import { SETTINGS, page } from './shell'
@@ -71,9 +71,15 @@ export async function auditRecords(env: Bindings) {
 }
 
 export async function auditPage(env: Bindings, actor: Actor, url: URL) {
-  const [rows, records] = await Promise.all([audit(env, actor), auditRecords(env)])
-  return page(env, 'Audit trail', actor, h`<h1>Audit trail</h1><p class="gk-lede">The latest 500 changes.</p>${table(['When', 'Who', 'Action', 'Record'], rows.map(row => [showInstant(row.at, actor.zone), row.actor_name ?? '—',
-    ACTIONS[row.action] ?? 'Changed a record', records.get(row.subject) ?? h`<span class="gk-muted">A deleted record</span>`]), 'Audit trail', { wrap: [1, 2, 3] })}`, { url })
+  const [{ rows, next }, records] = await Promise.all([audit(env, actor, url), auditRecords(env)])
+  const filters = new URLSearchParams([...url.searchParams].filter(([key, value]) => ['action', 'from', 'to', 'site'].includes(key) && value))
+  const search = h`<form method="get" action="/app/audit" class="gk-form gk-audit-search"><div class="gk-grid">
+    ${select('Action', 'action', Object.entries(ACTIONS).map(([value, label]) => ({ value, label })), filters.get('action') ?? '', { required: false, blank: 'Every action' })}
+    ${field('From', 'from', { type: 'date', required: false, value: filters.get('from') ?? '' })}${field('To', 'to', { type: 'date', required: false, value: filters.get('to') ?? '' })}</div>
+    <div class="gk-actions"><button type="submit" class="gk-secondary">Search</button><a class="gk-button gk-secondary" href="/app/audit.csv${filters.size ? `?${filters}` : ''}">Download CSV</a></div></form>`
+  const older = next ? h`<p><a class="gk-more-rows" href="/app/audit?${new URLSearchParams([...filters, ['before', String(next)]])}">Older changes</a></p>` : ''
+  return page(env, 'Audit trail', actor, h`<h1>Audit trail</h1><p class="gk-lede">Every change, newest first, with who made it and on what authority. The download holds every matching change.</p>${search}${table(['When', 'Who', 'Action', 'Record'], rows.map(row => [showInstant(row.at, actor.zone), h`${row.actor_name ?? '—'}<span class="gk-sub">${row.authority}</span>`,
+    ACTIONS[row.action] ?? 'Changed a record', records.get(row.subject) ?? h`<span class="gk-muted">A deleted record</span>`]), 'Audit trail', { wrap: [1, 2, 3] })}${older}`, { url })
 }
 
 export async function morePage(env: Bindings, actor: Actor, url: URL) {

@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09 and GAS-11 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11 and ADMIN-006 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 0 | 44 | 78 | 122 |
-| All | 14 | 44 | 78 | 136 |
+| Target and push further | 1 | 43 | 78 | 122 |
+| All | 15 | 43 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -384,7 +384,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `ADMIN-003` | Role rights and separation of duties | target | partial | `src/gasket/actor.ts`; `src/gasket/site.ts`; `tests/gasket/flows.mjs` | Fixed owner/lead/maintainer/supervisor/agent roles exist; site, stores, purchasing, analyst roles, custom grants, a technician create-work right and the Operator template do not. |
 | `ADMIN-004` | Requester and contractor access | target | missing |  | No requester or contractor identity, scoped portal or expiring external work grant. |
 | `ADMIN-005` | Enterprise identity lifecycle | target | missing |  | No SSO, SCIM, MFA policy or group/site mapping. |
-| `ADMIN-006` | Attributed append-only audit | target | partial | `src/gasket/core.ts`; `src/gasket/history.ts`; `src/gasket/views.ts`; `tests/gasket/flows.mjs` | Core atomic audit and append-only history exist; searchable site/date export and full integration/AI action coverage are not implemented. |
+| `ADMIN-006` | Attributed append-only audit | target | done | `src/gasket/core.ts`; `src/gasket/audit.ts`; `src/gasket/history.ts`; `src/gasket/views.ts`; `migrations/core/0018_audit_role.sql`; `tests/gasket/flows.mjs` |  |
 | `ADMIN-007` | Retention and verifiable erasure | target | missing |  | No domain retention/hold, erasure preview, anonymization or restore fence. |
 | `ADMIN-008` | Protected credentials and private attachments | target | partial | `src/gasket/work.ts`; `src/gasket/actor.ts` | Authenticated evidence access and safe response headers exist; connector secret lifecycle, scanning, scoped links and export/context redaction are unproved. |
 | `ADMIN-009` | Complete portable archive and inactive restore | target | partial | `scripts/installer/local.mjs`; `vite.config.ts`; `src/gasket/history.ts` | Existing rer export/import commands and CSV history are present; complete domain manifest, attachment round trip, erasure fences and inactive restore are not established. |

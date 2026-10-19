@@ -384,7 +384,61 @@ try {
     const status = Object.fromEntries(list.map(row => [row.id, row.status]))
     assert.deepEqual([status[corrective.id], status[schedule.id], status[count.id], status[own.id]], ['approved', 'rejected', 'pending', 'approved'])
     const audit = await h.api('audit', cookie.owner)
-    assert.ok(audit.some(row => row.action === 'proposal.approve' && row.subject === corrective.id && JSON.parse(row.detail).hash === corrective.hash), 'the approval records the exact payload hash')
+    assert.ok(audit.rows.some(row => row.action === 'proposal.approve' && row.subject === corrective.id && JSON.parse(row.detail).hash === corrective.hash), 'the approval records the exact payload hash')
+    ids.proposal = corrective.id
+  })
+
+  await check('ADMIN-006 audit search, authority and download', async () => {
+    // A stale write changes nothing and adds no audit entry.
+    const counts = await h.api('audit?action=part.count', cookie.sam)
+    await h.api('part.count', cookie.lead, { part: ids.drier, counted: '1', seen: '0' }, 409)
+    assert.deepEqual(await h.api('audit?action=part.count', cookie.sam), counts)
+    // Page by page, every entry once; the download holds every one of them.
+    const entries = []
+    for (let next = null, first = true; first || next; first = false) {
+      const page = await h.api(`audit?limit=25${next ? `&before=${next}` : ''}`, cookie.owner)
+      entries.push(...page.rows)
+      next = page.next
+    }
+    assert.ok(entries.length > 50, `several pages (${entries.length})`)
+    await h.api('audit?limit=501', cookie.owner, undefined, 400)
+    assert.equal(new Set(entries.map(row => row.seq)).size, entries.length)
+    const csv = await h.raw('/app/audit.csv', { cookie: cookie.sam })
+    assert.equal(csv.status, 200)
+    assert.match(csv.headers.get('content-type'), /text\/csv/)
+    assert.equal((await csv.text()).trim().split('\r\n').length - 1, entries.length)
+    // By action family, by site-local date and by site.
+    const family = await h.api('audit?action=proposal', cookie.sam)
+    assert.ok(family.rows.length >= 6 && family.rows.every(row => row.action.startsWith('proposal.')))
+    assert.equal((await h.api(`audit?from=${addDays(today, -1)}&to=${addDays(today, 1)}`, cookie.sam)).rows.length, Math.min(entries.length, 100))
+    assert.equal((await h.api(`audit?from=${addDays(today, 1)}`, cookie.sam)).rows.length, 0)
+    assert.equal((await h.api(`audit?to=${addDays(today, -1)}`, cookie.sam)).rows.length, 0)
+    const csvByAction = await (await h.raw('/app/audit.csv?action=proposal', { cookie: cookie.owner })).text()
+    assert.equal(csvByAction.trim().split('\r\n').length - 1, family.rows.length)
+    const site = (await h.api('site', cookie.owner)).name
+    assert.deepEqual((await h.api(`audit?site=${encodeURIComponent(site)}`, cookie.sam)).rows, entries.slice(0, 100))
+    await h.api('audit?site=Elsewhere', cookie.sam, undefined, 404)
+    await h.api('audit?from=yesterday', cookie.sam, undefined, 400)
+    // Agent and move-in decisions name their authority.
+    assert.ok(family.rows.some(row => row.action === 'proposal.prepare' && row.actor === ids.agent && row.role === 'agent'))
+    const approval = family.rows.find(row => row.action === 'proposal.approve' && row.subject === ids.proposal)
+    assert.equal(approval.role, 'lead')
+    assert.match(approval.authority, new RegExp(ids.proposal))
+    const carried = entries.find(row => row.action === 'workorder.create' && JSON.parse(row.detail).proposal === ids.proposal)
+    assert.equal(carried.actor, approval.actor)
+    assert.match(carried.authority, new RegExp(ids.proposal))
+    assert.ok(entries.some(row => row.action === 'import.apply' && row.role === 'lead' && row.authority.includes(row.subject)))
+    // The role an entry acted under stays as it was when a person's role changes later.
+    const before = entries.filter(row => row.actor === ids.mo).map(row => row.role)
+    assert.ok(before.length && before.every(role => role === 'maintainer'))
+    await h.api('access.role', cookie.owner, { member: ids.mo, role: 'lead' })
+    const after = (await h.api('audit', cookie.owner)).rows
+    assert.equal(after[0].action, 'access.role')
+    assert.ok(after.filter(row => row.actor === ids.mo).every(row => row.role === 'maintainer'))
+    // Maintainers cannot read or download it.
+    await h.api('audit', cookie.max, undefined, 403)
+    assert.equal((await h.raw('/app/audit.csv', { cookie: cookie.max })).status, 403)
+    assert.equal((await h.raw('/app/audit?action=workorder', { cookie: cookie.sam })).status, 200)
   })
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
@@ -399,10 +453,10 @@ try {
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
       return { assets, orders, files, members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
-        histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam') }
+        histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam'), auditCsv: await download('/app/audit.csv', 'owner') }
     }
     const before = await read(h, cookie)
-    assert.ok(before.assets.length && before.orders.length && before.audit.length, 'a populated installation')
+    assert.ok(before.assets.length && before.orders.length && before.audit.rows.length, 'a populated installation')
     assert.ok(before.files.length >= 2 && before.files.every(row => row.downloaded === row.recorded), 'evidence downloads match their recorded digests')
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'gasket.rer')

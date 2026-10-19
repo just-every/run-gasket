@@ -14,7 +14,7 @@ export const PAGE_DOORS: [string, string][] = [
   ['^/app/work/([\\w-]+)$', 'workOrder'], ['^/app/evidence/([\\w-]+)$', 'evidence'],
   ['^/app/assets$', 'assets'], ['^/app/assets/([\\w-]+)$', 'asset'], ['^/app/assets/([\\w-]+)/history\\.csv$', 'historyCsv'],
   ['^/app/schedules$', 'schedules'], ['^/app/checklists/([\\w-]+)$', 'checklist'], ['^/app/parts$', 'parts'], ['^/app/parts/([\\w-]+)$', 'part'],
-  ['^/app/board$', 'board'], ['^/app/proposals$', 'proposals'], ['^/app/move-in$', 'moveIn'], ['^/app/audit$', 'audit'], ['^/app/more$', 'more'],
+  ['^/app/board$', 'board'], ['^/app/proposals$', 'proposals'], ['^/app/move-in$', 'moveIn'], ['^/app/audit$', 'audit'], ['^/app/audit\\.csv$', 'auditCsv'], ['^/app/more$', 'more'],
 ]
 
 export function match(doors: [string, string][], path: string): { name: string; id: string } | null {

@@ -26,7 +26,7 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 | `board` | Overdue work, waiting for review, open follow-ups, assets down, 30-day downtime, low parts (lead, supervisor, owner) |
 | `proposals` | Proposals with payload, reasoning, basis, status and decision |
 | `imports` | The move-in journal (lead, owner) |
-| `audit` | The latest 500 audit entries (supervisor, owner) |
+| `audit` (`?action=`, `?from=`, `?to=`, `?site=`, `?limit=`, `?before=`) | Audit entries newest first, 100 a page (`limit` up to 500); `next` continues with `before`. `action` is one action or a family such as `workorder`; `from` and `to` are site-local dates; each entry carries the role it acted under and its authority (supervisor, owner). `/app/audit.csv` with the same filters downloads every matching entry. |
 
 ## Changing
 

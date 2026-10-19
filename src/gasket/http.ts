@@ -7,6 +7,7 @@ import { actions } from './actions'
 import { can, currentActor, type Actor } from './actor'
 import { GasketError } from './core'
 import { PAGE_DOORS, match } from './doors'
+import { auditCsv } from './audit'
 import { assetHistoryCsv } from './history'
 import { Input } from './input'
 import { site } from './site'
@@ -119,6 +120,7 @@ const pages: Record<string, Page> = {
   site: guarded(actor => can(actor, 'site.manage'), (env, actor, url) => sitePage(env, actor, url)),
   access: guarded(actor => can(actor, 'site.manage'), (env, actor, url) => accessPage(env, actor, url)),
   audit: guarded(actor => can(actor, 'audit.read'), (env, actor, url) => auditPage(env, actor, url)),
+  auditCsv: async (env, actor, url) => new Response(await auditCsv(env, actor, url), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="audit.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   more: (env, actor, url) => morePage(env, actor, url),
 }
 

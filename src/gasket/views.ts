@@ -3,9 +3,10 @@
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { assetDetail, assetList } from './assets'
+import { audit } from './audit'
 import { board } from './board'
 import { checklistDetail, checklistList } from './checklists'
-import { GasketError, all } from './core'
+import { GasketError } from './core'
 import { API_DOORS, match } from './doors'
 import { assetHistory } from './history'
 import { importJobs } from './movein/maintainx'
@@ -16,11 +17,6 @@ import { members, site } from './site'
 import { workList, workOrderDetail } from './work'
 
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
-
-export async function audit(env: Bindings, actor: Actor) {
-  requireCapability(actor, 'audit.read')
-  return await all(env, 'SELECT a.seq, a.at, a.actor, m.name AS actor_name, a.action, a.subject, a.detail FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor ORDER BY a.at DESC, a.seq DESC LIMIT 500')
-}
 
 export const views: Record<string, View> = {
   me: async (_env, actor) => ({ id: actor.id, email: actor.email, name: actor.name, role: actor.role, today: actor.today, zone: actor.zone }),
@@ -39,7 +35,7 @@ export const views: Record<string, View> = {
   board: (env, actor) => board(env, actor),
   proposals: (env, actor) => proposalList(env, actor),
   imports: (env, actor) => importJobs(env, actor),
-  audit: (env, actor) => audit(env, actor),
+  audit: (env, actor, _id, url) => audit(env, actor, url),
 }
 
 export function route(path: string): { view: View; id: string } {

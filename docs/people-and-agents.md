@@ -24,4 +24,4 @@ Each proposal shows what it would do and the agent's reasoning. On **More → Pr
 
 ## The audit trail
 
-**More → Audit trail** lists the latest 500 changes: when, who, what and which record.
+**More → Audit trail** lists every change, newest first: when, who, what and which record, with the role the person acted under and, for agent proposals and move-ins, what they acted on. Search by action and by date, page back with **Older changes**, and press **Download CSV** for every matching change. Owners and supervisors can read it.
