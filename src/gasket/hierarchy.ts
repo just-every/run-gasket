@@ -8,7 +8,7 @@
 // Roll-ups cover an entry and everything below it: downtime is the union of
 // their ended outages, so an outage two of them share counts once (an outage
 // still open is listed as down now and counts once it ends, as on the asset
-// itself), and cost is the moved-in work cost (MIG-002) of the subtree.
+// itself; degraded operation, REPORT-002, is not an outage), and cost is the moved-in work cost (MIG-002) of the subtree.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, now, one, stmt, type Row } from './core'
@@ -83,8 +83,8 @@ export async function hierarchyOf(env: Bindings, asset: Row) {
     SELECT a.id, a.tag, a.name, a.level FROM up JOIN gk_assets a ON a.id = up.id WHERE up.depth > 0 ORDER BY up.depth DESC`, asset.id)
   const children = await all(env, 'SELECT id, tag, name, level, retired_at FROM gk_assets WHERE parent_id = ? ORDER BY tag', asset.id)
   const below = await all(env, `${SUBTREE} SELECT a.id, a.tag FROM tree JOIN gk_assets a ON a.id = tree.id WHERE tree.depth > 0 ORDER BY a.tag`, asset.id)
-  const spans = await all(env, `${SUBTREE} SELECT d.asset_id, d.started_on, d.ended_on FROM gk_downtime d WHERE d.asset_id IN (SELECT id FROM tree) AND d.ended_on IS NOT NULL`, asset.id)
-  const down = await all(env, `${SUBTREE} SELECT DISTINCT a.tag FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id WHERE d.asset_id IN (SELECT id FROM tree) AND d.ended_on IS NULL ORDER BY a.tag`, asset.id)
+  const spans = await all(env, `${SUBTREE} SELECT d.asset_id, d.started_on, d.ended_on FROM gk_downtime d WHERE d.asset_id IN (SELECT id FROM tree) AND d.ended_on IS NOT NULL AND d.degraded = 0`, asset.id)
+  const down = await all(env, `${SUBTREE} SELECT DISTINCT a.tag FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id WHERE d.asset_id IN (SELECT id FROM tree) AND d.ended_on IS NULL AND d.degraded = 0 ORDER BY a.tag`, asset.id)
   const each = [...new Set(spans.map(span => span.asset_id))].reduce((sum, id) => sum + unionMinutes(spans.filter(span => span.asset_id === id)), 0)
   const rolled = unionMinutes(spans)
   const work = await one(env, `${SUBTREE} SELECT SUM(w.status NOT IN ('closed', 'cancelled')) AS open, SUM(w.status = 'closed') AS closed FROM gk_work_orders w WHERE w.asset_id IN (SELECT id FROM tree)`, asset.id)

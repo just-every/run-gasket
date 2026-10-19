@@ -27,6 +27,7 @@ import { noticesPage } from './ui/chasing'
 import { teamsPage } from './ui/crew'
 import { performancePage } from './ui/performance'
 import { reliabilityPage } from './ui/reliability'
+import { availabilityPage } from './ui/availability'
 import { accessPage, auditPage, morePage, sitePage } from './ui/settings'
 import { workOrderPage, workPage } from './ui/work'
 
@@ -133,6 +134,7 @@ const pages: Record<string, Page> = {
   teams: (env, actor, url) => teamsPage(env, actor, url),
   performance: guarded(actor => can(actor, 'board.read'), (env, actor, url) => performancePage(env, actor, url)),
   reliability: guarded(actor => can(actor, 'board.read'), (env, actor, url) => reliabilityPage(env, actor, url)),
+  availability: guarded(actor => can(actor, 'board.read'), (env, actor, url) => availabilityPage(env, actor, url)),
   more: (env, actor, url) => morePage(env, actor, url),
 }
 

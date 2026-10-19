@@ -15,12 +15,12 @@ export async function board(env: Bindings, actor: Actor) {
   const overdue = await all(env, `${ORDER} WHERE w.status NOT IN ('closed', 'cancelled', 'submitted') AND w.due_date < ? ORDER BY w.due_date, w.number`, actor.today)
   const awaitingReview = await all(env, `${ORDER} WHERE w.status = 'submitted' ORDER BY w.submitted_at`)
   const followUps = await all(env, `${ORDER} WHERE w.follow_up_of IS NOT NULL AND w.status NOT IN ('closed', 'cancelled') ORDER BY w.due_date`)
-  const down = (await all(env, 'SELECT d.started_on, d.reason, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, w.number FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id LEFT JOIN gk_work_orders w ON w.id = d.work_order_id WHERE d.ended_on IS NULL ORDER BY d.started_on'))
+  const down = (await all(env, 'SELECT d.started_on, d.reason, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, w.number FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id LEFT JOIN gk_work_orders w ON w.id = d.work_order_id WHERE d.ended_on IS NULL AND d.degraded = 0 ORDER BY d.started_on'))
     .map(row => ({ ...row, minutesSoFar: Math.max(0, minutesBetween(row.started_on, clock)) }))
-  // Downtime overlapping the last 30 days, clipped to the window; open downtime counts to now.
+  // Downtime overlapping the last 30 days, clipped to the window; open downtime counts to now. Degraded operation (REPORT-002) is not downtime.
   const windowStart = `${since}T00:00`
   const downtime = (await all(env, `SELECT a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, d.started_on, COALESCE(d.ended_on, ?) AS ended_on
-    FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id WHERE COALESCE(d.ended_on, ?) >= ?`, clock, clock, windowStart))
+    FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id WHERE COALESCE(d.ended_on, ?) >= ? AND d.degraded = 0`, clock, clock, windowStart))
   const perAsset = new Map<string, { asset_id: string; asset_tag: string; asset_name: string; minutes: number; events: number }>()
   for (const row of downtime) {
     const start = row.started_on < windowStart ? windowStart : row.started_on

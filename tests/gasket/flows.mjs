@@ -1302,6 +1302,63 @@ try {
     assert.deepEqual(await Promise.all(['lead', 'max'].map(async who => (await (await h.raw(`/app/assets/${lineB}`, { cookie: cookie[who] })).text()).includes('Move with everything below'))), [true, false])
   })
 
+  await check('REPORT-002 downtime and production availability', async () => {
+    // A filling line: a filler with an hour meter and its pump below it, and a capper. Two days, 06:00 to 22:00 every day.
+    const add = async (tag, name, level, parent) => (await h.api('asset.create', cookie.lead, { tag, name, location: 'Plant 3', level, ...(parent ? { parent } : {}) })).id
+    const line = await add('LINE-R2', 'Filling line R2', 'line'), filler = await add('FIL-1', 'Filler', 'machine', line)
+    const pump = await add('FIL-1-P', 'Filler pump', 'component', filler), capper = await add('CAP-1', 'Capper', 'machine', line)
+    await h.api('production.hours.add', cookie.max, { weekdays: ['1'], starts: '06:00', ends: '22:00' }, 403)
+    await h.api('production.hours.add', cookie.lead, { weekdays: ['1'], starts: '22:00', ends: '06:00' }, 400)
+    assert.equal((await h.submit('production.hours.add', cookie.lead, { weekdays: ['1', '2', '3', '4', '5', '6', '7'], starts: '06:00', ends: '22:00' }, '/app/availability')).searchParams.get('error'), null)
+    assert.equal((await h.api('production.hours.add', cookie.lead, { weekdays: ['3'], starts: '21:00', ends: '24:00' }, 409)).error, 'hours_overlap')
+    const d0 = addDays(today, -3), d1 = addDays(today, -2)
+    const meter = (await h.api('meter.create', cookie.lead, { asset: filler, name: 'Filler run hours', unit: 'h', kind: 'counter', feedWindowHours: '168' })).id
+    for (const [value, takenOn] of [['100', `${d0}T06:00`], ['120', `${d1}T12:00`]]) await h.api('meter.feed', cookie.lead, { meter, source: 'Filler PLC', unit: 'h', value, takenOn })
+    const job = async asset => (await h.api('workorder.create', cookie.lead, { asset, title: 'Line R2 stoppage', due: today, assignee: ids.max })).id
+    const jobs = { filler: await job(filler), pump: await job(pump), capper: await job(capper) }
+    const outage = async (workOrder, startedOn, endedOn, fields = {}) => {
+      const { downtime } = await h.api('downtime.start', cookie.max, { workOrder, startedOn, reason: 'Stopped', ...fields })
+      if (endedOn) await h.api('downtime.end', cookie.max, { workOrder, endedOn })
+      return downtime
+    }
+    assert.equal((await h.api('downtime.start', cookie.max, { workOrder: jobs.capper, startedOn: `${d0}T12:00`, reason: 'Slow', planned: true, degraded: true }, 400)).error, 'degraded_is_not_a_planned_stop')
+    // Across the reporting boundary, then the pump below it down at the same time for an hour.
+    const boundary = await outage(jobs.filler, `${addDays(d0, -1)}T21:00`, `${d0}T08:00`, { reason: 'Filler jammed' })
+    const overlap = await outage(jobs.pump, `${d0}T07:00`, `${d0}T09:00`, { reason: 'Pump seal' })
+    const degraded = await outage(jobs.capper, `${d0}T12:00`, `${d0}T13:30`, { reason: 'Running at half speed', degraded: true })
+    const shutdown = await outage(jobs.filler, `${d1}T10:00`, `${d1}T14:00`, { reason: 'Planned changeover shutdown', planned: true })
+    const open = await outage(jobs.capper, `${d1}T21:00`, null, { reason: 'Capper head broke' })
+
+    const period = `from=${d0}&to=${d1}`
+    await h.api(`availability?${period}`, cookie.max, undefined, 403)
+    await h.api(`availability?${period}&site=Elsewhere`, cookie.lead, undefined, 404)
+    const report = await h.api(`availability?${period}&asset=${line}`, cookie.sam)
+    assert.deepEqual([report.window, report.production.declared, report.production.minutes], [{ start: `${d0}T00:00`, end: `${addDays(d1, 1)}T00:00` }, true, 1920])
+    // By hand: production 2 x 16 h = 1920 min. The filler's planned shutdown takes 240 out of its denominator; its failures cover
+    // 06:00-08:00 and 07:00-09:00 of production (the 21:00-06:00 part is outside production or before the period), 180 min with
+    // 60 shared. Its hour meter reported from d0 06:00 to d1 12:00, so d1 14:00-22:00 is unknown coverage.
+    const row = id => { const entry = report.entries.find(item => item.id === id); return [entry.plannedMinutes, entry.denominatorMinutes, entry.downMinutes, entry.overlapMinutes, entry.degradedMinutes, entry.availabilityPercent, entry.unknownCoverageMinutes, entry.downNow] }
+    assert.deepEqual(report.entries.map(item => item.tag), ['LINE-R2', 'CAP-1', 'FIL-1', 'FIL-1-P'])
+    assert.deepEqual(row(line), [240, 1680, 240, 60, 90, 85.7, 480, ['CAP-1']], '(1680 - 240) / 1680; the capper is down now')
+    assert.deepEqual(row(filler), [240, 1680, 180, 60, 0, 89.3, 480, []], '(1680 - 180) / 1680')
+    assert.deepEqual(row(pump), [0, 1920, 120, 0, 0, 93.8, 1920, []], 'no hour meter on the pump: all of it unknown')
+    assert.deepEqual(row(capper), [0, 1920, 60, 0, 90, 96.9, 1920, ['CAP-1']], 'degraded operation does not lower availability; the open outage counts to the period end')
+    assert.deepEqual(report.outages.map(item => [item.id, item.kind, item.span.from, item.span.to, item.startsBefore, item.endsAfter, item.open, item.productionMinutes, item.outsideProductionMinutes]), [
+      [boundary, 'failure', `${d0}T00:00`, `${d0}T08:00`, true, false, false, 120, 360],
+      [overlap, 'failure', `${d0}T07:00`, `${d0}T09:00`, false, false, false, 120, 0],
+      [degraded, 'degraded', `${d0}T12:00`, `${d0}T13:30`, false, false, false, 90, 0],
+      [shutdown, 'planned', `${d1}T10:00`, `${d1}T14:00`, false, false, false, 240, 0],
+      [open, 'failure', `${d1}T21:00`, `${addDays(d1, 1)}T00:00`, false, true, true, 60, 120]])
+    assert.deepEqual([report.outages[0].line.tag, report.outages[0].reason, report.outages[0].work.id], ['LINE-R2', 'Filler jammed', jobs.filler])
+    assert.ok((await h.api(`availability?${period}`, cookie.lead)).entries.some(item => item.id === line && item.availabilityPercent === 85.7), 'the site report lists every line')
+    // Degraded operation is not a stop: the reliability report counts only the capper's failure.
+    assert.deepEqual((await h.api(`reliability?${period}&asset=${capper}`, cookie.sam)).failures.map(item => item.id), [open])
+    const page = (await (await h.raw(`/app/availability?${period}&asset=${line}`, { cookie: cookie.sam })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Availability by entry', '85.7%', '89.3%', '60 overlapping min counted once', 'Source timeline', 'began before the period', 'still open', 'Degraded operation', 'Monday: 6:00 am to 10:00 pm', 'Unknown coverage']) assert.ok(page.includes(text), text)
+    assert.equal((await h.raw('/app/availability', { cookie: cookie.max })).status, 403)
+    assert.ok((await (await h.raw(`/app/work/${jobs.capper}`, { cookie: cookie.max })).text()).includes('Degraded operation'))
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

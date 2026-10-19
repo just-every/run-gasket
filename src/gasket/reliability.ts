@@ -3,7 +3,7 @@
 // each linked to its work. For leads, supervisors and the owner, over a period
 // of site-local days (both ends included; the last 30 days by default), for the
 // site or one asset.
-// - A stop is downtime recorded on a work order. Each is a planned stop or a
+// - A stop is downtime recorded on a work order (degraded operation, REPORT-002, is not one). Each is a planned stop or a
 //   failure, with an optional failure mode, as recorded when the asset went
 //   down; a lead corrects that by appending a classification with a reason, and
 //   the latest one counts. Planned stops are left out of every measure.
@@ -105,7 +105,7 @@ export async function reliability(env: Bindings, actor: Actor, url: URL) {
   if (assetId) insist(asset, 'asset_not_found', 404)
   const start = `${from}T00:00`, upTo = `${addDays(to, 1)}T00:00`, clock = localNow(actor.zone)
   const end = upTo < clock ? upTo : clock
-  const scope = `d.started_on >= ? AND d.started_on < ? ${assetId ? 'AND d.asset_id = ?' : ''}`, scopeArgs = [start, end, ...(assetId ? [assetId] : [])]
+  const scope = `d.started_on >= ? AND d.started_on < ? AND d.degraded = 0 ${assetId ? 'AND d.asset_id = ?' : ''}`, scopeArgs = [start, end, ...(assetId ? [assetId] : [])]
   const stops = await classifiedStops(env, scope, ...scopeArgs)
   const acknowledgements = await all(env, `SELECT subject, at FROM gk_audit WHERE action = 'workorder.acknowledge' AND subject IN (SELECT d.work_order_id FROM gk_downtime d WHERE ${scope}) ORDER BY at, seq`, ...scopeArgs)
 

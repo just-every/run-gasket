@@ -18,6 +18,7 @@ import { adjustMeter, feedReading, setFeedWindow } from './meters'
 import { moveCode, retireCode, setCode } from './codes'
 import { declareState } from './states'
 import { classifyStop } from './reliability'
+import { addProductionHours, removeProductionHours } from './availability'
 import { approveSubstitute, createKit, release, reserve } from './reservations'
 import { reviseBom } from './bom'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
@@ -95,6 +96,8 @@ export const actions: Record<string, Handler> = {
   'downtime.start': (env, actor, input) => downtimeStart(env, actor, input),
   'downtime.end': (env, actor, input) => downtimeEnd(env, actor, input),
   'downtime.classify': (env, actor, input) => classifyStop(env, actor, input),
+  'production.hours.add': (env, actor, input) => addProductionHours(env, actor, input),
+  'production.hours.remove': (env, actor, input) => removeProductionHours(env, actor, input),
   'finding.record': (env, actor, input) => recordFinding(env, actor, input),
   'workorder.submit': (env, actor, input) => submit(env, actor, input),
   'workorder.review': (env, actor, input) => review(env, actor, input),
