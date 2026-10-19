@@ -30,6 +30,7 @@ import { decide, prepare } from './proposals'
 import { review, submit } from './review'
 import { createSchedule, evaluateMeter, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole } from './site'
+import { retireField, saveField, saveStatus, setFieldValue, setWaiting } from './work-fields'
 import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, recordFinding, recordReadings, recordResults } from './work'
 
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
@@ -105,6 +106,11 @@ export const actions: Record<string, Handler> = {
   'loss.rate': (env, actor, input) => documentLossRate(env, actor, input),
   'template.save': (env, actor, input) => saveTemplate(env, actor, input),
   'template.retire': (env, actor, input) => retireTemplate(env, actor, input),
+  'workfield.save': (env, actor, input) => saveField(env, actor, input),
+  'workfield.retire': (env, actor, input) => retireField(env, actor, input),
+  'workorder.field': (env, actor, input) => setFieldValue(env, actor, input),
+  'workstatus.save': (env, actor, input) => saveStatus(env, actor, input),
+  'workorder.waiting': (env, actor, input) => setWaiting(env, actor, input),
   'workorder.priority': (env, actor, input) => setPriority(env, actor, input),
   'workorders.fromTemplate': (env, actor, input) => workFromTemplate(env, actor, input),
   'finding.record': (env, actor, input) => recordFinding(env, actor, input),

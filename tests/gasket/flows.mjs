@@ -1497,6 +1497,50 @@ try {
     assert.ok(page.includes('Emergency priority') && page.includes(`from template ${fields.name} (revision 1)`))
     const templates = (await (await h.raw('/app/templates', { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
     for (const text of ['Work templates', fields.name, 'revision 2', 'Retired']) assert.ok(templates.includes(text), text)
+    // A required field, a template that requires a field and evidence, and permissioned waiting statuses; nobody submits past them through the API.
+    await h.api('workfield.save', cookie.max, { label: 'Fault code', kind: 'text' }, 403)
+    assert.equal((await h.api('workfield.save', cookie.lead, { label: 'Lamp type', kind: 'choice', option: ['LED'] }, 400)).error, 'invalid_option')
+    const lamp = (await h.api('workfield.save', cookie.lead, { label: 'Lamp type', kind: 'choice', option: ['LED', 'Sodium'] })).id
+    await h.submit('workfield.save', cookie.lead, { label: 'Fault code', kind: 'text', required: 'yes' }, '/app/templates')
+    assert.equal((await h.api('workfield.save', cookie.lead, { label: 'fault CODE', kind: 'number' }, 409)).error, 'field_label_taken')
+    const faultCode = (await h.api('work-fields', cookie.max)).fields.find(row => row.label === 'Fault code')
+    assert.equal(faultCode.required, true)
+    await h.submit('template.save', cookie.lead, { name: 'Dock light check', title: 'Check the dock light', priority: 'normal', requiredField: lamp, requiresEvidence: 'yes' }, '/app/templates')
+    const check = (await h.api('templates', cookie.lead)).find(row => row.name === 'Dock light check')
+    assert.deepEqual([check.requiredFields, check.requiresEvidence], [[lamp], true])
+    const job = (await h.api('workorder.create', cookie.lead, { location: 'Dock 3 light', template: check.id, due: today, assignee: ids.max })).id
+    const ownJob = (await h.api('workorder.create', cookie.lead, { location: 'Dock 4 light', template: check.id, due: today, assignee: ids.lead })).id
+    const refused = async (who, id) => { const w = await wo(who, id); const body = await h.api('workorder.submit', cookie[who], { workOrder: id, version: w.version }, 409); assert.equal(body.error, 'not_ready_for_review'); return body.detail.missing }
+    const owed = ['the required field Lamp type has no value', 'the required field Fault code has no value', 'the template requires a photo or document as evidence']
+    assert.deepEqual(await refused('max', job), owed, 'the assignee cannot submit past the requirements')
+    assert.deepEqual(await refused('lead', ownJob), owed, 'nor can a lead on their own work')
+    assert.equal((await h.api('workorder.field', cookie.lead, { workOrder: job, field: lamp, value: 'Halogen' }, 400)).error, 'invalid_value')
+    await h.api('workorder.field', cookie.nia, { workOrder: job, field: lamp, value: 'LED' }, 403)
+    await h.api('workorder.field', cookie.lead, { workOrder: job, field: lamp, value: 'LED' })
+    await h.submit('workorder.field', cookie.max, { workOrder: job, field: faultCode.id, value: 'E42' }, `/app/work/${job}`)
+    assert.ok((await h.api('audit?action=workorder.field', cookie.owner)).rows.some(row => row.subject === job && JSON.parse(row.detail).to === 'E42' && JSON.parse(row.detail).from === null))
+    // Waiting statuses: each names who may set and clear it; a maintainer only on work they hold.
+    assert.equal((await h.api('workstatus.save', cookie.lead, { label: 'Waiting on parts', role: ['janitor'] }, 400)).error, 'invalid_role')
+    await h.api('workstatus.save', cookie.max, { label: 'Waiting on parts', role: ['lead'] }, 403)
+    const parts = (await h.api('workstatus.save', cookie.lead, { label: 'Waiting on parts', role: ['lead'] })).id
+    await h.submit('workstatus.save', cookie.lead, { label: 'Waiting on access', role: ['lead', 'maintainer'] }, '/app/templates')
+    const access = (await h.api('work-fields', cookie.lead)).statuses.find(row => row.label === 'Waiting on access').id
+    assert.equal((await h.api('workorder.waiting', cookie.max, { workOrder: job, status: parts }, 403)).error, 'status_not_permitted')
+    await h.api('workorder.waiting', cookie.lead, { workOrder: job, status: parts })
+    assert.equal((await h.api('workorder.waiting', cookie.max, { workOrder: job, status: '' }, 403)).error, 'status_not_permitted', 'only a role the status names clears it')
+    await h.api('workorder.waiting', cookie.lead, { workOrder: job, status: access })
+    assert.equal((await h.api('workorder.waiting', cookie.nia, { workOrder: job, status: '' }, 403)).error, 'not_your_work')
+    await h.api('workorder.waiting', cookie.max, { workOrder: job, status: '' })
+    await h.submit('workorder.waiting', cookie.max, { workOrder: job, status: access }, `/app/work/${job}`)
+    const jobPage = (await (await h.raw(`/app/work/${job}`, { cookie: cookie.max })).text()).replace(/<[^>]+>/g, '')
+    assert.ok(jobPage.includes('Waiting on access') && jobPage.includes('Lamp type (required)') && jobPage.includes('E42'), 'the page shows the status and field values')
+    assert.equal((await h.api('work', cookie.lead)).find(row => row.id === job).waiting, 'Waiting on access')
+    assert.deepEqual(await refused('max', job), [owed[2]], 'the evidence rule still holds')
+    await h.api('workorder.evidence', cookie.max, { workOrder: job, file: file('dock-light.png', png, 'image/png') })
+    await h.api('workorder.submit', cookie.max, { workOrder: job, version: (await wo('max', job)).version })
+    // A retired field stops being required; the template's own requirement stays with its work.
+    await h.api('workfield.retire', cookie.lead, { field: faultCode.id })
+    assert.deepEqual(await refused('lead', ownJob), [owed[0], owed[2]])
   })
 
   await check('GAS-11 rer export and rer import keep every record', async () => {

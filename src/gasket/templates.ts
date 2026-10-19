@@ -10,6 +10,7 @@ import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import type { Input } from './input'
+import { requiredFieldsOf } from './work-fields'
 import { estimate } from './performance'
 
 export const PRIORITIES = ['emergency', 'high', 'normal', 'low'] as const
@@ -24,7 +25,8 @@ export function priorityOf(input: Input): Priority | null {
   return value as Priority
 }
 
-export const templateList = (env: Bindings) => all(env, 'SELECT id, name, title, instructions, priority, estimate_minutes, revision, retired_at FROM gk_work_templates ORDER BY retired_at IS NOT NULL, name')
+export const templateList = async (env: Bindings) => (await all(env, 'SELECT id, name, title, instructions, priority, estimate_minutes, required_fields, requires_evidence, revision, retired_at FROM gk_work_templates ORDER BY retired_at IS NOT NULL, name'))
+  .map(({ required_fields, requires_evidence, ...row }) => ({ ...row, requiredFields: required_fields ? JSON.parse(required_fields) as string[] : [], requiresEvidence: Boolean(requires_evidence) }))
 
 /** The active template a new work order is made from, when one is named. */
 export async function chosenTemplate(env: Bindings, input: Input) {
@@ -40,12 +42,14 @@ export async function chosenTemplate(env: Bindings, input: Input) {
 export async function saveTemplate(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.assign')
   const id = input.text('template', { optional: true, max: 100 }) || null
-  const fields = { name: input.text('name', { max: 80 }), title: input.text('title', { max: 160 }), instructions: input.text('instructions', { optional: true, max: 2000 }) || null, priority: priorityOf(input) ?? 'normal', estimateMinutes: estimate(input) }
+  const fields = { name: input.text('name', { max: 80 }), title: input.text('title', { max: 160 }), instructions: input.text('instructions', { optional: true, max: 2000 }) || null, priority: priorityOf(input) ?? 'normal', estimateMinutes: estimate(input),
+    requiredFields: await requiredFieldsOf(env, input), requiresEvidence: input.flag('requiresEvidence') }
+  const requirements = [fields.requiredFields.length ? JSON.stringify(fields.requiredFields) : null, fields.requiresEvidence ? 1 : 0]
   const named = await one(env, 'SELECT id FROM gk_work_templates WHERE name = ? COLLATE NOCASE', fields.name)
   insist(!named || named.id === id, 'template_name_taken', 409)
   if (!id) {
     const created = newId()
-    await commit(env, [stmt(env, 'INSERT INTO gk_work_templates (id, name, title, instructions, priority, estimate_minutes, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', created, fields.name, fields.title, fields.instructions, fields.priority, fields.estimateMinutes, actor.id, now(), now())],
+    await commit(env, [stmt(env, 'INSERT INTO gk_work_templates (id, name, title, instructions, priority, estimate_minutes, required_fields, requires_evidence, created_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', created, fields.name, fields.title, fields.instructions, fields.priority, fields.estimateMinutes, ...requirements, actor.id, now(), now())],
       { actor: actor.id, action: 'template.save', subject: created, detail: { ...fields, revision: 1 } })
     return { id: created, revision: 1 }
   }
@@ -54,7 +58,7 @@ export async function saveTemplate(env: Bindings, actor: Actor, input: Input) {
   insist(!template.retired_at, 'template_retired', 409)
   insist(input.integer('revision', { min: 1, max: 1_000_000 }) === template.revision, 'stale', 409)
   await commit(env, [guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_work_templates WHERE id = ? AND revision = ?)', id, template.revision),
-    stmt(env, 'UPDATE gk_work_templates SET name = ?, title = ?, instructions = ?, priority = ?, estimate_minutes = ?, revision = revision + 1, updated_at = ? WHERE id = ?', fields.name, fields.title, fields.instructions, fields.priority, fields.estimateMinutes, now(), id)],
+    stmt(env, 'UPDATE gk_work_templates SET name = ?, title = ?, instructions = ?, priority = ?, estimate_minutes = ?, required_fields = ?, requires_evidence = ?, revision = revision + 1, updated_at = ? WHERE id = ?', fields.name, fields.title, fields.instructions, fields.priority, fields.estimateMinutes, ...requirements, now(), id)],
   { actor: actor.id, action: 'template.save', subject: id, detail: { ...fields, revision: template.revision + 1 } })
   return { id, revision: template.revision + 1 }
 }

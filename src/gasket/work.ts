@@ -22,6 +22,7 @@ import { bomOf } from './bom'
 import { partList } from './parts'
 import { workCosts } from './bad-actors'
 import { chosenTemplate, priorityOf } from './templates'
+import { fieldsOf } from './work-fields'
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
@@ -71,7 +72,7 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   if (assignee) await assigneeFits(env, assignee, crew.team)
   const estimateMinutes = estimate(input) ?? (template?.estimate_minutes as number | null) ?? null
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, actor.id, now()), ...(also?.(id) ?? [])],
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, required_fields, requires_evidence, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, template?.required_fields ?? null, template?.requires_evidence ?? 0, actor.id, now()), ...(also?.(id) ?? [])],
     { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
   return { id }
 }
@@ -281,14 +282,14 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; costs: Awaited<ReturnType<typeof workCosts>>; mine: boolean; missing: string[] }
+export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
   // Work at a location with no asset (PLAN-001) shows the location where an asset's name and place would be.
   const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
-    m.name AS assignee_name, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
-    FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_work_templates t ON t.id = w.template_id
+    m.name AS assignee_name, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
+    FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_work_templates t ON t.id = w.template_id LEFT JOIN gk_work_statuses ws ON ws.id = w.waiting_status
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
     LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
   insist(order, 'work_order_not_found', 404)
@@ -324,11 +325,13 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const { items_json: _items, ...rest } = order
   // PLAN-006: the work order's comments, with this person's unread state.
   const comments = await thread(env, actor, 'work', id), costs = await workCosts(env, id)
-  return { ...rest, trigger, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
+  // PLAN-001: custom field values, and what the fields and the template require before review.
+  const fields = await fieldsOf(env, order)
+  return { ...rest, trigger, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */
-export function submitBlockers({ items, findings, downtime, unacknowledged = false }: { items: { index: number; text: string; result: { outcome: string } | null }[]; findings: { item: number | null }[]; downtime: { ended_on: string | null }[]; unacknowledged?: boolean }) {
+export function submitBlockers({ items, findings, downtime, unacknowledged = false, fields = [], evidenceRequired = false }: { items: { index: number; text: string; result: { outcome: string } | null }[]; findings: { item: number | null }[]; downtime: { ended_on: string | null }[]; unacknowledged?: boolean; fields?: { label: string; value: string | null; required: boolean }[]; evidenceRequired?: boolean }) {
   const blockers: string[] = []
   if (unacknowledged) blockers.push('the assignee has not acknowledged this correction')
   const missing = items.filter(item => !item.result).length
@@ -336,6 +339,8 @@ export function submitBlockers({ items, findings, downtime, unacknowledged = fal
   for (const item of items) if (item.result && item.result.outcome !== 'pass' && !findings.some(finding => finding.item === item.index))
     blockers.push(`step ${item.index + 1} (${item.text}) ${item.result.outcome === 'fail' ? 'failed' : 'needs attention'} and needs a linked corrective finding`)
   if (downtime.some(row => !row.ended_on)) blockers.push('downtime is still open')
+  for (const field of fields) if (field.required && field.value === null) blockers.push(`the required field ${field.label} has no value`)
+  if (evidenceRequired) blockers.push('the template requires a photo or document as evidence')
   return blockers
 }
 
@@ -347,7 +352,7 @@ export async function workList(env: Bindings, actor: Actor, url: URL) {
   const filter = state === 'closed' ? "w.status IN ('closed', 'cancelled')" : "w.status NOT IN ('closed', 'cancelled')"
   const collaborating = 'EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id = w.id AND c.member_id = ? AND c.removed_at IS NULL)'
   return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.priority, w.status, w.due_date, w.version, w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location, m.name AS assignee, w.assignee_id,
-    t.name AS team, w.trade, w.shift, CASE WHEN w.assignee_id = ? THEN 'assignee' WHEN ${collaborating} THEN 'collaborator' END AS my_part
+    t.name AS team, w.trade, w.shift, (SELECT label FROM gk_work_statuses WHERE id = w.waiting_status) AS waiting, CASE WHEN w.assignee_id = ? THEN 'assignee' WHEN ${collaborating} THEN 'collaborator' END AS my_part
     FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_teams t ON t.id = w.team_id
     WHERE ${filter} ${mine ? `AND (w.assignee_id = ? OR ${collaborating})` : ''} ${team ? 'AND w.team_id = ?' : ''} ORDER BY ${state === 'closed' ? 'w.closed_at DESC' : 'w.due_date, w.number'} LIMIT 500`,
   actor.id, actor.id, ...(mine ? [actor.id, actor.id] : []), ...(team ? [team] : []))

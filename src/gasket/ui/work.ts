@@ -23,6 +23,7 @@ import { bomCard } from './bom'
 import { costCard } from './bad-actors'
 import { PRIORITIES, PRIORITY_LABELS, type Priority } from '../templates'
 import { crewCard } from './crew'
+import { statusList } from '../work-fields'
 import { CODE_KIND } from './codes'
 import { OUTCOME, STATUS, amount, area, backLink, band as headerBand, card, checkbox, details, field, fileField, form, h, hidden, initials, raw, select, table, tag, woNumber, type Html } from './html'
 import { ICON, actionIcon, machine } from './icons'
@@ -155,7 +156,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const post = (action: string, fields: unknown, submit: string, options: { multipart?: boolean; secondary?: boolean; layout?: string } = {}) => form(action, back, h`${ids}${fields}`, submit, options)
 
   const band = h`${headerBand({ id: 'wo-asset',
-    eyebrow: h`${woNumber(w.number)} · ${w.kind === 'preventive' ? 'Preventive' : 'Corrective'} · ${PRIORITY_LABELS[w.priority as Priority]} priority${w.template_name ? ` · from template ${w.template_name} (revision ${w.template_revision})` : ''}${w.follow_up_of_number ? h` · follow-up of <a href="/app/work/${w.follow_up_of}">${woNumber(w.follow_up_of_number)}</a>` : ''}`,
+    eyebrow: h`${woNumber(w.number)} · ${w.kind === 'preventive' ? 'Preventive' : 'Corrective'} · ${PRIORITY_LABELS[w.priority as Priority]} priority${w.waiting_label ? ` · ${w.waiting_label}` : ''}${w.template_name ? ` · from template ${w.template_name} (revision ${w.template_revision})` : ''}${w.follow_up_of_number ? h` · follow-up of <a href="/app/work/${w.follow_up_of}">${woNumber(w.follow_up_of_number)}</a>` : ''}`,
     title: w.asset_id ? h`<a href="/app/assets/${w.asset_id}">${w.asset_name}</a>` : h`${w.location}`,
     facts: w.asset_id ? [`Serial ${w.asset_serial ?? '—'}`, w.asset_location, `Custodian: ${w.asset_custodian ?? '—'}`] : ['Location, no asset'],
     status: tag(STATUS[w.status]),
@@ -223,6 +224,12 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const reviews = w.reviews.length ? card('Reviews', table(['Decision', 'By', 'Reason'], w.reviews.map(row => [tag(row.decision === 'approved' ? 'Approved' : 'Returned'), h`${row.reviewer}<span class="gk-sub">${showInstant(row.at, actor.zone)}</span>`, row.reason ?? '']), 'Reviews', { wrap: [2] }), { id: 'reviews' }) : ''
 
   const lead = can(actor, 'work.assign')
+  // PLAN-001: custom field values (set by whoever records the work, or a lead) and the waiting status.
+  const settable = (recording || lead) && ['open', 'in_progress', 'returned'].includes(w.status)
+  const fieldsCard = w.fields.length ? card('Fields', h`<dl class="gk-pairs">${w.fields.map(f => h`<div><dt>${f.label}${f.required ? ' (required)' : ''}</dt><dd>${f.value ?? h`<span class="gk-muted">No value</span>`}${f.setBy ? h`<span class="gk-sub">${f.setBy}</span>` : ''}</dd></div>`)}</dl>
+    ${settable ? w.fields.filter(f => !f.retired).map(f => post('workorder.field', h`${hidden('field', f.id)}${f.options ? select(f.label, 'value', f.options.map(option => ({ value: option, label: option })), f.value ?? '', { required: false, blank: 'No value' }) : field(f.label, 'value', { value: f.value ?? '', required: false, attrs: f.kind === 'number' ? 'inputmode="decimal"' : '' })}`, `Save ${f.label}`, { secondary: true })) : ''}`, { id: 'fields' }) : ''
+  const statuses = settable ? (await statusList(env)).filter(row => !row.retired_at) : []
+  const waitingCard = w.waiting_label || statuses.length ? card('Waiting', h`<p>${w.waiting_label ?? h`<span class="gk-muted">Not waiting</span>`}</p>${statuses.length ? post('workorder.waiting', select('Waiting status', 'status', statuses.map(row => ({ value: row.id, label: row.label })), w.waiting_status ?? '', { required: false, blank: 'Not waiting' }), 'Set waiting status', { secondary: true }) : ''}`, { id: 'waiting' }) : ''
   const siblings = lead && w.kind === 'corrective' && ['open', 'in_progress', 'returned'].includes(w.status)
     ? (await workList(env, actor, new URL('https://gasket.invalid/?state=open'))).filter(row => row.asset_id === w.asset_id && row.location === w.location && row.id !== w.id) : []
   const assign = lead && ['open', 'in_progress', 'returned'].includes(w.status)
@@ -246,7 +253,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     <form method="post" action="/app/do/workorder.review" class="gk-inline">${hidden('returnTo', back)}${ids}${hidden('decision', 'approve')}<button type="submit">Approve and close</button></form>`
 
   const body = h`${backLink('/app', 'Work orders')}${band}
-    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${w.bom ? bomCard(w.bom, actor.zone) : ''}${parts}${evidence}${commentsCard(w.comments, actor, { field: 'workOrder', id: w.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${lead && ['open', 'in_progress', 'returned', 'submitted'].includes(w.status) ? card('Priority', form('workorder.priority', back, h`${hidden('workOrder', w.id)}${select('Priority', 'priority', PRIORITIES.map(value => ({ value, label: PRIORITY_LABELS[value] })), w.priority)}${field('Reason', 'reason')}`, 'Change priority', { secondary: true }), { id: 'priority' }) : ''}${costCard(w, actor, back)}${findings}${reviews}${assign}${control}
+    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${w.bom ? bomCard(w.bom, actor.zone) : ''}${parts}${evidence}${commentsCard(w.comments, actor, { field: 'workOrder', id: w.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${lead && ['open', 'in_progress', 'returned', 'submitted'].includes(w.status) ? card('Priority', form('workorder.priority', back, h`${hidden('workOrder', w.id)}${select('Priority', 'priority', PRIORITIES.map(value => ({ value, label: PRIORITY_LABELS[value] })), w.priority)}${field('Reason', 'reason')}`, 'Change priority', { secondary: true }), { id: 'priority' }) : ''}${waitingCard}${fieldsCard}${costCard(w, actor, back)}${findings}${reviews}${assign}${control}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ...(w.trigger ? [['Raised by reading', `${w.trigger.meter} ${w.trigger.value}${w.trigger.unit === 'condition' ? '' : ` ${w.trigger.unit}`}, taken ${showLocal(w.trigger.taken_on)}${w.trigger.provenance === 'feed' ? ` (feed: ${w.trigger.source})` : ''}`] as [string, unknown]] : []), ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }
