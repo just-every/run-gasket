@@ -111,6 +111,7 @@ export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>
     // PM-001: the occurrence's stable identity; the scheduler never issues one that already had work (a cancelled one stays owed).
     const occurrence = `${schedule.id}@${byDate ? schedule.next_due_date : fired ? `reading:${fired.id}` : `meter:${schedule.next_due_meter}`}`
     if (automatic && await one(env, 'SELECT 1 FROM gk_work_orders WHERE occurrence = ?', occurrence)) continue
+    statements.push(guard(env, 'stale', "NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE schedule_id=? AND status NOT IN ('closed','cancelled')) AND (?=0 OR NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE occurrence=?))", schedule.id, Number(automatic), occurrence))
     statements.push(guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_schedules WHERE id=? AND active=1 AND revision=?)', schedule.id, schedule.revision))
     statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, occurrence, assignee_id, team_id, trade, estimate_minutes, status, created_by, created_at)
       SELECT ?, ${NEXT_NUMBER}, ?, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, ?, (SELECT trade FROM gk_teams WHERE id = ?), ?, 'open', ?, ?
