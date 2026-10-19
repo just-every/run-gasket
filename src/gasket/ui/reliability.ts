@@ -44,5 +44,5 @@ export async function reliabilityPage(env: Bindings, actor: Actor, url: URL) {
     row.from ? h`${showLocal(row.from)}<span class="gk-sub">to ${showLocal(row.to)}</span>` : h`<span class="gk-muted">No readings</span>`, one(row.operatingHours, 'h'), one(row.unknownHours, 'h'), one(row.mtbfHours, 'h')]), 'Operating time by asset', { wrap: [0] }) : h`<p class="gk-muted">No asset has an hour meter reading or a stop in this period.</p>`, { id: 'coverage' })
   const definitions = card('Definitions', h`<dl class="gk-pairs">${r.definitions.map(row => h`<div><dt>${row.term}</dt><dd>${row.text}</dd></div>`)}</dl>`, { id: 'definitions' })
   return page(env, 'Reliability', actor, h`<h1>Reliability</h1><p class="gk-lede">${r.asset ? `${r.asset.tag} ${r.asset.name}` : r.site ?? 'The site'}: ${showDate(r.from)} to ${showDate(r.to)}, from ${showLocal(r.window.start)} to ${showLocal(r.window.end)}.</p>${filters}${tiles}
-    <div class="gk-columns"><div class="gk-col-main">${samples}${pareto}${repeats}${failures}${planned}</div><div class="gk-col-side">${correct}${coverage}${definitions}</div></div>`, { url })
+    <div class="gk-columns"><div class="gk-col-main">${samples}${coverage}${pareto}${repeats}${failures}${planned}</div><div class="gk-col-side">${correct}${definitions}</div></div>`, { url })
 }
