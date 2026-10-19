@@ -1359,6 +1359,74 @@ try {
     assert.ok((await (await h.raw(`/app/work/${jobs.capper}`, { cookie: cookie.max })).text()).includes('Degraded operation'))
   })
 
+  await check('REPORT-005 downtime Pareto and cost of bad actors', async () => {
+    // A bakery building: an oven with its burner and a mixer on line R5, and a wrapper on no line. Production 06:00-22:00 (REPORT-002).
+    const add = async (tag, name, level, parent) => (await h.api('asset.create', cookie.lead, { tag, name, location: 'Bakery', level, ...(parent ? { parent } : {}) })).id
+    const bakery = await add('BLD-5', 'Bakery', 'building'), line = await add('LINE-R5', 'Bread line R5', 'line', bakery)
+    const oven = await add('OVN-1', 'Tunnel oven', 'machine', line), burner = await add('OVN-1-B', 'Oven burner', 'component', oven)
+    const mixer = await add('MIX-1', 'Dough mixer', 'machine', line), wrapper = await add('WRP-1', 'Wrapper', 'machine', bakery)
+    for (const [key, label] of [['overheating', 'Overheating'], ['product_jam', 'Product jam']]) await h.api('code.set', cookie.lead, { kind: 'failure_mode', key, label })
+    const day = addDays(today, -5), at = time => `${day}T${time}`
+    const job = async asset => (await h.api('workorder.create', cookie.lead, { asset, title: 'Bakery stoppage', due: today, assignee: ids.max })).id
+    const jobs = { oven: await job(oven), burner: await job(burner), mixer: await job(mixer), wrapper: await job(wrapper) }
+    const outage = async (workOrder, from, to, fields) => { const { downtime } = await h.api('downtime.start', cookie.max, { workOrder, startedOn: at(from), ...fields }); await h.api('downtime.end', cookie.max, { workOrder, endedOn: at(to) }); return downtime }
+    const a = await outage(jobs.oven, '08:00', '10:00', { reason: 'Overheated', failureMode: 'overheating' })
+    const b = await outage(jobs.burner, '09:00', '11:00', { reason: ' overheated ', failureMode: 'overheating' })
+    const c = await outage(jobs.mixer, '09:30', '10:30', { reason: 'Jammed', failureMode: 'product_jam' })
+    await outage(jobs.oven, '12:00', '13:00', { reason: 'Belt change', planned: true })
+    const d = await outage(jobs.mixer, '14:00', '14:45', { reason: 'jammed', failureMode: 'product_jam' })
+    const e = await outage(jobs.wrapper, '05:00', '07:00', { reason: 'Film snapped' })
+    await outage(jobs.wrapper, '15:00', '16:00', { reason: 'Running slow', degraded: true })
+    // Repair costs on three of the four work orders, one corrected; the wrapper's stays unknown.
+    await h.api('work.cost', cookie.max, { workOrder: jobs.oven, category: 'parts', amount: '350.00', note: 'Thermocouple' }, 403)
+    await h.api('work.cost', cookie.lead, { workOrder: jobs.oven, category: 'parts', amount: 'abc', note: 'Thermocouple' }, 400)
+    assert.equal((await h.api('work.cost', cookie.lead, { workOrder: jobs.wrapper, category: 'other', amount: '-10', note: 'Too low' }, 409)).error, 'cost_below_zero')
+    for (const [workOrder, category, amount, note] of [[jobs.oven, 'parts', '350.00', 'Thermocouple'], [jobs.oven, 'labor', '200', 'Two hours'], [jobs.oven, 'labor', '-50.00', 'Half an hour was travel'], [jobs.burner, 'contractor', '$1,200.00', 'Burner service call'], [jobs.mixer, 'parts', '80', 'Shear pin']])
+      await h.api('work.cost', cookie.lead, { workOrder, category, amount, note })
+    assert.equal((await h.submit('work.cost', cookie.owner, { workOrder: jobs.mixer, category: 'labor', amount: '0', note: 'Nothing' }, `/app/work/${jobs.mixer}`)).searchParams.get('error'), 'invalid_amount')
+    assert.deepEqual((await wo('lead', jobs.oven)).costs.totalCents, 50000)
+    // Documented lost production: the line at $600 an hour (replacing $500); the burner's loss documented as unknown; none for the wrapper.
+    await h.api('loss.rate', cookie.sam, { asset: line, rate: '500', basis: 'Guess' }, 403)
+    await h.api('loss.rate', cookie.lead, { asset: line, rate: '500', basis: 'Lost loaves times margin, 2025' })
+    assert.equal((await h.submit('loss.rate', cookie.lead, { asset: line, rate: '600.00', basis: 'Lost loaves times margin, 2026' }, '/app/bad-actors')).searchParams.get('error'), null)
+    await h.api('loss.rate', cookie.lead, { asset: burner, rate: '', basis: 'Burner loss not yet measured' })
+
+    const period = `from=${day}&to=${day}&asset=${bakery}`
+    await h.api(`bad-actors?${period}`, cookie.max, undefined, 403)
+    const r = await h.api(`bad-actors?${period}`, cookie.sam)
+    // By hand: A 120, B 120 less the 60 it shares with the oven above it, C 60 and D 45 (the mixer is not on the oven's branch), E 60 of production.
+    assert.deepEqual(r.failures.map(row => [row.id, row.minutes, row.duplicateMinutes, row.duplicateOf.map(other => other.asset), row.repairCents, row.lossCents]), [
+      [e, 60, 0, [], null, null], [a, 120, 0, [], 50000, 120000], [b, 60, 60, ['OVN-1'], 120000, null], [c, 60, 0, [], 8000, 60000], [d, 45, 0, [], 8000, 45000]])
+    assert.deepEqual(r.totals, { minutes: 345, failures: 5, duplicateMinutes: 60, repairCents: 178000, repairUnknown: 1, lossCents: 225000, lossUnknownMinutes: 120 })
+    assert.deepEqual(r.excluded, { planned: 1, degraded: 1 })
+    const ranked = rows => rows.map(row => [row.label, row.minutes, row.percent, row.cumulativePercent])
+    assert.deepEqual(ranked(r.byAsset), [['OVN-1 Tunnel oven', 120, 34.8, 34.8], ['MIX-1 Dough mixer', 105, 30.4, 65.2], ['OVN-1-B Oven burner', 60, 17.4, 82.6], ['WRP-1 Wrapper', 60, 17.4, 100]])
+    assert.deepEqual(ranked(r.byLine), [['LINE-R5 Bread line R5', 285, 82.6, 82.6], ['No line', 60, 17.4, 100]])
+    assert.deepEqual(ranked(r.byFailureMode), [['Overheating', 180, 52.2, 52.2], ['Product jam', 105, 30.4, 82.6], ['Unclassified', 60, 17.4, 100]])
+    assert.deepEqual(ranked(r.byReason), [['Overheated', 180, 52.2, 52.2], ['Jammed', 105, 30.4, 82.6], ['Film snapped', 60, 17.4, 100]])
+    const money = rows => rows.map(row => [row.repeats, row.repairCents, row.repairUnknown, row.lossCents, row.lossUnknownMinutes])
+    assert.deepEqual(money(r.byAsset), [[0, 50000, 0, 120000, 0], [1, 8000, 0, 105000, 0], [0, 120000, 0, null, 60], [0, null, 1, null, 60]], 'the mixer work order counts once; unknown losses stay unknown')
+    assert.deepEqual(money(r.byFailureMode)[0], [0, 170000, 0, 120000, 60])
+    assert.deepEqual(r.byAsset[2].contributors.map(row => [row.id, row.minutes, row.duplicateMinutes]), [[b, 60, 60]])
+    assert.deepEqual(r.repeats.map(row => [row.asset.tag, row.failureMode.key, row.count]), [['MIX-1', 'product_jam', 2]])
+    assert.deepEqual([r.failures[2].rate.entry.tag, r.failures[2].rate.centsPerHour, r.failures[3].rate.entry.tag, r.failures[3].rate.centsPerHour, r.failures[0].rate], ['OVN-1-B', null, 'LINE-R5', 60000, null])
+    // The exported inputs carry every figure and say "unknown" where nothing was documented.
+    const csv = await (await h.raw(`/app/bad-actors.csv?${period}`, { cookie: cookie.sam })).text()
+    const cells = line => [...line.matchAll(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g)].map(([, value]) => value.startsWith('"') ? value.slice(1, -1).replace(/""/g, '"') : value)
+    const lines = csv.trim().split('\r\n').map(cells)
+    const column = name => lines[0].indexOf(name)
+    assert.equal(lines.length, 6)
+    const of = id => lines.find(line => line[0] === id)
+    assert.deepEqual([of(b)[column('Counted minutes')], of(b)[column('Duplicate of')], of(b)[column('Repair cost USD')], of(b)[column('Loss rate USD per hour')], of(b)[column('Lost production USD')]], ['60', 'OVN-1', '1200.00', 'unknown', 'unknown'])
+    assert.deepEqual([of(e)[column('Repair cost USD')], of(e)[column('Loss rate USD per hour')], of(e)[column('Lost production USD')], of(e)[column('Line')]], ['unknown', 'unknown', 'unknown', ''])
+    assert.deepEqual([of(a)[column('Loss rate USD per hour')], of(a)[column('Loss rate entry')], of(a)[column('Lost production USD')]], ['600.00', 'LINE-R5', '1200.00'])
+    assert.equal((await h.raw(`/app/bad-actors.csv?${period}`, { cookie: cookie.max })).status, 403)
+    const page = (await (await h.raw(`/app/bad-actors?${period}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Downtime Pareto', 'By asset', 'By line', 'By failure mode', 'By reason', '34.8%', '65.2%', '60 duplicate min not counted', '$1,780.00', '$2,250.00', '120 min have no documented loss rate', 'Burner loss not yet measured', 'Download inputs (CSV)']) assert.ok(page.includes(text), text)
+    const work = (await (await h.raw(`/app/work/${jobs.oven}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
+    for (const text of ['Repair cost', 'Half an hour was travel', 'Total $500.00']) assert.ok(work.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

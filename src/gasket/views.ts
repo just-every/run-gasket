@@ -13,6 +13,7 @@ import { teamList } from './crew'
 import { performance } from './performance'
 import { reliability } from './reliability'
 import { availability } from './availability'
+import { badActors } from './bad-actors'
 import { kitList, substituteList } from './reservations'
 import { codeList, failureReport } from './codes'
 import { GasketError, insist, one } from './core'
@@ -57,6 +58,7 @@ export const views: Record<string, View> = {
   performance: (env, actor, _id, url) => performance(env, actor, url),
   reliability: (env, actor, _id, url) => reliability(env, actor, url),
   availability: (env, actor, _id, url) => availability(env, actor, url),
+  badActors: (env, actor, _id, url) => badActors(env, actor, url),
   kits: async env => ({ kits: await kitList(env), substitutes: await substituteList(env) }),
   failures: (env, actor) => failureReport(env, actor),
 }

@@ -24,6 +24,7 @@ export const NAV: Destination[] = [
   { href: '/app/board', label: 'Overdue and downtime', detail: 'Overdue work, work waiting for review, follow-ups, assets down and low parts.', icon: ICON.board, show: actor => can(actor, 'board.read') },
   { href: '/app/performance', label: 'Performance', detail: 'Backlog hours and age, PM compliance, planned and reactive work, schedule attainment.', icon: ICON.board, show: actor => can(actor, 'board.read') },
   { href: '/app/availability', label: 'Availability', detail: 'Production time, planned and down time, availability and unknown coverage by line and asset, with each outage.', icon: ICON.board, show: actor => can(actor, 'board.read') },
+  { href: '/app/bad-actors', label: 'Downtime Pareto', detail: 'Downtime ranked by asset, line, failure mode and reason, with repeats, repair cost and documented lost production.', icon: ICON.board, show: actor => can(actor, 'board.read') },
   { href: '/app/reliability', label: 'Reliability', detail: 'MTBF, MTTR and MTTA with their definitions, failures by failure mode and repeat failures.', icon: ICON.board, show: actor => can(actor, 'board.read') },
 ]
 export const SETTINGS: Destination[] = [

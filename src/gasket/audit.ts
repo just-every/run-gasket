@@ -56,7 +56,7 @@ export async function audit(env: Bindings, actor: Actor, url: URL, { every = fal
   return { rows: rows.slice(0, size), next: rows.length > size ? rows[size - 1].seq : null }
 }
 
-const cell = (value: unknown) => { const text = String(value ?? ''); return /[",\n\r]/.test(text) || /^[=+\-@\t]/.test(text) ? `"${(/^[=+\-@\t]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"` : text }
+export const cell = (value: unknown) => { const text = String(value ?? ''); return /[",\n\r]/.test(text) || /^[=+\-@\t]/.test(text) ? `"${(/^[=+\-@\t]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"` : text }
 
 /** Every matching entry as CSV, in the site's clock. */
 export async function auditCsv(env: Bindings, actor: Actor, url: URL) {
