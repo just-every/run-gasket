@@ -55,7 +55,7 @@ export async function stopClass(env: Bindings, input: Input) {
 export async function classifiedStops(env: Bindings, where: string, ...params: unknown[]) {
   const stops = await all(env, `SELECT d.*, a.tag AS asset_tag, a.name AS asset_name, w.number, w.title, m.name AS recorded_by_name FROM gk_downtime d JOIN gk_assets a ON a.id = d.asset_id
     LEFT JOIN gk_work_orders w ON w.id = d.work_order_id LEFT JOIN gk_members m ON m.id = d.recorded_by WHERE ${where} ORDER BY d.started_on, d.id`, ...params)
-  const corrections = await all(env, `SELECT c.*, m.name AS by FROM gk_downtime_classes c JOIN gk_downtime d ON d.id = c.downtime_id LEFT JOIN gk_members m ON m.id = c.recorded_by WHERE ${where} ORDER BY c.recorded_at, c.rowid`, ...params)
+  const corrections = await all(env, `SELECT c.*, m.name AS by FROM gk_downtime_classes c JOIN gk_downtime d ON d.id = c.downtime_id LEFT JOIN gk_members m ON m.id = c.recorded_by WHERE ${where} ORDER BY c.recorded_at, c.id`, ...params)
   const codes = new Map((await all(env, "SELECT id, key, label FROM gk_codes WHERE kind = 'failure_mode'")).map(code => [code.id, { key: code.key as string, label: code.label as string }]))
   const mode = (id: string | null) => id ? codes.get(id) ?? null : null
   return stops.map(stop => {
