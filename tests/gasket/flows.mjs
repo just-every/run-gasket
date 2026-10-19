@@ -359,6 +359,57 @@ try {
     assert.equal(jobs[0].blockers.length, 1)
   })
 
+  await check('PM-003 cadence, seasonal windows and exceptions', async () => {
+    // A seasonal Monday PM (March and April only) planned across the April 2027 daylight-saving change in Sydney.
+    const season = { asset: ids.fryer, checklist: ids.checklist, title: 'Autumn fryer flue check', everyDays: 7, firstDue: '2027-03-22', months: ['3', '4'], weekdays: ['1'], assignee: ids.max }
+    await h.api('schedule.create', cookie.lead, { ...season, weekdays: ['8'] }, 400)
+    const seasonal = (await h.api('schedule.create', cookie.lead, season)).id
+    const read = async () => (await h.api('schedules', cookie.lead)).find(row => row.id === seasonal)
+    await h.api('closure.add', cookie.max, { kind: 'holiday', label: 'Easter Monday', startsOn: '2027-03-29' }, 403)
+    await h.api('closure.add', cookie.lead, { kind: 'holiday', label: 'Easter Monday', startsOn: '2027-03-29' })
+    const shutdown = (await h.api('closure.add', cookie.lead, { kind: 'shutdown', label: 'Autumn deep clean', startsOn: '2027-03-20', endsOn: '2027-03-24' })).id
+    assert.equal((await read()).next_due_date, '2027-04-05', 'off the shutdown and the holiday, to the next allowed Monday')
+    await h.api('closure.remove', cookie.lead, { closure: shutdown })
+    let row = await read()
+    assert.equal(row.next_due_date, '2027-03-22')
+    // Editing previews the next dates before and after and writes nothing; then it applies.
+    const change = { schedule: seasonal, revision: row.revision, everyDays: 14, months: ['3', '4'], weekdays: ['1'] }
+    const preview = await h.api('schedule.edit', cookie.lead, { ...change, preview: true })
+    assert.deepEqual([preview.before, preview.after, preview.issued], [['2027-03-22', '2027-04-05', '2027-04-12', '2027-04-19', '2027-04-26'], ['2027-03-22', '2027-04-05', '2027-04-19', '2028-03-06', '2028-03-20'], []])
+    assert.equal((await read()).every_days, 7, 'a preview writes nothing')
+    await h.api('schedule.edit', cookie.lead, change)
+    assert.deepEqual([(row = await read()).every_days, row.next_due_date], [14, '2027-03-22'])
+    // Issued work keeps its due date and checklist revision when its schedule changes; deferral is bounded and approved by someone else.
+    const weekly = (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: ids.checklist, title: 'Fryer oil change', everyDays: 7, firstDue: addDays(today, -4), assignee: ids.max, maxDeferDays: 10 })).id
+    const issued = (await h.api('workorders.generate', cookie.lead, {})).created.find(item => item.schedule === weekly).id
+    const before = await wo('lead', issued)
+    let weeklyRow = (await h.api('schedules', cookie.lead)).find(item => item.id === weekly)
+    const edit = await h.api('schedule.edit', cookie.lead, { schedule: weekly, revision: weeklyRow.revision, everyDays: 10, cadence: 'completion', preview: true })
+    assert.deepEqual(edit.issued.map(item => [item.id, item.due_date, item.unchanged]), [[issued, addDays(today, -4), true]])
+    await h.api('schedule.edit', cookie.lead, { schedule: weekly, revision: weeklyRow.revision, everyDays: 10, cadence: 'completion' })
+    assert.deepEqual([(await wo('lead', issued)).due_date, (await wo('lead', issued)).checklist_revision_id], [addDays(today, -4), before.checklist_revision_id])
+    assert.equal((await h.api('schedule.defer', cookie.lead, { schedule: weekly, until: addDays(today, 11), reason: 'Fryer out for a deep clean' }, 409)).error, 'deferral_too_long')
+    const defer = await h.api('schedule.defer', cookie.lead, { schedule: weekly, until: addDays(today, 5), reason: 'Fryer out for a deep clean' })
+    await h.api('schedule.defer', cookie.lead, { schedule: weekly, until: addDays(today, 4), reason: 'Again' }, 409)
+    await h.api('schedule.exception', cookie.owner, { exception: defer.id, decision: 'reject', note: 'Clean it after the change' })
+    assert.equal((await wo('lead', issued)).due_date, addDays(today, -4), 'a rejected deferral moves nothing')
+    const again = await h.api('schedule.defer', cookie.owner, { schedule: weekly, until: addDays(today, 5), reason: 'Deep clean moved to this week' })
+    await h.api('schedule.exception', cookie.owner, { exception: again.id, decision: 'approve' }, 403)
+    await h.api('schedule.exception', cookie.sam, { exception: again.id, decision: 'approve' })
+    const deferred = await wo('lead', issued)
+    assert.deepEqual([deferred.due_date, deferred.checklist_revision_id], [addDays(today, 5), before.checklist_revision_id])
+    weeklyRow = (await h.api('schedules', cookie.lead)).find(item => item.id === weekly)
+    assert.deepEqual([weeklyRow.next_due_date, weeklyRow.exceptions.map(item => item.decision)], [addDays(today, 5), ['approved', 'rejected']])
+    // Completion cadence counts from the day the work is approved (today + 10), not from its planned date (which would give today + 6).
+    await h.api('workorder.results', cookie.max, { workOrder: issued, outcome: deferred.items.map(() => 'pass'), note: deferred.items.map(() => '') })
+    await h.api('workorder.submit', cookie.max, { workOrder: issued, version: (await wo('max', issued)).version })
+    await h.api('workorder.review', cookie.sam, { workOrder: issued, version: (await wo('sam', issued)).version, decision: 'approve' })
+    assert.equal((await h.api('schedules', cookie.lead)).find(item => item.id === weekly).next_due_date, addDays(today, 10))
+    assert.equal((await h.api('closures', cookie.max)).map(item => item.label).join(), 'Easter Monday')
+    const page = await (await h.raw('/app/schedules', { cookie: cookie.lead })).text()
+    for (const text of ['Easter Monday', 'Skips and deferrals', 'from completion', 'Deep clean moved to this week']) assert.ok(page.includes(text), text)
+  })
+
   await check('MIG-002 MaintainX completed work history across date ranges', async () => {
     const first = { assets: file('maintainx-assets-2.csv', historyAssetsCsv), work: file('maintainx-work-orders-q1.csv', workCsv) }
     const preview = await h.api('import.preview', cookie.lead, first)
@@ -498,9 +549,13 @@ try {
     let schedule = (await h.api('schedules', cookie.lead)).find(row => row.id === missed)
     assert.deepEqual([schedule.overdue, schedule.open_work, schedule.next_due_date], [true, null, addDays(today, -3)])
     await h.api('schedule.skip', cookie.max, { schedule: missed, reason: 'x' }, 403)
-    await h.api('schedule.skip', cookie.lead, { schedule: missed, reason: 'Burner replaced new this week; next check on cadence' })
+    // PM-003: the skip is a request; the occurrence stays overdue until an owner or supervisor approves it.
+    const skip = await h.api('schedule.skip', cookie.lead, { schedule: missed, reason: 'Burner replaced new this week; next check on cadence' })
+    assert.equal((await h.api('schedules', cookie.lead)).find(row => row.id === missed).overdue, true)
+    await h.api('schedule.exception', cookie.lead, { exception: skip.id, decision: 'approve' }, 403)
+    await h.api('schedule.exception', cookie.sam, { exception: skip.id, decision: 'approve' })
     schedule = (await h.api('schedules', cookie.lead)).find(row => row.id === missed)
-    assert.deepEqual([schedule.overdue, schedule.next_due_date], [false, addDays(today, 27)])
+    assert.deepEqual([schedule.overdue, schedule.next_due_date, schedule.exceptions.map(row => [row.kind, row.occurrence, row.decision])], [false, addDays(today, 27), [['skip', addDays(today, -3), 'approved']]])
     // Merge a duplicate: it is cancelled into the work that carries on and keeps its own evidence.
     assert.equal((await h.api('workorder.merge', cookie.lead, { workOrder: pm, into: fan, reason: 'x' }, 409)).error, 'merge_preventive')
     await h.submit('workorder.merge', cookie.lead, { workOrder: rattle, into: fan, reason: 'Same fan, reported twice' }, `/app/work/${rattle}`)

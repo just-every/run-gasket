@@ -146,7 +146,7 @@ The scheduler's existing fixed-calendar and approval-reading meter cadence remai
 
 - **PM-002 — Automatic meter and condition triggers.** Validated manual or integrated counter, gauge and condition readings automatically evaluate thresholds, trend duration and hysteresis. Combined calendar/meter policies state whichever-first or both; repeated/late sensor deliveries do not duplicate work or satisfy a condition with stale data. **Acceptance evidence:** Configure counter and sustained-temperature triggers, send fresh, repeated, late and recovered readings through ingest and await generated work. Inspect one order per trigger, source evidence and explicit rejection of stale data.
 
-- **PM-003 — Cadence, seasonal windows and exceptions.** Leads choose fixed versus completion cadence, seasonal months, weekdays, holidays, shutdown windows and bounded deferral with a reason. Skipping a task retains the missed obligation and independent risk approval; editing schedules previews already-issued and future work. **Acceptance evidence:** Configure weekday/seasonal PMs across a holiday and daylight-saving change, defer one with approval and edit an interval. Inspect next dates, retained missed work and unchanged issued checklist/due evidence.
+- **PM-003 — Cadence, seasonal windows and exceptions.** Leads choose fixed versus completion cadence, seasonal months, weekdays, holidays, shutdown windows and bounded deferral with a reason. Skipping a task retains the missed obligation and independent risk approval; editing schedules previews already-issued and future work. Due dates are site-local calendar days, so a daylight-saving change never moves one. A calendar schedule may allow only some months and ISO weekdays and, unless it is set to run through them, avoids the site's closures (holidays and shutdown windows, both ends inclusive, kept by leads); a due date on a day it may not fall moves forward to the next allowed day, never earlier. Fixed cadence counts from the planned (nominal) date, so moves never drift it; completion cadence counts from the day the work is approved. A lead asks to skip an overdue occurrence that has no open work, or to defer the current occurrence to a date after it and at most the schedule's deferral limit later (14 days unless set, up to 365), always with a reason; nothing moves until an owner or supervisor other than the person who asked approves it, issued work moves with an approved deferral and keeps its checklist revision, and every request and decision stays on record, so a skipped occurrence remains recorded as missed. Editing a calendar schedule's interval, cadence or calendar shows a no-write preview of its issued work (unchanged: due date and checklist revision) and of its next five due dates before and after the change. **Acceptance evidence:** Configure weekday/seasonal PMs across a holiday and daylight-saving change, defer one with approval and edit an interval. Inspect next dates, retained missed work and unchanged issued checklist/due evidence.
 
 - **PM-004 — Failed inspection creates accountable correction.** A failed required result automatically creates or links a corrective finding/work order according to a lead-approved rule, carrying failed step, readings, evidence, severity and deadline. Acknowledgement and independent repair verification close the obligation; closing the PM cannot hide unresolved corrective work. **Acceptance evidence:** Fail a required inspection item through mobile/API without manually asking for follow-up, inspect the linked corrective work and notice, complete/review it and verify the originating failure closes only under the configured rule.
 
@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002 and ASSET-004 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004 and PM-003 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 4 | 40 | 78 | 122 |
-| All | 18 | 40 | 78 | 136 |
+| Target and push further | 5 | 39 | 78 | 122 |
+| All | 19 | 39 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -421,7 +421,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `PLAN-009` | No-code automation rules | target | missing |  | Routing, priority and assignment are manual; no rule builder, triggers/conditions/actions, test mode, loop protection or rule-revision audit. |
 | `PM-001` | Unattended calendar generation | target | partial | `src/gasket/schedules.ts`; `tests/gasket/flows.mjs` | Calendar generation is command-driven only; no unattended scheduler, occurrence ledger or missed-run recovery. |
 | `PM-002` | Automatic meter and condition triggers | target | partial | `src/gasket/schedules.ts`; `src/gasket/work.ts` | Manual counter-threshold generation exists; gauge/condition policies, event-driven evaluation and ingest deduplication do not. |
-| `PM-003` | Cadence, seasonal windows and exceptions | target | partial | `src/gasket/schedules.ts` | Fixed-day calendar and approval-based meter advancement exist; seasonal/business calendars, configurable cadence and approved deferral do not. |
+| `PM-003` | Cadence, seasonal windows and exceptions | target | done | `src/gasket/schedules.ts`; `src/gasket/calendar.ts`; `src/gasket/exceptions.ts`; `migrations/core/0026_pm_calendar.sql`; `tests/gasket/flows.mjs` |  |
 | `PM-004` | Failed inspection creates accountable correction | target | done | `src/gasket/corrections.ts`; `src/gasket/work.ts`; `src/gasket/review.ts`; `migrations/core/0020_failure_rules.sql`; `tests/gasket/flows.mjs` |  |
 | `PM-005` | Assignee and approver notifications | target | missing |  | No maintenance notification outbox, provider delivery, push registration or preferences. |
 | `PM-006` | Overdue escalation and blocker chasing | target | partial | `src/gasket/board.ts` | Overdue display exists; automatic reminders, acknowledgements, owned blockers and timed escalation do not. |

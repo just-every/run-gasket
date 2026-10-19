@@ -36,7 +36,11 @@ For something that needs fixing now, open the asset and use **Raise corrective w
 
 Under **Assignment**, a lead can cancel a work order with a reason, or merge a duplicate repair into the work order that carries on: the duplicate is cancelled with a link to it and keeps its own photos and records. **Changes to this work order** lists every cancellation, reschedule, reopening and merge with its reason. A cancelled work order, or a reviewed repair whose fault came back, can be reopened with a reason; a reopened repair goes back for rework and a fresh review.
 
-Cancelling preventive work does not cancel the obligation: its schedule shows **Overdue** until the work is issued again or a lead presses **Skip occurrence** with a reason, which moves the schedule on to its next due date.
+Cancelling preventive work does not cancel the obligation: its schedule shows **Overdue** until the work is issued again or a lead presses **Ask to skip** with a reason and an owner or supervisor approves it; then the schedule moves on to its next due date and the missed occurrence stays listed under **Skips and deferrals**.
+
+## Seasons, weekdays, holidays and deferrals
+
+A calendar schedule can run on fixed dates or count from completion (the day its work is approved), only in some months or on some weekdays, and moves off the site's holidays and shutdown windows unless set to run through them. Add closed days under **Calendar** on the Schedules page. A due date that lands on a day it may not fall moves to the next allowed day. A lead can ask to defer the current occurrence, up to the schedule's deferral limit; an owner or supervisor approves it before anything moves. Changing a schedule shows its issued work, which keeps its due date and checklist, and the next five dates before and after the change.
 
 Through the JSON door (`workorders.bulk`), a lead can assign, reschedule or cancel many work orders at once: a preview first lists each one's outcome and what else it touches, such as a schedule or open follow-up work, without changing anything, then each work order succeeds or fails on its own.
 

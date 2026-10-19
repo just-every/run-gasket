@@ -5,7 +5,9 @@ import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
 import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from './assets'
 import { createChecklist, reviseChecklist } from './checklists'
-import { bulk, merge, reopen, skipOccurrence } from './control'
+import { bulk, merge, reopen } from './control'
+import { addClosure, removeClosure } from './calendar'
+import { decideException, editSchedule, requestDeferral, requestSkip } from './exceptions'
 import { acknowledge, setRule } from './corrections'
 import type { Input } from './input'
 import { adjustMeter, feedReading, setFeedWindow } from './meters'
@@ -48,7 +50,12 @@ export const actions: Record<string, Handler> = {
   'schedule.create': (env, actor, input) => createSchedule(env, actor, input),
   'workorders.generate': (env, actor) => generateDue(env, actor),
   'workorders.bulk': (env, actor, input) => bulk(env, actor, input),
-  'schedule.skip': (env, actor, input) => skipOccurrence(env, actor, input),
+  'schedule.skip': (env, actor, input) => requestSkip(env, actor, input),
+  'schedule.defer': (env, actor, input) => requestDeferral(env, actor, input),
+  'schedule.exception': (env, actor, input) => decideException(env, actor, input),
+  'schedule.edit': (env, actor, input) => editSchedule(env, actor, input),
+  'closure.add': (env, actor, input) => addClosure(env, actor, input),
+  'closure.remove': (env, actor, input) => removeClosure(env, actor, input),
   'workorder.create': (env, actor, input) => createCorrective(env, actor, input),
   'workorder.assign': (env, actor, input) => assign(env, actor, input),
   'workorder.plan': (env, actor, input) => decidePlan(env, actor, input),

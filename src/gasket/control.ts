@@ -2,8 +2,8 @@
 // cancel selected work orders after a no-write preview of each one's consequences;
 // each row succeeds or fails on its own. Cancelled work can be reopened and a
 // duplicate merged into the work order that carries on, always with a reason and
-// with every record kept. A cancelled preventive occurrence stays due until a lead
-// explicitly skips it. Nothing here records, completes or approves maintenance.
+// with every record kept. A cancelled preventive occurrence stays due until its
+// skip is approved (PM-003, exceptions.ts). Nothing here records, completes or approves maintenance.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { GasketError, all, commit, guard, insist, newId, now, one, stmt } from './core'
@@ -121,19 +121,4 @@ export async function merge(env: Bindings, actor: Actor, input: Input) {
     stmt(env, 'UPDATE gk_work_orders SET version = version + 1 WHERE id = ?', into.id),
   ], [{ actor: actor.id, action: 'workorder.merge', subject: duplicate.id, detail: { into: into.id, reason } }, { actor: actor.id, action: 'workorder.merged', subject: into.id, detail: { duplicate: duplicate.id, reason } }])
   return { id: duplicate.id, into: into.id }
-}
-
-/** The explicit resolution of a missed preventive occurrence: skip it, with a reason, and move the schedule on. */
-export async function skipOccurrence(env: Bindings, actor: Actor, input: Input) {
-  requireCapability(actor, 'work.assign')
-  const schedule = await one(env, 'SELECT * FROM gk_schedules WHERE id = ?', input.text('schedule', { max: 100 }))
-  insist(schedule, 'schedule_not_found', 404)
-  insist(schedule.next_due_date && schedule.next_due_date < actor.today, 'not_overdue', 409)
-  const reason = input.text('reason', { max: 500 })
-  await commit(env, [
-    guard(env, 'open_work_exists', "NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE schedule_id = ? AND status NOT IN ('closed', 'cancelled'))", schedule.id),
-    guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_schedules WHERE id = ? AND revision = ?)', schedule.id, schedule.revision),
-    ...await advanceStatements(env, schedule.id, actor.today),
-  ], { actor: actor.id, action: 'schedule.skip', subject: schedule.id, detail: { skipped: schedule.next_due_date, reason } })
-  return { id: schedule.id }
 }
