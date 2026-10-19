@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11 and ADMIN-006 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006 and PLAN-007 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 1 | 43 | 78 | 122 |
-| All | 15 | 43 | 78 | 136 |
+| Target and push further | 2 | 42 | 78 | 122 |
+| All | 16 | 42 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -416,7 +416,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `PLAN-004` | Skills, qualifications and resources | target | missing |  | No skills, qualification expiry, tools or resource scheduling. |
 | `PLAN-005` | Dependencies and production windows | target | missing |  | No work dependencies, blocker tracking or production-window exchange. |
 | `PLAN-006` | Comments, mentions and shift handoff | target | missing |  | No team comments, mentions, unread state or shift handoff thread. |
-| `PLAN-007` | Bulk actions and controlled cancellation | target | partial | `src/gasket/work.ts` | Individual cancellation retains a reason; no bulk preview, dependency consequences, reopen or work merge. |
+| `PLAN-007` | Bulk actions and controlled cancellation | target | done | `src/gasket/control.ts`; `src/gasket/work.ts`; `src/gasket/schedules.ts`; `migrations/core/0019_work_merge.sql`; `tests/gasket/flows.mjs` |  |
 | `PLAN-008` | Team, group and direct messaging | target | missing |  | No conversations, team or All team chat, direct/group messages, unread state, offline message queue or message-to-work conversion. |
 | `PLAN-009` | No-code automation rules | target | missing |  | Routing, priority and assignment are manual; no rule builder, triggers/conditions/actions, test mode, loop protection or rule-revision audit. |
 | `PM-001` | Unattended calendar generation | target | partial | `src/gasket/schedules.ts`; `tests/gasket/flows.mjs` | Calendar generation is command-driven only; no unattended scheduler, occurrence ledger or missed-run recovery. |

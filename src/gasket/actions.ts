@@ -5,6 +5,7 @@ import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
 import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from './assets'
 import { createChecklist, reviseChecklist } from './checklists'
+import { bulk, merge, reopen, skipOccurrence } from './control'
 import type { Input } from './input'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
@@ -33,10 +34,14 @@ export const actions: Record<string, Handler> = {
   'checklist.revise': (env, actor, input) => reviseChecklist(env, actor, input),
   'schedule.create': (env, actor, input) => createSchedule(env, actor, input),
   'workorders.generate': (env, actor) => generateDue(env, actor),
+  'workorders.bulk': (env, actor, input) => bulk(env, actor, input),
+  'schedule.skip': (env, actor, input) => skipOccurrence(env, actor, input),
   'workorder.create': (env, actor, input) => createCorrective(env, actor, input),
   'workorder.assign': (env, actor, input) => assign(env, actor, input),
   'workorder.plan': (env, actor, input) => decidePlan(env, actor, input),
   'workorder.cancel': (env, actor, input) => cancel(env, actor, input),
+  'workorder.reopen': (env, actor, input) => reopen(env, actor, input),
+  'workorder.merge': (env, actor, input) => merge(env, actor, input),
   'workorder.results': (env, actor, input) => recordResults(env, actor, input),
   'workorder.evidence': (env, actor, input) => addEvidence(env, actor, input),
   'workorder.readings': (env, actor, input) => recordReadings(env, actor, input),

@@ -30,4 +30,12 @@ A lead assigns or reassigns any open work order from its page, under **Assignmen
 
 For something that needs fixing now, open the asset and use **Raise corrective work**: say what needs doing, when it is due and who does it.
 
+## Change, cancel, merge and reopen work
+
+Under **Assignment**, a lead can cancel a work order with a reason, or merge a duplicate repair into the work order that carries on: the duplicate is cancelled with a link to it and keeps its own photos and records. **Changes to this work order** lists every cancellation, reschedule, reopening and merge with its reason. A cancelled work order, or a reviewed repair whose fault came back, can be reopened with a reason; a reopened repair goes back for rework and a fresh review.
+
+Cancelling preventive work does not cancel the obligation: its schedule shows **Overdue** until the work is issued again or a lead presses **Skip occurrence** with a reason, which moves the schedule on to its next due date.
+
+Through the JSON door (`workorders.bulk`), a lead can assign, reschedule or cancel many work orders at once: a preview first lists each one's outcome and what else it touches, such as a schedule or open follow-up work, without changing anything, then each work order succeeds or fails on its own.
+
 Next: [Doing the work](doing-the-work.md).

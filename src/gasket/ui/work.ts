@@ -183,9 +183,20 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const decisions = w.decisions.length ? card('Overdue decisions', h`<ul class="gk-findings">${w.decisions.map(row => h`<li>${row.plan === 'keep' ? `Kept with ${row.holder ?? 'the assignee'}` : row.plan === 'reassign' ? `Reassigned to ${row.to ?? 'someone else'}` : `Kept as is${row.holder ? `, with ${row.holder}` : ''}`}<span class="gk-sub">${row.decided_by ?? '—'} · ${showInstant(row.at, actor.zone)}</span></li>`)}</ul>`, { id: 'decisions' }) : ''
   const reviews = w.reviews.length ? card('Reviews', table(['Decision', 'By', 'Reason'], w.reviews.map(row => [tag(row.decision === 'approved' ? 'Approved' : 'Returned'), h`${row.reviewer}<span class="gk-sub">${showInstant(row.at, actor.zone)}</span>`, row.reason ?? '']), 'Reviews', { wrap: [2] }), { id: 'reviews' }) : ''
 
-  const assign = can(actor, 'work.assign') && ['open', 'in_progress', 'returned'].includes(w.status)
+  const lead = can(actor, 'work.assign')
+  const siblings = lead && w.kind === 'corrective' && ['open', 'in_progress', 'returned'].includes(w.status)
+    ? (await workList(env, actor, new URL('https://gasket.invalid/?state=open'))).filter(row => row.asset_id === w.asset_id && row.id !== w.id) : []
+  const assign = lead && ['open', 'in_progress', 'returned'].includes(w.status)
     ? card('Assignment', h`${post('workorder.assign', select('Assign to', 'assignee', (await assignable(env)).map(person => ({ value: person.id, label: person.name })), w.assignee_id ?? '', { blank: 'Choose a person' }), 'Assign', { secondary: true })}
-      ${post('workorder.cancel', field('Reason to cancel', 'reason'), 'Cancel work order', { secondary: true })}`, { id: 'assignment' }) : ''
+      ${post('workorder.cancel', field('Reason to cancel', 'reason'), 'Cancel work order', { secondary: true })}
+      ${siblings.length ? post('workorder.merge', h`${select('Duplicate of', 'into', siblings.map(row => ({ value: row.id, label: `${woNumber(row.number)} ${row.title}` })), '', { blank: 'Choose the work order that carries on' })}${field('Reason to merge', 'reason')}`, 'Merge as duplicate', { secondary: true }) : ''}`, { id: 'assignment' }) : ''
+  // PLAN-007: what was cancelled, rescheduled, reopened or merged, and why; cancelled or reviewed repairs can be reopened.
+  const verb: Record<string, string> = { 'workorder.cancel': 'Cancelled', 'workorder.reschedule': 'Rescheduled', 'workorder.reopen': 'Reopened', 'workorder.merge': 'Merged as a duplicate', 'workorder.merged': 'Took in a duplicate' }
+  const reopenable = lead && !w.merged_into && (w.status === 'cancelled' || (w.status === 'closed' && w.kind === 'corrective'))
+  const control = w.control.length || w.merged.length || w.merged_into || reopenable ? card('Changes to this work order', h`${w.merged_into ? h`<p>Merged into <a href="/app/work/${w.merged_into}">${woNumber(w.merged_into_number)}</a>; its records stay here.</p>` : ''}
+    ${w.merged.length ? h`<p>Duplicates merged in: ${w.merged.map((row, index) => h`${index ? ', ' : ''}<a href="/app/work/${row.id}">${woNumber(row.number)}</a>`)}</p>` : ''}
+    ${w.control.length ? h`<ul class="gk-findings">${w.control.map(row => h`<li>${verb[row.action] ?? 'Changed'}${row.action === 'workorder.reschedule' ? ` to ${showDate(row.to)}` : ''}${row.reason ? `: ${row.reason}` : ''}<span class="gk-sub">${row.by ?? '—'} · ${showInstant(row.at, actor.zone)}</span></li>`)}</ul>` : ''}
+    ${reopenable ? post('workorder.reopen', field('Reason to reopen', 'reason'), 'Reopen work order', { secondary: true }) : ''}`, { id: 'changes' }) : ''
 
   let bar = h``
   if (working) bar = w.missing.length
@@ -196,7 +207,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     <form method="post" action="/app/do/workorder.review" class="gk-inline">${hidden('returnTo', back)}${ids}${hidden('decision', 'approve')}<button type="submit">Approve and close</button></form>`
 
   const body = h`${backLink('/app', 'Work orders')}${band}
-    <div class="gk-columns"><div class="gk-col-main">${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${downtime}${findings}${reviews}${assign}
+    <div class="gk-columns"><div class="gk-col-main">${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${downtime}${findings}${reviews}${assign}${control}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

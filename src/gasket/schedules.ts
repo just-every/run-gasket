@@ -87,10 +87,12 @@ export async function advanceStatements(env: Bindings, scheduleId: string, today
   return [stmt(env, 'UPDATE gk_schedules SET next_due_date = ?, next_due_meter = ?, revision = revision + 1 WHERE id = ?', nextDate, nextMeter, schedule.id)]
 }
 
-export async function scheduleList(env: Bindings, _actor: Actor) {
-  return await all(env, `SELECT s.id, s.title, s.every_days, s.every_units, s.next_due_date, s.next_due_meter, s.active, s.revision,
+export async function scheduleList(env: Bindings, actor: Actor) {
+  const rows = await all(env, `SELECT s.id, s.title, s.every_days, s.every_units, s.next_due_date, s.next_due_meter, s.active, s.revision,
     a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, c.name AS checklist, m.name AS meter, m.unit AS meter_unit, ${LATEST('s.meter_id')} AS meter_now, mb.name AS assignee,
     (SELECT w.id FROM gk_work_orders w WHERE w.schedule_id = s.id AND w.status NOT IN ('closed', 'cancelled')) AS open_work
     FROM gk_schedules s JOIN gk_assets a ON a.id = s.asset_id JOIN gk_checklists c ON c.id = s.checklist_id
     LEFT JOIN gk_meters m ON m.id = s.meter_id LEFT JOIN gk_members mb ON mb.id = s.assignee_id ORDER BY s.active DESC, COALESCE(s.next_due_date, '9999'), a.tag`)
+  // A missed occurrence with no open work stays overdue until a lead issues it again or skips it (PLAN-007).
+  return rows.map(row => ({ ...row, overdue: Boolean(row.active && row.next_due_date && row.next_due_date < actor.today && !row.open_work) }))
 }

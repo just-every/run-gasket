@@ -253,15 +253,15 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; mine: boolean; missing: string[] }
+export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
   const order = await one(env, `SELECT w.*, a.tag AS asset_tag, a.name AS asset_name, a.serial AS asset_serial, a.location AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
-    m.name AS assignee_name, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number
+    m.name AS assignee_name, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number
     FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
-    LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of WHERE w.id = ?`, id)
+    LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
   insist(order, 'work_order_not_found', 404)
   const results = new Map((await all(env, 'SELECT r.item, r.outcome, r.note, m.name AS recorded_by, r.recorded_at FROM gk_results r LEFT JOIN gk_members m ON m.id = r.recorded_by WHERE r.work_order_id = ?', id)).map(row => [row.item, row]))
   const items = order.items_json ? (JSON.parse(order.items_json) as { text: string }[]).map((item, index) => ({ index, text: item.text, result: results.get(index) ?? null })) : []
@@ -278,8 +278,13 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
     LEFT JOIN gk_members h ON h.id = json_extract(a.detail, '$.holder') LEFT JOIN gk_members t ON t.id = json_extract(a.detail, '$.to') WHERE a.action = 'workorder.plan' AND a.subject = ? ORDER BY a.at DESC, a.seq DESC`, id))
     .map(({ detail, too, ...row }) => ({ ...row, plan: JSON.parse(detail).plan, to: too }))
+  // PLAN-007: cancellations, reschedules, reopenings and merges, with their reasons, and the duplicates merged into this one.
+  const control = (await all(env, `SELECT a.at, a.action, a.detail, m.name AS by FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
+    WHERE a.subject = ? AND a.action IN ('workorder.cancel', 'workorder.reschedule', 'workorder.reopen', 'workorder.merge', 'workorder.merged') ORDER BY a.seq`, id))
+    .map(({ detail, ...row }) => ({ ...row, ...JSON.parse(detail) }))
+  const merged = await all(env, 'SELECT id, number, title FROM gk_work_orders WHERE merged_into = ? ORDER BY number', id)
   const { items_json: _items, ...rest } = order
-  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime }) }
+  return { ...rest, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */

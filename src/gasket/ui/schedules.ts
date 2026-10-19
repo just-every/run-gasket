@@ -18,7 +18,7 @@ export async function schedulesPage(env: Bindings, actor: Actor, url: URL) {
   const list = schedules.length ? table(['Schedule', 'Asset', 'Cadence', 'Next due', 'Default maintainer', 'Open work'], schedules.map(row => [
     h`${row.title}<span class="gk-sub">${row.checklist}${row.active ? '' : ' · inactive'}</span>`, h`<a href="/app/assets/${row.asset_id}">${row.asset_name}</a><span class="gk-sub">${row.asset_tag}</span>`, cadence(row),
     h`${row.next_due_date ? showDate(row.next_due_date) : ''}${row.next_due_meter ? h`<span class="gk-sub">at ${amount(row.next_due_meter, row.meter_unit)} (now ${row.meter_now === null || row.meter_now === undefined ? '—' : showNumber(row.meter_now)})</span>` : ''}`,
-    row.assignee ?? '—', row.open_work ? h`<a href="/app/work/${row.open_work}">Open</a>` : h`<span class="gk-muted">None</span>`]), 'Schedules', { wrap: [0, 2] })
+    row.assignee ?? '—', row.open_work ? h`<a href="/app/work/${row.open_work}">Open</a>` : row.overdue ? h`${tag('Overdue')}${can(actor, 'work.assign') ? form('schedule.skip', '/app/schedules', h`${hidden('schedule', row.id)}${field('Reason to skip this occurrence', 'reason')}`, 'Skip occurrence', { secondary: true }) : ''}` : h`<span class="gk-muted">None</span>`]), 'Schedules', { wrap: [0, 2, 5] })
     : h`<div class="gk-empty"><img src="/brand/assets/clipboard.svg" alt="" width="200" height="160"><h2>No schedules yet</h2><p>${manage ? 'Write a checklist, then schedule it on an asset.' : 'A maintenance lead schedules preventive work.'}</p></div>`
   const generate = can(actor, 'work.assign') ? form('workorders.generate', '/app', '', 'Create due work orders', { secondary: true, layout: 'gk-inline' }) : ''
   let create = h``

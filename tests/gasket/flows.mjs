@@ -274,6 +274,7 @@ try {
     // Nobody reviews work they did, even after it is reassigned: the owner holds both work.do and work.review.
     const owner = (await h.api('me', cookie.owner)).id
     const handed = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Tighten fryer basket hanger', due: addDays(today, 4), assignee: owner })).id
+    ids.handed = handed
     await h.api('finding.record', cookie.owner, { workOrder: handed, severity: 'low', text: 'Basket hanger loose; tightened.' })
     await h.api('workorder.assign', cookie.lead, { workOrder: handed, assignee: ids.max })
     await h.api('workorder.submit', cookie.max, { workOrder: handed, version: (await wo('max', handed)).version })
@@ -440,6 +441,53 @@ try {
     assert.equal((await h.raw('/app/audit.csv', { cookie: cookie.max })).status, 403)
     assert.equal((await h.raw('/app/audit?action=workorder', { cookie: cookie.sam })).status, 200)
   })
+  await check('PLAN-007 bulk actions and controlled cancellation', async () => {
+    const fan = (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title: 'Condenser fan noisy', due: addDays(today, 2), assignee: ids.max })).id
+    const rattle = (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title: 'Fan rattles at start-up', due: addDays(today, 2), assignee: ids.max })).id
+    await h.api('workorder.evidence', cookie.max, { workOrder: rattle, file: file('rattle.png', png, 'image/png') })
+    const missed = (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: ids.checklist, title: 'Fryer burner check', everyDays: 30, firstDue: addDays(today, -3), assignee: ids.max })).id
+    const pm = (await h.api('workorders.generate', cookie.lead, {})).created.find(row => row.schedule === missed).id
+    const version = async id => (await wo('lead', id)).version
+    const stale = (await version(rattle)) - 1
+    // A no-write preview of mixed rows: changeable, stale, closed and unknown work, with each one's consequences.
+    const selection = { workOrder: [fan, rattle, pm, ids.pm, 'no-such-work'], version: [await version(fan), stale, await version(pm), await version(ids.pm), 1].map(String) }
+    const preview = await h.api('workorders.bulk', cookie.lead, { ...selection, action: 'reschedule', due: addDays(today, 6), preview: true })
+    assert.deepEqual(preview.rows.map(row => row.outcome), ['would_change', 'stale', 'would_change', 'work_order_not_open', 'work_order_not_found'])
+    assert.ok(preview.rows[2].notes.length, 'the preventive row names its schedule consequence')
+    assert.equal((await wo('lead', fan)).due_date, addDays(today, 2), 'a preview writes nothing')
+    const applied = await h.api('workorders.bulk', cookie.lead, { ...selection, action: 'reschedule', due: addDays(today, 6) })
+    assert.deepEqual(applied.rows.map(row => row.outcome), ['changed', 'stale', 'changed', 'work_order_not_open', 'work_order_not_found'])
+    assert.deepEqual([(await wo('lead', fan)).due_date, (await wo('lead', rattle)).due_date], [addDays(today, 6), addDays(today, 2)])
+    // Bulk never completes work; maintainers cannot use it.
+    assert.equal((await h.api('workorders.bulk', cookie.lead, { workOrder: [fan], version: [String(await version(fan))], action: 'close' }, 400)).error, 'invalid_action')
+    await h.api('workorders.bulk', cookie.max, { workOrder: [fan], version: [String(await version(fan))], action: 'cancel', reason: 'x' }, 403)
+    // Cancel the PM (and try work whose asset is still down): per-row outcomes, and the missed occurrence stays owed.
+    const cancelled = await h.api('workorders.bulk', cookie.lead, { workOrder: [pm, ids.corrective], version: [String(await version(pm)), String(await version(ids.corrective))], action: 'cancel', reason: 'Burner swapped under warranty' })
+    assert.deepEqual(cancelled.rows.map(row => row.outcome), ['changed', 'downtime_open'])
+    assert.equal((await wo('lead', pm)).status, 'cancelled')
+    let schedule = (await h.api('schedules', cookie.lead)).find(row => row.id === missed)
+    assert.deepEqual([schedule.overdue, schedule.open_work, schedule.next_due_date], [true, null, addDays(today, -3)])
+    await h.api('schedule.skip', cookie.max, { schedule: missed, reason: 'x' }, 403)
+    await h.api('schedule.skip', cookie.lead, { schedule: missed, reason: 'Burner replaced new this week; next check on cadence' })
+    schedule = (await h.api('schedules', cookie.lead)).find(row => row.id === missed)
+    assert.deepEqual([schedule.overdue, schedule.next_due_date], [false, addDays(today, 27)])
+    // Merge a duplicate: it is cancelled into the work that carries on and keeps its own evidence.
+    assert.equal((await h.api('workorder.merge', cookie.lead, { workOrder: pm, into: fan, reason: 'x' }, 409)).error, 'merge_preventive')
+    await h.submit('workorder.merge', cookie.lead, { workOrder: rattle, into: fan, reason: 'Same fan, reported twice' }, `/app/work/${rattle}`)
+    const duplicate = await wo('lead', rattle), carrier = await wo('lead', fan)
+    assert.deepEqual([duplicate.status, duplicate.merged_into, duplicate.evidence.length], ['cancelled', fan, 1])
+    assert.deepEqual(carrier.merged.map(row => row.id), [rattle])
+    assert.equal((await h.raw(`/app/evidence/${duplicate.evidence[0].id}`, { cookie: cookie.sam })).status, 200)
+    assert.equal((await h.api('workorder.reopen', cookie.lead, { workOrder: rattle, reason: 'x' }, 409)).error, 'merged')
+    // Reopen a reviewed repair that came back: it returns for rework and keeps its review.
+    await h.api('workorder.reopen', cookie.lead, { workOrder: ids.handed }, 400)
+    await h.api('workorder.reopen', cookie.max, { workOrder: ids.handed, reason: 'x' }, 403)
+    await h.api('workorder.reopen', cookie.lead, { workOrder: ids.handed, reason: 'Basket hanger loose again' })
+    const reopened = await wo('sam', ids.handed)
+    assert.deepEqual([reopened.status, reopened.reviews.map(row => row.decision), reopened.control.map(row => [row.action, row.reason])], ['returned', ['approved'], [['workorder.reopen', 'Basket hanger loose again']]])
+    assert.equal((await h.raw(`/app/work/${rattle}`, { cookie: cookie.lead })).status, 200)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
