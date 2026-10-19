@@ -32,6 +32,7 @@ export async function emittedWorker(vars, { installation, offset } = {}) {
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort(), origin = `https://127.0.0.1:${port}`
   const mails = []
+  let mailOutcome = 'accepted'
   const bindings = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'false', MAIL_PROVIDER: 'resend', MAIL_FROM: 'Gasket <auth@example.test>', MAIL_API_KEY: 'test-only-key', ...vars }
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter(file => file.endsWith('.js')).map(file => `assets/${file}`)]
     .map(file => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
@@ -49,6 +50,8 @@ export async function emittedWorker(vars, { installation, offset } = {}) {
       outboundService: async request => {
         if (request.url !== 'https://api.resend.com/emails') throw new Error(`Unexpected test network destination ${new URL(request.url).origin}`)
         mails.push(await request.json())
+        if (mailOutcome === 'rejected') return Response.json({ message: 'Test provider refused the request' }, { status: 400 })
+        if (mailOutcome === 'uncertain') return new Response('Test upstream unavailable', { status: 503 })
         return Response.json({ id: `test-receipt-${mails.length}` })
       },
     }),
@@ -66,7 +69,7 @@ export async function emittedWorker(vars, { installation, offset } = {}) {
   } catch (error) { await close(); throw error }
   return worker()
 
-  function worker() { return { origin, mails, request, scheduled, signInToken, close } }
+  function worker() { return { origin, mails, setMailOutcome: value => { mailOutcome = value }, request, scheduled, signInToken, close } }
 
   /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
   async function scheduled(cron, at = Date.now() + (offset ?? 0)) {

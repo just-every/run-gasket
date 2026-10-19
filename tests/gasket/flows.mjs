@@ -12,6 +12,7 @@ import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, 
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney } from './automation.mjs'
+import { purchaseOrdersJourney } from './purchase-orders.mjs'
 import { nestedJourney } from './nested.mjs'
 import { purchasingJourney } from './purchasing.mjs'
 import { now, zone } from './clock.mjs'
@@ -2198,6 +2199,7 @@ try {
     for (const text of ['Compressor service manual', 'Revision 3: copeland-ae4-1418-c.pdf', 'Expired', 'Coolflow Refrigeration Supply']) assert.ok(page.includes(text), text)
   })
 
+  await check('BUY-002 quotes and numbered purchase orders', async () => { await purchaseOrdersJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm }) })
   await check('PM-009 nested programs', nestedJourney)
   await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
 
@@ -2218,13 +2220,20 @@ try {
         assert.equal(download.status, 200)
         files.push({ id: revision.id, recorded: revision.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
+      // BUY-002: quote and order originals travel with the installation.
+      const quoteFiles = (await h.api('quotes', cookie.owner)).flatMap(row => row.snapshot.attachments)
+      const orderFiles = (await h.api('purchase-orders', cookie.owner)).flatMap(row => row.snapshot.attachments)
+      for (const attachment of [...new Map([...quoteFiles, ...orderFiles].map(row => [row.id, row])).values()]) {
+        const response = await h.raw(`/app/purchase-files/${attachment.id}`, { cookie: cookie.sam }); assert.equal(response.status, 200)
+        files.push({ id: attachment.id, recorded: attachment.sha256, downloaded: createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex') })
+      }
       // PLAN-006: comment photos are attachments too.
       for (const evidence of [...orders.flatMap(order => order.evidence), ...orders.flatMap(order => order.comments.comments.flatMap(comment => comment.photos)).map(photo => ({ ...photo, path: 'comment-photos' }))]) {
         const download = await h.raw(`/app/${evidence.path ?? 'evidence'}/${evidence.id}`, { cookie: cookie.sam })
         assert.equal(download.status, 200)
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
-      return { assets, orders, files, automation: await h.api('automation/jobs', cookie.owner), purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
+      return { assets, orders, files, quotes: await h.api('quotes', cookie.owner), purchaseOrders: await Promise.all((await h.api('purchase-orders', cookie.owner)).map(row => h.api(`purchase-orders/${row.id}`, cookie.owner))), automation: await h.api('automation/jobs', cookie.owner), purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
         histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam'), auditCsv: await download('/app/audit.csv', 'owner') }
     }
     const before = await read(h, cookie)

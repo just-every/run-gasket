@@ -3,6 +3,7 @@
 // API patterns are relative to /api/gasket/; page patterns are absolute.
 export const API_DOORS: [string, string][] = [
   ['^programs$', 'nested'],
+  ['^quotes$', 'quotes'], ['^purchase-orders$', 'purchaseOrders'], ['^purchase-orders/([\\w-]+)$', 'purchaseOrder'],
   ['^automation$', 'automation'], ['^automation/jobs$', 'automationLedger'], ['^automation/preview$', 'automationPreview'],
   ['^purchasing$', 'purchasing'], ['^suppliers/([\\w-]+)$', 'supplier'], ['^requisitions/([\\w-]+)$', 'requisition'],
   ['^me$', 'me'], ['^site$', 'site'], ['^members$', 'members'],
@@ -14,6 +15,7 @@ export const API_DOORS: [string, string][] = [
 
 export const PAGE_DOORS: [string, string][] = [
   ['^/app/programs$', 'nested'],
+  ['^/app/purchase-orders$', 'purchaseOrders'], ['^/app/purchase-orders/([\\w-]+)$', 'purchaseOrder'], ['^/app/purchase-files/([\\w-]+)$', 'purchaseFile'],
   ['^/app/automation$', 'automation'],
   ['^/app/purchasing$', 'purchasing'], ['^/app/suppliers/([\\w-]+)$', 'supplier'], ['^/app/requisitions/([\\w-]+)$', 'requisition'],
   ['^/app$', 'work'], ['^/app/site$', 'site'], ['^/app/access$', 'access'],
