@@ -389,6 +389,7 @@ try {
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
+      const download = async (path, who) => { const response = await h.raw(path, { cookie: cookie[who] }); assert.equal(response.status, 200, path); return await response.text() }
       const assets = await h.api('assets', cookie.owner), work = [...await h.api('work', cookie.owner), ...await h.api('work?state=closed', cookie.owner)]
       const orders = await Promise.all(work.map(row => h.api(`work/${row.id}`, cookie.sam)))
       const files = []
@@ -398,7 +399,7 @@ try {
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
       return { assets, orders, files, members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
-        histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await (await h.raw(`/app/assets/${ids.compressor}/history.csv`, { cookie: cookie.sam })).text() }
+        histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam') }
     }
     const before = await read(h, cookie)
     assert.ok(before.assets.length && before.orders.length && before.audit.length, 'a populated installation')
@@ -412,6 +413,8 @@ try {
       const restored = await harness({ vars: h.vars, installation: empty })
       try {
         const signedIn = { owner: await restored.signIn(h.vars.OWNER_EMAIL), sam: await restored.signIn('sam@example.test') }
+        // First-run confirmation belongs to an installation, not to its archive: the owner confirms the restored one.
+        assert.equal((await restored.raw('/setup', { cookie: signedIn.owner, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
         assert.deepEqual(await read(restored, signedIn), before, 'the restored installation reads exactly as the exported one')
       } finally { await restored.close() }
     } finally { await empty.remove() }

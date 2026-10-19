@@ -11,8 +11,10 @@ import { promisify } from 'node:util'
 
 const checkout = fileURLToPath(new URL('../../', import.meta.url))
 const exec = promisify(execFile)
+// The scratch installation is its own root: a parent rer operation's lock token (rer verify passes one down) names this checkout, not it.
+const { RER_LOCAL_OPERATION: _parent, ...environment } = process.env
 const run = async (command, args, cwd) => {
-  try { return (await exec(command, args, { cwd, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, CI: 'true', WRANGLER_SEND_METRICS: 'false' } })).stdout }
+  try { return (await exec(command, args, { cwd, maxBuffer: 16 * 1024 * 1024, env: { ...environment, CI: 'true', WRANGLER_SEND_METRICS: 'false' } })).stdout }
   catch (error) { throw new Error(`${[command, ...args].join(' ')} failed:\n${error.stdout}\n${error.stderr}`) }
 }
 
