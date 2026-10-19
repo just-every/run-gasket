@@ -1085,6 +1085,67 @@ try {
     assert.equal((await h.raw('/app/reliability', { cookie: cookie.max })).status, 403)
   })
 
+  await check('PART-002 parts reservations, kits and approved substitution', async () => {
+    const part = async (number, name) => (await h.api('part.create', cookie.lead, { number, name, unit: 'each' })).id
+    const bearing = await part('BRG-6205', 'Deep groove bearing'), sealed = await part('BRG-6205-2RS', 'Sealed bearing'), seal = await part('SEAL-30', 'Shaft seal')
+    for (const [id, quantity] of [[bearing, '3'], [sealed, '2'], [seal, '2']]) await h.api('part.receive', cookie.lead, { part: id, quantity })
+    const kitLines = { name: 'Pump rebuild kit', part: [bearing, seal], quantity: ['2', '1'] }
+    await h.api('kit.create', cookie.max, kitLines, 403)
+    await h.api('kit.create', cookie.lead, { name: 'Empty kit', part: [''], quantity: [''] }, 400)
+    const kit = (await h.api('kit.create', cookie.lead, kitLines)).id
+    await h.api('kit.create', cookie.lead, { ...kitLines, name: 'pump REBUILD kit' }, 409)
+    const stock = async () => Object.fromEntries((await h.api('parts', cookie.lead)).filter(row => [bearing, sealed, seal].includes(row.id)).map(row => [row.number, [row.onHand, row.reserved, row.available]]))
+    const job = async title => (await h.api('workorder.create', cookie.lead, { asset: ids.compressor, title, due: addDays(today, 3), assignee: ids.max })).id
+    const first = await job('Rebuild the condenser pump'), second = await job('Rebuild the standby pump'), third = await job('Check the spare seal')
+    // Two competing work orders reserve the same kit: the second cannot take the last bearings.
+    await h.api('workorder.reserve', cookie.max, { workOrder: first, kit }, 403)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: first, kit })
+    assert.deepEqual(await stock(), { 'BRG-6205': ['3', '2', '1'], 'BRG-6205-2RS': ['2', '0', '2'], 'SEAL-30': ['2', '1', '1'] })
+    await h.api('workorder.reserve', cookie.lead, { workOrder: second, kit }, 409)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: second, kit, swap: [`${bearing}:${sealed}`] }, 409)
+    assert.deepEqual(await stock(), { 'BRG-6205': ['3', '2', '1'], 'BRG-6205-2RS': ['2', '0', '2'], 'SEAL-30': ['2', '1', '1'] }, 'a refused kit reserves nothing')
+    // A lead approves the sealed bearing in place of the open one; the planner reserves the kit with it through the work page form.
+    await h.api('part.substitute', cookie.max, { part: bearing, substitute: sealed }, 403)
+    await h.api('part.substitute', cookie.lead, { part: bearing, substitute: sealed, reason: 'Same bore and width; sealed is fine for the pump' })
+    assert.equal((await h.submit('workorder.reserve', cookie.lead, { workOrder: second, kit, swap: `${bearing}:${sealed}` }, `/app/work/${second}`)).searchParams.get('error'), null)
+    assert.deepEqual((await wo('lead', second)).reservations.map(row => [row.part.number, row.insteadOf?.number ?? null, row.kit, row.quantity, row.state]), [['BRG-6205-2RS', 'BRG-6205', 'Pump rebuild kit', '2', 'open'], ['SEAL-30', null, 'Pump rebuild kit', '1', 'open']])
+    assert.deepEqual(await stock(), { 'BRG-6205': ['3', '2', '1'], 'BRG-6205-2RS': ['2', '2', '0'], 'SEAL-30': ['2', '2', '0'] }, 'reserving moves no stock')
+    await h.api('workorder.reserve', cookie.lead, { workOrder: third, part: seal, quantity: '1' }, 409)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: third, part: seal, quantity: '1', insteadOf: bearing }, 409)
+    await h.api('workorder.reserve', cookie.lead, { workOrder: first, part: seal, quantity: '1' }, 409)
+    // Issue stays a separate movement and never takes stock reserved for other work.
+    await h.api('workorder.issue', cookie.max, { workOrder: third, part: bearing, quantity: '1' })
+    await h.api('workorder.issue', cookie.max, { workOrder: third, part: bearing, quantity: '1' }, 409)
+    await h.api('workorder.issue', cookie.max, { workOrder: first, part: bearing, quantity: '2' })
+    assert.deepEqual((await wo('lead', first)).reservations.map(row => [row.part.number, row.stillNeeded, row.state]), [['BRG-6205', '0', 'issued'], ['SEAL-30', '1', 'open']])
+    assert.deepEqual(await stock(), { 'BRG-6205': ['0', '0', '0'], 'BRG-6205-2RS': ['2', '2', '0'], 'SEAL-30': ['2', '2', '0'] })
+    // Cancelling one order releases its reservations; closing the other releases what it never used.
+    await h.api('workorder.cancel', cookie.lead, { workOrder: second, reason: 'Pump replaced under warranty' })
+    assert.deepEqual((await wo('lead', second)).reservations.map(row => [row.state, row.releaseReason, row.releasedBy]), [['released', 'Work order cancelled: Pump replaced under warranty', 'Lena Park'], ['released', 'Work order cancelled: Pump replaced under warranty', 'Lena Park']])
+    assert.deepEqual(await stock(), { 'BRG-6205': ['0', '0', '0'], 'BRG-6205-2RS': ['2', '0', '2'], 'SEAL-30': ['2', '1', '1'] })
+    await h.api('workorder.submit', cookie.max, { workOrder: first, version: (await wo('max', first)).version })
+    await h.api('workorder.review', cookie.sam, { workOrder: first, version: (await wo('sam', first)).version, decision: 'approve' })
+    assert.deepEqual((await wo('lead', first)).reservations.map(row => [row.part.number, row.state, row.releaseReason]), [['BRG-6205', 'released', 'Work order approved and closed'], ['SEAL-30', 'released', 'Work order approved and closed']])
+    assert.deepEqual(await stock(), { 'BRG-6205': ['0', '0', '0'], 'BRG-6205-2RS': ['2', '0', '2'], 'SEAL-30': ['2', '0', '2'] })
+    // A planner releases a reservation with a reason; a maintainer cannot.
+    const [held] = (await h.api('workorder.reserve', cookie.lead, { workOrder: third, part: seal, quantity: '1' })).reservations
+    await h.api('reservation.release', cookie.max, { reservation: held, reason: 'Not needed' }, 403)
+    await h.api('reservation.release', cookie.lead, { reservation: held, reason: '' }, 400)
+    await h.api('reservation.release', cookie.lead, { reservation: held, reason: 'Seal was fine' })
+    await h.api('reservation.release', cookie.lead, { reservation: held, reason: 'Again' }, 409)
+    assert.deepEqual((await stock())['SEAL-30'], ['2', '0', '2'])
+    const listed = await h.api('kits', cookie.max)
+    assert.deepEqual([listed.kits.find(row => row.id === kit).lines.map(line => [line.number, line.quantity]), listed.substitutes.map(row => [row.part_number, row.substitute_number])], [[['BRG-6205', '2'], ['SEAL-30', '1']], [['BRG-6205', 'BRG-6205-2RS']]])
+    await h.api('part.substitute', cookie.lead, { part: bearing, substitute: sealed, withdraw: true })
+    assert.deepEqual((await h.api('kits', cookie.max)).substitutes, [])
+    const partPage = await (await h.raw(`/app/parts/${seal}`, { cookie: cookie.lead })).text()
+    for (const text of ['Reservations', 'Available', 'Released', 'Work order cancelled: Pump replaced under warranty', 'Seal was fine']) assert.ok(partPage.includes(text), text)
+    const list = await (await h.raw('/app/parts', { cookie: cookie.lead })).text()
+    for (const text of ['Available', 'Repair kits', 'Pump rebuild kit', 'Make kit']) assert.ok(list.includes(text), text)
+    const work = await (await h.raw(`/app/work/${third}`, { cookie: cookie.lead })).text()
+    for (const text of ['Reserve part', 'Reserve kit', 'Released']) assert.ok(work.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

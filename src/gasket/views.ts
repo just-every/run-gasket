@@ -11,6 +11,7 @@ import { chaseRule, notices } from './chasing'
 import { teamList } from './crew'
 import { performance } from './performance'
 import { reliability } from './reliability'
+import { kitList, substituteList } from './reservations'
 import { codeList, failureReport } from './codes'
 import { GasketError } from './core'
 import { API_DOORS, match } from './doors'
@@ -51,6 +52,7 @@ export const views: Record<string, View> = {
   teams: env => teamList(env),
   performance: (env, actor, _id, url) => performance(env, actor, url),
   reliability: (env, actor, _id, url) => reliability(env, actor, url),
+  kits: async env => ({ kits: await kitList(env), substitutes: await substituteList(env) }),
   failures: (env, actor) => failureReport(env, actor),
 }
 

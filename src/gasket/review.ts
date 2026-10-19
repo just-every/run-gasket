@@ -6,6 +6,7 @@ import { requireCapability, type Actor } from './actor'
 import { commit, guard, insist, newId, now, one, stmt } from './core'
 import { RECORDERS } from './crew'
 import type { Input } from './input'
+import { releaseWithWork } from './reservations'
 import { advanceStatements } from './schedules'
 import { OPEN, workOrder, workOrderDetail } from './work'
 
@@ -43,6 +44,8 @@ export async function review(env: Bindings, actor: Actor, input: Input) {
     decision === 'approve'
       ? stmt(env, "UPDATE gk_work_orders SET status = 'closed', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, order.id)
       : stmt(env, "UPDATE gk_work_orders SET status = 'returned', version = version + 1 WHERE id = ?", order.id),
+    // PART-002: closing ends what the work order still had reserved.
+    ...(decision === 'approve' ? [releaseWithWork(env, actor, order.id, 'Work order approved and closed')] : []),
   ]
   if (decision === 'approve' && order.schedule_id) statements.push(...await advanceStatements(env, order.schedule_id, actor.today))
   await commit(env, statements, { actor: actor.id, action: decision === 'approve' ? 'workorder.approve' : 'workorder.return', subject: order.id, detail: { review: id, version, reason } })

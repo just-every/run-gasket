@@ -16,6 +16,7 @@ import { adjustMeter, feedReading, setFeedWindow } from './meters'
 import { moveCode, retireCode, setCode } from './codes'
 import { declareState } from './states'
 import { classifyStop } from './reliability'
+import { approveSubstitute, createKit, release, reserve } from './reservations'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
 import { countPart, createPart, receivePart } from './parts'
 import { decide, prepare } from './proposals'
@@ -47,6 +48,10 @@ export const actions: Record<string, Handler> = {
   'part.create': (env, actor, input) => createPart(env, actor, input),
   'part.receive': (env, actor, input) => receivePart(env, actor, input),
   'part.count': (env, actor, input) => countPart(env, actor, input),
+  'part.substitute': (env, actor, input) => approveSubstitute(env, actor, input),
+  'kit.create': (env, actor, input) => createKit(env, actor, input),
+  'workorder.reserve': (env, actor, input) => reserve(env, actor, input),
+  'reservation.release': (env, actor, input) => release(env, actor, input),
   'checklist.create': (env, actor, input) => createChecklist(env, actor, input),
   'checklist.revise': (env, actor, input) => reviseChecklist(env, actor, input),
   'rule.set': (env, actor, input) => setRule(env, actor, input),

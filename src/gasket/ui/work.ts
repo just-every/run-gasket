@@ -15,6 +15,7 @@ import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../
 import { woDigits } from '../quantity'
 import { workList, workOrderDetail } from '../work'
 import { teamList } from '../crew'
+import { kitList, substituteList } from '../reservations'
 import { chaseCard } from './chasing'
 import { crewCard } from './crew'
 import { CODE_KIND } from './codes'
@@ -172,10 +173,21 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
       : field(`${meter.name} (${meter.unit})`, 'value', { required: false, attrs: 'inputmode="decimal"' })}`)}</div>`, 'Record readings', { secondary: true }) : ''}
     ${recording && !meters.length ? h`<p class="gk-muted">This asset has no meters. A lead adds them on the asset.</p>` : ''}`, { id: 'readings' })
 
-  const stock = recording ? (await partList(env, actor)) : []
-  const parts = card('Parts issued and returned', h`${w.parts.length ? table(['Part', 'Issued', 'Returned', 'Used'], w.parts.map(row => [h`${row.name}<span class="gk-sub">${row.number}</span>`, amount(row.issued, row.unit), amount(row.returned, row.unit), amount(row.used, row.unit)]), 'Parts', { wrap: [0] }) : h`<p class="gk-muted">No parts issued.</p>`}
+  // PART-002: what is reserved to this work order, and the planner's reserve and release doors.
+  const planning = can(actor, 'work.assign') && ['open', 'in_progress', 'returned'].includes(w.status)
+  const stock = recording || planning ? (await partList(env, actor)) : []
+  const RESERVATION: Record<string, string> = { open: 'Reserved', issued: 'Issued', released: 'Released' }
+  const held = w.reservations.length ? table(['Reserved', 'Quantity', 'Still needed', 'State'], w.reservations.map(row => [h`${row.part.name}<span class="gk-sub">${row.part.number}${row.insteadOf ? ` · instead of ${row.insteadOf.number}` : ''}${row.kit ? ` · ${row.kit}` : ''}</span>`,
+    amount(row.quantity, row.part.unit), amount(row.stillNeeded, row.part.unit), h`${tag(RESERVATION[row.state])}${row.releaseReason ? h`<span class="gk-sub">${row.releaseReason}</span>` : ''}`]), 'Reservations', { wrap: [0, 3] }) : ''
+  const kits = planning ? await kitList(env) : [], swaps = planning ? await substituteList(env) : []
+  const reserveForms = planning && stock.length ? h`<div class="gk-split">${post('workorder.reserve', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.available, part.unit)} available)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}
+      ${swaps.length ? select('Instead of', 'insteadOf', [...new Map(swaps.map(row => [row.part_id, { value: row.part_id, label: `${row.part_number} ${row.part_name}` }])).values()], '', { required: false, blank: 'The part itself' }) : ''}`, 'Reserve part', { secondary: true })}
+    ${kits.length ? post('workorder.reserve', h`${select('Repair kit', 'kit', kits.map(kit => ({ value: kit.id, label: `${kit.name}: ${kit.lines.map(line => `${line.quantity} ${line.number}`).join(', ')}` })), '', { blank: 'Choose a kit' })}
+      ${swaps.length ? select('Use a substitute', 'swap', swaps.map(row => ({ value: `${row.part_id}:${row.substitute_id}`, label: `${row.substitute_number} for ${row.part_number}` })), '', { required: false, blank: 'No substitute' }) : ''}`, 'Reserve kit', { secondary: true }) : ''}</div>
+    ${w.reservations.some(row => row.state === 'open') ? post('reservation.release', h`${select('Reservation', 'reservation', w.reservations.filter(row => row.state === 'open').map(row => ({ value: row.id, label: `${row.part.number} ${row.part.name}` })), '', { blank: 'Choose a reservation' })}${field('Reason', 'reason')}`, 'Release reservation', { secondary: true }) : ''}` : ''
+  const parts = card('Parts issued and returned', h`${held}${w.parts.length ? table(['Part', 'Issued', 'Returned', 'Used'], w.parts.map(row => [h`${row.name}<span class="gk-sub">${row.number}</span>`, amount(row.issued, row.unit), amount(row.returned, row.unit), amount(row.used, row.unit)]), 'Parts', { wrap: [0] }) : h`<p class="gk-muted">No parts issued.</p>`}
     ${recording && stock.length ? h`<div class="gk-split">${post('workorder.issue', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.onHand, part.unit)} on hand)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Issue part', { secondary: true })}
-      ${w.parts.length ? post('workorder.return', h`${select('Part', 'part', w.parts.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.used, part.unit)} held)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Return unused', { secondary: true }) : ''}</div>` : ''}`, { id: 'parts' })
+      ${w.parts.length ? post('workorder.return', h`${select('Part', 'part', w.parts.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.used, part.unit)} held)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Return unused', { secondary: true }) : ''}</div>` : ''}${reserveForms}`, { id: 'parts' })
 
   const evidence = card('Inspection evidence', h`${w.evidence.length ? h`<ul class="gk-files">${w.evidence.map(file => h`<li><a href="/app/evidence/${file.id}">${file.filename}</a><span class="gk-sub">${Math.ceil(file.size / 1024)} KB · ${file.uploaded_by} · ${showInstant(file.uploaded_at, actor.zone)}</span>${details([['SHA-256', file.sha256], ['Type', file.media_type]])}</li>`)}</ul>` : h`<p class="gk-muted">No photos or documents attached.</p>`}
     ${recording ? post('workorder.evidence', fileField('Photo or document', 'file', { required: true, accept: '.png,.jpg,.jpeg,.webp,.heic,.pdf', hint: 'PNG, JPEG, WebP, HEIC or PDF, up to 1.5 MB.' }), 'Attach evidence', { multipart: true, secondary: true }) : ''}`, { id: 'evidence' })

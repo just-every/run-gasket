@@ -10,6 +10,7 @@ import { GasketError, all, commit, guard, insist, newId, now, one, stmt } from '
 import { assigneeFits, handoffStatements } from './crew'
 import { isDate } from './dates'
 import type { Input } from './input'
+import { releaseWithWork } from './reservations'
 import { woDigits } from './quantity'
 import { advanceStatements } from './schedules'
 import { OPEN, workOrder } from './work'
@@ -74,7 +75,7 @@ export async function bulk(env: Bindings, actor: Actor, input: Input) {
     if (preview) continue
     const change = action === 'assign' ? handoffStatements(env, actor, order, assignee, { team: order.team_id, trade: order.trade, shift: order.shift }, null)
       : action === 'reschedule' ? [stmt(env, 'UPDATE gk_work_orders SET due_date = ?, version = version + 1 WHERE id = ?', due, id)]
-      : [stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, id)]
+      : [stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, id), releaseWithWork(env, actor, id, `Work order cancelled: ${reason}`)]
     const checks = action === 'cancel' ? [
       guard(env, 'parts_still_issued', '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE work_order_id = ?) = 0', id),
       guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', id)] : []
@@ -122,6 +123,7 @@ export async function merge(env: Bindings, actor: Actor, input: Input) {
     guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', duplicate.id),
     stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', merged_into = ?, version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", into.id, now(), actor.id, duplicate.id),
     stmt(env, 'UPDATE gk_work_orders SET version = version + 1 WHERE id = ?', into.id),
+    releaseWithWork(env, actor, duplicate.id, `Merged into another work order: ${reason}`),
   ], [{ actor: actor.id, action: 'workorder.merge', subject: duplicate.id, detail: { into: into.id, reason } }, { actor: actor.id, action: 'workorder.merged', subject: into.id, detail: { duplicate: duplicate.id, reason } }])
   return { id: duplicate.id, into: into.id }
 }

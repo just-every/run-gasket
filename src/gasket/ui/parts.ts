@@ -3,8 +3,9 @@ import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
 import { showInstant } from '../dates'
 import { partDetail, partList } from '../parts'
+import { kitList } from '../reservations'
 import { showNumber } from '../quantity'
-import { amount, backLink, band as headerBand, card, field, form, h, hidden, table, tag, woNumber } from './html'
+import { amount, backLink, band as headerBand, card, checkbox, field, form, h, hidden, select, table, tag, woNumber } from './html'
 import { binDrawing } from './icons'
 import { page } from './shell'
 
@@ -13,11 +14,15 @@ const KIND: Record<string, string> = { opening: 'Opening stock', receive: 'Recei
 export async function partsPage(env: Bindings, actor: Actor, url: URL) {
   const parts = await partList(env, actor)
   const manage = can(actor, 'register.manage')
-  const list = parts.length ? table(['Part', 'On hand', 'Minimum', 'Location', ''], parts.map(part => [
-    h`<a href="/app/parts/${part.id}">${part.name}</a><span class="gk-sub">${part.number}${part.origin === 'import' ? ' · moved in' : ''}</span>`, amount(part.onHand, part.unit), amount(part.minimum, part.unit), part.location ?? '—', part.below ? tag('Below minimum') : '']), 'Parts', { wrap: [0, 3] })
+  const list = parts.length ? table(['Part', 'On hand', 'Available', 'Minimum', 'Location', ''], parts.map(part => [
+    h`<a href="/app/parts/${part.id}">${part.name}</a><span class="gk-sub">${part.number}${part.origin === 'import' ? ' · moved in' : ''}</span>`, amount(part.onHand, part.unit), h`${amount(part.available, part.unit)}${part.reserved !== '0' ? h`<span class="gk-sub">${amount(part.reserved, part.unit)} reserved</span>` : ''}`, amount(part.minimum, part.unit), part.location ?? '—', part.below ? tag('Below minimum') : '']), 'Parts', { wrap: [0, 4] })
     : h`<div class="gk-empty"><h2>No parts yet</h2><p>${manage ? 'Add the spares you keep below, or move in your MaintainX part export.' : 'A maintenance lead keeps the parts list.'}</p></div>`
   const create = manage ? card('Add a part', form('part.create', '/app/parts/{id}', h`<div class="gk-grid">${field('Part number', 'number')}${field('Name', 'name')}${field('Unit', 'unit', { value: 'each', hint: 'each, L, m, kg…' })}${field('Minimum on hand', 'minimum', { required: false, value: '0', attrs: 'inputmode="decimal"' })}${field('Location', 'location', { required: false })}</div>`, 'Add part'), { id: 'add-part' }) : ''
-  return page(env, 'Parts', actor, h`<div class="gk-columns"><div class="gk-col-main"><div class="gk-head"><div><h1>Parts</h1><p class="gk-lede">Spares on the shelf, what work used them, and physical counts.</p></div></div>${list}</div><div class="gk-col-side">${create}</div></div>`, { url })
+  // PART-002: repair kits, reserved to work as a whole.
+  const kits = await kitList(env)
+  const kitCard = card('Repair kits', h`${kits.length ? h`<ul class="gk-plain-list">${kits.map(kit => h`<li><b>${kit.name}</b><span class="gk-sub">${kit.lines.map(line => `${line.quantity} ${line.unit} ${line.number} ${line.name}`).join(' · ')}</span></li>`)}</ul>` : h`<p class="gk-muted">No repair kits yet.</p>`}
+    ${manage && parts.length ? form('kit.create', '/app/parts', h`${field('Kit name', 'name')}${[0, 1, 2, 3].map(() => h`<div class="gk-grid">${select('Part', 'part', parts.map(part => ({ value: part.id, label: `${part.number} ${part.name}` })), '', { required: false, blank: 'No part' })}${field('Quantity', 'quantity', { required: false, attrs: 'inputmode="decimal"' })}</div>`)}`, 'Make kit', { secondary: true }) : ''}`, { id: 'kits' })
+  return page(env, 'Parts', actor, h`<div class="gk-columns"><div class="gk-col-main"><div class="gk-head"><div><h1>Parts</h1><p class="gk-lede">Spares on the shelf, what work used them, and physical counts.</p></div></div>${list}</div><div class="gk-col-side">${create}${kitCard}</div></div>`, { url })
 }
 
 export async function partPage(env: Bindings, actor: Actor, id: string, url: URL) {
@@ -25,11 +30,17 @@ export async function partPage(env: Bindings, actor: Actor, id: string, url: URL
   const back = `/app/parts/${part.id}`
   const manage = can(actor, 'register.manage')
   const band = headerBand({ id: 'part-name', eyebrow: part.number, title: part.name, facts: [part.location ?? 'No shelf location'], status: part.on_hand < part.minimum_milli ? tag('Below minimum') : '',
-    meta: [{ label: 'On hand', value: h`<span class="gk-big">${amount(part.onHand, part.unit)}</span>` }, { label: 'Minimum', value: amount(part.minimum, part.unit) }], art: binDrawing })
+    meta: [{ label: 'On hand', value: h`<span class="gk-big">${amount(part.onHand, part.unit)}</span>` }, { label: 'Reserved', value: amount(part.reserved, part.unit) }, { label: 'Available', value: amount(part.available, part.unit) }, { label: 'Minimum', value: amount(part.minimum, part.unit) }], art: binDrawing })
+  const STATE: Record<string, string> = { open: 'Reserved', issued: 'Issued', released: 'Released' }
+  const held = card('Reservations', part.reservations.length ? table(['Work order', 'Quantity', 'Still needed', 'State'], part.reservations.map((row: any) => [h`<a href="/app/work/${row.workOrder.id}">${woNumber(row.workOrder.number)}</a> ${row.workOrder.title}${row.insteadOf ? h`<span class="gk-sub">Instead of ${row.insteadOf.number}</span>` : ''}`,
+    amount(row.quantity, part.unit), amount(row.stillNeeded, part.unit), h`${tag(STATE[row.state])}${row.releaseReason ? h`<span class="gk-sub">${row.releaseReason}</span>` : ''}`]), 'Reservations', { wrap: [0, 3] }) : h`<p class="gk-muted">Nothing reserved.</p>`, { id: 'reservations' })
+  const others = (await partList(env, actor)).filter(row => row.id !== part.id)
+  const subs = card('Approved substitutes', h`${part.substitutes.length ? h`<ul class="gk-plain-list">${part.substitutes.map((row: any) => h`<li>${row.substitute_number} ${row.substitute_name} may fill ${row.part_number} ${row.part_name}<span class="gk-sub">${row.approved_by ?? '—'}${row.reason ? ` · ${row.reason}` : ''}</span></li>`)}</ul>` : h`<p class="gk-muted">No approved substitutes.</p>`}
+    ${manage && others.length ? form('part.substitute', back, h`${hidden('part', part.id)}${select('Substitute part', 'substitute', others.map(row => ({ value: row.id, label: `${row.number} ${row.name}` })), '', { blank: 'Choose a part' })}${field('Reason', 'reason', { required: false })}${checkbox('Withdraw this approval', 'withdraw')}`, 'Save approval', { secondary: true }) : ''}`, { id: 'substitutes' })
   const moves = card('Movements', part.moves.length ? table(['When', 'Movement', 'Quantity', 'Work order', 'By', 'Note'], part.moves.map((move: any) => [showInstant(move.at, actor.zone), KIND[move.kind],
     move.kind === 'count' ? h`Counted ${amount(move.counted, part.unit)}<span class="gk-sub">variance ${move.quantity_milli > 0 ? '+' : ''}${showNumber(move.quantity)}</span>` : `${move.quantity_milli > 0 ? '+' : ''}${amount(move.quantity, part.unit)}`,
     move.work_order_id ? h`<a href="/app/work/${move.work_order_id}">${woNumber(move.work_order_number)}</a>` : '—', move.actor ?? (move.kind === 'opening' ? 'Move-in' : '—'), move.note ?? '']), 'Movements', { wrap: [5] }) : h`<p class="gk-muted">No movements yet.</p>`, { id: 'moves' })
   const side = manage ? h`${card('Receive stock', form('part.receive', back, h`${hidden('part', part.id)}${field(`Quantity (${part.unit})`, 'quantity', { attrs: 'inputmode="decimal"' })}${field('Note', 'note', { required: false, hint: 'Supplier, docket or reason.' })}`, 'Receive', { secondary: true }), { id: 'receive' })}
     ${card('Record a physical count', form('part.count', back, h`${hidden('part', part.id)}${hidden('seen', part.seen)}${field(`Counted on the shelf (${part.unit})`, 'counted', { attrs: 'inputmode="decimal"' })}${field('Note', 'note', { required: false })}`, 'Record count', { secondary: true }), { id: 'count', extra: h`<span class="gk-count">Records the difference from ${amount(part.onHand, part.unit)}</span>` })}` : ''
-  return page(env, part.name, actor, h`${backLink('/app/parts', 'Parts')}${band}<div class="gk-columns"><div class="gk-col-main">${moves}</div><div class="gk-col-side">${side}</div></div>`, { url })
+  return page(env, part.name, actor, h`${backLink('/app/parts', 'Parts')}${band}<div class="gk-columns"><div class="gk-col-main">${held}${moves}</div><div class="gk-col-side">${side}${subs}</div></div>`, { url })
 }

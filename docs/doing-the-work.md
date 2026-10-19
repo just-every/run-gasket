@@ -16,7 +16,7 @@ Under **Meter and condition readings**, enter the time the readings were taken a
 
 ## Parts
 
-**Issue part** takes parts off the shelf for this work order; you can never issue more than is on hand. **Return unused** puts back what you did not use; you can never return more than you issued. The card shows what was issued, returned and used.
+**Issue part** takes parts off the shelf for this work order; you can never issue more than is on hand, less what is reserved for other work. Parts reserved for this work order are listed at the top of the card. **Return unused** puts back what you did not use; you can never return more than you issued. The card shows what was issued, returned and used.
 
 ## Downtime
 

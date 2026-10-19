@@ -12,6 +12,14 @@ On a part's page:
 
 On-hand stock never goes below zero.
 
+## Reservations, kits and substitutes
+
+A lead or owner can set stock aside for a work order before it starts. On the work order, **Reserve part** reserves one part, and **Reserve kit** reserves every part of a repair kit at once. Each part then shows what is **Reserved** for work and what is **Available** to anyone else; nothing leaves the shelf until it is issued. A reservation is refused when there is not enough available, so two jobs can never both count on the last unit, and issuing to one job never takes parts reserved for another.
+
+Under **Repair kits** on **Parts**, a lead makes a kit from up to four parts and quantities. On a part's page, **Approved substitutes** lets a lead approve another part that may fill in for it; when reserving, choose **Instead of** or **Use a substitute** to take the approved part. Unapproved substitutes are refused.
+
+A reservation ends when a lead releases it with a reason, or when its work order is cancelled, merged into another or approved and closed. Each part's **Reservations** card keeps every reservation with how and why it ended.
+
 ## The asset register
 
 A lead registers each asset on **Assets** and keeps its details up to date under **Change details**; the earlier values stay in its history. **Retire asset** takes it out of service for good while keeping its history; close or cancel its open work first.

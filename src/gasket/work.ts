@@ -16,6 +16,7 @@ import { readingStatements } from './meters'
 import { fromMilli } from './quantity'
 import { estimate } from './performance'
 import { classifiedStops, stopClass } from './reliability'
+import { releaseWithWork, reservations } from './reservations'
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
@@ -114,6 +115,7 @@ export async function cancel(env: Bindings, actor: Actor, input: Input) {
     guard(env, 'parts_still_issued', "(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE work_order_id = ?) = 0", order.id),
     guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', order.id),
     stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, order.id),
+    releaseWithWork(env, actor, order.id, `Work order cancelled: ${reason}`),
   ], { actor: actor.id, action: 'workorder.cancel', subject: order.id, detail: { reason } })
   return { id: order.id }
 }
@@ -259,7 +261,7 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; mine: boolean; missing: string[] }
+export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
@@ -280,6 +282,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const downtime = (await classifiedStops(env, 'd.work_order_id = ?', id)).map(row => ({ id: row.id, started_on: row.started_on, ended_on: row.ended_on, minutes: row.minutes, reason: row.reason, planned: row.planned, failure_mode: row.failureMode, reclassified: row.reclassified, classifications: row.classifications }))
   const findings = (await all(env, 'SELECT f.id, f.item, f.severity, f.text, f.follow_up_id, f.rule_id, (SELECT group_concat(c.label, \' · \') FROM gk_codes c WHERE c.id IN (f.failure_mode, f.cause, f.remedy, f.risk)) AS codes, f.failure_mode, f.cause, f.remedy, f.risk, w.number AS follow_up_number, w.status AS follow_up_status, w.acknowledged_at AS follow_up_acknowledged, m.name AS recorded_by, f.recorded_at FROM gk_findings f LEFT JOIN gk_work_orders w ON w.id = f.follow_up_id LEFT JOIN gk_members m ON m.id = f.recorded_by WHERE f.work_order_id = ? ORDER BY f.recorded_at, f.item', id))
     .map(row => ({ ...row, obligation: obligation(row) }))
+  const reserved = await reservations(env, 'r.work_order_id = ?', id)
   const evidence = await all(env, 'SELECT e.id, e.filename, e.media_type, e.size, e.sha256, m.name AS uploaded_by, e.uploaded_at FROM gk_evidence e LEFT JOIN gk_members m ON m.id = e.uploaded_by WHERE e.work_order_id = ? ORDER BY e.uploaded_at', id)
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
@@ -296,7 +299,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const chase = await chaseOf(env, order, actor.today)
   const crew = await crewOf(env, order, actor)
   const { items_json: _items, ...rest } = order
-  return { ...rest, trigger, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
+  return { ...rest, trigger, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */
