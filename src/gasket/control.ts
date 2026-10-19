@@ -7,6 +7,7 @@
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { GasketError, all, commit, guard, insist, newId, now, one, stmt } from './core'
+import { assigneeFits, handoffStatements } from './crew'
 import { isDate } from './dates'
 import type { Input } from './input'
 import { woDigits } from './quantity'
@@ -52,7 +53,7 @@ export async function bulk(env: Bindings, actor: Actor, input: Input) {
   let assignee: string | null = null, due: string | null = null, reason: string | null = null
   if (action === 'assign') {
     assignee = input.text('assignee', { max: 100 })
-    insist(await one(env, "SELECT 1 FROM gk_members WHERE id = ? AND status = 'active' AND role IN ('owner', 'lead', 'maintainer')", assignee), 'assignee_not_assignable', 409)
+    await assigneeFits(env, assignee, null)
   }
   if (action === 'reschedule') { due = input.text('due', { max: 10 }); insist(isDate(due), 'invalid_due') }
   if (action === 'cancel') reason = input.text('reason', { max: 500 })
@@ -68,16 +69,18 @@ export async function bulk(env: Bindings, actor: Actor, input: Input) {
     row.notes = effect.notes
     if (effect.refused) { row.outcome = effect.refused; continue }
     if (action === 'assign' && order.assignee_id === assignee) { row.outcome = 'unchanged'; continue }
+    // PLAN-002: work that names a team goes only to a member of that team.
+    if (action === 'assign' && order.team_id && !await one(env, 'SELECT 1 FROM gk_team_members WHERE team_id = ? AND member_id = ?', order.team_id, assignee)) { row.outcome = 'assignee_not_in_team'; continue }
     if (preview) continue
-    const change = action === 'assign' ? stmt(env, 'UPDATE gk_work_orders SET assignee_id = ?, version = version + 1 WHERE id = ?', assignee, id)
-      : action === 'reschedule' ? stmt(env, 'UPDATE gk_work_orders SET due_date = ?, version = version + 1 WHERE id = ?', due, id)
-      : stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, id)
+    const change = action === 'assign' ? handoffStatements(env, actor, order, assignee, { team: order.team_id, trade: order.trade, shift: order.shift }, null)
+      : action === 'reschedule' ? [stmt(env, 'UPDATE gk_work_orders SET due_date = ?, version = version + 1 WHERE id = ?', due, id)]
+      : [stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, id)]
     const checks = action === 'cancel' ? [
       guard(env, 'parts_still_issued', '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE work_order_id = ?) = 0', id),
       guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', id)] : []
     const detail = action === 'assign' ? { from: order.assignee_id, to: assignee } : action === 'reschedule' ? { from: order.due_date, to: due } : { reason }
     try {
-      await commit(env, [unchanged(env, id, order.version), ...checks, change], { actor: actor.id, action: `workorder.${action}`, subject: id, detail: { ...detail, bulk: batch } })
+      await commit(env, [unchanged(env, id, order.version), ...checks, ...change], { actor: actor.id, action: `workorder.${action}`, subject: id, detail: { ...detail, bulk: batch } })
     } catch (error) {
       if (!(error instanceof GasketError)) throw error
       row.outcome = error.code

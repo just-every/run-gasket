@@ -896,6 +896,59 @@ try {
     assert.equal((await h.raw('/app/notices', { cookie: cookie.max })).status, 200)
   })
 
+  await check('PLAN-002 teams, trades and accountable assignments', async () => {
+    for (const [key, name] of [['nia', 'Nia Okafor'], ['uma', 'Uma Reyes']]) {
+      ids[key] = (await h.api('access.give', cookie.owner, { name, email: `${key}@example.test`, role: 'maintainer' })).id
+      cookie[key] = await h.signIn(`${key}@example.test`)
+    }
+    // A lead names an electrical team; only assignable people join it.
+    await h.api('team.create', cookie.max, { name: 'Electrical', trade: 'Electrical' }, 403)
+    await h.api('team.create', cookie.lead, { name: 'Electrical', trade: 'Electrical', member: [ids.max, ids.sam] }, 409)
+    const team = (await h.api('team.create', cookie.lead, { name: 'Electrical', trade: 'Electrical', member: [ids.max, ids.nia] })).id
+    await h.api('team.create', cookie.lead, { name: 'electrical', trade: 'HVAC' }, 409)
+    // The job goes to the team and its lead technician on the day shift; someone off the team is refused.
+    const job = { asset: ids.fryer, title: 'Rewire fryer control panel', due: addDays(today, 3), team, shift: 'Day' }
+    await h.api('workorder.create', cookie.lead, { ...job, assignee: ids.mo }, 409)
+    const id = (await h.api('workorder.create', cookie.lead, { ...job, assignee: ids.max })).id
+    let order = await wo('lead', id)
+    assert.deepEqual([order.crew.team.name, order.crew.trade, order.crew.shift, order.acknowledged_at], ['Electrical', 'Electrical', 'Day', null])
+    // A collaborator joins through the form door; both queues and the team queue carry the job.
+    await h.api('workorder.collaborate', cookie.max, { workOrder: id, member: ids.mo }, 403)
+    await h.api('workorder.collaborate', cookie.lead, { workOrder: id, member: ids.max }, 409)
+    await h.submit('workorder.collaborate', cookie.lead, { workOrder: id, member: ids.mo }, `/app/work/${id}`)
+    const part = async (who, path = 'work?mine=1') => (await h.api(path, cookie[who])).find(row => row.id === id)?.my_part ?? null
+    assert.deepEqual([await part('max'), await part('mo'), await part('nia'), (await h.api(`work?team=${team}`, cookie.lead)).map(row => row.id)], ['assignee', 'collaborator', null, [id]])
+    // The accountable assignee acknowledges; the assignee and the collaborator record; an unrelated technician cannot write.
+    await h.api('workorder.acknowledge', cookie.mo, { workOrder: id }, 403)
+    await h.api('workorder.acknowledge', cookie.max, { workOrder: id })
+    await h.api('workorder.acknowledge', cookie.max, { workOrder: id }, 409)
+    await h.api('finding.record', cookie.max, { workOrder: id, severity: 'medium', text: 'Terminal block 4 scorched' })
+    await h.api('finding.record', cookie.mo, { workOrder: id, severity: 'low', text: 'Cable tray cleared for the new run' })
+    for (const [action, body] of [['finding.record', { severity: 'low', text: 'Not mine' }], ['workorder.acknowledge', {}], ['workorder.respond', { response: 'on_it' }]]) await h.api(action, cookie.uma, { workOrder: id, ...body }, 403)
+    await h.api('workorder.decline', cookie.mo, { workOrder: id, kind: 'parts', nextAction: 'x', promisedOn: today }, 403)
+    // Handover to the night shift stays inside the team, with a note, and asks for a fresh acknowledgement.
+    await h.api('workorder.assign', cookie.lead, { workOrder: id, assignee: ids.mo, shift: 'Night' }, 409)
+    await h.api('workorder.assign', cookie.lead, { workOrder: id, assignee: ids.nia, shift: 'Night', note: 'Panel isolated and tagged; terminals 4 to 6 still to land' })
+    order = await wo('nia', id)
+    assert.deepEqual([order.assignee_id, order.crew.shift, order.acknowledged_at, order.crew.collaborators.map(row => row.name)], [ids.nia, 'Night', null, ['Mo Haddad']])
+    assert.deepEqual(order.crew.handoffs.at(-1), { ...order.crew.handoffs.at(-1), from: 'Max Ortiz', to: 'Nia Okafor', from_shift: 'Day', to_shift: 'Night', note: 'Panel isolated and tagged; terminals 4 to 6 still to land', by: 'Lena Park' })
+    assert.deepEqual(order.crew.contributors.map(row => [row.name, row.part, row.records]), [['Max Ortiz', 'former', 1], ['Mo Haddad', 'collaborator', 1]])
+    assert.deepEqual([await part('max'), await part('nia'), await part('mo')], [null, 'assignee', 'collaborator'])
+    await h.api('finding.record', cookie.max, { workOrder: id, severity: 'low', text: 'After handover' }, 403)
+    const preview = await h.api('workorders.bulk', cookie.lead, { workOrder: [id], version: [String(order.version)], action: 'assign', assignee: ids.mo, preview: true })
+    assert.equal(preview.rows[0].outcome, 'assignee_not_in_team')
+    // Declining needs a blocker; it returns the job unassigned and tells the lead.
+    await h.api('workorder.decline', cookie.nia, { workOrder: id }, 400)
+    await h.api('workorder.decline', cookie.nia, { workOrder: id, kind: 'skill', nextAction: 'Needs a licensed electrician for the 480 V panel', promisedOn: addDays(today, 1), note: 'Not licensed for 480 V' })
+    order = await wo('lead', id)
+    assert.deepEqual([order.assignee_id, order.crew.answers.map(row => [row.answer, row.by]), order.chase.blockers.map(row => [row.kind, row.owner])], [null, [['acknowledged', 'Max Ortiz'], ['declined', 'Nia Okafor']], [['skill', 'Nia Okafor']]])
+    assert.ok((await h.api('notices', cookie.lead)).some(row => row.work_order_id === id && row.kind === 'declined'))
+    const page = await (await h.raw(`/app/work/${id}`, { cookie: cookie.lead })).text()
+    for (const text of ['Crew', 'Team Electrical', 'Night shift', 'terminals 4 to 6 still to land', 'Collaborator', 'Earlier on this work']) assert.ok(page.includes(text), text)
+    const teams = await (await h.raw('/app/teams', { cookie: cookie.uma })).text()
+    for (const text of ['Electrical · Electrical', 'Max Ortiz', 'Nia Okafor', 'Rewire fryer control panel']) assert.ok(teams.includes(text), text)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
@@ -908,7 +961,7 @@ try {
         assert.equal(download.status, 200)
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
-      return { assets, orders, files, members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
+      return { assets, orders, files, members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
         histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam'), auditCsv: await download('/app/audit.csv', 'owner') }
     }
     const before = await read(h, cookie)

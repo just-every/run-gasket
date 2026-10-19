@@ -64,13 +64,12 @@ export async function correctionStatements(env: Bindings, actor: Actor, order: R
   return { statements, audits }
 }
 
-/** The assignee of a correction takes it on. */
+/** The assignee takes on work assigned to them (PLAN-002); a correction cannot be submitted before this (PM-004). */
 export async function acknowledge(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.do')
   const order = await one(env, 'SELECT * FROM gk_work_orders WHERE id = ?', input.text('workOrder', { max: 100 }))
   insist(order, 'work_order_not_found', 404)
   insist(order.assignee_id === actor.id, 'not_your_work', 403)
-  insist(await one(env, 'SELECT 1 FROM gk_findings WHERE follow_up_id = ? AND rule_id IS NOT NULL', order.id), 'not_a_correction', 409)
   insist(!order.acknowledged_at, 'already_acknowledged', 409)
   await commit(env, [
     guard(env, 'stale', "EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ('open', 'in_progress', 'returned'))", order.id, order.version),

@@ -37,7 +37,7 @@ export async function accessPage(env: Bindings, actor: Actor, url: URL) {
 export const ACTIONS: Record<string, string> = {
   'site.configure': 'Changed the site settings', 'access.give': 'Gave access', 'access.role': 'Changed a role', 'access.end': 'Ended access',
   'asset.create': 'Registered an asset', 'asset.update': 'Changed asset details', 'asset.retire': 'Retired an asset', 'asset.sighting': 'Recorded a sighting', 'asset.state': 'Declared an asset state', 'meter.create': 'Added a meter', 'meter.feed': 'Received a feed reading', 'meter.adjust': 'Explained a meter change', 'meter.window': 'Set a feed lateness window', 'code.set': 'Added or relabelled a code', 'code.move': 'Reordered a code', 'code.retire': 'Retired a code',
-  'checklist.create': 'Wrote a checklist', 'checklist.revise': 'Published a checklist revision', 'rule.set': 'Approved a failed-step rule', 'workorder.acknowledge': 'Acknowledged a correction', 'schedule.create': 'Scheduled preventive work',
+  'checklist.create': 'Wrote a checklist', 'checklist.revise': 'Published a checklist revision', 'rule.set': 'Approved a failed-step rule', 'workorder.acknowledge': 'Acknowledged assigned work', 'workorder.decline': 'Declined assigned work', 'workorder.collaborate': 'Added a collaborator', 'workorder.uncollaborate': 'Removed a collaborator', 'team.create': 'Named a team', 'team.join': 'Added someone to a team', 'team.leave': 'Removed someone from a team', 'schedule.create': 'Scheduled preventive work',
   'workorder.generate': 'Created a work order from its schedule', 'workorder.create': 'Raised a work order', 'workorder.assign': 'Assigned the work', 'workorder.plan': 'Decided on overdue work', 'workorder.cancel': 'Cancelled a work order', 'workorder.reschedule': 'Rescheduled a work order', 'workorder.reopen': 'Reopened a work order', 'workorder.merge': 'Merged a duplicate work order', 'workorder.merged': 'Took in a duplicate work order', 'schedule.skip': 'Asked to skip a missed preventive occurrence', 'schedule.defer': 'Asked to defer a preventive occurrence', 'schedule.exception': 'Decided a skip or deferral', 'schedule.edit': 'Changed a schedule\'s cadence', 'closure.add': 'Added closed days', 'workorder.schedule': 'Issued by the scheduler', 'chase.rule': 'Approved the chase rule', 'workorder.respond': 'Answered a reminder', 'blocker.raise': 'Raised a blocker', 'blocker.resolve': 'Cleared a blocker', 'workorder.trigger': 'Raised by a meter reading', 'closure.remove': 'Removed closed days',
   'workorder.results': 'Recorded checklist results', 'workorder.readings': 'Recorded readings', 'workorder.evidence': 'Attached evidence',
   'workorder.submit': 'Submitted for review', 'workorder.approve': 'Approved and closed', 'workorder.return': 'Returned for more work',
@@ -50,14 +50,15 @@ const PROPOSAL: Record<string, string> = { schedule: 'Preventive schedule', corr
 
 /** The record each audit row names, by its business label and page; never its id. */
 export async function auditRecords(env: Bindings) {
-  const [orders, assets, parts, people, checklists, schedules, proposals, meters, imports] = await Promise.all([
+  const [orders, assets, parts, people, checklists, schedules, proposals, meters, imports, teams] = await Promise.all([
     all(env, 'SELECT w.id, w.number, a.name FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id'), all(env, 'SELECT id, tag, name FROM gk_assets'),
     all(env, 'SELECT id, number, name FROM gk_parts'), all(env, 'SELECT id, name FROM gk_members'), all(env, 'SELECT id, name FROM gk_checklists'),
     all(env, 'SELECT id, title FROM gk_schedules'), all(env, 'SELECT id, kind FROM gk_proposals'),
-    all(env, 'SELECT m.id, m.name, a.id AS asset, a.tag FROM gk_meters m JOIN gk_assets a ON a.id = m.asset_id'), all(env, 'SELECT id FROM ik_jobs')])
+    all(env, 'SELECT m.id, m.name, a.id AS asset, a.tag FROM gk_meters m JOIN gk_assets a ON a.id = m.asset_id'), all(env, 'SELECT id FROM ik_jobs'), all(env, 'SELECT id, name FROM gk_teams')])
   const link = (href: string, label: string) => h`<a href="${href}">${label}</a>`
   return new Map<string, Html>([
     ['site', link('/app/site', 'The site')],
+    ...teams.map(row => [row.id, link('/app/teams', `Team: ${row.name}`)] as const),
     ...orders.map(row => [row.id, link(`/app/work/${row.id}`, `${woNumber(row.number)} · ${row.name}`)] as const),
     ...assets.map(row => [row.id, link(`/app/assets/${row.id}`, `${row.tag} ${row.name}`)] as const),
     ...parts.map(row => [row.id, link(`/app/parts/${row.id}`, `${row.number} ${row.name}`)] as const),

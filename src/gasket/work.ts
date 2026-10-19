@@ -10,6 +10,7 @@ import type { Input } from './input'
 import { issuePart, returnPart } from './parts'
 import type { FromProposal } from './schedules'
 import { chaseOf } from './chasing'
+import { assigneeFits, crewChoice, crewOf, handoffStatements, isCollaborator } from './crew'
 import { activeCode } from './codes'
 import { readingStatements } from './meters'
 import { fromMilli } from './quantity'
@@ -24,11 +25,11 @@ export async function workOrder(env: Bindings, id: string) {
   return row
 }
 
-/** The assigned person may record on an open work order; the version they saw must still be current. */
+/** The assigned person or a collaborator (PLAN-002) may record on an open work order; the version they saw must still be current. */
 async function workable(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.do')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
-  insist(order.assignee_id === actor.id, 'not_your_work', 403)
+  insist(order.assignee_id === actor.id || await isCollaborator(env, order.id, actor.id), 'not_your_work', 403)
   insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
   if (input.has('version')) insist(input.integer('version', { min: 1, max: 1_000_000 }) === order.version, 'stale', 409)
   return order
@@ -49,27 +50,26 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   const due = input.text('due', { max: 10 })
   insist(isDate(due), 'invalid_due')
   const assignee = input.text('assignee', { optional: true, max: 100 }) || null
-  if (assignee) await assignable(env, assignee)
+  const crew = await crewChoice(env, input, null)
+  if (assignee) await assigneeFits(env, assignee, crew.team)
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, actor.id, now()), ...(also?.(id) ?? [])],
-    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, ...(proposal ? { proposal } : {}) } })
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, team_id, trade, shift, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, crew.team, crew.trade, crew.shift, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
   return { id }
 }
 
-async function assignable(env: Bindings, member: string) {
-  insist(await one(env, "SELECT 1 FROM gk_members WHERE id = ? AND status = 'active' AND role IN ('owner', 'lead', 'maintainer')", member), 'assignee_not_assignable', 409)
-}
-
+/** PLAN-002: assign or reassign with an optional team, trade, shift and handoff note; the new assignee acknowledges afresh. */
 export async function assign(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.assign')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
   insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
-  const assignee = input.text('assignee', { max: 100 })
-  await assignable(env, assignee)
+  const assignee = input.text('assignee', { max: 100 }), note = input.text('note', { optional: true, max: 1000 }) || null
+  const crew = await crewChoice(env, input, order)
+  await assigneeFits(env, assignee, crew.team)
   await commit(env, [
     guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, order.version),
-    stmt(env, 'UPDATE gk_work_orders SET assignee_id = ?, version = version + 1 WHERE id = ?', assignee, order.id),
-  ], { actor: actor.id, action: 'workorder.assign', subject: order.id, detail: { from: order.assignee_id, to: assignee } })
+    ...handoffStatements(env, actor, order, assignee, crew, note),
+  ], { actor: actor.id, action: 'workorder.assign', subject: order.id, detail: { from: order.assignee_id, to: assignee, ...crew, note } })
   return { id: order.id }
 }
 
@@ -94,8 +94,8 @@ export async function decidePlan(env: Bindings, actor: Actor, input: Input) {
   const to = choice.startsWith('to:') ? choice.slice(3) : ''
   insist(to && to !== order.assignee_id, 'invalid_plan')
   insist(to !== actor.id, 'plan_to_self', 409)
-  await assignable(env, to)
-  await commit(env, [unchanged, stmt(env, 'UPDATE gk_work_orders SET assignee_id = ?, version = version + 1 WHERE id = ?', to, order.id)], [
+  await assigneeFits(env, to, order.team_id)
+  await commit(env, [unchanged, ...handoffStatements(env, actor, order, to, { team: order.team_id, trade: order.trade, shift: order.shift }, null)], [
     { actor: actor.id, action: 'workorder.assign', subject: order.id, detail: { from: order.assignee_id, to } },
     { actor: actor.id, action: 'workorder.plan', subject: order.id, detail: { plan: 'reassign', holder: order.assignee_id, to } },
   ])
@@ -254,7 +254,7 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
   return { id: order.id, finding: id, followUp: followUpId }
 }
 
-export type WorkView = Row & { items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; mine: boolean; missing: string[] }
+export type WorkView = Row & { crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: { index: number; text: string; result: Row | null }[]; meters: Row[]; readings: Row[]; parts: Row[]; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
@@ -289,8 +289,9 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   // PM-002: the reading that raised this preventive work, as evidence.
   const trigger = order.trigger_reading_id ? await one(env, 'SELECT r.id, r.value, r.taken_on, r.provenance, r.source, r.quality, g.name AS meter, g.unit FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id WHERE r.id = ?', order.trigger_reading_id) : null
   const chase = await chaseOf(env, order, actor.today)
+  const crew = await crewOf(env, order, actor)
   const { items_json: _items, ...rest } = order
-  return { ...rest, trigger, chase, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
+  return { ...rest, trigger, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, downtime, findings, evidence, reviews, decisions, control, merged, origin, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at) }) }
 }
 
 /** Why a work order cannot be submitted yet, in the person's words. Each failed or needs-attention step needs its own linked finding. */
@@ -305,14 +306,18 @@ export function submitBlockers({ items, findings, downtime, unacknowledged = fal
   return blockers
 }
 
-/** Work lists: everything open, or one person's own. */
+/** Work lists: everything open, one team's (`team`), or one person's own: assigned to them or collaborating on it (PLAN-002). */
 export async function workList(env: Bindings, actor: Actor, url: URL) {
   const mine = url.searchParams.get('mine') === '1' || (!can(actor, 'work.assign') && !can(actor, 'work.review') && actor.role !== 'agent')
+  const team = url.searchParams.get('team')
   const state = url.searchParams.get('state') ?? 'open'
   const filter = state === 'closed' ? "w.status IN ('closed', 'cancelled')" : "w.status NOT IN ('closed', 'cancelled')"
-  return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.version, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, a.location AS asset_location, a.category AS asset_category, m.name AS assignee, w.assignee_id
-    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id
-    WHERE ${filter} ${mine ? 'AND w.assignee_id = ?' : ''} ORDER BY ${state === 'closed' ? 'w.closed_at DESC' : 'w.due_date, w.number'} LIMIT 500`, ...(mine ? [actor.id] : []))
+  const collaborating = 'EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id = w.id AND c.member_id = ? AND c.removed_at IS NULL)'
+  return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.version, a.id AS asset_id, a.tag AS asset_tag, a.name AS asset_name, a.location AS asset_location, a.category AS asset_category, m.name AS assignee, w.assignee_id,
+    t.name AS team, w.trade, w.shift, CASE WHEN w.assignee_id = ? THEN 'assignee' WHEN ${collaborating} THEN 'collaborator' END AS my_part
+    FROM gk_work_orders w JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_teams t ON t.id = w.team_id
+    WHERE ${filter} ${mine ? `AND (w.assignee_id = ? OR ${collaborating})` : ''} ${team ? 'AND w.team_id = ?' : ''} ORDER BY ${state === 'closed' ? 'w.closed_at DESC' : 'w.due_date, w.number'} LIMIT 500`,
+  actor.id, actor.id, ...(mine ? [actor.id, actor.id] : []), ...(team ? [team] : []))
 }
 
 export async function evidenceFile(env: Bindings, _actor: Actor, id: string) {

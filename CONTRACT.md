@@ -124,7 +124,7 @@ The scheduler's existing fixed-calendar and approval-reading meter cadence remai
 
 - **PLAN-001 — Priority, lifecycle and reusable work templates.** Leads plan corrective, emergency and preventive work against an asset or a location with no asset (a restroom door, a dock light) with priority, estimated duration, instructions, due date, custom fields and permissioned custom statuses. Reusable templates and bulk creation preserve stable work numbers and required completion/review rules. Work a technician creates (FIELD-009) follows the same template, required-field, required-evidence and review rules as work a lead creates. **Acceptance evidence:** Create urgent corrective work from a template, create location-only work for a dock light, add a required field and custom waiting status, bulk-create selected jobs and try to bypass completion requirements through the API as a lead and as the technician who created the work. Inspect persistent numbers and refusal.
 
-- **PLAN-002 — Teams, trades and accountable assignments.** A work order has an accountable assignee plus collaborators, trade/team and shift. Leads assign/reassign with handoff notes; technicians acknowledge or decline with a blocker and only authorized participants record scoped work. **Acceptance evidence:** Assign an electrical job to a team and lead technician, add a collaborator and hand over across shifts. Inspect both queues, acknowledgement and recorded contributor; an unrelated technician cannot write.
+- **PLAN-002 — Teams, trades and accountable assignments.** A work order has an accountable assignee plus collaborators, trade/team and shift. Leads assign/reassign with handoff notes; technicians acknowledge or decline with a blocker and only authorized participants record scoped work. A team is a named group of assignable people (owner, leads, maintainers) with one trade, kept by leads; a work order may name a team, a trade (the team's by default) and a shift label, and when it names a team every assignment door (assign, overdue plan, bulk) gives it only to a member of that team. Every reassignment keeps a handoff (from and to person and shift, an optional note, who and when) and asks the new assignee to acknowledge again. Collaborators are assignable people a lead adds or removes; the assignee and active collaborators record results, readings, evidence, parts, downtime and findings, only the assignee acknowledges, declines, answers chasing and submits, and anyone else is refused. Declining needs a blocker (PM-006's kinds, owner, next action and promised date), returns the work unassigned and gives every active lead (the owners when there is none) an in-app notice; PM-005 adds email and push delivery of it before it ships. Each record names who made it, the work order lists its contributors, and a contributor cannot review it (GAS-09). **Acceptance evidence:** Assign an electrical job to a team and lead technician, add a collaborator and hand over across shifts. Inspect both queues, acknowledgement and recorded contributor; an unrelated technician cannot write.
 
 - **PLAN-003 — Calendar and workload scheduling.** Leads schedule work on day/week calendars with estimated hours, drag/reschedule preview and capacity by person/team/site. Workload conflicts, unassigned jobs, leave and overdue work remain visible; calendar edits do not silently reset PM due policy. **Acceptance evidence:** Schedule five repairs into a 16-hour team window, mark a technician absent and move a job between days. Inspect capacity/conflicts, unassigned work and unchanged PM due evidence on desktop and phone.
 
@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001 and PM-006 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001, PM-006 and PLAN-002 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 8 | 36 | 78 | 122 |
-| All | 22 | 36 | 78 | 136 |
+| Target and push further | 9 | 35 | 78 | 122 |
+| All | 23 | 35 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -411,7 +411,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `REQ-006` | Email and Google Forms intake | target | missing |  | No maintenance inbound email or Google Forms connector. |
 | `REQ-007` | Request reporting and operator adoption | target | missing |  | No request reporting or lifecycle metrics. |
 | `PLAN-001` | Priority, lifecycle and reusable work templates | target | partial | `src/gasket/work.ts`; `src/gasket/review.ts` | Corrective/preventive work and fixed lifecycle exist; priorities, duration, custom fields/statuses, bulk creation, work templates and location-only work do not. |
-| `PLAN-002` | Teams, trades and accountable assignments | target | partial | `src/gasket/work.ts`; `src/gasket/site.ts` | One active assignee and reassignment exist; teams, collaborators, trade/shift and acknowledgement do not. |
+| `PLAN-002` | Teams, trades and accountable assignments | target | done | `src/gasket/crew.ts`; `src/gasket/work.ts`; `src/gasket/control.ts`; `src/gasket/ui/crew.ts`; `migrations/core/0031_crew.sql`; `tests/gasket/flows.mjs` |  |
 | `PLAN-003` | Calendar and workload scheduling | target | missing |  | No work calendar, capacity model, leave or drag scheduling. |
 | `PLAN-004` | Skills, qualifications and resources | target | missing |  | No skills, qualification expiry, tools or resource scheduling. |
 | `PLAN-005` | Dependencies and production windows | target | missing |  | No work dependencies, blocker tracking or production-window exchange. |

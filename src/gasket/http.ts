@@ -23,6 +23,7 @@ import { proposalsPage } from './ui/proposals'
 import { checklistPage, schedulesPage } from './ui/schedules'
 import { codesPage } from './ui/codes'
 import { noticesPage } from './ui/chasing'
+import { teamsPage } from './ui/crew'
 import { accessPage, auditPage, morePage, sitePage } from './ui/settings'
 import { workOrderPage, workPage } from './ui/work'
 
@@ -125,6 +126,7 @@ const pages: Record<string, Page> = {
   auditCsv: async (env, actor, url) => new Response(await auditCsv(env, actor, url), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="audit.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   codes: (env, actor, url) => codesPage(env, actor, url),
   notices: (env, actor, url) => noticesPage(env, actor, url),
+  teams: (env, actor, url) => teamsPage(env, actor, url),
   more: (env, actor, url) => morePage(env, actor, url),
 }
 

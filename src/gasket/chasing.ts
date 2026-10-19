@@ -54,7 +54,7 @@ export async function respond(env: Bindings, actor: Actor, input: Input) {
   return { id, blocker: blocker?.id ?? null }
 }
 
-async function blockerStatements(env: Bindings, actor: Actor, order: Row, input: Input) {
+export async function blockerStatements(env: Bindings, actor: Actor, order: Row, input: Input) {
   const kind = input.text('kind', { max: 20 }), nextAction = input.text('nextAction', { max: 500 }), promisedOn = input.text('promisedOn', { max: 10 })
   insist(KINDS.includes(kind), 'invalid_kind')
   insist(isDate(promisedOn) && promisedOn >= actor.today, 'invalid_promisedOn')

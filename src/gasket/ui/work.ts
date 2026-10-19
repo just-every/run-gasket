@@ -14,7 +14,9 @@ import { assignable, site } from '../site'
 import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../today'
 import { woDigits } from '../quantity'
 import { workList, workOrderDetail } from '../work'
+import { teamList } from '../crew'
 import { chaseCard } from './chasing'
+import { crewCard } from './crew'
 import { CODE_KIND } from './codes'
 import { OUTCOME, STATUS, amount, area, backLink, band as headerBand, card, checkbox, details, field, fileField, form, h, hidden, initials, raw, select, table, tag, woNumber, type Html } from './html'
 import { ICON, actionIcon, machine } from './icons'
@@ -138,6 +140,8 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const w = await workOrderDetail(env, actor, id)
   const back = `/app/work/${w.id}`
   const working = w.mine && can(actor, 'work.do') && ['open', 'in_progress', 'returned'].includes(w.status)
+  // PLAN-002: collaborators record alongside the accountable assignee, who alone submits.
+  const recording = (w.mine || w.collaborating) && can(actor, 'work.do') && ['open', 'in_progress', 'returned'].includes(w.status)
   const reviewing = can(actor, 'work.review') && w.status === 'submitted' && !w.mine
   const ids = h`${hidden('workOrder', w.id)}${hidden('version', w.version)}`
   const post = (action: string, fields: unknown, submit: string, options: { multipart?: boolean; secondary?: boolean; layout?: string } = {}) => form(action, back, h`${ids}${fields}`, submit, options)
@@ -153,7 +157,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const task = w.items.length && w.title === w.checklist_name && !w.description ? '' : card('What needs doing', h`<p>${w.title}</p>${w.description ? h`<p class="gk-muted">${w.description}</p>` : ''}`, { id: 'task' })
 
   const done = w.items.filter(item => item.result).length
-  const checklist = !w.items.length ? '' : card(`${w.checklist_name}, revision ${w.checklist_revision}`, working
+  const checklist = !w.items.length ? '' : card(`${w.checklist_name}, revision ${w.checklist_revision}`, recording
     ? h`<form method="post" action="/app/do/workorder.results" class="gk-form">${hidden('returnTo', back)}${ids}<ol class="gk-checklist">${w.items.map(item => h`<li>
         <fieldset class="gk-item"><legend>${item.text}</legend><div class="gk-segmented">${['pass', 'attention', 'fail'].map(outcome => h`<label><input type="radio" name="outcome-${item.index}" value="${outcome}"${item.result?.outcome === outcome ? raw(' checked') : ''}><span>${OUTCOME[outcome]}</span></label>`)}</div>
         ${field('Note', `note-${item.index}`, { value: item.result?.note ?? '', required: false })}</fieldset></li>`)}</ol>
@@ -163,29 +167,29 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
 
   const meters = w.meters
   const readings = card('Meter and condition readings', h`${w.readings.length ? h`<dl class="gk-readings">${w.readings.map(row => h`<div><dt>${row.meter}</dt><dd>${row.kind === 'condition' ? condition(row.value) : amount(row.value, row.unit)}<span class="gk-sub">Taken ${showLocal(row.taken_on)}</span></dd></div>`)}</dl>` : h`<p class="gk-muted">No readings recorded on this work order.</p>`}
-    ${working && meters.length ? post('workorder.readings', h`${field('Taken on', 'takenOn', { type: 'datetime-local', value: localNow(actor.zone) })}<div class="gk-grid">${meters.map(meter => h`${hidden('meter', meter.id)}${meter.kind === 'condition'
+    ${recording && meters.length ? post('workorder.readings', h`${field('Taken on', 'takenOn', { type: 'datetime-local', value: localNow(actor.zone) })}<div class="gk-grid">${meters.map(meter => h`${hidden('meter', meter.id)}${meter.kind === 'condition'
       ? select(`${meter.name}`, 'value', [{ value: 'good', label: 'Good' }, { value: 'fair', label: 'Fair' }, { value: 'poor', label: 'Poor' }], '', { required: false, blank: 'Not read' })
       : field(`${meter.name} (${meter.unit})`, 'value', { required: false, attrs: 'inputmode="decimal"' })}`)}</div>`, 'Record readings', { secondary: true }) : ''}
-    ${working && !meters.length ? h`<p class="gk-muted">This asset has no meters. A lead adds them on the asset.</p>` : ''}`, { id: 'readings' })
+    ${recording && !meters.length ? h`<p class="gk-muted">This asset has no meters. A lead adds them on the asset.</p>` : ''}`, { id: 'readings' })
 
-  const stock = working ? (await partList(env, actor)) : []
+  const stock = recording ? (await partList(env, actor)) : []
   const parts = card('Parts issued and returned', h`${w.parts.length ? table(['Part', 'Issued', 'Returned', 'Used'], w.parts.map(row => [h`${row.name}<span class="gk-sub">${row.number}</span>`, amount(row.issued, row.unit), amount(row.returned, row.unit), amount(row.used, row.unit)]), 'Parts', { wrap: [0] }) : h`<p class="gk-muted">No parts issued.</p>`}
-    ${working && stock.length ? h`<div class="gk-split">${post('workorder.issue', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.onHand, part.unit)} on hand)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Issue part', { secondary: true })}
+    ${recording && stock.length ? h`<div class="gk-split">${post('workorder.issue', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.onHand, part.unit)} on hand)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Issue part', { secondary: true })}
       ${w.parts.length ? post('workorder.return', h`${select('Part', 'part', w.parts.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.used, part.unit)} held)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}`, 'Return unused', { secondary: true }) : ''}</div>` : ''}`, { id: 'parts' })
 
   const evidence = card('Inspection evidence', h`${w.evidence.length ? h`<ul class="gk-files">${w.evidence.map(file => h`<li><a href="/app/evidence/${file.id}">${file.filename}</a><span class="gk-sub">${Math.ceil(file.size / 1024)} KB · ${file.uploaded_by} · ${showInstant(file.uploaded_at, actor.zone)}</span>${details([['SHA-256', file.sha256], ['Type', file.media_type]])}</li>`)}</ul>` : h`<p class="gk-muted">No photos or documents attached.</p>`}
-    ${working ? post('workorder.evidence', fileField('Photo or document', 'file', { required: true, accept: '.png,.jpg,.jpeg,.webp,.heic,.pdf', hint: 'PNG, JPEG, WebP, HEIC or PDF, up to 1.5 MB.' }), 'Attach evidence', { multipart: true, secondary: true }) : ''}`, { id: 'evidence' })
+    ${recording ? post('workorder.evidence', fileField('Photo or document', 'file', { required: true, accept: '.png,.jpg,.jpeg,.webp,.heic,.pdf', hint: 'PNG, JPEG, WebP, HEIC or PDF, up to 1.5 MB.' }), 'Attach evidence', { multipart: true, secondary: true }) : ''}`, { id: 'evidence' })
 
   const open = w.downtime.find(row => !row.ended_on)
   const downtime = card('Downtime', h`${w.downtime.length ? h`<dl class="gk-pairs">${w.downtime.map(row => h`<div><dt>Start</dt><dd>${showLocal(row.started_on)}</dd></div><div><dt>End</dt><dd>${row.ended_on ? showLocal(row.ended_on) : tag('Down')}</dd></div>${row.minutes !== null ? h`<div class="gk-total"><dt>Total downtime</dt><dd>${row.minutes} minutes</dd></div>` : ''}<div><dt>Reason</dt><dd>${row.reason}</dd></div>`)}</dl>` : h`<p class="gk-muted">The asset has not been taken down for this work.</p>`}
-    ${working && !open ? post('downtime.start', h`${field('Went down at', 'startedOn', { type: 'datetime-local', value: localNow(actor.zone) })}${field('Reason', 'reason')}`, 'Record asset down', { secondary: true }) : ''}
-    ${working && open ? post('downtime.end', field('Back in service at', 'endedOn', { type: 'datetime-local', value: localNow(actor.zone) }), 'Record back in service', { secondary: true }) : ''}`, { id: 'downtime' })
+    ${recording && !open ? post('downtime.start', h`${field('Went down at', 'startedOn', { type: 'datetime-local', value: localNow(actor.zone) })}${field('Reason', 'reason')}`, 'Record asset down', { secondary: true }) : ''}
+    ${recording && open ? post('downtime.end', field('Back in service at', 'endedOn', { type: 'datetime-local', value: localNow(actor.zone) }), 'Record back in service', { secondary: true }) : ''}`, { id: 'downtime' })
 
   // ASSET-004: the catalog's active codes, offered on a finding when the catalog has any.
   const catalog = (await codeList(env)).filter(code => !code.retired)
   const codeFields = h`<div class="gk-grid">${(['failure_mode', 'cause', 'remedy', 'risk'] as const).map(kind => ({ kind, options: catalog.filter(code => code.kind === kind) })).filter(({ options }) => options.length).map(({ kind, options }) => select(CODE_KIND[kind], kind === 'failure_mode' ? 'failureMode' : kind, options.map(code => ({ value: code.key, label: code.label })), '', { required: false, blank: 'Not classified' }))}</div>`
   const findings = card('Corrective findings', h`${w.findings.length ? h`<ul class="gk-findings">${w.findings.map(row => h`<li>${tag(row.severity === 'high' ? 'High' : row.severity === 'medium' ? 'Medium' : 'Low')} ${row.item !== null ? h`<b>Step ${row.item + 1}:</b> ` : ''}${row.text}${row.codes ? h`<span class="gk-sub">${row.codes}</span>` : ''}${row.follow_up_id ? h`<span class="gk-sub">${row.rule_id ? 'Correction' : 'Follow-up'} <a href="/app/work/${row.follow_up_id}">${woNumber(row.follow_up_number)}</a> · ${STATUS[row.follow_up_status]}${row.obligation ? ` · ${OBLIGATION[row.obligation]}` : ''}</span>` : ''}</li>`)}</ul>` : h`<p class="gk-muted">No findings recorded.</p>`}
-    ${working ? post('finding.record', h`${w.items.length ? select('Checklist step', 'item', w.items.map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}${item.result && item.result.outcome !== 'pass' ? ` (${OUTCOME[item.result.outcome]})` : ''}` })), w.items.find(item => item.result && item.result.outcome !== 'pass' && !w.findings.some(row => row.item === item.index))?.index.toString() ?? '', { required: false, blank: 'The whole work order' }) : ''}${area('What was found and what was done', 'text')}${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], 'low')}${codeFields}${checkbox('Needs follow-up work (raises a corrective work order)', 'followUp')}${field('Follow-up due', 'followUpDue', { type: 'date', required: false, hint: 'Leave empty for tomorrow (high) or a week from today.' })}`, 'Record finding', { secondary: true }) : ''}`, { id: 'findings' })
+    ${recording ? post('finding.record', h`${w.items.length ? select('Checklist step', 'item', w.items.map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}${item.result && item.result.outcome !== 'pass' ? ` (${OUTCOME[item.result.outcome]})` : ''}` })), w.items.find(item => item.result && item.result.outcome !== 'pass' && !w.findings.some(row => row.item === item.index))?.index.toString() ?? '', { required: false, blank: 'The whole work order' }) : ''}${area('What was found and what was done', 'text')}${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], 'low')}${codeFields}${checkbox('Needs follow-up work (raises a corrective work order)', 'followUp')}${field('Follow-up due', 'followUpDue', { type: 'date', required: false, hint: 'Leave empty for tomorrow (high) or a week from today.' })}`, 'Record finding', { secondary: true }) : ''}`, { id: 'findings' })
 
   // PM-004: the failure this correction answers, and its assignee's acknowledgement.
   const origin = w.origin ? card('Failed step to correct', h`<p>${w.origin.text}</p><p class="gk-sub">From <a href="/app/work/${w.origin.work_order_id}">${woNumber(w.origin.number)}</a> · ${w.origin.severity} severity · rule ${w.origin.rule}</p>
@@ -199,7 +203,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const siblings = lead && w.kind === 'corrective' && ['open', 'in_progress', 'returned'].includes(w.status)
     ? (await workList(env, actor, new URL('https://gasket.invalid/?state=open'))).filter(row => row.asset_id === w.asset_id && row.id !== w.id) : []
   const assign = lead && ['open', 'in_progress', 'returned'].includes(w.status)
-    ? card('Assignment', h`${post('workorder.assign', select('Assign to', 'assignee', (await assignable(env)).map(person => ({ value: person.id, label: person.name })), w.assignee_id ?? '', { blank: 'Choose a person' }), 'Assign', { secondary: true })}
+    ? card('Assignment', h`${post('workorder.assign', h`<div class="gk-grid">${select('Assign to', 'assignee', (await assignable(env)).map(person => ({ value: person.id, label: person.name })), w.assignee_id ?? '', { blank: 'Choose a person' })}${select('Team', 'team', (await teamList(env)).map(team => ({ value: team.id, label: `${team.name} (${team.trade})` })), w.team_id ?? '', { required: false, blank: 'No team' })}${field('Trade', 'trade', { required: false, value: w.trade ?? '', hint: 'Leave empty for the team\'s trade.' })}${field('Shift', 'shift', { required: false, value: w.shift ?? '', hint: 'For example Day or Night.' })}</div>${area('Handoff note', 'note', { required: false, hint: 'What the next person needs to know.' })}`, 'Assign', { secondary: true })}
       ${post('workorder.cancel', field('Reason to cancel', 'reason'), 'Cancel work order', { secondary: true })}
       ${siblings.length ? post('workorder.merge', h`${select('Duplicate of', 'into', siblings.map(row => ({ value: row.id, label: `${woNumber(row.number)} ${row.title}` })), '', { blank: 'Choose the work order that carries on' })}${field('Reason to merge', 'reason')}`, 'Merge as duplicate', { secondary: true }) : ''}`, { id: 'assignment' }) : ''
   // PLAN-007: what was cancelled, rescheduled, reopened or merged, and why; cancelled or reviewed repairs can be reopened.
@@ -219,7 +223,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     <form method="post" action="/app/do/workorder.review" class="gk-inline">${hidden('returnTo', back)}${ids}${hidden('decision', 'approve')}<button type="submit">Approve and close</button></form>`
 
   const body = h`${backLink('/app', 'Work orders')}${band}
-    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${findings}${reviews}${assign}${control}
+    <div class="gk-columns"><div class="gk-col-main">${origin}${task}${checklist}${readings}${parts}${evidence}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${findings}${reviews}${assign}${control}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ...(w.trigger ? [['Raised by reading', `${w.trigger.meter} ${w.trigger.value}${w.trigger.unit === 'condition' ? '' : ` ${w.trigger.unit}`}, taken ${showLocal(w.trigger.taken_on)}${w.trigger.provenance === 'feed' ? ` (feed: ${w.trigger.source})` : ''}`] as [string, unknown]] : []), ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, body, { url, bar: working || reviewing ? bar : undefined })
 }

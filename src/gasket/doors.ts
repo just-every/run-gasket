@@ -6,7 +6,7 @@ export const API_DOORS: [string, string][] = [
   ['^assets$', 'assets'], ['^assets/([\\w-]+)$', 'asset'], ['^assets/([\\w-]+)/history$', 'history'],
   ['^parts$', 'parts'], ['^parts/([\\w-]+)$', 'part'], ['^checklists$', 'checklists'], ['^checklists/([\\w-]+)$', 'checklist'],
   ['^schedules$', 'schedules'], ['^work$', 'work'], ['^work/([\\w-]+)$', 'workOrder'], ['^board$', 'board'],
-  ['^proposals$', 'proposals'], ['^imports$', 'imports'], ['^audit$', 'audit'], ['^codes$', 'codes'], ['^failures$', 'failures'], ['^closures$', 'closures'], ['^scheduler$', 'scheduler'], ['^notices$', 'notices'], ['^chase-rule$', 'chaseRule'],
+  ['^proposals$', 'proposals'], ['^imports$', 'imports'], ['^audit$', 'audit'], ['^codes$', 'codes'], ['^failures$', 'failures'], ['^closures$', 'closures'], ['^scheduler$', 'scheduler'], ['^notices$', 'notices'], ['^chase-rule$', 'chaseRule'], ['^teams$', 'teams'],
 ]
 
 export const PAGE_DOORS: [string, string][] = [
@@ -14,7 +14,7 @@ export const PAGE_DOORS: [string, string][] = [
   ['^/app/work/([\\w-]+)$', 'workOrder'], ['^/app/evidence/([\\w-]+)$', 'evidence'],
   ['^/app/assets$', 'assets'], ['^/app/assets/([\\w-]+)$', 'asset'], ['^/app/assets/([\\w-]+)/history\\.csv$', 'historyCsv'],
   ['^/app/schedules$', 'schedules'], ['^/app/checklists/([\\w-]+)$', 'checklist'], ['^/app/parts$', 'parts'], ['^/app/parts/([\\w-]+)$', 'part'],
-  ['^/app/board$', 'board'], ['^/app/proposals$', 'proposals'], ['^/app/move-in$', 'moveIn'], ['^/app/audit$', 'audit'], ['^/app/audit\\.csv$', 'auditCsv'], ['^/app/codes$', 'codes'], ['^/app/notices$', 'notices'], ['^/app/more$', 'more'],
+  ['^/app/board$', 'board'], ['^/app/proposals$', 'proposals'], ['^/app/move-in$', 'moveIn'], ['^/app/audit$', 'audit'], ['^/app/audit\\.csv$', 'auditCsv'], ['^/app/codes$', 'codes'], ['^/app/notices$', 'notices'], ['^/app/teams$', 'teams'], ['^/app/more$', 'more'],
 ]
 
 export function match(doors: [string, string][], path: string): { name: string; id: string } | null {

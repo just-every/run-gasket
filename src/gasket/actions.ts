@@ -3,6 +3,7 @@
 // handler checks the actor's role itself.
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
+import { collaborate, createTeam, decline, teamMember } from './crew'
 import { addMeter, createAsset, recordSighting, retireAsset, updateAsset } from './assets'
 import { createChecklist, reviseChecklist } from './checklists'
 import { bulk, merge, reopen } from './control'
@@ -49,6 +50,10 @@ export const actions: Record<string, Handler> = {
   'checklist.revise': (env, actor, input) => reviseChecklist(env, actor, input),
   'rule.set': (env, actor, input) => setRule(env, actor, input),
   'workorder.acknowledge': (env, actor, input) => acknowledge(env, actor, input),
+  'workorder.decline': (env, actor, input) => decline(env, actor, input),
+  'workorder.collaborate': (env, actor, input) => collaborate(env, actor, input),
+  'team.create': (env, actor, input) => createTeam(env, actor, input),
+  'team.member': (env, actor, input) => teamMember(env, actor, input),
   'schedule.create': (env, actor, input) => createSchedule(env, actor, input),
   'workorders.generate': (env, actor) => generateDue(env, actor),
   'workorders.bulk': (env, actor, input) => bulk(env, actor, input),

@@ -4,6 +4,7 @@
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { commit, guard, insist, newId, now, one, stmt } from './core'
+import { RECORDERS } from './crew'
 import type { Input } from './input'
 import { advanceStatements } from './schedules'
 import { OPEN, workOrder, workOrderDetail } from './work'
@@ -51,7 +52,6 @@ export async function review(env: Bindings, actor: Actor, input: Input) {
 /** Whether this person recorded anything on the work order, whoever it is assigned to now.
  * Every record bumps the work order's version, so the review's version guard covers a record made after this read. */
 async function didWork(env: Bindings, workOrderId: string, member: string) {
-  const recorders = [['gk_result_log', 'recorded_by'], ['gk_readings', 'entered_by'], ['gk_part_moves', 'actor'], ['gk_downtime', 'recorded_by'], ['gk_findings', 'recorded_by'], ['gk_evidence', 'uploaded_by']]
-  const found = await one<{ did: number }>(env, `SELECT ${recorders.map(([table, column]) => `EXISTS(SELECT 1 FROM ${table} WHERE work_order_id = ? AND ${column} = ?)`).join(' OR ')} AS did`, ...recorders.flatMap(() => [workOrderId, member]))
+  const found = await one<{ did: number }>(env, `SELECT ${RECORDERS.map(([table, column]) => `EXISTS(SELECT 1 FROM ${table} WHERE work_order_id = ? AND ${column} = ?)`).join(' OR ')} AS did`, ...RECORDERS.flatMap(() => [workOrderId, member]))
   return found!.did === 1
 }

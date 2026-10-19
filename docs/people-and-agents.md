@@ -22,6 +22,10 @@ An agent reads the register, parts, schedules and work orders, and prepares thre
 
 Each proposal shows what it would do and the agent's reasoning. On **More → Proposals**, a lead or the owner presses **Approve and run** or **Reject**; the person who prepared a proposal can never decide it. Approving runs the ordinary action as the approver, and is refused if the records the proposal relied on changed since it was prepared.
 
+## Teams, shifts and handovers
+
+On **More → Teams**, a lead names a team with its trade (Electrical, Mechanical, HVAC) and adds its people. A work order can name a team, a trade and a shift; when it names a team, only that team's people can be given it. One person is accountable for each work order and **acknowledges** it, or **declines** it with a blocker, which sends it back unassigned and tells the leads. A lead can add **collaborators**, who record results, readings, photos, parts, downtime and findings alongside the accountable person; only the accountable person submits. Handing over to the next shift is an ordinary reassignment with a handoff note, kept on the work order's **Crew** card with everyone who recorded on it. Each team's open work is its queue on the Teams page; **Assigned to me** includes work you collaborate on.
+
 ## The audit trail
 
 **More → Audit trail** lists every change, newest first: when, who, what and which record, with the role the person acted under and, for agent proposals and move-ins, what they acted on. Search by action and by date, page back with **Older changes**, and press **Download CSV** for every matching change. Owners and supervisors can read it.

@@ -6,7 +6,7 @@ import { showDate, showInstant } from '../dates'
 import { card, field, form, h, hidden, select, table, tag } from './html'
 import { page } from './shell'
 
-const KIND: Record<string, string> = { reminder: 'Reminder', overdue: 'Overdue', escalation_lead: 'Escalated to leads', escalation_supervisor: 'Escalated to supervisors', blocker_missed: 'Blocker promise missed' }
+const KIND: Record<string, string> = { reminder: 'Reminder', overdue: 'Overdue', escalation_lead: 'Escalated to leads', escalation_supervisor: 'Escalated to supervisors', blocker_missed: 'Blocker promise missed', declined: 'Declined' }
 const BLOCKERS = [{ value: 'parts', label: 'Parts' }, { value: 'access', label: 'Access' }, { value: 'skill', label: 'Skill' }, { value: 'production', label: 'Production' }]
 
 export async function noticesPage(env: Bindings, actor: Actor, url: URL) {
@@ -15,10 +15,10 @@ export async function noticesPage(env: Bindings, actor: Actor, url: URL) {
   const ruleText = `Remind ${rule.remind_before_days} day${rule.remind_before_days === 1 ? '' : 's'} before the due date and when overdue; escalate to leads after ${rule.lead_after_days} day${rule.lead_after_days === 1 ? '' : 's'} overdue or ${rule.response_within_days} day${rule.response_within_days === 1 ? '' : 's'} without a response; to supervisors after ${rule.supervisor_after_days} days.`
   const ruleCard = card('Chase rule', h`<p>${ruleText}</p><p class="gk-sub">${rule.number ? `Rule ${rule.number}` : 'Gasket\'s default rule'}. Notices appear here and on the work order; email and push are not sent yet.</p>
     ${can(actor, 'register.manage') ? form('chase.rule', '/app/notices', h`<div class="gk-grid">${field('Remind before due (days)', 'remindBeforeDays', { type: 'number', value: String(rule.remind_before_days) })}${field('Response expected within (days)', 'responseWithinDays', { type: 'number', value: String(rule.response_within_days) })}${field('Escalate to leads after (days overdue)', 'leadAfterDays', { type: 'number', value: String(rule.lead_after_days) })}${field('Escalate to supervisors after (days overdue)', 'supervisorAfterDays', { type: 'number', value: String(rule.supervisor_after_days) })}</div>`, 'Approve rule', { secondary: true }) : ''}`, { id: 'rule' })
-  return page(env, 'Notices', actor, h`<h1>Notices</h1><p class="gk-lede">Reminders and escalations about overdue work.</p><div class="gk-columns"><div class="gk-col-main">${card('My notices', list, { id: 'mine' })}</div><div class="gk-col-side">${ruleCard}</div></div>`, { url })
+  return page(env, 'Notices', actor, h`<h1>Notices</h1><p class="gk-lede">Reminders and escalations about overdue work, and work its assignee declined.</p><div class="gk-columns"><div class="gk-col-main">${card('My notices', list, { id: 'mine' })}</div><div class="gk-col-side">${ruleCard}</div></div>`, { url })
 }
 
-const blockerFields = (people: { id: string; name: string }[]) => h`<div class="gk-grid">${select('Blocked by', 'kind', BLOCKERS)}${select('Owner', 'owner', people.map(person => ({ value: person.id, label: person.name })), '', { required: false, blank: 'Me' })}${field('Next action', 'nextAction')}${field('Promised by', 'promisedOn', { type: 'date' })}</div>`
+export const blockerFields = (people: { id: string; name: string }[]) => h`<div class="gk-grid">${select('Blocked by', 'kind', BLOCKERS)}${select('Owner', 'owner', people.map(person => ({ value: person.id, label: person.name })), '', { required: false, blank: 'Me' })}${field('Next action', 'nextAction')}${field('Promised by', 'promisedOn', { type: 'date' })}</div>`
 
 /** The chase on one work order: overdue age, responses, blockers and notices, with the assignee's and a lead's actions. */
 export function chaseCard(w: any, actor: Actor, back: string, people: { id: string; name: string }[]) {
