@@ -4,9 +4,12 @@ const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued
 // public doors (JSON door, form door, pages and downloads) against the built
 // Worker with real local D1. No provider is involved; all people are invented.
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { join } from 'node:path'
 import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
 import { assetsCsv, partsCsv, png, readingsCsv } from './fixtures.mjs'
 import { file, harness } from './harness.mjs'
+import { installation } from './installation.mjs'
 
 const h = await harness()
 const check = async (id, run) => { await run(); console.log(`${id} passed`) }
@@ -382,6 +385,36 @@ try {
     assert.deepEqual([status[corrective.id], status[schedule.id], status[count.id], status[own.id]], ['approved', 'rejected', 'pending', 'approved'])
     const audit = await h.api('audit', cookie.owner)
     assert.ok(audit.some(row => row.action === 'proposal.approve' && row.subject === corrective.id && JSON.parse(row.detail).hash === corrective.hash), 'the approval records the exact payload hash')
+  })
+  await check('GAS-11 rer export and rer import keep every record', async () => {
+    // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
+    const read = async (h, cookie) => {
+      const assets = await h.api('assets', cookie.owner), work = [...await h.api('work', cookie.owner), ...await h.api('work?state=closed', cookie.owner)]
+      const orders = await Promise.all(work.map(row => h.api(`work/${row.id}`, cookie.sam)))
+      const files = []
+      for (const evidence of orders.flatMap(order => order.evidence)) {
+        const download = await h.raw(`/app/evidence/${evidence.id}`, { cookie: cookie.sam })
+        assert.equal(download.status, 200)
+        files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
+      }
+      return { assets, orders, files, members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
+        histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await (await h.raw(`/app/assets/${ids.compressor}/history.csv`, { cookie: cookie.sam })).text() }
+    }
+    const before = await read(h, cookie)
+    assert.ok(before.assets.length && before.orders.length && before.audit.length, 'a populated installation')
+    assert.ok(before.files.length >= 2 && before.files.every(row => row.downloaded === row.recorded), 'evidence downloads match their recorded digests')
+    await h.stop()
+    const archive = join(h.installation.root, 'exports', 'gasket.rer')
+    await h.installation.rer('export', '--output', archive)
+    const empty = await installation()
+    try {
+      await empty.rer('import', '--input', archive, '--yes')
+      const restored = await harness({ vars: h.vars, installation: empty })
+      try {
+        const signedIn = { owner: await restored.signIn(h.vars.OWNER_EMAIL), sam: await restored.signIn('sam@example.test') }
+        assert.deepEqual(await read(restored, signedIn), before, 'the restored installation reads exactly as the exported one')
+      } finally { await restored.close() }
+    } finally { await empty.remove() }
   })
   console.log('Gasket flows: 13 clauses passed')
 } finally {

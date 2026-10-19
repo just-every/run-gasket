@@ -1,13 +1,21 @@
-// Runs the built Worker (dist/) with its own local D1 and drives it only
+// Runs the built Worker (dist/) on a local installation's D1 and drives it only
 // through public HTTP doors: the JSON door, the form door, pages and downloads.
+// Given an installation (a restored one) and its configuration, it runs on that.
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { emittedWorker } from '../emitted-worker.mjs'
+import { installation as newInstallation } from './installation.mjs'
 
-export async function harness() {
+export async function harness({ vars, installation } = {}) {
   const secret = () => randomBytes(32).toString('base64url')
-  const vars = { OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: secret(), SETUP_TOKEN: secret() }
-  const worker = await emittedWorker(vars), origin = worker.origin, close = worker.close
+  vars ??= { OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: secret(), SETUP_TOKEN: secret() }
+  const owned = !installation
+  if (owned) { installation = await newInstallation(); await installation.migrate() }
+  const worker = await emittedWorker(vars, { installation: installation.root }), origin = worker.origin
+  /** Stops the Worker and keeps the installation's data; close also removes an installation made here. */
+  let stopped = false
+  const stop = async () => { if (!stopped) { stopped = true; await worker.close() } }
+  const close = async () => { await stop(); if (owned) await installation.remove() }
 
   const raw = (path, { cookie, body, form, method } = {}) => worker.request(path, {
     method: method ?? (body !== undefined || form ? 'POST' : 'GET'), redirect: 'manual',
@@ -51,7 +59,7 @@ export async function harness() {
     return cookie
   }
 
-  return { origin, vars, raw, api, submit, signIn, owner, close }
+  return { origin, vars, installation, raw, api, submit, signIn, owner, stop, close }
 }
 
 export const file = (filename, content, type = 'application/octet-stream') => ({ filename, base64: Buffer.from(content).toString('base64'), type })

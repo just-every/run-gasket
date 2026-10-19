@@ -22,7 +22,8 @@ async function freePort() {
   return port
 }
 
-export async function emittedWorker(vars) {
+/** With `installation`, the Worker runs on that local installation's D1 (already migrated) and leaves it in place. */
+export async function emittedWorker(vars, { installation } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort(), origin = `https://127.0.0.1:${port}`
@@ -35,7 +36,7 @@ export async function emittedWorker(vars) {
       modules: modules.map(file => ({ type: 'ESModule', path: join(root, 'dist/server', file) })),
       compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
       assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
-      d1Databases: { DB: 'gasket-test' },
+      d1Databases: { DB: installation ? config.d1_databases[0].database_id : 'gasket-test' },
       bindings,
       outboundService: async request => {
         if (request.url !== 'https://api.resend.com/emails') throw new Error(`Unexpected test network destination ${new URL(request.url).origin}`)
@@ -44,16 +45,20 @@ export async function emittedWorker(vars) {
       },
     }),
     log: new Log(LogLevel.WARN),
-    resourcePersistencePath: join(directory, 'state'),
+    resourcePersistencePath: installation ? join(installation, '.wrangler/state/v3') : join(directory, 'state'),
   })
   const close = async () => { await mf.dispose(); await rm(directory, { recursive: true, force: true }) }
   try {
     await mf.ready
+    if (installation) return worker()
     const db = await mf.getD1Database('DB')
     for (const file of (await readdir(join(root, 'migrations/core'))).filter(file => file.endsWith('.sql')).sort()) {
       for (const statement of splitSql(await readFile(join(root, 'migrations/core', file), 'utf8'))) await db.prepare(statement).run()
     }
   } catch (error) { await close(); throw error }
+  return worker()
+
+  function worker() { return { origin, mails, request, signInToken, close } }
 
   /** One request to the Worker. Form bodies are encoded here, so every body reaches it as bytes. */
   async function request(path, init = {}) {
@@ -72,6 +77,4 @@ export async function emittedWorker(vars) {
     const link = mail?.text?.match(/https:\/\/\S+/)?.[0]
     return link ? new URL(link).searchParams.get('token') : null
   }
-
-  return { origin, mails, request, signInToken, close }
 }
