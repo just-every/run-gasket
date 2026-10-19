@@ -22,6 +22,7 @@ export const NAV: Destination[] = [
   { href: '/app/parts', label: 'Parts', detail: 'Spares on the shelf.', icon: ICON.parts, show: () => true },
   { href: '/app/proposals', label: 'Proposals', detail: 'Schedules, corrective work and counts an agent prepared for approval.', icon: ICON.proposals, show: actor => can(actor, 'proposal.prepare') || can(actor, 'proposal.decide'), count: 'proposals' },
   { href: '/app/board', label: 'Overdue and downtime', detail: 'Overdue work, work waiting for review, follow-ups, assets down and low parts.', icon: ICON.board, show: actor => can(actor, 'board.read') },
+  { href: '/app/performance', label: 'Performance', detail: 'Backlog hours and age, PM compliance, planned and reactive work, schedule attainment.', icon: ICON.board, show: actor => can(actor, 'board.read') },
 ]
 export const SETTINGS: Destination[] = [
   { href: '/app/move-in', label: 'Move in from MaintainX', detail: 'Dry run, apply and undo an import of MaintainX exports.', icon: ICON.movein, show: actor => can(actor, 'import.run') },

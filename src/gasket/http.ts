@@ -24,6 +24,7 @@ import { checklistPage, schedulesPage } from './ui/schedules'
 import { codesPage } from './ui/codes'
 import { noticesPage } from './ui/chasing'
 import { teamsPage } from './ui/crew'
+import { performancePage } from './ui/performance'
 import { accessPage, auditPage, morePage, sitePage } from './ui/settings'
 import { workOrderPage, workPage } from './ui/work'
 
@@ -127,6 +128,7 @@ const pages: Record<string, Page> = {
   codes: (env, actor, url) => codesPage(env, actor, url),
   notices: (env, actor, url) => noticesPage(env, actor, url),
   teams: (env, actor, url) => teamsPage(env, actor, url),
+  performance: guarded(actor => can(actor, 'board.read'), (env, actor, url) => performancePage(env, actor, url)),
   more: (env, actor, url) => morePage(env, actor, url),
 }
 

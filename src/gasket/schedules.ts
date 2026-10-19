@@ -11,7 +11,9 @@ import { requireCapability, type Actor } from './actor'
 import { closures, nextAllowed, policyFields, policyOf } from './calendar'
 import { CURRENT_REVISION } from './checklists'
 import { NEXT_NUMBER, all, commit, insist, newId, now, one, stmt, type Row } from './core'
+import { assigneeFits } from './crew'
 import { addDays, isDate } from './dates'
+import { estimate } from './performance'
 import type { Input } from './input'
 import { meterState } from './meters'
 import { addMeter, compareMeter, meterNumber } from './quantity'
@@ -55,8 +57,12 @@ export async function scheduleFields(env: Bindings, input: Input) {
   const policy = policyFields(input), maxDeferDays = input.integer('maxDeferDays', { min: 0, max: 365, optional: true }) ?? 14
   const nextDueDate = everyDays ? nextAllowed(firstDue!, policyOf({ months: policy.months, weekdays: policy.weekdays, observe_closures: policy.observeClosures }), await closures(env)) : null
   const assigneeId = input.text('assignee', { optional: true, max: 100 }) || null
-  if (assigneeId) insist(await one(env, "SELECT 1 FROM gk_members WHERE id = ? AND status = 'active' AND role IN ('owner', 'lead', 'maintainer')", assigneeId), 'assignee_not_assignable', 409)
-  return { asset: asset.id, checklist: checklist.id, title, everyDays, meterId, everyUnits, nominalDate: everyDays ? firstDue : null, nextDueDate, nextDueMeter, assigneeId, combine, trigger, cadence, months: policy.months, weekdays: policy.weekdays, observeClosures: policy.observeClosures, maxDeferDays }
+  // REPORT-004: an optional team (the assignee must belong to it) and estimate, carried onto the work it issues.
+  const teamId = input.text('team', { optional: true, max: 100 }) || null
+  if (teamId) insist(await one(env, 'SELECT 1 FROM gk_teams WHERE id = ?', teamId), 'team_not_found', 404)
+  if (assigneeId) await assigneeFits(env, assigneeId, teamId)
+  const estimateMinutes = estimate(input)
+  return { teamId, estimateMinutes, asset: asset.id, checklist: checklist.id, title, everyDays, meterId, everyUnits, nominalDate: everyDays ? firstDue : null, nextDueDate, nextDueMeter, assigneeId, combine, trigger, cadence, months: policy.months, weekdays: policy.weekdays, observeClosures: policy.observeClosures, maxDeferDays }
 }
 
 export interface FromProposal { proposal?: string; also?: (id: string) => D1PreparedStatement[] }
@@ -64,8 +70,8 @@ export interface FromProposal { proposal?: string; also?: (id: string) => D1Prep
 export async function createSchedule(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
   requireCapability(actor, proposal ? 'proposal.decide' : 'register.manage')
   const value = await scheduleFields(env, input), id = newId()
-  await commit(env, [stmt(env, 'INSERT INTO gk_schedules (id, asset_id, checklist_id, title, every_days, meter_id, every_units, next_due_date, next_due_meter, assignee_id, cadence, months, weekdays, observe_closures, max_defer_days, nominal_date, combine, trigger_when, trigger_value, reset_value, sustain_minutes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    id, value.asset, value.checklist, value.title, value.everyDays, value.meterId, value.everyUnits, value.nextDueDate, value.nextDueMeter, value.assigneeId, value.cadence, value.months, value.weekdays, value.observeClosures ? 1 : 0, value.maxDeferDays, value.nominalDate,
+  await commit(env, [stmt(env, 'INSERT INTO gk_schedules (id, asset_id, checklist_id, title, every_days, meter_id, every_units, next_due_date, next_due_meter, assignee_id, team_id, estimate_minutes, cadence, months, weekdays, observe_closures, max_defer_days, nominal_date, combine, trigger_when, trigger_value, reset_value, sustain_minutes, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    id, value.asset, value.checklist, value.title, value.everyDays, value.meterId, value.everyUnits, value.nextDueDate, value.nextDueMeter, value.assigneeId, value.teamId, value.estimateMinutes, value.cadence, value.months, value.weekdays, value.observeClosures ? 1 : 0, value.maxDeferDays, value.nominalDate,
     value.combine, value.trigger?.when ?? null, value.trigger?.value ?? null, value.trigger?.reset ?? null, value.trigger?.sustainMinutes ?? 0, actor.id, now()), ...(also?.(id) ?? [])],
   { actor: actor.id, action: 'schedule.create', subject: id, detail: { ...value, ...(proposal ? { proposal } : {}) } })
   return { id }
@@ -94,10 +100,10 @@ export async function issueDue(env: Bindings, actor: Pick<Actor, 'id' | 'today'>
     // PM-001: the occurrence's stable identity; the scheduler never issues one that already had work (a cancelled one stays owed).
     const occurrence = `${schedule.id}@${byDate ? schedule.next_due_date : fired ? `reading:${fired.id}` : `meter:${schedule.next_due_meter}`}`
     if (automatic && await one(env, 'SELECT 1 FROM gk_work_orders WHERE occurrence = ?', occurrence)) continue
-    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, occurrence, assignee_id, status, created_by, created_at)
-      SELECT ?, ${NEXT_NUMBER}, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, 'open', ?, ?
+    statements.push(stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, schedule_id, title, checklist_revision_id, due_date, due_meter, trigger_reading_id, occurrence, assignee_id, team_id, trade, estimate_minutes, status, created_by, created_at)
+      SELECT ?, ${NEXT_NUMBER}, ?, 'preventive', ?, ?, ${CURRENT_REVISION}, ?, ?, ?, ?, ?, ?, (SELECT trade FROM gk_teams WHERE id = ?), ?, 'open', ?, ?
       WHERE NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE schedule_id = ? AND status NOT IN ('closed', 'cancelled'))`,
-    id, schedule.asset_id, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, occurrence, schedule.assignee_id, actor.id, now(), schedule.id))
+    id, schedule.asset_id, schedule.id, schedule.title, schedule.checklist_id, dueDate, byMeter && !schedule.trigger_when ? schedule.next_due_meter : null, byMeter ? reading : null, occurrence, schedule.assignee_id, schedule.team_id, schedule.team_id, schedule.estimate_minutes, actor.id, now(), schedule.id))
     if (fired) statements.push(stmt(env, 'UPDATE gk_schedules SET trigger_fired_on = ?, revision = revision + 1 WHERE id = ?', fired.taken_on, schedule.id))
     created.push({ id, schedule: schedule.id, due: dueDate, reason: byDate && byMeter ? 'both' : byDate ? 'date' : 'meter', occurrence, ...(byMeter && reading ? { reading } : {}) })
   }

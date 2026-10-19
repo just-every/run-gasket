@@ -14,6 +14,7 @@ import { assigneeFits, crewChoice, crewOf, handoffStatements, isCollaborator } f
 import { activeCode } from './codes'
 import { readingStatements } from './meters'
 import { fromMilli } from './quantity'
+import { estimate } from './performance'
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
@@ -52,9 +53,10 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   const assignee = input.text('assignee', { optional: true, max: 100 }) || null
   const crew = await crewChoice(env, input, null)
   if (assignee) await assigneeFits(env, assignee, crew.team)
+  const estimateMinutes = estimate(input)
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, team_id, trade, shift, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, crew.team, crew.trade, crew.shift, actor.id, now()), ...(also?.(id) ?? [])],
-    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset.id, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { asset: asset.id, title, due, assignee, ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}) } })
   return { id }
 }
 

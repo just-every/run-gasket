@@ -949,6 +949,55 @@ try {
     for (const text of ['Electrical · Electrical', 'Max Ortiz', 'Nia Okafor', 'Rewire fryer control panel']) assert.ok(teams.includes(text), text)
   })
 
+  await check('REPORT-004 backlog, PM compliance and schedule performance', async () => {
+    const team = (await h.api('team.create', cookie.lead, { name: 'Utilities', trade: 'Mechanical', member: [ids.max, ids.uma] })).id
+    const list = (await h.api('checklist.create', cookie.lead, { name: 'Boiler blowdown', items: ['Blow down the boiler'] })).id
+    const schedule = async (title, firstDue, estimateHours) => (await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: list, title, everyDays: 30, firstDue, assignee: ids.max, team, ...(estimateHours ? { estimateHours } : {}) })).id
+    await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: list, title: 'Off team', everyDays: 30, firstDue: today, assignee: ids.mo, team }, 409)
+    await h.api('schedule.create', cookie.lead, { asset: ids.fryer, checklist: list, title: 'Bad estimate', everyDays: 30, firstDue: today, team, estimateHours: '-1' }, 400)
+    // Preventive obligations: done on time, done late, cancelled, left overdue with a blocker; then one skipped and one never generated.
+    const pm = { onTime: await schedule('Blowdown A', today, '1'), late: await schedule('Blowdown B', addDays(today, -3), '2'), cancelled: await schedule('Blowdown C', addDays(today, -4), '0.5'), overdue: await schedule('Blowdown F', addDays(today, -1), '1') }
+    const created = (await h.api('workorders.generate', cookie.lead, {})).created
+    const work = Object.fromEntries(Object.entries(pm).map(([key, id]) => [key, created.find(row => row.schedule === id).id]))
+    assert.deepEqual([(await wo('lead', work.late)).crew.team.name, (await wo('lead', work.late)).estimate_minutes], ['Utilities', 120])
+    const complete = async (id, results = true) => {
+      if (results) await h.api('workorder.results', cookie.max, { workOrder: id, outcome: ['pass'], note: [''] })
+      await h.api('workorder.submit', cookie.max, { workOrder: id, version: (await wo('max', id)).version })
+    }
+    const approve = async id => await h.api('workorder.review', cookie.sam, { workOrder: id, version: (await wo('sam', id)).version, decision: 'approve' })
+    for (const key of ['onTime', 'late']) { await complete(work[key]); await approve(work[key]) }
+    await h.api('workorder.cancel', cookie.lead, { workOrder: work.cancelled, reason: 'Boiler drained for the inspector' })
+    await h.api('blocker.raise', cookie.lead, { workOrder: work.overdue, kind: 'parts', nextAction: 'Gasket kit on order', promisedOn: addDays(today, 2) })
+    const skipped = await schedule('Blowdown D', addDays(today, -5))
+    await h.api('schedule.exception', cookie.sam, { exception: (await h.api('schedule.skip', cookie.lead, { schedule: skipped, reason: 'Boiler out of service' })).id, decision: 'approve' })
+    await schedule('Blowdown E', addDays(today, -2), '3')
+    // Reactive repairs: one closed, one overdue, one not started and unestimated, one waiting for review.
+    const repair = async (title, due, estimateHours) => (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title, due, assignee: ids.max, team, ...(estimateHours ? { estimateHours } : {}) })).id
+    const fixed = await repair('Replace blowdown valve', today, '1.5')
+    await complete(fixed, false); await approve(fixed)
+    await repair('Feed pump seal weeping', addDays(today, -1), '2')
+    const unestimated = await repair('Trace low water alarm', addDays(today, 3))
+    await complete(await repair('Relabel isolation valves', addDays(today, 20), '1'), false)
+    // The team's report against those source occurrences and work orders.
+    const period = `from=${addDays(today, -10)}&to=${today}`
+    await h.api(`performance?${period}&team=${team}`, cookie.max, undefined, 403)
+    await h.api(`performance?${period}&site=Elsewhere`, cookie.lead, undefined, 404)
+    const report = await h.api(`performance?${period}&team=${team}&site=Harbour%20Kitchen%20Co`, cookie.lead)
+    const c = report.compliance
+    assert.deepEqual([c.denominator, c.onTime, c.onTimePercent, c.outcomes], [6, 1, 16.7, { on_time: 1, late: 1, overdue: 1, cancelled: 1, skipped: 1, ungenerated: 1, pending: 0 }])
+    assert.deepEqual(c.occurrences.map(row => [row.title, row.outcome]), [['Blowdown D', 'skipped'], ['Blowdown C', 'cancelled'], ['Blowdown B', 'late'], ['Blowdown E', 'ungenerated'], ['Blowdown F', 'overdue'], ['Blowdown A', 'on_time']])
+    const late = c.occurrences.find(row => row.outcome === 'overdue')
+    assert.deepEqual([late.work.id, late.work.assignee, late.blockers.map(row => [row.kind, row.next_action])], [work.overdue, 'Max Ortiz', [['parts', 'Gasket kit on order']]])
+    assert.deepEqual([report.mix.planned, report.mix.reactive, report.mix.plannedPercent], [{ count: 2, hours: 3, unestimated: 0 }, { count: 1, hours: 1.5, unestimated: 0 }, 66.7])
+    assert.deepEqual([report.attainment.due, report.attainment.attained, report.attainment.percent], [6, 2, 33.3])
+    const b = report.backlog
+    assert.deepEqual([b.count, b.hours, b.unestimated.map(row => row.id), b.bands[0].count, b.overdue.count, b.overdue.hours, b.atRisk.count, b.atRisk.unestimated, b.awaitingReview.count, b.awaitingReview.hours], [3, 3, [unestimated], 3, 2, 3, 1, 1, 1, 1])
+    assert.ok((await h.api(`performance?${period}`, cookie.sam)).compliance.denominator >= 6, 'the whole site includes the team')
+    const page = await (await h.raw(`/app/performance?${period}&team=${team}`, { cookie: cookie.sam })).text()
+    for (const text of ['PM compliance', 'Not generated', 'Skipped: Boiler out of service', 'Gasket kit on order', '16.7%', '33.3%', '66.7%']) assert.ok(page.includes(text), text)
+    assert.equal((await h.raw('/app/performance', { cookie: cookie.max })).status, 403)
+  })
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {

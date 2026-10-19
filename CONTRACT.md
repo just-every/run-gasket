@@ -226,7 +226,7 @@ The scheduler's existing fixed-calendar and approval-reading meter cadence remai
 
 - **REPORT-003 — MTBF, MTTR and failure analysis.** Reliability reports calculate MTBF from defined operating time and qualifying failure counts, MTTR from defined repair durations, and MTTA from acknowledgement events. Definitions, sample size, exclusions and unknown inputs are displayed; failure-code Pareto and repeat failures link to work. **Acceptance evidence:** Record three failures, one planned stop and missing operating coverage; compare MTBF/MTTR/MTTA and failure Pareto to hand-calculated source events. Correct a failure classification and inspect revised definitions and retained provenance.
 
-- **REPORT-004 — Backlog, PM compliance and schedule performance.** Leads see backlog age and estimated hours, overdue risk, PM on-time compliance, planned/reactive ratio, schedule attainment and work awaiting review. Missed/skipped/canceled PM occurrences remain in the disclosed denominator and drill to accountable work/blockers. **Acceptance evidence:** Create on-time, late, canceled and ungenerated PM obligations plus reactive repairs, then filter by site/team and compare counts/hours and compliance denominator against source due occurrences.
+- **REPORT-004 — Backlog, PM compliance and schedule performance.** Leads see backlog age and estimated hours, overdue risk, PM on-time compliance, planned/reactive ratio, schedule attainment and work awaiting review. Missed/skipped/canceled PM occurrences remain in the disclosed denominator and drill to accountable work/blockers. Exactly: the report covers a period of site-local days, both ends included (the last 30 days by default), for the site and optionally one team (a schedule may name a team and an estimate, which the work it issues carries). Backlog is open, in-progress and returned work now, by age since it was raised (0-7, 8-30, 31-90, over 90 days) with the leads' estimated hours, and work with no estimate is counted and named rather than guessed; overdue is due before today and at risk is due within the next 7 days and not started; work awaiting review is counted on its own. A PM occurrence is a schedule and its due date (when issued more than once, its latest work order counts) and is judged once its due date has passed or its work is done: on time when submitted on or before its due date, otherwise late, overdue (still open), cancelled, skipped (an approved skip) or not generated (due with no work ever issued); all of these stay in the denominator, occurrences not yet due are left out and counted. Planned/reactive compares preventive and corrective work approved and closed in the period; schedule attainment is the share of work due in the period, judged the same way, done on or before its due date. Percentages have one decimal, rounded half up. **Acceptance evidence:** Create on-time, late, canceled and ungenerated PM obligations plus reactive repairs, then filter by site/team and compare counts/hours and compliance denominator against source due occurrences.
 
 - **REPORT-005 — Downtime Pareto and cost of bad actors.** Leads rank downtime by asset, line, failure mode and reason, alongside repeat failures, repair cost and documented lost-production assumptions. Unknown costs remain unknown; drill-down explains each ranked contributor and excludes duplicate component time. **Acceptance evidence:** Enter costed failures across three assets, including overlapping components and one unknown loss rate, then inspect Pareto/cumulative percentages and exported inputs without a fabricated loss estimate.
 
@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001, PM-006 and PLAN-002 were re-judged on 19 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001, PM-006, PLAN-002 and REPORT-004 were re-judged on 19 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 9 | 35 | 78 | 122 |
-| All | 23 | 35 | 78 | 136 |
+| Target and push further | 10 | 34 | 78 | 122 |
+| All | 24 | 34 | 78 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -457,7 +457,7 @@ Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40
 | `REPORT-001` | Work and asset maintenance costing | target | missing |  | No labor/part/contractor cost records or cost rollups. |
 | `REPORT-002` | Downtime and production availability | target | partial | `src/gasket/board.ts`; `src/gasket/work.ts`; `tests/gasket/flows.mjs` | Open downtime and clipped 30-day asset minutes exist; no planned categories, production denominator, parent overlap handling or coverage state. |
 | `REPORT-003` | MTBF, MTTR and failure analysis | target | missing |  | No reliability denominator model, MTBF/MTTR/MTTA or failure-code Pareto calculations. |
-| `REPORT-004` | Backlog, PM compliance and schedule performance | target | partial | `src/gasket/board.ts`; `src/gasket/work.ts` | Overdue, review and follow-up lists exist; no backlog hours/age bands, occurrence compliance or schedule/ratio metrics. |
+| `REPORT-004` | Backlog, PM compliance and schedule performance | target | done | `src/gasket/performance.ts`; `src/gasket/ui/performance.ts`; `src/gasket/schedules.ts`; `migrations/core/0032_performance.sql`; `tests/gasket/flows.mjs` |  |
 | `REPORT-005` | Downtime Pareto and cost of bad actors | target | partial | `src/gasket/board.ts` | Assets rank by downtime minutes; no reason/failure/line Pareto, cumulative analysis, cost linkage or deduplicated parent time. |
 | `REPORT-006` | Scheduled reports and CSV PDF delivery | target | partial | `src/gasket/history.ts` | On-demand asset history CSV exists; no scheduled report jobs, KPI datasets, PDF or email delivery. |
 | `REPORT-007` | Custom dashboards and cross-site comparisons | target | missing |  | No report builder, saved custom charts or site comparisons. |
