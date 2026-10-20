@@ -32,6 +32,8 @@ export async function partCatalogJourney(h,cookie,onReady) {
   assert.deepEqual((await h.api('parts',cookie.lead)).filter(p=>[source,canonical].includes(p.id)).map(p=>p.onHand),['0','0'])
   const vendor=await h.api(`suppliers/${second}`,cookie.owner)
   await h.api('supplier.catalog',cookie.owner,{supplier:second,revision:vendor.revision,sku:'MID-6',description:'Cannot turn linked inventory into a service',kind:'service',unit:'hour',price:'48.00'},409)
+  const unrelated=(await h.api('part.create',cookie.lead,{number:'CAT-WASHER',name:'Conveyor mounting washer',unit:'each',minimum:'0'})).id
+  await h.api('part.receive',cookie.lead,{part:unrelated,quantity:'5',unitPrice:'1'})
   const beforeBad=await h.api('parts',cookie.lead)
   await h.api('catalog.preview',cookie.owner,importFile(second,catalogB+ 'BAD,Invalid row,each,Acme,OTHER,BAD,box,0.0001,2\n'),400)
   assert.deepEqual(await h.api('parts',cookie.lead),beforeBad,'PART-008 invalid catalog is wholly refused')
@@ -64,7 +66,8 @@ export async function partCatalogJourney(h,cookie,onReady) {
   const receipt=(await h.api('receipt.receive',cookie.lead,{order,revisionId:revision,externalId:'PART008-RECEIPT',lines:[{line:0,part:source,quantity:'1',quarantine:'0',bin:'A3',lot:'6205-LOT-104'}]})).receipt
   const originalReceipt=await h.api(`receipts/${receipt}`,cookie.lead)
   await h.api('part.substitute',cookie.lead,{part:source,substitute:canonical,reason:'Identical Acme 6205 bearing in a supplier six pack'})
-  const kit=(await h.api('kit.create',cookie.lead,{name:'PART-008 conveyor repair kit',part:[source,canonical],quantity:['1','2']})).id
+  await h.api('part.substitute',cookie.lead,{part:source,substitute:unrelated,reason:'Temporary test-approved stock alternative retained through merge'})
+  const kit=(await h.api('kit.create',cookie.lead,{name:'PART-008 conveyor repair kit',part:[source,canonical,unrelated],quantity:['1','2','2']})).id
   await h.api('bom.revise',cookie.lead,{asset,part:[source],quantity:['1'],serialFrom:['DRIVE-001'],serialTo:['DRIVE-010'],alternateFor:[source],alternate:[canonical],alternateFrom:['DRIVE-001'],alternateTo:['DRIVE-003'],tool:['Bearing puller']})
   await h.api('workorder.reserve',cookie.lead,{workOrder:work,part:canonical,insteadOf:source,quantity:'1'},409)
   await h.api('workorder.reserve',cookie.lead,{workOrder:work,part:source,quantity:'1'})
@@ -111,8 +114,11 @@ export async function partCatalogJourney(h,cookie,onReady) {
   await h.api('workorder.return',cookie.max,{workOrder:work,part:canonical,quantity:'1'})
   b=await h.api(`parts/${canonical}`,cookie.lead)
   assert.deepEqual([b.onHand,b.valueCents,b.reserved],['16',13600,'3'],'PART-008 historical issue return uses its original value after merge')
+  await h.api('part.substitute',cookie.lead,{part:canonical,substitute:unrelated,withdraw:true,reason:'Withdraw inherited alternative after confirming the duplicate bearing'})
   const secondWork=(await h.api('workorder.create',cookie.lead,{asset,title:'Spare drive bearing repair',due:today,assignee:tech})).id
+  await h.api('workorder.reserve',cookie.lead,{workOrder:secondWork,part:unrelated,insteadOf:canonical,quantity:'1'},409)
   await h.api('workorder.reserve',cookie.lead,{workOrder:secondWork,kit})
+  assert.equal((await h.api(`parts/${unrelated}`,cookie.lead)).reserved,'2','PART-008 merge does not consume an unrelated kit item as canonical stock')
   assert.equal((await h.api(`parts/${canonical}`,cookie.lead)).reserved,'6','PART-008 retained two-line kit reserves combined demand')
   const values=await h.api(`valuation?from=${today}&to=${today}`,cookie.lead)
   assert.deepEqual(values.parts.filter(p=>p.id===canonical).map(p=>p.closing),[{quantity:'16',valueCents:13600}])
