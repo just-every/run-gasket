@@ -1,3 +1,4 @@
+import { receivingPanel } from './receiving'
 // BUY-002's quote comparison and immutable order history, in the existing shell.
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
@@ -74,5 +75,6 @@ export async function purchaseOrderPage(env: Bindings, actor: Actor, id: string,
   return page(env, `PO-${order.number}`, actor, h`${backLink('/app/purchase-orders', 'Purchase orders')}<h1>PO-${order.number}</h1><p>Initiated by ${order.initiator}. Each change creates a numbered revision and needs independent approval again.</p>
     ${purchaseApprovalPanel(actor,order)}
     ${manage && order.route.complete && !order.route.blocked && !order.route.release && !current.send ? card('Email authorized revision', form('purchase.send', `/app/purchase-orders/${id}`, h`${hidden('order', id)}${hidden('revision', order.current_revision)}<p>Submit this exact approved revision to ${current.snapshot.supplier.email}. Provider acceptance is separate from vendor acknowledgment.</p>`, 'Submit vendor email')) : ''}
+    ${await receivingPanel(env, actor, order)}
     ${[...history].reverse()}${manage && data ? card('Create next revision', form('purchase.save', '/app/purchase-orders/{id}', h`${hidden('order', id)}${hidden('revision', order.current_revision)}${factsFields(data, actor, current.snapshot)}${area('Reason for purchase', 'reason', { value: current.snapshot.reason })}${quoteChoices(data.quotes, current.snapshot)}<p>Saving changes requires approval again, including after an earlier email submission.</p>`, 'Save next revision', { multipart: true })) : ''}`, { url })
 }

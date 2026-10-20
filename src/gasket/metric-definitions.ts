@@ -3,6 +3,7 @@
 // Report source doors accept their existing from/to and scope query parameters.
 // Record-specific measures link to their public JSON directory; use its ids
 // with /api/gasket/assets/:id, requisitions/:id or suppliers/:id for details.
+import { RECEIVING_METRICS } from './receiving-metrics'
 import { PURCHASE_METRICS } from './purchase-metrics'
 
 export type MetricDefinition = Readonly<{
@@ -35,6 +36,7 @@ function definitions(sourceDoor: string, clause: string, eventTime: string, excl
 /** Frozen array and frozen scalar-only records; this is the immutable version-1 catalog. */
 export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
   ...PURCHASE_METRICS,
+  ...RECEIVING_METRICS,
   // board.ts intentionally has different status and time policies from performance.ts.
   ...definitions('/api/gasket/board', 'GAS-10', 'Current state on request; due dates are compared with today in the site time zone.', 'No additional exclusions beyond the stated status filter.', [
     ['board.overdue', 'Board overdue work', 'Count work with due_date before today and status other than closed, cancelled or submitted.'],
