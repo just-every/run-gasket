@@ -14,9 +14,10 @@ async function withPage(h,cookie,run) {
 async function capture(page,h,path,name) {
   for(const width of [1440,390]) {
     await page.setViewportSize({width,height:1100})
-    await page.goto(h.origin+path)
+    assert.equal((await page.goto(h.origin+path)).status(),200,`AGENT-005 ${name} opens`)
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`AGENT-005 ${name} fits ${width}`)
     await page.screenshot({path:`${process.env.AGENT_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
+    if(path.startsWith('/app/work/')) await page.locator('#chasing').screenshot({path:`${process.env.AGENT_SCREENSHOTS}/${name}-chasing-${width}.png`})
   }
 }
 export async function agentFollowUpBrowser({h,cookie,pm,query,today}) {

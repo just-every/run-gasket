@@ -13,9 +13,12 @@ const LABELS: Record<string, string> = { workOrder: 'Work order', asset: 'Asset'
 export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
   const rows = await proposalList(env, actor)
   // Show the records a proposal names by their business names; the ids stay in Details.
-  const names = new Map<string, string>((await all(env, `SELECT id, tag || ' ' || name AS label FROM gk_assets UNION ALL SELECT id, number || ' ' || name FROM gk_parts
-    UNION ALL SELECT id, 'WO-' || number || ' ' || title FROM gk_work_orders
-    UNION ALL SELECT id, name FROM gk_members UNION ALL SELECT id, name FROM gk_checklists UNION ALL SELECT id, name || ' (' || unit || ')' FROM gk_meters`)).map(row => [row.id, row.label]))
+  const [registerNames, workNames] = await Promise.all([
+    all(env, `SELECT id, tag || ' ' || name AS label FROM gk_assets UNION ALL SELECT id, number || ' ' || name FROM gk_parts
+      UNION ALL SELECT id, name FROM gk_members UNION ALL SELECT id, name FROM gk_checklists UNION ALL SELECT id, name || ' (' || unit || ')' FROM gk_meters`),
+    all(env, "SELECT id, 'WO-' || number || ' ' || title AS label FROM gk_work_orders"),
+  ])
+  const names = new Map<string, string>([...registerNames, ...workNames].map(row => [row.id, row.label]))
   const show = (key: string, value: string) => ['due', 'firstDue'].includes(key) ? showDate(value) : names.get(value) ?? value
   const decider = can(actor, 'proposal.decide')
   // One violet primary per screen: "Approve and run" on the first proposal this person may decide, secondary below it.
