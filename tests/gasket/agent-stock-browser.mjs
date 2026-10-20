@@ -18,10 +18,12 @@ export async function agentStockBrowser({h,cookie,proposal,source,canonical}) {
       assert.ok((await page.locator('body').innerText()).includes('Combined: 8 each, USD 68.00'))
       assert.ok((await page.locator('body').innerText()).includes('no physical receipt'))
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`AGENT-006 proposal fits ${width}`)
+      await page.evaluate(()=>scrollTo(0,0))
       await page.screenshot({path:`${process.env.STOCK_SCREENSHOTS}/agent-stock-review-${width}.png`,fullPage:true})
       await page.goto(h.origin+'/app')
       assert.ok((await page.locator('body').innerText()).includes('1 proposal waiting for a decision'))
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`AGENT-006 Work summary fits ${width}`)
+      await page.evaluate(()=>scrollTo(0,0))
       await page.screenshot({path:`${process.env.STOCK_SCREENSHOTS}/agent-stock-work-${width}.png`,fullPage:true})
     }
     await page.goto(h.origin+'/app/proposals')
@@ -32,6 +34,7 @@ export async function agentStockBrowser({h,cookie,proposal,source,canonical}) {
       await page.setViewportSize({width,height:1100})
       await page.goto(h.origin+'/app/proposals')
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+      await page.evaluate(()=>scrollTo(0,0))
       await page.screenshot({path:`${process.env.STOCK_SCREENSHOTS}/agent-stock-approved-${width}.png`,fullPage:true})
     }
     await context.close()
@@ -43,6 +46,7 @@ export async function agentStockBrowser({h,cookie,proposal,source,canonical}) {
       assert.equal((await audit.goto(h.origin+'/app/audit?action=proposal.approve')).status(),200)
       assert.equal(await audit.getByRole('link',{name:'Proposal: Duplicate part merge'}).count(),1)
       assert.equal(await audit.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`AGENT-006 audit fits ${width}`)
+      await audit.evaluate(()=>scrollTo(0,0))
       await audit.screenshot({path:`${process.env.STOCK_SCREENSHOTS}/agent-stock-audit-${width}.png`,fullPage:true})
     }
     await owner.close()
