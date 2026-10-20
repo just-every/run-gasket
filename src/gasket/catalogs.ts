@@ -71,7 +71,8 @@ export async function preferCatalogItem(env: Bindings, actor: Actor, input: Inpu
   const item=await one(env,`SELECT i.*,${canonical('i.part_id')} AS canonical_id FROM gk_supplier_items i JOIN gk_suppliers s ON s.id=i.supplier_id WHERE i.id=? AND i.part_id IS NOT NULL AND s.active=1`,input.text('item'))
   insist(item,'catalog_item_unavailable',409)
   await commit(env,[authority(env,actor,'register.manage'),
-    stmt(env,`UPDATE gk_supplier_items SET preferred=0 WHERE ${canonical('part_id')}=?`,item.canonical_id),
+    guard(env,'stale',`EXISTS(SELECT 1 FROM gk_supplier_items i WHERE i.id=? AND ${canonical('i.part_id')}=?)`,item.id,item.canonical_id),
+    stmt(env,`UPDATE gk_supplier_items SET preferred=0 WHERE ${canonical('gk_supplier_items.part_id')}=?`,item.canonical_id),
     stmt(env,'UPDATE gk_supplier_items SET preferred=1 WHERE id=?',item.id)],
     {actor:actor.id,action:'catalog.prefer',subject:item.canonical_id,detail:{item:item.id}})
   return {id:item.canonical_id}

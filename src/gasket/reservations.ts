@@ -46,12 +46,17 @@ async function part(env: Bindings, id: string) {
 export async function approveSubstitute(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'register.manage')
   const original = await part(env, input.text('part', { max: 100 })), substitute = await part(env, input.text('substitute', { max: 100 }))
-  insist(original.id !== substitute.id, 'substitute_is_part')
-  const withdraw = input.flag('withdraw'), reason = input.text('reason', { optional: true, max: 300 }) || null
-  const active = await one(env, 'SELECT 1 FROM gk_part_substitutes WHERE part_id = ? AND substitute_id = ? AND withdrawn_at IS NULL', original.id, substitute.id)
+  const withdraw = input.flag('withdraw')
+  insist(withdraw || original.id !== substitute.id, 'substitute_is_part')
+  const reason = input.text('reason', { optional: true, max: 300 }) || null
+  const matching = `${canonicalSql('s.part_id')}=? AND ${canonicalSql('s.substitute_id')}=? AND s.withdrawn_at IS NULL`
+  const active = await one(env, `SELECT 1 FROM gk_part_substitutes s WHERE ${matching}`, original.id, substitute.id)
   insist(withdraw ? active : !active, withdraw ? 'substitute_not_approved' : 'substitute_already_approved', 409)
-  await commit(env, [withdraw
-    ? stmt(env, 'UPDATE gk_part_substitutes SET withdrawn_by = ?, withdrawn_at = ? WHERE part_id = ? AND substitute_id = ? AND withdrawn_at IS NULL', actor.id, now(), original.id, substitute.id)
+  await commit(env, [
+    guard(env,'stale','NOT EXISTS(SELECT 1 FROM gk_part_canonical WHERE part_id IN (?,?))',original.id,substitute.id),
+    guard(env,'stale',`${withdraw ? '' : 'NOT '}EXISTS(SELECT 1 FROM gk_part_substitutes s WHERE ${matching})`,original.id,substitute.id),
+    withdraw
+    ? stmt(env, `UPDATE gk_part_substitutes AS s SET withdrawn_by = ?, withdrawn_at = ? WHERE ${matching}`, actor.id, now(), original.id, substitute.id)
     : stmt(env, 'INSERT INTO gk_part_substitutes (part_id, substitute_id, reason, approved_by, approved_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(part_id, substitute_id) DO UPDATE SET reason = excluded.reason, approved_by = excluded.approved_by, approved_at = excluded.approved_at, withdrawn_by = NULL, withdrawn_at = NULL', original.id, substitute.id, reason, actor.id, now())],
   { actor: actor.id, action: withdraw ? 'part.substitute.withdraw' : 'part.substitute', subject: original.id, detail: { substitute: substitute.id, reason } })
   return { part: original.id, substitute: substitute.id, approved: !withdraw }
@@ -100,7 +105,7 @@ export async function reserve(env: Bindings, actor: Actor, input: Input) {
   const swaps = new Map<string, string>()
   if (kitId) {
     insist(await one(env, 'SELECT 1 FROM gk_kits WHERE id = ?', kitId), 'kit_not_found', 404)
-    lines = (await all(env, `SELECT ${canonicalSql('part_id')} AS part_id,SUM(quantity_milli) AS quantity_milli FROM gk_kit_lines WHERE kit_id=? GROUP BY ${canonicalSql('part_id')} ORDER BY MIN(position),part_id`, kitId)).map(row => ({ requested: row.part_id, quantity: row.quantity_milli }))
+    lines = (await all(env, `SELECT ${canonicalSql('gk_kit_lines.part_id')} AS part_id,SUM(quantity_milli) AS quantity_milli FROM gk_kit_lines WHERE kit_id=? GROUP BY ${canonicalSql('gk_kit_lines.part_id')} ORDER BY MIN(position),part_id`, kitId)).map(row => ({ requested: row.part_id, quantity: row.quantity_milli }))
     for (const swap of input.has('swap') ? input.list('swap') : []) {
       const [from, to] = swap.split(':')
       insist(from && to && lines.some(line => line.requested === from), 'invalid_swap')

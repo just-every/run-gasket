@@ -97,10 +97,10 @@ export async function substitutionRefusal(env: Bindings, assetId: string, reques
   const alternate = latest ? await one(env, 'SELECT serial_from, serial_to FROM gk_bom_alternates WHERE revision_id = ? AND part_id = ? AND alternate_id = ?', latest.id, requestedId, chosenId) : null
   if (alternate) return fits(asset?.serial ?? null, alternate.serial_from, alternate.serial_to) ? null : 'substitute_not_compatible'
   if (await canonicalId(env,requestedId) === await canonicalId(env,chosenId)) {
-    const lines = latest ? await all(env, `SELECT serial_from, serial_to FROM gk_bom_lines WHERE revision_id=? AND ${canonicalSql('part_id')}=?`, latest.id, await canonicalId(env,requestedId)) : []
+    const lines = latest ? await all(env, `SELECT serial_from, serial_to FROM gk_bom_lines WHERE revision_id=? AND ${canonicalSql('gk_bom_lines.part_id')}=?`, latest.id, await canonicalId(env,requestedId)) : []
     return lines.some(line=>!fits(asset?.serial ?? null,line.serial_from,line.serial_to)) ? 'part_not_compatible' : null
   }
-  const mapped = latest ? await all(env, `SELECT serial_from,serial_to FROM gk_bom_alternates WHERE revision_id=? AND ${canonicalSql('part_id')}=? AND ${canonicalSql('alternate_id')}=?`,latest.id,await canonicalId(env,requestedId),await canonicalId(env,chosenId)) : []
+  const mapped = latest ? await all(env, `SELECT serial_from,serial_to FROM gk_bom_alternates WHERE revision_id=? AND ${canonicalSql('gk_bom_alternates.part_id')}=? AND ${canonicalSql('gk_bom_alternates.alternate_id')}=?`,latest.id,await canonicalId(env,requestedId),await canonicalId(env,chosenId)) : []
   if(mapped.length) return mapped.every(row=>fits(asset?.serial ?? null,row.serial_from,row.serial_to)) ? null : 'substitute_not_compatible'
-  return await one(env, `SELECT 1 FROM gk_part_substitutes WHERE ${canonicalSql('part_id')}=? AND ${canonicalSql('substitute_id')}=? AND withdrawn_at IS NULL`, await canonicalId(env,requestedId), await canonicalId(env,chosenId)) ? null : 'substitute_not_approved'
+  return await one(env, `SELECT 1 FROM gk_part_substitutes WHERE ${canonicalSql('gk_part_substitutes.part_id')}=? AND ${canonicalSql('gk_part_substitutes.substitute_id')}=? AND withdrawn_at IS NULL`, await canonicalId(env,requestedId), await canonicalId(env,chosenId)) ? null : 'substitute_not_approved'
 }
