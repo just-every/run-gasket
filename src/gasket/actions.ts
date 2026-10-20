@@ -6,6 +6,7 @@ import { receivePurchaseOrder, inspectReceipt } from './receiving'
 import { saveSpendPolicy, saveDelegation } from './purchase-policy'
 import { saveEmergencyOverride, releaseCommitment } from './purchase-authority'
 import { saveQuote } from './quotes'
+import { setFollowRule } from './vendor-follow-up'
 import { savePurchaseOrder, approvePurchaseOrder, sendPurchaseOrder, acknowledgePurchaseOrder } from './purchase-orders'
 import { saveEquivalence, satisfyNested } from './nested'
 import type { Bindings } from '../auth.server'
@@ -57,6 +58,7 @@ type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => 
 export const actions: Record<string, Handler> = {
   'replenishment.policy': saveReplenishmentPolicy, 'replenishment.envelope': saveReplenishmentEnvelope,
   'replenishment.envelope.approve': approveReplenishmentEnvelope, 'replenishment.envelope.revoke': revokeReplenishmentEnvelope,
+  'vendor.rule': setFollowRule,
   'receipt.receive': receivePurchaseOrder, 'receipt.inspect': inspectReceipt,
   'spend.policy': saveSpendPolicy, 'spend.delegate': saveDelegation, 'purchase.emergency': saveEmergencyOverride, 'purchase.release': releaseCommitment,
   'quote.save': (env, actor, input) => saveQuote(env, actor, input),

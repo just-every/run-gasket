@@ -19,6 +19,7 @@ import { spendJourney } from './spend.mjs'
 import { metricsJourney } from './metrics.mjs'
 import { nestedJourney } from './nested.mjs'
 import { purchasingJourney } from './purchasing.mjs'
+import { vendorFollowUpJourney } from './vendor-follow-up.mjs'
 import { now, zone } from './clock.mjs'
 
 const h = await harness()
@@ -2213,7 +2214,9 @@ try {
 
   await check('BUY-004 partial receiving, inspection and returns', async () => { await receivingJourney(h,cookie) })
 
-  await check('PART-005 reorder policies and bounded automatic ordering', replenishmentJourney)
+  await check('PART-005 reorder policies and BUY-006 per-order and period auto-buy limits', replenishmentJourney)
+
+  await check('BUY-006 vendor delivery follow-up', vendorFollowUpJourney)
 
   await check('BUY-003 spend approval and purchasing separation', async () => { await spendJourney(h,cookie,{...ids,asset:ids.compressor}) })
 
@@ -2271,7 +2274,7 @@ try {
       } finally { await restored.close() }
     } finally { await empty.remove() }
   })
-  console.log('Gasket flows: 13 clauses passed')
+  console.log('Gasket flows: 14 clauses passed')
 } finally {
   await h.close()
 }

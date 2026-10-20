@@ -10,6 +10,7 @@ import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { runReplenishment } from './replenishment'
 import { chase } from './chasing'
+import { runVendorFollowUp } from './vendor-reminders'
 import { remindExpiring } from './documents'
 import { all, at as atInstant, newId, now, one, stmt } from './core'
 import { today } from './dates'
@@ -27,6 +28,7 @@ export async function executeRule(env: Bindings, rule: AutomationRule, day: stri
   const input = await automationInputs(env, rule, day)
   return await runJob<{ created: any[]; runs: any[]; notices: any[] }>(env, rule, source, input, async () => {
     if (rule === 'replenishment') return await runReplenishment(env, day)
+    if (rule === 'vendor') return await runVendorFollowUp(env, day)
     if (rule === 'pm') return { ...await issueDue(env, { id: SCHEDULER.id, today: day }, input.schedules!, 'workorder.schedule', { automatic: true }), runs: [], notices: [] }
     if (rule === 'routes') return { created: [], runs: await issueDueRoutes(env, { id: SCHEDULER.id, today: day }), notices: [] }
     if (rule === 'chase') await chase(env, day)
@@ -48,6 +50,7 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
       await executeRule(env, 'chase', day, 'cron', { instant: at })
       await executeRule(env, 'expiry', day, 'cron', { instant: at })
       await executeRule(env, 'replenishment', day, 'cron', { instant: at })
+      await executeRule(env, 'vendor', day, 'cron', { instant: at })
       const created = pm.output?.created.length ?? 0
       const runs = routes.output && 'runs' in routes.output ? routes.output.runs : []
       await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET created=?,finished_at=?,state='completed' WHERE id=?", created + runs.reduce((sum: number, run: any) => sum + run.workOrders.length, 0), now(), id)])

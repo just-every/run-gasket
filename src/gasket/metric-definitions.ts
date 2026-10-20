@@ -6,6 +6,7 @@
 import { REPLENISHMENT_METRICS } from './replenishment-metrics'
 import { RECEIVING_METRICS } from './receiving-metrics'
 import { PURCHASE_METRICS } from './purchase-metrics'
+import { VENDOR_METRICS } from './vendor-follow-up-metrics'
 
 export type MetricDefinition = Readonly<{
   id: string
@@ -39,6 +40,7 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
   ...PURCHASE_METRICS,
   ...RECEIVING_METRICS,
   ...REPLENISHMENT_METRICS,
+  ...VENDOR_METRICS,
   // board.ts intentionally has different status and time policies from performance.ts.
   ...definitions('/api/gasket/board', 'GAS-10', 'Current state on request; due dates are compared with today in the site time zone.', 'No additional exclusions beyond the stated status filter.', [
     ['board.overdue', 'Board overdue work', 'Count work with due_date before today and status other than closed, cancelled or submitted.'],

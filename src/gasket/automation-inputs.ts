@@ -6,8 +6,10 @@ import { meterState } from './meters'
 import { DUE_SCHEDULES } from './schedules'
 import { replenishmentInputs } from './replenishment-state'
 import type { AutomationRule } from './automation-jobs'
+import { followUps } from './vendor-follow-up'
 
 export async function automationInputs(env: Bindings, rule: AutomationRule, day: string) {
+  if (rule === 'vendor') return { day, vendor: await followUps(env, day) }
   if (rule === 'replenishment') return { day, replenishment: await replenishmentInputs(env, day) }
   if (rule === 'pm') {
     const schedules = await all(env, DUE_SCHEDULES)

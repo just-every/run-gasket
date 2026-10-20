@@ -1,5 +1,6 @@
 import { replenishmentPage } from './ui/replenishment'
 import { receiptEvidence } from './receiving'
+import { vendorFollowUpPage } from './ui/vendor-follow-up'
 // Gasket's public doors: /app pages, /app/do/ACTION form posts, /api/gasket
 // JSON and evidence downloads. Every request resolves the signed-in member
 // first; nothing is served to a signed-out request.
@@ -134,6 +135,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  vendorFollowUp: (env,actor,url) => vendorFollowUpPage(env,actor,url),
   replenishment: (env,actor,url) => replenishmentPage(env,actor,url),
   receiptEvidence: (env,actor,_url,id) => receiptEvidence(env,actor,id),
   metrics: (env,actor,url) => metricsPage(env,actor,url),
