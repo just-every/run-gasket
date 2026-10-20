@@ -1,3 +1,5 @@
+import { assessOutcome } from './outcomes'
+import { planOutcome, outcomeFollowUp } from './outcomes-plan'
 import { setIntervalLimit } from './intervals'
 import { catalogPreview, importCatalog, undoCatalog, receiveCatalogPack, preferCatalogItem } from './catalogs'
 import { mergePreview, approveMerge } from './part-merge'
@@ -186,6 +188,10 @@ export const actions: Record<string, Handler> = {
   'route.sign': (env, actor, input) => signRun(env, actor, input),
   'calibration.create': (env, actor, input) => createCalibration(env, actor, input),
   'workorder.tool': (env, actor, input) => recordTool(env, actor, input),
+  'outcome.window': (env, actor, input) => planOutcome(env, actor, input),
+  'outcome.assess': (env, actor, input) => assessOutcome(env, actor, input),
+  'outcome.reversal': (env, actor, input) => outcomeFollowUp(env, actor, input, true),
+  'outcome.investigate': (env, actor, input) => outcomeFollowUp(env, actor, input, false),
   'interval.limit': (env, actor, input) => setIntervalLimit(env, actor, input),
   'proposal.prepare': (env, actor, input) => prepare(env, actor, input),
   'proposal.decide': (env, actor, input) => decide(env, actor, input),

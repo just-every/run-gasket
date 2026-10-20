@@ -1,3 +1,4 @@
+import { readOutcome } from './outcomes'
 import { lookupPart } from './catalogs'
 import { followUpView } from './agent-follow-up'
 import { replenishmentView, previewReplenishment } from './replenishment'
@@ -51,6 +52,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  outcome:(env,actor,id)=>readOutcome(env,actor,id),
   partLookup:(env,actor,_id,url)=>lookupPart(env,actor,url),
   agentFollowUp: (env, actor, id) => followUpView(env, actor, id),
   vendorFollowUp: (env,actor) => vendorFollowUp(env,actor),

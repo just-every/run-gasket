@@ -1,3 +1,4 @@
+import { outcomeJourney } from './outcomes.mjs'
 import { intervalJourney } from './intervals.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
 import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
@@ -2222,6 +2223,8 @@ try {
   await check('PART-005 reorder policies and BUY-006 per-order and period auto-buy limits', replenishmentJourney)
 
   await check('BUY-006 vendor delivery follow-up', vendorFollowUpJourney)
+
+  await check('AGENT-004 measured reliability outcomes', outcomeJourney)
 
   await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
 

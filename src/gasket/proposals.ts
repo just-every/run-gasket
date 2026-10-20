@@ -45,9 +45,9 @@ async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string
 function payloadOf(kind: Kind, input: Input): Record<string, string> {
   const fields: Record<Kind, [string, boolean][]> = {
     schedule: [['asset', true], ['checklist', true], ['title', true], ['everyDays', false], ['meter', false], ['everyUnits', false], ['firstDue', false], ['firstDueMeter', false], ['assignee', false]],
-    corrective: [['asset', true], ['title', true], ['description', false], ['due', true], ['assignee', false]],
+    corrective: [['asset', true], ['title', true], ['description', false], ['due', true], ['assignee', false], ['outcome', false]],
     count: [['part', true], ['counted', true], ['note', false]],
-    interval: [['schedule', true], ['everyDays', false], ['everyUnits', false], ['from', true], ['to', true], ['peers', true], ['rollbackPlan', true], ['rollbackOf', false]],
+    interval: [['schedule', true], ['everyDays', false], ['everyUnits', false], ['from', true], ['to', true], ['peers', true], ['rollbackPlan', true], ['rollbackOf', false], ['outcome', false]],
     reassign: [['workOrder', true], ['assignee', true], ['note', true]],
   }
   const payload: Record<string, string> = {}

@@ -9,7 +9,7 @@ import { card, field, form, h, hidden, tag } from './html'
 import { page } from './shell'
 
 const KIND: Record<string, string> = { interval: 'PM interval change', reassign: 'Reassignment', schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
-const LABELS: Record<string, string> = { schedule: 'Schedule', from: 'Evidence from', to: 'Evidence through', peers: 'Peer assets', rollbackPlan: 'Rollback plan', rollbackOf: 'Original approval', workOrder: 'Work order', asset: 'Asset', checklist: 'Checklist', title: 'Title', everyDays: 'Every (days)', meter: 'Meter', everyUnits: 'Every (units)', firstDue: 'First due', firstDueMeter: 'First due at', assignee: 'Maintainer', description: 'Details', due: 'Due', part: 'Part', counted: 'Counted', note: 'Note' }
+const LABELS: Record<string, string> = { outcome: 'Outcome comparison', schedule: 'Schedule', from: 'Evidence from', to: 'Evidence through', peers: 'Peer assets', rollbackPlan: 'Rollback plan', rollbackOf: 'Original approval', workOrder: 'Work order', asset: 'Asset', checklist: 'Checklist', title: 'Title', everyDays: 'Every (days)', meter: 'Meter', everyUnits: 'Every (units)', firstDue: 'First due', firstDueMeter: 'First due at', assignee: 'Maintainer', description: 'Details', due: 'Due', part: 'Part', counted: 'Counted', note: 'Note' }
 
 export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
   const rows = await proposalList(env, actor)
@@ -21,7 +21,7 @@ export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
     all(env, "SELECT id, title AS label FROM gk_schedules"),
   ])
   const names = new Map<string, string>([...registerNames, ...workNames, ...scheduleNames].map(row => [row.id, row.label]))
-  const show = (key: string, value: string) => key === 'peers' ? value.split(',').map(id => names.get(id.trim()) ?? id.trim()).join('; ') : ['due', 'firstDue'].includes(key) ? showDate(value) : names.get(value) ?? value
+  const show = (key: string, value: string) => key === 'outcome' ? h`<a href="/api/gasket/outcomes/${value}">Read retained comparison</a>` : key === 'peers' ? value.split(',').map(id => names.get(id.trim()) ?? id.trim()).join('; ') : ['due', 'firstDue'].includes(key) ? showDate(value) : names.get(value) ?? value
   const decider = can(actor, 'proposal.decide')
   // One violet primary per screen: "Approve and run" on the first proposal this person may decide, secondary below it.
   const first = rows.find(row => decider && row.status === 'pending' && row.prepared_by !== actor.id)
