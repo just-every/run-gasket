@@ -31,6 +31,10 @@ async function migrationProof() {
     assert.deepEqual((await sql(read)).map(result=>result.results),before,'AGENT-006 migration preserves proposals and both AGENT-004 foreign-key children')
     assert.deepEqual((await sql('PRAGMA foreign_key_check;'))[0].results,[])
     await assert.rejects(()=>sql("UPDATE gk_proposals SET status='pending' WHERE id='migration-proposal'"),/gasket_immutable/,'AGENT-006 upgrade keeps terminal decisions immutable')
+    await sql(`INSERT INTO gk_merge_proposals(id,kind,payload_json,payload_hash,basis_json,reasoning,prepared_by,prepared_at) VALUES ('migration-merge','merge','{}','merge-hash','{}','Retained duplicate proposal','migration-owner',2);`)
+    assert.deepEqual((await sql('SELECT kind FROM gk_all_proposals ORDER BY kind'))[0].results,[{kind:'interval'},{kind:'merge'}],'AGENT-006 combined read door includes both proposal stores')
+    await sql("UPDATE gk_merge_proposals SET status='rejected' WHERE id='migration-merge'")
+    await assert.rejects(()=>sql("UPDATE gk_merge_proposals SET status='pending' WHERE id='migration-merge'"),/gasket_immutable/,'AGENT-006 new merge decisions are immutable too')
     console.log('AGENT-006 populated proposal/outcome migration passed')
   } finally { await old.remove() }
 }

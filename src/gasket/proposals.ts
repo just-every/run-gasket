@@ -19,6 +19,8 @@ import { meterNumber, toMilli } from './quantity'
 
 const KINDS = ['schedule', 'corrective', 'count', 'reassign', 'interval', 'merge'] as const
 type Kind = typeof KINDS[number]
+// Merge proposals are additive: existing outcome foreign keys keep their original parent.
+const proposalTable = (kind: Kind) => kind === 'merge' ? 'gk_merge_proposals' : 'gk_proposals'
 
 /** The versions a proposal relies on: if any changes before approval, the proposal is stale. */
 async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string>, actor: Actor) {
@@ -74,7 +76,7 @@ export async function prepare(env: Bindings, actor: Actor, input: Input) {
   if (kind === 'count') toMilli(payload.counted, 'counted', { allowZero: true })
   const basis = await basisOf(env, kind, payload, actor)
   const json = JSON.stringify(payload), hash = await sha256Hex(json), id = newId()
-  await commit(env, [stmt(env, 'INSERT INTO gk_proposals (id, kind, payload_json, payload_hash, basis_json, reasoning, prepared_by, prepared_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', id, kind, json, hash, JSON.stringify(basis), reasoning, actor.id, now())],
+  await commit(env, [stmt(env, `INSERT INTO ${proposalTable(kind)} (id, kind, payload_json, payload_hash, basis_json, reasoning, prepared_by, prepared_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, kind, json, hash, JSON.stringify(basis), reasoning, actor.id, now())],
     { actor: actor.id, action: 'proposal.prepare', subject: id, detail: { kind, hash } })
   return { id, kind, hash }
 }
@@ -82,15 +84,16 @@ export async function prepare(env: Bindings, actor: Actor, input: Input) {
 export async function decide(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'proposal.decide')
   const revision = await auditRevision(env)
-  const proposal = await one(env, 'SELECT * FROM gk_proposals WHERE id = ?', input.text('proposal', { max: 100 }))
+  const proposal = await one(env, 'SELECT * FROM gk_all_proposals WHERE id = ?', input.text('proposal', { max: 100 }))
   insist(proposal, 'proposal_not_found', 404)
+  const table = proposalTable(proposal.kind)
   insist(proposal.status === 'pending', 'already_decided', 409)
   insist(proposal.prepared_by !== actor.id, 'own_proposal', 403)
   const decision = input.text('decision', { max: 10 })
   insist(['approve', 'reject'].includes(decision), 'invalid_decision')
   const note = input.text('note', { optional: decision === 'approve', max: 1000 }) || null
   if (decision === 'reject') {
-    await commit(env, [stmt(env, "UPDATE gk_proposals SET status = 'rejected', decided_by = ?, decided_at = ?, decision_note = ? WHERE id = ? AND status = 'pending'", actor.id, now(), note, proposal.id)],
+    await commit(env, [stmt(env, `UPDATE ${table} SET status = 'rejected', decided_by = ?, decided_at = ?, decision_note = ? WHERE id = ? AND status = 'pending'`, actor.id, now(), note, proposal.id)],
       { actor: actor.id, action: 'proposal.reject', subject: proposal.id, detail: { note } })
     return { id: proposal.id, status: 'rejected' }
   }
@@ -102,8 +105,8 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   // The command and the decision commit in one batch: a second approver finds it decided.
   const also = (resultId: string) => [
     ...(['reassign', 'interval', 'merge'].includes(proposal.kind) ? [auditFence(env, revision)] : []),
-    guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id = ? AND status = 'pending')", proposal.id),
-    stmt(env, "UPDATE gk_proposals SET status = 'approved', decided_by = ?, decided_at = ?, decision_note = ?, result_id = ? WHERE id = ?", actor.id, now(), note, resultId, proposal.id),
+    guard(env, 'already_decided', `EXISTS(SELECT 1 FROM ${table} WHERE id = ? AND status = 'pending')`, proposal.id),
+    stmt(env, `UPDATE ${table} SET status = 'approved', decided_by = ?, decided_at = ?, decision_note = ?, result_id = ? WHERE id = ?`, actor.id, now(), note, resultId, proposal.id),
     stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.approve', proposal.id, JSON.stringify({ hash: proposal.payload_hash, result: resultId })),
   ]
   const options = { proposal: proposal.id, also }
@@ -117,7 +120,7 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
 }
 
 export async function proposalList(env: Bindings, _actor: Actor) {
-  const rows = await all(env, `SELECT p.*, m.name AS prepared_by_name, d.name AS decided_by_name FROM gk_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by LEFT JOIN gk_members d ON d.id = p.decided_by
+  const rows = await all(env, `SELECT p.*, m.name AS prepared_by_name, d.name AS decided_by_name FROM gk_all_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by LEFT JOIN gk_members d ON d.id = p.decided_by
     ORDER BY p.status = 'pending' DESC, p.prepared_at DESC LIMIT 200`)
   return rows.map(row => ({ ...row, payload: JSON.parse(row.payload_json), basis: JSON.parse(row.basis_json), payload_json: undefined, basis_json: undefined }))
 }
