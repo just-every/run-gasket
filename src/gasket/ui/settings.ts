@@ -53,14 +53,14 @@ export const ACTIONS: Record<string, string> = {
   'proposal.prepare': 'Prepared a proposal', 'proposal.approve': 'Approved a proposal', 'proposal.reject': 'Rejected a proposal',
   'import.apply': 'Moved in from MaintainX', 'import.undo': 'Undid a move-in',
 }
-const PROPOSAL: Record<string, string> = { schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
+const PROPOSAL: Record<string, string> = { merge: 'Duplicate part merge', schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
 
 /** The record each audit row names, by its business label and page; never its id. */
 export async function auditRecords(env: Bindings) {
   const [orders, assets, parts, people, checklists, schedules, proposals, meters, imports, teams, suppliers, requisitions, centers] = await Promise.all([
     all(env, 'SELECT w.id, w.number, COALESCE(a.name, w.location) AS name FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id'), all(env, 'SELECT id, tag, name FROM gk_assets'),
     all(env, 'SELECT id, number, name FROM gk_parts'), all(env, 'SELECT id, name FROM gk_members'), all(env, 'SELECT id, name FROM gk_checklists'),
-    all(env, 'SELECT id, title FROM gk_schedules'), all(env, 'SELECT id, kind FROM gk_proposals'),
+    all(env, 'SELECT id, title FROM gk_schedules'), all(env, 'SELECT id, kind FROM gk_all_proposals'),
     all(env, 'SELECT m.id, m.name, a.id AS asset, a.tag FROM gk_meters m JOIN gk_assets a ON a.id = m.asset_id'), all(env, 'SELECT id FROM ik_jobs'), all(env, 'SELECT id, name FROM gk_teams'), all(env, 'SELECT id, name FROM gk_suppliers'), all(env, 'SELECT id, number FROM gk_requisitions'), all(env, 'SELECT id, code, name FROM gk_cost_centers')])
   const link = (href: string, label: string) => h`<a href="${href}">${label}</a>`
   return new Map<string, Html>([

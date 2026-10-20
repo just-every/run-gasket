@@ -111,8 +111,8 @@ async function plansFor(env: Bindings, actor: Actor, order: Row, busy: Row[]): P
 
 /** The agent strip: proposals waiting for a decision, the newest first. */
 export async function pendingProposals(env: Bindings) {
-  const latest = await one<{ reasoning: string; kind: string; prepared_by: string; prepared_at: number }>(env, "SELECT p.reasoning, p.kind, m.name AS prepared_by, p.prepared_at FROM gk_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by WHERE p.status = 'pending' ORDER BY p.prepared_at DESC LIMIT 1")
-  const count = (await one<{ n: number }>(env, "SELECT COUNT(*) AS n FROM gk_proposals WHERE status = 'pending'"))!.n
+  const latest = await one<{ reasoning: string; kind: string; prepared_by: string; prepared_at: number }>(env, "SELECT p.reasoning, p.kind, m.name AS prepared_by, p.prepared_at FROM gk_all_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by WHERE p.status = 'pending' ORDER BY p.prepared_at DESC LIMIT 1")
+  const count = (await one<{ n: number }>(env, "SELECT COUNT(*) AS n FROM gk_all_proposals WHERE status = 'pending'"))!.n
   return { count, latest }
 }
 

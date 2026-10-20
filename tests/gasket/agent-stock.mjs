@@ -5,7 +5,7 @@ import { copyFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
-import { harness } from './harness.mjs'
+import { harness, file } from './harness.mjs'
 import { installation } from './installation.mjs'
 
 // Upgrade an existing installation with immutable outcome rows referencing proposals.
@@ -30,11 +30,11 @@ async function migrationProof() {
     await old.migrate()
     assert.deepEqual((await sql(read)).map(result=>result.results),before,'AGENT-006 migration preserves proposals and both AGENT-004 foreign-key children')
     assert.deepEqual((await sql('PRAGMA foreign_key_check;'))[0].results,[])
-    await assert.rejects(()=>sql("UPDATE gk_proposals SET status='pending' WHERE id='migration-proposal'"),/gasket_immutable/,'AGENT-006 upgrade keeps terminal decisions immutable')
+    await assert.rejects(()=>sql("UPDATE gk_proposals SET status='pending' WHERE id='migration-proposal'"),error=>error.code===1 && /gasket_immutable/.test(error.stdout),'AGENT-006 upgrade keeps terminal decisions immutable')
     await sql(`INSERT INTO gk_merge_proposals(id,kind,payload_json,payload_hash,basis_json,reasoning,prepared_by,prepared_at) VALUES ('migration-merge','merge','{}','merge-hash','{}','Retained duplicate proposal','migration-owner',2);`)
     assert.deepEqual((await sql('SELECT kind FROM gk_all_proposals ORDER BY kind'))[0].results,[{kind:'interval'},{kind:'merge'}],'AGENT-006 combined read door includes both proposal stores')
     await sql("UPDATE gk_merge_proposals SET status='rejected' WHERE id='migration-merge'")
-    await assert.rejects(()=>sql("UPDATE gk_merge_proposals SET status='pending' WHERE id='migration-merge'"),/gasket_immutable/,'AGENT-006 new merge decisions are immutable too')
+    await assert.rejects(()=>sql("UPDATE gk_merge_proposals SET status='pending' WHERE id='migration-merge'"),error=>error.code===1 && /gasket_immutable/.test(error.stdout),'AGENT-006 new merge decisions are immutable too')
     console.log('AGENT-006 populated proposal/outcome migration passed')
   } finally { await old.remove() }
 }
@@ -92,6 +92,7 @@ export async function agentStockJourney() {
     assert.equal((await decide(own,'lead','approve',403)).error,'own_proposal')
     await decide(own,'owner','reject')
     const fresh=await prepare('agent')
+    assert.ok((await (await h.raw('/app',{cookie:cookie.lead})).text()).includes('1 proposal waiting for a decision'),'AGENT-006 Work summary includes pending merge proposals')
     const sourceBefore=await h.api(`parts/${source}`,cookie.lead),canonicalBefore=await h.api(`parts/${canonical}`,cookie.lead)
     retained=(await h.api('proposals',cookie.lead)).find(p=>p.id===fresh.id)
     assert.deepEqual(retained.basis.combined,{quantity:'8',unit:'each',valueCents:6800})
@@ -114,6 +115,14 @@ export async function agentStockJourney() {
     assert.equal(freshAudit.rows.filter(row=>row.subject===canonical).length,1,'AGENT-006 retry never repeats a merge')
     await h.api('workorder.return',cookie.max,{workOrder:work,part:canonical,quantity:'1'})
     assert.deepEqual((await h.api(`parts/${canonical}`,cookie.lead)).moves.filter(m=>m.kind==='return').map(m=>m.value_cents),[1000],'AGENT-006 old issues retain their original return value')
+    const supplier=(await h.api('supplier.save',cookie.owner,{name:'Lake Erie Spare Bearings',contact:'Dina Morris',email:'catalog@example.test',phone:'+1 216 555 0164',street:'4100 Lakeside Avenue',city:'Cleveland',state:'OH',zip:'44114',taxTreatment:'sales_tax',paymentTerms:'Net 30',leadDays:6,active:true})).id
+    const catalog={supplier,file:file('merge-source.csv','number,name,unit,manufacturer,manufacturerNumber,vendorNumber,packUnit,packQuantity,price\n6205-IMPORTED,6205 spare bearing,each,Acme,AC-6205,IMPORTED-6205,each,1,10.00\n','text/csv')}
+    const preview=await h.api('catalog.preview',cookie.owner,catalog)
+    const imported=await h.api('catalog.import',cookie.owner,{...catalog,fingerprint:preview.fingerprint})
+    const importedPart=(await h.api('parts/lookup?number=6205-IMPORTED',cookie.agent)).id
+    await prepare('agent',{source:importedPart,canonical,reason:'Review imported duplicate identity without deleting its source evidence'})
+    assert.equal((await h.api('catalog.undo',cookie.owner,{job:imported.job},409)).error,'catalog_undo_blocked','AGENT-006 retained merge proposals block destructive catalog undo')
+    assert.equal((await h.api(`parts/${importedPart}`,cookie.lead)).id,importedPart)
     console.log('AGENT-006 cited duplicate proposals, physical count staleness, independent approval and conserved history passed')
   } finally {await h.close()}
 }

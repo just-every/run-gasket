@@ -31,7 +31,7 @@ export const snapshotSql = `WITH scope AS (SELECT ? AS parts,? AS items,? AS sup
  'policyRevisions',json(${jsonRows('gk_replenishment_policy_revisions','id',inParts('part_id'))}),
  'replenishments',json(${jsonRows('gk_replenishments','id,closed_at',inParts('part_id'))}),
  'notices',json(${jsonRows('gk_notices','id',inParts('part_id'))}),
- 'proposals',json(${jsonRows('gk_proposals','id,status,payload_json,basis_json',`json_extract(payload_json,'$.part') IN (SELECT value FROM json_each((SELECT parts FROM scope)))`)}),
+ 'proposals',json(${jsonRows('gk_all_proposals','id,status,payload_json,basis_json',`json_extract(payload_json,'$.part') IN (SELECT value FROM json_each((SELECT parts FROM scope))) OR json_extract(payload_json,'$.source') IN (SELECT value FROM json_each((SELECT parts FROM scope))) OR json_extract(payload_json,'$.canonical') IN (SELECT value FROM json_each((SELECT parts FROM scope)))`)}),
  'quotes',json(${jsonRows('gk_quotes','id',`supplier_id=(SELECT supplier FROM scope)`)}),
  'orders',json(${jsonRows('gk_purchase_revisions','id',`json_extract(snapshot,'$.supplier.id')=(SELECT supplier FROM scope)`)}),
  'requisitions',json(${jsonRows('gk_requisitions','id',`supplier_id=(SELECT supplier FROM scope)`)}),
