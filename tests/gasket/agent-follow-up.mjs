@@ -62,6 +62,10 @@ export async function agentFollowUpJourney() {
     await h.api('agent.answer',cookie.max,{query,nextAction:'Another answer',promisedOn:today},409)
     const reviewQuery = (await h.api('agent.query',cookie.agent,{workOrder:repair,version:(await h.api(`work/${repair}`,cookie.agent)).version,question:'Please review the repair evidence and confirm the next action.'})).id
     assert.equal((await h.api(`agent-follow-up/${repair}`,cookie.agent)).queries.find(q=>q.id===reviewQuery).recipient_id,ids.sam)
+    assert.equal((await h.api(`agent-follow-up/${repair}`,cookie.agent)).unanswered.length,0,'question is within its approved response interval')
+    const promisedToday=await h.api(`agent-follow-up/${pm}`,cookie.agent)
+    assert.equal(promisedToday.missed.length,0,'today remains within the promised site-local day')
+    assert.equal(promisedToday.escalationDue,false,'answered query and today promises do not bypass lead policy')
     // The existing installation reopens two days later. No product clock/test endpoint is added.
     await h.stop()
     h = await harness({installation:initial.installation,vars:initial.vars,clockOffset:offset+2*86_400_000})
