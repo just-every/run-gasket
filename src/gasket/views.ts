@@ -1,5 +1,7 @@
 // Read models served at GET /api/gasket/... Every view applies the same role
 // checks as the page that renders it.
+import { spendPolicySettings } from './purchase-policy'
+import { spendReport } from './purchase-report'
 import { metrics } from './metrics'
 import { quoteList } from './quotes'
 import { purchaseOrders, purchaseOrderDetail } from './purchase-orders'
@@ -44,7 +46,9 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
-  metrics: (env, actor, _id, url) => metrics(env, actor, url),
+  metrics: (env,actor,_id,url) => metrics(env,actor,url),
+  spendPolicy: (env,actor) => spendPolicySettings(env,actor),
+  spendReport: (env,actor) => spendReport(env,actor),
   quotes: (env, actor) => quoteList(env, actor),
   purchaseOrders: (env, actor) => purchaseOrders(env, actor),
   purchaseOrder: (env, actor, id) => purchaseOrderDetail(env, actor, id),

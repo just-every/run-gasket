@@ -1,6 +1,8 @@
 // Every state change in Gasket, by name. The same handler serves the HTML form
 // door (/app/do/NAME) and the JSON door (/api/gasket/NAME) agents use. Each
 // handler checks the actor's role itself.
+import { saveSpendPolicy, saveDelegation } from './purchase-policy'
+import { saveEmergencyOverride, releaseCommitment } from './purchase-authority'
 import { saveQuote } from './quotes'
 import { savePurchaseOrder, approvePurchaseOrder, sendPurchaseOrder, acknowledgePurchaseOrder } from './purchase-orders'
 import { saveEquivalence, satisfyNested } from './nested'
@@ -51,6 +53,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'spend.policy': saveSpendPolicy, 'spend.delegate': saveDelegation, 'purchase.emergency': saveEmergencyOverride, 'purchase.release': releaseCommitment,
   'quote.save': (env, actor, input) => saveQuote(env, actor, input),
   'purchase.save': (env, actor, input) => savePurchaseOrder(env, actor, input),
   'purchase.approve': (env, actor, input) => approvePurchaseOrder(env, actor, input),

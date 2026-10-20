@@ -1,6 +1,7 @@
 // Gasket's public doors: /app pages, /app/do/ACTION form posts, /api/gasket
 // JSON and evidence downloads. Every request resolves the signed-in member
 // first; nothing is served to a signed-out request.
+import { spendPolicyPage } from './ui/spend-policy'
 import { metricsPage } from './ui/metrics'
 import { purchaseAttachment } from './quotes'
 import { purchaseOrderPage, purchaseOrdersPage } from './ui/purchase-orders'
@@ -131,7 +132,8 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
-  metrics: (env, actor, url) => metricsPage(env, actor, url),
+  metrics: (env,actor,url) => metricsPage(env,actor,url),
+  spendPolicy: (env,actor,url) => spendPolicyPage(env,actor,url),
   purchaseOrders: (env, actor, url) => purchaseOrdersPage(env, actor, url),
   purchaseOrder: (env, actor, url, id) => purchaseOrderPage(env, actor, id, url),
   purchaseFile: (env, actor, _url, id) => purchaseAttachment(env, actor, id),

@@ -30,6 +30,7 @@ export const NAV: Destination[] = [
 ]
 export const SETTINGS: Destination[] = [
   { href: '/app/metrics', label: 'Measure definitions', detail: 'KPI formulas, source freshness and unresolved data quality.', icon: ICON.board, show: actor => can(actor, 'board.read') },
+  { href: '/app/spend-policy', label: 'Spend policy', detail: 'Period envelopes, independent routing, delegations and overrides.', icon: ICON.parts, show: actor => can(actor, 'site.manage') },
   { href: '/app/automation', label: 'Automation', detail: 'Execution health, rule previews, pause and catch-up controls.', icon: ICON.clock, show: actor => can(actor, 'board.read') },
   { href: '/app/purchasing', label: 'Purchasing', detail: 'Suppliers, catalogs, cost centers and maintenance requisitions awaiting approval.', icon: ICON.parts, show: () => true },
   { href: '/app/move-in', label: 'Move in from MaintainX', detail: 'Dry run, apply and undo an import of MaintainX exports.', icon: ICON.movein, show: actor => can(actor, 'import.run') },

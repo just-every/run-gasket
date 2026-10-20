@@ -11,7 +11,8 @@ export async function metrics(env: Bindings, actor: Actor, url: URL) {
   const version = url.searchParams.get('version') || '1'
   insist(version === '1', 'metric_version_not_found', 404)
   const id = url.searchParams.get('metric')
-  const definitions = id ? METRIC_DEFINITIONS.filter(row => row.id === id) : METRIC_DEFINITIONS
+  const permitted = METRIC_DEFINITIONS.filter(row => !row.requiredCapability || can(actor,row.requiredCapability))
+  const definitions = id ? permitted.filter(row => row.id === id) : permitted
   insist(definitions.length, 'metric_not_found', 404)
   const report = await reliability(env, actor, url)
   const [history, findings, meters, movements, imports, uncosted, audit] = await Promise.all([

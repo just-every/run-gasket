@@ -10,6 +10,7 @@ import { cents } from './valuation'
 
 const safe = (amount: bigint) => { insist(amount <= BigInt(Number.MAX_SAFE_INTEGER), 'purchase_amount_too_large'); return Number(amount) }
 export function purchaseFacts(input: Input) {
+  insist(!input.has('currency') || input.text('currency') === 'USD', 'usd_only')
   const descriptions = input.list('description', { keepEmpty: true })
   const fields = ['kind', 'quantity', 'unit', 'unitPrice'].map(name => input.list(name, { keepEmpty: true }))
   insist(descriptions.length > 0 && descriptions.length <= 50 && fields.every(values => values.length === descriptions.length), 'invalid_lines')
