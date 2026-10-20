@@ -1,3 +1,4 @@
+import { replenishmentView, previewReplenishment } from './replenishment'
 import { purchaseReceiving, receiptDetail } from './receiving'
 // Read models served at GET /api/gasket/... Every view applies the same role
 // checks as the page that renders it.
@@ -47,6 +48,8 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  replenishment: (env,actor) => replenishmentView(env,actor),
+  replenishmentPreview: (env,actor) => previewReplenishment(env,actor),
   purchaseReceiving: (env,actor,id) => purchaseReceiving(env,actor,id),
   receipt: (env,actor,id) => receiptDetail(env,actor,id),
   metrics: (env,actor,_id,url) => metrics(env,actor,url),

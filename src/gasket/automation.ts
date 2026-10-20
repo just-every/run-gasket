@@ -1,6 +1,7 @@
+import { visibleEnvelope } from './replenishment-policy'
 // PM-008 public controls and views; only the installation owner changes authority.
 import type { Bindings } from '../auth.server'
-import { requireCapability, type Actor } from './actor'
+import { can, requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, now, one, stmt } from './core'
 import type { Input } from './input'
 import { AUTOMATION_RULES, automationLedger, automationRules, type AutomationRule } from './automation-jobs'
@@ -62,12 +63,17 @@ export async function automationHealth(env: Bindings, actor: Actor) {
       const since = latest?.started_at ?? (rule.changed_at || null), minutes = since === null ? null : Math.max(0, Math.floor((instant - since) / 60_000))
       return { ...rule, name: AUTOMATION_RULES[rule.id as AutomationRule], lastRun: latest?.started_at ?? null, uncoveredMinutes: minutes, missed: minutes !== null && minutes > SCHEDULER.missedAfterMinutes }
     })), jobs: jobs.map(row => ({ ...row, output: row.output === null ? null : JSON.parse(row.output) })), coverage,
-    delivery: { inApp: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='failed'")).n, stored: (await one(env, 'SELECT COUNT(*) AS n FROM gk_notices')).n }, external: { state: 'unavailable', detail: 'Email and push delivery workers are not configured. In-app notices are saved synchronously.' } },
+    delivery: { replenishment: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='failed'")).n }, inApp: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='failed'")).n, stored: (await one(env, 'SELECT COUNT(*) AS n FROM gk_notices')).n }, external: { state: 'unavailable', detail: 'Email and push delivery workers are not configured. In-app notices are saved synchronously.' } },
   }
 }
 export async function ledgerView(env: Bindings, actor: Actor, url?: URL) {
   requireCapability(actor, 'board.read')
   const ledger = await automationLedger(env), job = url?.searchParams.get('job')
+  if (!can(actor,'work.review')) ledger.jobs = ledger.jobs.map(row=>{
+    if (row.rule_id!=='replenishment' || !row.input.replenishment) return row
+    const {uses:_uses,envelopes,...facts}=row.input.replenishment
+    return {...row,input:{...row.input,replenishment:{...facts,envelopes:envelopes.map((entry: any)=>visibleEnvelope(entry,false)),envelopeBudgetAccess:false}}}
+  })
   if (!job) return ledger
   const record = ledger.jobs.find(row => row.id === job); insist(record, 'job_not_found', 404); return record
 }

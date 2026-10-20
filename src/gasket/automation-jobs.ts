@@ -3,7 +3,7 @@ import type { Bindings } from '../auth.server'
 import { withAutomation } from './automation-context'
 import { all, GasketError, insist, newId, now, one, stmt } from './core'
 
-export const AUTOMATION_RULES = { pm: 'Preventive work', routes: 'Inspection routes', chase: 'Work reminders and escalation', expiry: 'Document expiry reminders' }
+export const AUTOMATION_RULES = { pm: 'Preventive work', routes: 'Inspection routes', chase: 'Work reminders and escalation', expiry: 'Document expiry reminders', replenishment: 'Stores replenishment' }
 export type AutomationRule = keyof typeof AUTOMATION_RULES
 export type Source = 'cron' | 'catchup' | 'reading'
 export async function automationRules(env: Bindings) { return await all(env, 'SELECT * FROM gk_automation_rules ORDER BY id') }

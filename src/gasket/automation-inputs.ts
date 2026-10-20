@@ -4,9 +4,11 @@ import { all } from './core'
 import { chaseRule } from './chasing'
 import { meterState } from './meters'
 import { DUE_SCHEDULES } from './schedules'
+import { replenishmentInputs } from './replenishment-state'
 import type { AutomationRule } from './automation-jobs'
 
 export async function automationInputs(env: Bindings, rule: AutomationRule, day: string) {
+  if (rule === 'replenishment') return { day, replenishment: await replenishmentInputs(env, day) }
   if (rule === 'pm') {
     const schedules = await all(env, DUE_SCHEDULES)
     return { day, schedules, meters: await Promise.all(schedules.filter(row => row.meter_id).map(async row => ({ meter: row.meter_id, state: await meterState(env, row.meter_id) }))) }

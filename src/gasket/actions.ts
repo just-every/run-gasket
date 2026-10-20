@@ -1,3 +1,4 @@
+import { saveReplenishmentPolicy, saveReplenishmentEnvelope, approveReplenishmentEnvelope, revokeReplenishmentEnvelope } from './replenishment'
 // Every state change in Gasket, by name. The same handler serves the HTML form
 // door (/app/do/NAME) and the JSON door (/api/gasket/NAME) agents use. Each
 // handler checks the actor's role itself.
@@ -54,6 +55,8 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'replenishment.policy': saveReplenishmentPolicy, 'replenishment.envelope': saveReplenishmentEnvelope,
+  'replenishment.envelope.approve': approveReplenishmentEnvelope, 'replenishment.envelope.revoke': revokeReplenishmentEnvelope,
   'receipt.receive': receivePurchaseOrder, 'receipt.inspect': inspectReceipt,
   'spend.policy': saveSpendPolicy, 'spend.delegate': saveDelegation, 'purchase.emergency': saveEmergencyOverride, 'purchase.release': releaseCommitment,
   'quote.save': (env, actor, input) => saveQuote(env, actor, input),

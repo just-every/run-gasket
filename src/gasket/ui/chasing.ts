@@ -6,7 +6,7 @@ import { showDate, showInstant } from '../dates'
 import { card, field, form, h, hidden, select, table, tag } from './html'
 import { page } from './shell'
 
-const KIND: Record<string, string> = { reminder: 'Reminder', overdue: 'Overdue', escalation_lead: 'Escalated to leads', escalation_supervisor: 'Escalated to supervisors', blocker_missed: 'Blocker promise missed', declined: 'Declined', mention: 'Mentioned', expiry: 'Document expiry' }
+const KIND: Record<string, string> = { replenishment: 'Replenishment', reminder: 'Reminder', overdue: 'Overdue', escalation_lead: 'Escalated to leads', escalation_supervisor: 'Escalated to supervisors', blocker_missed: 'Blocker promise missed', declined: 'Declined', mention: 'Mentioned', expiry: 'Document expiry' }
 const BLOCKERS = [{ value: 'parts', label: 'Parts' }, { value: 'access', label: 'Access' }, { value: 'skill', label: 'Skill' }, { value: 'production', label: 'Production' }]
 
 export async function noticesPage(env: Bindings, actor: Actor, url: URL) {

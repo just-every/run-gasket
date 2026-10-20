@@ -12,6 +12,7 @@ import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, 
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney } from './automation.mjs'
+import { replenishmentJourney } from './replenishment.mjs'
 import { receivingJourney } from './receiving.mjs'
 import { purchaseOrdersJourney } from './purchase-orders.mjs'
 import { spendJourney } from './spend.mjs'
@@ -2211,6 +2212,8 @@ try {
   })
 
   await check('BUY-004 partial receiving, inspection and returns', async () => { await receivingJourney(h,cookie) })
+
+  await check('PART-005 reorder policies and bounded automatic ordering', replenishmentJourney)
 
   await check('BUY-003 spend approval and purchasing separation', async () => { await spendJourney(h,cookie,{...ids,asset:ids.compressor}) })
 

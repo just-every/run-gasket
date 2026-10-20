@@ -120,8 +120,8 @@ export async function chase(env: Bindings, today: string) {
 }
 
 /** My notices, newest first; a mention (PLAN-006) links to its comment and stays unread until I have read that comment. */
-export const notices = async (env: Bindings, actor: Actor) => (await all(env, `SELECT n.id, n.kind, n.text, n.work_order_id, n.asset_id, n.comment_id, ${NOTICE_UNREAD} AS unread, n.created_at FROM gk_notices n WHERE n.recipient_id = ? ORDER BY n.created_at DESC, n.id LIMIT 100`, actor.id))
-  .map(row => ({ ...row, unread: Boolean(row.unread), link: noticeLink(row) }))
+export const notices = async (env: Bindings, actor: Actor) => (await all(env, `SELECT n.id, n.kind, n.text, n.work_order_id, n.asset_id, n.comment_id, n.part_id, n.purchase_order_id, ${NOTICE_UNREAD} AS unread, n.created_at FROM gk_notices n WHERE n.recipient_id = ? ORDER BY n.created_at DESC, n.id LIMIT 100`, actor.id))
+  .map(row => ({ ...row, unread: Boolean(row.unread), link: row.purchase_order_id ? `/app/purchase-orders/${row.purchase_order_id}` : noticeLink(row) }))
 
 /** One work order's chase: overdue start and age, responses, blockers and every notice sent about it. */
 export async function chaseOf(env: Bindings, order: Row, today: string) {

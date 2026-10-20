@@ -31,6 +31,7 @@ import { addDays, daysBetween, isDate, localNow, zonedInstant } from './dates'
 import { fromMilli } from './quantity'
 import { RESERVED } from './reservations'
 import { site } from './site'
+import { openReplenishments } from './replenishment-state'
 import { reconciliation } from './valuation'
 
 const percent = (part: number, whole: number) => whole ? Math.round(part / whole * 1000) / 10 : null
@@ -98,6 +99,7 @@ export async function storesReport(env: Bindings, actor: Actor, url: URL) {
   const counted = rows.reduce((sum, row) => sum + row.counts.counted, 0), hits = rows.reduce((sum, row) => sum + row.counts.hits, 0)
   return {
     from: p.from, to: p.to, site: p.site, zone: actor.zone,
+    replenishment: { basis: 'Current open documents, independent of movement date filter', open: await openReplenishments(env, actor) },
     value: { openingCents: value.totals.opening, closingCents: value.totals.closing, averageCents, netIssuedCents, turns: averageCents > 0 ? Math.round(netIssuedCents / averageCents * 100) / 100 : null },
     stockouts: { stocked: stocked.length, withStockout: withStockout.length, percent: percent(withStockout.length, stocked.length), events: withStockout.flatMap(row => row.stockouts.map(event => ({ part: { id: row.id, number: row.number, name: row.name }, ...event }))), outNow: stocked.filter(row => row.onHandMilli <= 0).map(brief) },
     demand: { byWorkOrder, byAsset, committed: rows.filter(row => row.reserved !== '0').map(row => ({ id: row.id, number: row.number, name: row.name, unit: row.unit, reserved: row.reserved })) },

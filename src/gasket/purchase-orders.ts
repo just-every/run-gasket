@@ -7,6 +7,7 @@ import type { Input } from './input'
 import { purchaseFacts, purchaseFiles, purchaseLinks } from './quotes'
 import { approvalRoute, approvalStepStatements, completionStatements, routeGuardStatements } from './purchase-authority'
 import { buyer, supplierDetail } from './suppliers'
+import { purchaseWriteAuthority } from './replenishment-purchasing'
 
 export async function purchaseOrders(env: Bindings, actor: Actor) {
   const rows = (await all(env, `SELECT p.*,r.id AS revision_id,r.snapshot,m.name AS initiator,
@@ -62,14 +63,15 @@ export async function savePurchaseOrder(env: Bindings, actor: Actor, input: Inpu
     reason: input.text('reason', { max: 2000 }), comparisonNote: input.text('comparisonNote', { optional: true, max: 2000 }),
     quotes: compared, selectedQuote: selected || null, attachments: [...(existing?.current.snapshot.attachments ?? []), ...files.metadata] }
   insist(snapshot.attachments.length <= 20, 'too_many_attachments')
-  const revisionId = newId(), revision = seen + 1, authority = capabilitySql(actor.sessionId, 'site.manage')
-  await commit(env, [guard(env, 'stale', authority.sql, ...authority.params),
+  const revisionId = newId(), revision = seen + 1
+  const authority = purchaseWriteAuthority(env, actor, 'draft', id, revisionId, snapshot, Boolean(existing))
+  await commit(env, [...authority.before,
     guard(env, 'supplier_inactive', 'EXISTS(SELECT 1 FROM gk_suppliers WHERE id=? AND active=1 AND revision=?)', supplier.id, supplier.revision),
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_cost_centers WHERE id=? AND active=1)', snapshot.costCenter.id),
     ...(existing ? [guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_purchase_orders WHERE id=? AND current_revision=?)', id, seen),
       stmt(env, 'UPDATE gk_purchase_orders SET current_revision=? WHERE id=?', revision, id)] :
       [stmt(env, 'INSERT INTO gk_purchase_orders(id,number,current_revision,created_by,created_at) VALUES (?,(SELECT COALESCE(MAX(number),0)+1 FROM gk_purchase_orders),1,?,?)', id, actor.id, now())]),
-    stmt(env, 'INSERT INTO gk_purchase_revisions(id,order_id,revision,snapshot,created_by,created_at) VALUES (?,?,?,?,?,?)', revisionId, id, revision, JSON.stringify(snapshot), actor.id, now()), ...files.statements],
+    stmt(env, 'INSERT INTO gk_purchase_revisions(id,order_id,revision,snapshot,created_by,created_at) VALUES (?,?,?,?,?,?)', revisionId, id, revision, JSON.stringify(snapshot), actor.id, now()), ...files.statements, ...authority.after],
   { actor: actor.id, action: 'purchase.revise', subject: id, detail: { revision, revisionId, totalCents: snapshot.totalCents, quoteIds: quotes } })
   return { id, revision, revisionId }
 }
@@ -127,20 +129,21 @@ export async function sendPurchaseOrder(env: Bindings, actor: Actor, input: Inpu
   const sender = operatorMail(env); insist(sender, 'mail_not_configured', 409)
   const from = env.MAIL_FROM || (localDevelopment(env) || env.RER_DEMO === '1' ? 'Gasket <local@example.test>' : '')
   insist(from, 'mail_not_configured', 409)
-  const recipient = current.snapshot.supplier.email, id = newId(), authority = capabilitySql(actor.sessionId, 'site.manage')
+  const recipient = current.snapshot.supplier.email, id = newId()
+  const authority = purchaseWriteAuthority(env, actor, 'send', order.id, current.id, current.snapshot)
   const attachments = await Promise.all(current.snapshot.attachments.map(async (file: any) => {
     const row = await one(env, 'SELECT bytes FROM gk_purchase_files WHERE id=? AND order_id=?', file.id, order.id)
     insist(row, 'attachment_not_found', 404)
     return { filename: file.filename, contentType: file.mediaType, content: new Uint8Array(row.bytes) }
   }))
-  await commit(env, [guard(env, 'stale', authority.sql, ...authority.params),
+  await commit(env, [...authority.before,
     guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_purchase_orders WHERE id=? AND current_revision=?) AND NOT EXISTS(SELECT 1 FROM gk_purchase_sends WHERE revision_id=?)`, order.id, order.current_revision, current.id),
     guard(env, 'supplier_inactive', 'EXISTS(SELECT 1 FROM gk_suppliers WHERE id=? AND active=1)', current.snapshot.supplier.id),
     ...await routeGuardStatements(env, order, route),
     ...await completionStatements(env, actor, order, route),
     ...(automatic ? [stmt(env, `INSERT INTO gk_purchase_approvals(id,revision_id,approved_by,approved_at,note,authority_kind) VALUES (?,?,?,?,?,'threshold')`, approvalId, current.id, actor.id, now(), 'Policy threshold authorization; no manual approval')] : []),
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_purchase_approvals WHERE id=? AND revision_id=?)', approvalId, current.id),
-    stmt(env, "INSERT INTO gk_purchase_sends(id,revision_id,approval_id,recipient,state,claimed_by,claimed_at) VALUES (?,?,?,?,'unconfirmed',?,?)", id, current.id, approvalId, recipient, actor.id, now())],
+    stmt(env, "INSERT INTO gk_purchase_sends(id,revision_id,approval_id,recipient,state,claimed_by,claimed_at) VALUES (?,?,?,?,'unconfirmed',?,?)", id, current.id, approvalId, recipient, actor.id, now()), ...authority.after],
   { actor: actor.id, action: 'purchase.send.claim', subject: order.id, detail: { send: id, revision: order.current_revision, approval: approvalId, recipient } })
   // Claim first. A crash, uncertain result or replay never sends a second email.
   let state: string, provider: string | null = null, providerId: string | null = null, error: string | null = null
