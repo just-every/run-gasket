@@ -1,3 +1,4 @@
+import { UNMERGED, canonicalSql } from './part-identity'
 // PART-009: the stores report, for leads, supervisors and the owner, over a
 // period of site-local days (both ends included; the last 90 days by
 // default), and its source-movement download.
@@ -48,14 +49,14 @@ async function period(env: Bindings, actor: Actor, url: URL) {
 
 const MOVES = `SELECT m.seq, m.part_id, m.kind, m.quantity_milli, m.value_cents, m.at, m.origin, m.reason, m.work_order_id, m.count_line_id, p.number, p.name AS part_name, p.unit,
   w.number AS work_number, w.asset_id, a.tag, a.name AS asset_name, mb.name AS by_name
-  FROM gk_part_moves m JOIN gk_parts p ON p.id = m.part_id LEFT JOIN gk_work_orders w ON w.id = m.work_order_id LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members mb ON mb.id = m.actor`
+  FROM gk_stock_moves m JOIN gk_parts p ON p.id = m.part_id LEFT JOIN gk_work_orders w ON w.id = m.work_order_id LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members mb ON mb.id = m.actor`
 
 export async function storesReport(env: Bindings, actor: Actor, url: URL) {
   const p = await period(env, actor, url)
   const value = await reconciliation(env, actor, new URL(`http://gasket.invalid/?from=${p.from}&to=${p.to}`))
-  const parts = await all(env, `SELECT p.id, p.number, p.name, p.unit, p.origin, ${RESERVED} AS reserved FROM gk_parts p ORDER BY p.number`)
+  const parts = await all(env, `SELECT p.id, p.number, p.name, p.unit, p.origin, ${RESERVED} AS reserved FROM gk_parts p WHERE ${UNMERGED} ORDER BY p.number`)
   const moves = await all(env, `${MOVES} WHERE m.at < ? ORDER BY m.seq`, p.end)
-  const lines = await all(env, "SELECT l.part_id, l.counted_milli, l.expected_milli FROM gk_count_lines l JOIN gk_counts c ON c.id = l.count_id WHERE c.submitted_at >= ? AND c.submitted_at < ?", p.start, p.end)
+  const lines = await all(env, `SELECT ${canonicalSql('l.part_id')} AS part_id, l.counted_milli, l.expected_milli FROM gk_count_lines l JOIN gk_counts c ON c.id = l.count_id WHERE c.submitted_at >= ? AND c.submitted_at < ?`, p.start, p.end)
   const inPeriod = (move: Row) => move.at >= p.start
   const byPart = new Map<string, Row[]>(parts.map(part => [part.id as string, []]))
   for (const move of moves) byPart.get(move.part_id)!.push(move)

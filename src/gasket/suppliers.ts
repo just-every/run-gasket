@@ -42,8 +42,10 @@ export async function saveCatalogItem(env: Bindings, actor: Actor, input: Input)
   const supplier = await supplierDetail(env, input.text('supplier'))
   const sku = input.text('sku', { max: 100 }), kind = input.text('kind')
   insist(Object.hasOwn(ITEM_KINDS, kind), 'invalid_item_kind')
-  const id = (await one(env, 'SELECT id FROM gk_supplier_items WHERE supplier_id = ? AND sku = ?', supplier.id, sku))?.id ?? newId()
+  const previous = await one(env, 'SELECT * FROM gk_supplier_items WHERE supplier_id = ? AND sku = ?', supplier.id, sku)
+  const id = previous?.id ?? newId()
   const value = { sku, kind, description: input.text('description', { max: 500 }), unit: input.text('unit', { max: 40 }), priceCents: input.has('price') ? cents(input, 'price') : null }
+  insist(!previous?.part_id || kind === 'part' && value.unit === previous.unit, 'catalog_identity_changed', 409)
   await commit(env, [
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_suppliers WHERE id = ? AND revision = ?)', supplier.id, input.integer('revision', { min: 1 })),
     stmt(env, 'INSERT INTO gk_supplier_items (id,supplier_id,sku,description,kind,unit,price_cents) VALUES (?,?,?,?,?,?,?) ON CONFLICT(supplier_id,sku) DO UPDATE SET description=excluded.description,kind=excluded.kind,unit=excluded.unit,price_cents=excluded.price_cents', id, supplier.id, sku, value.description, kind, value.unit, value.priceCents),

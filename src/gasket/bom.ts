@@ -1,3 +1,4 @@
+import { canonicalId, canonicalSql } from './part-identity'
 // ASSET-006: each asset's bill of materials as numbered revisions. A lead saves
 // a new revision (the earlier ones stay readable): lines of parts with the
 // quantity a repair needs and an optional serial range the line fits, approved
@@ -68,10 +69,12 @@ type Stock = { id: string; number: string; name: string; unit: string; onHand: s
 export async function bomOf(env: Bindings, asset: { id: string; serial: string | null }, stock: (Row & Stock)[]) {
   const revisions = await all(env, 'SELECT r.id, r.number, r.note, r.tools, r.created_at, m.name AS created_by FROM gk_bom_revisions r LEFT JOIN gk_members m ON m.id = r.created_by WHERE r.asset_id = ? ORDER BY r.number DESC', asset.id)
   if (!revisions.length) return null
-  const latest = revisions[0], parts = new Map(stock.map(part => [part.id, part]))
+  const latest = revisions[0], currentStock = new Map(stock.map(part => [part.id, part]))
+  const identities = await all(env, `SELECT p.*,${canonicalSql('p.id')} AS canonical_id FROM gk_parts p`)
+  const parts = new Map(identities.map(part => [part.id,{...part,...currentStock.get(part.canonical_id),id:part.id,number:part.number,name:part.name,canonical_id:part.canonical_id}]))
   const describe = (id: string, from: string | null, to: string | null, quantity: number) => {
     const part = parts.get(id)!
-    return { part: { id, number: part.number, name: part.name, unit: part.unit }, onHand: part.onHand, available: part.available, serialFrom: from, serialTo: to, fits: fits(asset.serial, from, to), short: Number(part.available) < quantity / 1000 }
+    return { part: { id, canonicalId:part.canonical_id, number: part.number, name: part.name, unit: part.unit }, onHand: part.onHand, available: part.available, serialFrom: from, serialTo: to, fits: fits(asset.serial, from, to), short: Number(part.available) < quantity / 1000 }
   }
   const alternates = await all(env, 'SELECT * FROM gk_bom_alternates WHERE revision_id = ? ORDER BY position', latest.id)
   const lines = (await all(env, 'SELECT * FROM gk_bom_lines WHERE revision_id = ? ORDER BY position', latest.id)).map(line => ({
@@ -90,11 +93,14 @@ export async function bomOf(env: Bindings, asset: { id: string; serial: string |
 export async function substitutionRefusal(env: Bindings, assetId: string, requestedId: string, chosenId: string) {
   const asset = await one(env, 'SELECT serial FROM gk_assets WHERE id = ?', assetId)
   const latest = await current(env, assetId)
-  if (requestedId === chosenId) {
-    const line = latest ? await one(env, 'SELECT serial_from, serial_to FROM gk_bom_lines WHERE revision_id = ? AND part_id = ?', latest.id, requestedId) : null
-    return line && !fits(asset?.serial ?? null, line.serial_from, line.serial_to) ? 'part_not_compatible' : null
-  }
+  // First honor the exact historical alternate, including its serial restriction.
   const alternate = latest ? await one(env, 'SELECT serial_from, serial_to FROM gk_bom_alternates WHERE revision_id = ? AND part_id = ? AND alternate_id = ?', latest.id, requestedId, chosenId) : null
   if (alternate) return fits(asset?.serial ?? null, alternate.serial_from, alternate.serial_to) ? null : 'substitute_not_compatible'
-  return await one(env, 'SELECT 1 FROM gk_part_substitutes WHERE part_id = ? AND substitute_id = ? AND withdrawn_at IS NULL', requestedId, chosenId) ? null : 'substitute_not_approved'
+  if (await canonicalId(env,requestedId) === await canonicalId(env,chosenId)) {
+    const lines = latest ? await all(env, `SELECT serial_from, serial_to FROM gk_bom_lines WHERE revision_id=? AND ${canonicalSql('part_id')}=?`, latest.id, await canonicalId(env,requestedId)) : []
+    return lines.some(line=>!fits(asset?.serial ?? null,line.serial_from,line.serial_to)) ? 'part_not_compatible' : null
+  }
+  const mapped = latest ? await all(env, `SELECT serial_from,serial_to FROM gk_bom_alternates WHERE revision_id=? AND ${canonicalSql('part_id')}=? AND ${canonicalSql('alternate_id')}=?`,latest.id,await canonicalId(env,requestedId),await canonicalId(env,chosenId)) : []
+  if(mapped.length) return mapped.every(row=>fits(asset?.serial ?? null,row.serial_from,row.serial_to)) ? null : 'substitute_not_compatible'
+  return await one(env, `SELECT 1 FROM gk_part_substitutes WHERE ${canonicalSql('part_id')}=? AND ${canonicalSql('substitute_id')}=? AND withdrawn_at IS NULL`, await canonicalId(env,requestedId), await canonicalId(env,chosenId)) ? null : 'substitute_not_approved'
 }

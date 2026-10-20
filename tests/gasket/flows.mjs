@@ -1,3 +1,4 @@
+import { partCatalogJourney } from './part-catalog.mjs'
 import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
 const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued !== null) process.exit(queued)
 // Gasket's first-release clauses (ACCEPTANCE.md GAS-01 to GAS-13), each through
@@ -2213,6 +2214,8 @@ try {
     await purchasingJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm })
   })
 
+  await check('PART-008 supplier catalogs and approved canonical parts',async()=>{await partCatalogJourney(h,cookie)})
+
   await check('BUY-004 partial receiving, inspection and returns', async () => { await receivingJourney(h,cookie) })
 
   await check('PART-005 reorder policies and BUY-006 per-order and period auto-buy limits', replenishmentJourney)
@@ -2232,6 +2235,11 @@ try {
       const assets = await h.api('assets', cookie.owner), work = [...await h.api('work', cookie.owner), ...await h.api('work?state=closed', cookie.owner)]
       const orders = await Promise.all(work.map(row => h.api(`work/${row.id}`, cookie.sam)))
       const files = []
+      const partDetails=await Promise.all((await h.api('parts',cookie.owner)).map(row=>h.api(`parts/${row.id}`,cookie.owner)))
+      for(const photo of partDetails.flatMap(part=>part.photos)) {
+        const response=await h.raw(`/app/part-photos/${photo.id}`,{cookie:cookie.sam});assert.equal(response.status,200)
+        files.push({id:photo.id,recorded:photo.sha256,downloaded:createHash('sha256').update(Buffer.from(await response.arrayBuffer())).digest('hex')})
+      }
       // ASSET-003: every document revision is an attachment too.
       for (const asset of assets) for (const document of (await h.api(`assets/${asset.id}`, cookie.sam)).documents.documents) for (const revision of document.revisions) {
         const download = await h.raw(`/app/documents/${revision.id}`, { cookie: cookie.sam })
@@ -2256,7 +2264,7 @@ try {
         assert.equal(download.status, 200)
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
-      return { receiving, spendPolicy:await h.api('spend-policy',cookie.owner), spendReport:(({computedAt,...rest})=>rest)(await h.api('spend-report',cookie.owner)), metricQuality: (await h.api('metrics', cookie.owner)).quality, assets, orders, files, quotes: await h.api('quotes', cookie.owner), purchaseOrders: await Promise.all((await h.api('purchase-orders', cookie.owner)).map(row => h.api(`purchase-orders/${row.id}`, cookie.owner))), automation: await h.api('automation/jobs', cookie.owner), purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
+      return { partDetails, receiving, spendPolicy:await h.api('spend-policy',cookie.owner), spendReport:(({computedAt,...rest})=>rest)(await h.api('spend-report',cookie.owner)), metricQuality: (await h.api('metrics', cookie.owner)).quality, assets, orders, files, quotes: await h.api('quotes', cookie.owner), purchaseOrders: await Promise.all((await h.api('purchase-orders', cookie.owner)).map(row => h.api(`purchase-orders/${row.id}`, cookie.owner))), automation: await h.api('automation/jobs', cookie.owner), purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
         histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam'), auditCsv: await download('/app/audit.csv', 'owner') }
     }
     const before = await read(h, cookie)

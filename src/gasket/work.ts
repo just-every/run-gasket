@@ -155,7 +155,7 @@ export async function cancel(env: Bindings, actor: Actor, input: Input) {
   insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
   const reason = input.text('reason', { max: 500 })
   await commit(env, [
-    guard(env, 'parts_still_issued', "(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE work_order_id = ?) = 0", order.id),
+    guard(env, 'parts_still_issued', "(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_stock_moves WHERE work_order_id = ?) = 0", order.id),
     guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', order.id),
     stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, order.id),
     releaseWithWork(env, actor, order.id, `Work order cancelled: ${reason}`),
@@ -364,7 +364,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const parts = (await all(env, `SELECT p.id, p.number, p.name, p.unit,
     -SUM(CASE WHEN mv.kind = 'issue' THEN mv.quantity_milli ELSE 0 END) AS issued, SUM(CASE WHEN mv.kind = 'return' THEN mv.quantity_milli ELSE 0 END) AS returned,
     -SUM(CASE WHEN mv.kind = 'issue' THEN mv.value_cents ELSE 0 END) AS issued_cents, SUM(CASE WHEN mv.kind = 'return' THEN mv.value_cents ELSE 0 END) AS returned_cents, SUM(mv.value_cents IS NULL) AS unpriced
-    FROM gk_part_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
+    FROM gk_stock_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
     // PART-007: each issue keeps the value it was taken at and each return credits that value, so later prices and returns never rewrite this cost.
     .map(row => ({ ...row, issued: fromMilli(row.issued), returned: fromMilli(row.returned), used: fromMilli(row.issued - row.returned), usedCents: row.unpriced ? null : row.issued_cents - row.returned_cents }))
   const downtime = (await classifiedStops(env, 'd.work_order_id = ?', id)).map(row => ({ id: row.id, started_on: row.started_on, ended_on: row.ended_on, minutes: row.minutes, reason: row.reason, planned: row.planned, degraded: Boolean(row.degraded), failure_mode: row.failureMode, reclassified: row.reclassified, classifications: row.classifications }))

@@ -1,3 +1,4 @@
+import { UNMERGED, canonicalSql } from './part-identity'
 // Read-only threshold evaluator shared by preview, worker and stores report.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
@@ -9,8 +10,8 @@ import { fromMilli } from './quantity'
 
 export async function replenishmentInputs(env: Bindings, day: string) {
   const [policies,parts,documents,receipts,receiptLines,receiptEvents,envelopes,approvals,revocations,uses] = await Promise.all([
-    all(env, `SELECT v.* ${CURRENT_REPLENISHMENT} ORDER BY v.part_id`), all(env, `SELECT p.*,${ON_HAND} AS on_hand,${RESERVED} AS reserved,(SELECT COALESCE(MAX(seq),0) FROM gk_part_moves m WHERE m.part_id=p.id) AS seen FROM gk_parts p`),
-    all(env, 'SELECT * FROM gk_replenishments ORDER BY opened_at,id'), all(env, 'SELECT id,revision_id FROM gk_receipts'), all(env, 'SELECT id,receipt_id,line_index,quantity_milli,quarantine_milli FROM gk_receipt_lines'),
+    all(env, `SELECT v.* ${CURRENT_REPLENISHMENT} ORDER BY v.part_id`), all(env, `SELECT p.*,${ON_HAND} AS on_hand,${RESERVED} AS reserved,(SELECT COALESCE(MAX(seq),0) FROM gk_stock_moves m WHERE m.part_id=p.id) AS seen FROM gk_parts p WHERE ${UNMERGED}`),
+    all(env, 'SELECT * FROM gk_stock_replenishments ORDER BY opened_at,id'), all(env, 'SELECT id,revision_id FROM gk_receipts'), all(env, 'SELECT id,receipt_id,line_index,quantity_milli,quarantine_milli FROM gk_receipt_lines'),
     all(env, 'SELECT id,receipt_line_id,quarantine_delta,kind,quantity_milli FROM gk_receipt_events'), all(env, 'SELECT * FROM gk_replenishment_envelopes'),
     all(env, 'SELECT * FROM gk_replenishment_envelope_approvals'), all(env, 'SELECT * FROM gk_replenishment_envelope_revocations'), all(env, 'SELECT * FROM gk_replenishment_envelope_uses')])
   const [orders,orderRevisions,spendPolicies,spendSteps,commitments,members,suppliers,costCenters] = await Promise.all([
@@ -28,7 +29,7 @@ export async function replenishmentDocument(env: Bindings, document: Row, day: s
   // A buyer's edit must be reviewed: do not infer that changed lines still buy this part.
   const changed = order.current_revision_id !== document.revision_id
   const receipts = await all(env, `SELECT l.*,COALESCE((SELECT SUM(e.quarantine_delta) FROM gk_receipt_events e WHERE e.receipt_line_id=l.id),0) AS quarantine_delta,
-    COALESCE((SELECT SUM(e.quantity_milli) FROM gk_receipt_events e WHERE e.receipt_line_id=l.id AND e.kind='return'),0) AS returned FROM gk_receipt_lines l JOIN gk_receipts r ON r.id=l.receipt_id WHERE r.revision_id=? AND l.line_index=0 AND l.part_id=?`, document.revision_id, document.part_id)
+    COALESCE((SELECT SUM(e.quantity_milli) FROM gk_receipt_events e WHERE e.receipt_line_id=l.id AND e.kind='return'),0) AS returned FROM gk_stock_receipt_lines l JOIN gk_receipts r ON r.id=l.receipt_id WHERE r.revision_id=? AND l.line_index=0 AND l.part_id=?`, document.revision_id, document.part_id)
   const received = receipts.reduce((sum,row) => sum + row.quantity_milli,0), returned = receipts.reduce((sum,row) => sum + row.returned,0)
   const quarantine = receipts.reduce((sum,row) => sum + row.quarantine_milli + row.quarantine_delta,0)
   const outstanding = Math.max(0,document.quantity_milli-received+returned)
@@ -59,6 +60,6 @@ export async function previewReplenishment(env: Bindings, actor: Actor) {
 }
 export async function openReplenishments(env: Bindings, actor: Actor) {
   requireCapability(actor, 'board.read')
-  const rows = await all(env, `SELECT r.*,p.number AS part_number,p.name AS part_name,p.unit,p.location FROM gk_replenishments r JOIN gk_parts p ON p.id=r.part_id WHERE r.closed_at IS NULL ORDER BY r.opened_at,r.id`)
+  const rows = await all(env, `SELECT r.*,p.number AS part_number,p.name AS part_name,p.unit,p.location FROM gk_stock_replenishments r JOIN gk_parts p ON p.id=r.part_id WHERE r.closed_at IS NULL ORDER BY r.opened_at,r.id`)
   return await Promise.all(rows.map(row=>replenishmentDocument(env,row,actor.today)))
 }

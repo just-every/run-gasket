@@ -62,4 +62,4 @@ export const RECEIPT_BALANCE = `SELECT l.*,
  l.quarantine_freight_cents+COALESCE(SUM(e.quarantine_freight_cents),0) AS held_quarantine_freight,
  l.quarantine_tax_cents+COALESCE(SUM(e.quarantine_tax_cents),0) AS held_quarantine_tax,
  COALESCE(SUM(CASE WHEN e.kind='return' THEN e.quantity_milli ELSE 0 END),0) AS returned_milli,
- COUNT(e.id) AS event_count FROM gk_receipt_lines l LEFT JOIN gk_receipt_events e ON e.receipt_line_id=l.id`
+ COUNT(e.id) AS event_count FROM gk_stock_receipt_lines l LEFT JOIN gk_receipt_events e ON e.receipt_line_id=l.id`

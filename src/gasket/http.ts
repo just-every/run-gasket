@@ -1,3 +1,6 @@
+import { catalogPreviewPage } from './ui/catalog-preview'
+import { partMergePage } from './ui/part-merge'
+import { partPhoto } from './part-photos'
 import { replenishmentPage } from './ui/replenishment'
 import { receiptEvidence } from './receiving'
 import { vendorFollowUpPage } from './ui/vendor-follow-up'
@@ -98,6 +101,7 @@ async function apiResponse(env: Bindings, actor: Actor, request: Request, url: U
 async function pageResponse(env: Bindings, actor: Actor, request: Request, url: URL): Promise<Response> {
   const path = url.pathname
   if (request.method === 'POST') {
+    if (path === '/app/parts/catalog-preview') return await catalogPreviewPage(env,actor,await Input.from(request),url)
     if (path === '/app/move-in/preview') return await previewPage(env, actor, await Input.from(request), url)
     const name = path.match(/^\/app\/do\/([\w.]+)$/)?.[1]
     const action = name ? actions[name] : undefined
@@ -135,6 +139,8 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  partMerge:(env,actor,url)=>partMergePage(env,actor,url),
+  partPhoto:(env,actor,_url,id)=>partPhoto(env,actor,id),
   vendorFollowUp: (env,actor,url) => vendorFollowUpPage(env,actor,url),
   replenishment: (env,actor,url) => replenishmentPage(env,actor,url),
   receiptEvidence: (env,actor,_url,id) => receiptEvidence(env,actor,id),

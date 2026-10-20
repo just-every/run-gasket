@@ -19,7 +19,7 @@ export async function metrics(env: Bindings, actor: Actor, url: URL) {
     all(env, 'SELECT h.*,a.tag FROM gk_work_history h JOIN gk_assets a ON a.id=h.asset_id ORDER BY h.id'),
     all(env, 'SELECT f.id,f.work_order_id,w.number FROM gk_findings f JOIN gk_work_orders w ON w.id=f.work_order_id WHERE f.failure_mode IS NULL ORDER BY f.id'),
     all(env, "SELECT m.*,a.tag FROM gk_meters m JOIN gk_assets a ON a.id=m.asset_id WHERE m.kind='counter' ORDER BY m.id"),
-    all(env, `SELECT mv.id,mv.part_id,mv.kind,mv.quantity_milli,mv.at,p.number,p.name,p.unit FROM gk_part_moves mv JOIN gk_parts p ON p.id=mv.part_id WHERE mv.value_cents IS NULL OR (mv.kind='receive' AND mv.unit_price_cents IS NULL) ORDER BY mv.id`),
+    all(env, `SELECT mv.id,mv.part_id,mv.kind,mv.quantity_milli,mv.at,p.number,p.name,p.unit FROM gk_stock_moves mv JOIN gk_parts p ON p.id=mv.part_id WHERE mv.value_cents IS NULL OR (mv.kind='receive' AND mv.unit_price_cents IS NULL AND mv.catalog_item_id IS NULL) ORDER BY mv.id`),
     all(env, 'SELECT j.id,j.state,j.error,q.reviewed_json,q.recorded_at FROM ik_jobs j LEFT JOIN gk_import_quality q ON q.job_id=j.id WHERE j.destination=? AND j.state NOT IN (?,?) ORDER BY j.id', 'register', 'undone', 'rolled_back'),
     all(env, 'SELECT w.id,w.number,w.status FROM gk_work_orders w WHERE NOT EXISTS(SELECT 1 FROM gk_work_costs c WHERE c.work_order_id=w.id) ORDER BY w.id'),
     one(env, 'SELECT COALESCE(MAX(seq),0) AS sequence,MAX(at) AS latestAt FROM gk_audit'),

@@ -2,6 +2,7 @@
 // lists, so the access proof can crawl every one of them.
 // API patterns are relative to /api/gasket/; page patterns are absolute.
 export const API_DOORS: [string, string][] = [
+  ['^parts/lookup$', 'partLookup'],
   ['^agent-follow-up/([\\w-]+)$', 'agentFollowUp'],
   ['^vendor-follow-up$', 'vendorFollowUp'],
   ['^replenishment$', 'replenishment'], ['^replenishment/preview$', 'replenishmentPreview'],
@@ -20,6 +21,8 @@ export const API_DOORS: [string, string][] = [
 ]
 
 export const PAGE_DOORS: [string, string][] = [
+  ['^/app/part-photos/([\\w-]+)$','partPhoto'],
+  ['^/app/parts/merge$','partMerge'],
   ['^/app/vendor-follow-up$', 'vendorFollowUp'],
   ['^/app/replenishment$', 'replenishment'],
   ['^/app/receipt-evidence/([\\w-]+)$', 'receiptEvidence'],

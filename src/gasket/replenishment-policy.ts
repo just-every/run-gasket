@@ -1,3 +1,4 @@
+import { canonicalPart } from './part-identity'
 // PART-005: one current location per part until PART-001 adds bins/sites.
 import type { Bindings } from '../auth.server'
 import { can, capabilitySql, requireCapability, type Actor } from './actor'
@@ -7,7 +8,7 @@ import type { Input } from './input'
 import { usdCents } from './purchase-policy'
 import { fromMilli, toMilli } from './quantity'
 
-export const CURRENT_REPLENISHMENT = `FROM gk_replenishment_policies h JOIN gk_replenishment_policy_revisions v ON v.part_id=h.part_id AND v.revision=h.current_revision`
+export const CURRENT_REPLENISHMENT = `FROM gk_replenishment_policies h JOIN gk_replenishment_policy_revisions v ON v.part_id=h.part_id AND v.revision=h.current_revision AND NOT EXISTS(SELECT 1 FROM gk_part_canonical c WHERE c.part_id=h.part_id)`
 export const activeOwnerSql = `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON lower(o.email)=m.email WHERE m.id=? AND m.status='active' AND m.role='owner' AND o.status='active' AND o.role='owner')`
 const session = (env: Bindings, actor: Actor, capability: 'register.manage'|'site.manage'|'work.review') => {
   requireCapability(actor, capability)
@@ -17,7 +18,7 @@ const session = (env: Bindings, actor: Actor, capability: 'register.manage'|'sit
 
 export async function saveReplenishmentPolicy(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'register.manage')
-  const part = await one(env, 'SELECT * FROM gk_parts WHERE id=?', input.text('part'))
+  const part = await canonicalPart(env, input.text('part'))
   insist(part, 'part_not_found', 404)
   const previous = await one(env, 'SELECT * FROM gk_replenishment_policies WHERE part_id=?', part.id)
   const seen = input.integer('revision', { min: 0, optional: true }) ?? 0

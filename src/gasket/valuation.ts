@@ -1,3 +1,4 @@
+import { UNMERGED, canonicalSql, canonicalPart } from './part-identity'
 // PART-007: inventory valuation and the period reconciliation. The policy is
 // moving-average cost in whole US cents, and every movement keeps its own
 // signed value beside its quantity, so stock value is the sum of movement
@@ -48,8 +49,8 @@ export function receiptValue(input: Input, vendorPrice: number | null, quantityM
   return { unitPrice, freight, tax, value: extended + freight + tax }
 }
 
-const STOCK = '(SELECT COALESCE(SUM(value_cents), 0) AS value, COALESCE(SUM(quantity_milli), 0) AS qty FROM gk_part_moves WHERE part_id = ?)'
-const HELD = "(SELECT -COALESCE(SUM(value_cents), 0) AS value, -COALESCE(SUM(quantity_milli), 0) AS qty FROM gk_part_moves WHERE part_id = ? AND work_order_id = ? AND kind IN ('issue', 'return'))"
+const STOCK = '(SELECT COALESCE(SUM(value_cents), 0) AS value, COALESCE(SUM(quantity_milli), 0) AS qty FROM gk_stock_moves WHERE part_id = ?)'
+const HELD = "(SELECT -COALESCE(SUM(value_cents), 0) AS value, -COALESCE(SUM(quantity_milli), 0) AS qty FROM gk_stock_moves WHERE part_id = ? AND work_order_id = ? AND kind IN ('issue', 'return'))"
 
 /** The issue's insert, valued inside the batch at the stock's average (its guard has already refused a short issue). */
 export const issueInsert = (env: Bindings, id: string, part: string, quantity: number, workOrder: string, actor: string) =>
@@ -67,14 +68,14 @@ export async function varianceValue(env: Bindings, part: string, varianceMilli: 
   const stock = (await one<{ value: number; qty: number }>(env, `SELECT s.value, s.qty FROM ${STOCK} s`, part))!
   if (varianceMilli < 0) return -share(stock.value, -varianceMilli, stock.qty)
   if (stock.qty > 0) return share(stock.value, varianceMilli, stock.qty)
-  const last = await one<{ value_cents: number; quantity_milli: number }>(env, "SELECT value_cents, quantity_milli FROM gk_part_moves WHERE part_id = ? AND kind = 'receive' AND unit_price_cents IS NOT NULL ORDER BY seq DESC LIMIT 1", part)
+  const last = await one<{ value_cents: number; quantity_milli: number }>(env, "SELECT value_cents, quantity_milli FROM gk_stock_moves WHERE part_id = ? AND kind = 'receive' AND (unit_price_cents IS NOT NULL OR catalog_item_id IS NOT NULL) ORDER BY seq DESC LIMIT 1", part)
   return last ? share(last.value_cents, varianceMilli, last.quantity_milli) : 0
 }
 
 /** A lead sets a part's current vendor price (or clears it); stock and work values are untouched. */
 export async function setVendorPrice(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'register.manage')
-  const part = await one<{ id: string; price_cents: number | null }>(env, 'SELECT id, price_cents FROM gk_parts WHERE id = ?', input.text('part', { max: 100 }))
+  const part = await canonicalPart(env,input.text('part',{max:100}))
   insist(part, 'part_not_found', 404)
   const price = cents(input, 'price')
   await commit(env, [stmt(env, 'UPDATE gk_parts SET price_cents = ? WHERE id = ?', price, part.id)],
@@ -107,8 +108,8 @@ export async function reconciliation(env: Bindings, actor: Actor, url: URL) {
     ${SUM(during("'return'"), 'm.quantity_milli')} AS returned_q, ${SUM(during("'return'"), 'm.value_cents')} AS returned_v,
     ${SUM(during("'count'"), 'm.quantity_milli')} AS counted_q, ${SUM(during("'count'"), 'm.value_cents')} AS counted_v,
     ${SUM(`m.at < ${end}`, 'm.quantity_milli')} AS closing_q, ${SUM(`m.at < ${end}`, 'm.value_cents')} AS closing_v,
-    ${SUM(`m.at < ${end} AND (m.value_cents IS NULL OR (m.kind = 'receive' AND m.unit_price_cents IS NULL))`, '1')} AS unpriced
-    FROM gk_parts p LEFT JOIN gk_part_moves m ON m.part_id = p.id GROUP BY p.id ORDER BY p.number`)
+    ${SUM(`m.at < ${end} AND (m.value_cents IS NULL OR (m.kind = 'receive' AND m.unit_price_cents IS NULL AND m.catalog_item_id IS NULL))`, '1')} AS unpriced
+    FROM gk_parts p LEFT JOIN gk_stock_moves m ON m.part_id = p.id WHERE ${UNMERGED} GROUP BY p.id ORDER BY p.number`)
   const keys = ['opening', 'received', 'issued', 'returned', 'counted', 'closing'] as const
   const parts = rows.map(row => ({ id: row.id, number: row.number, name: row.name, unit: row.unit, unpriced: row.unpriced as number,
     ...Object.fromEntries(keys.map(key => [key, { quantity: fromMilli(row[`${key}_q`]), valueCents: row[`${key}_v`] as number }])) as Record<typeof keys[number], { quantity: string; valueCents: number }>,

@@ -1,3 +1,5 @@
+import { catalogImportCard, catalogCard, photosCard, mergeCard } from './part-catalog'
+import { lookupPart } from '../catalogs'
 // Parts: on-hand, receiving and physical counts, and each part's movements.
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
@@ -15,6 +17,7 @@ import { page } from './shell'
 const KIND: Record<string, string> = { opening: 'Opening stock', receive: 'Received', issue: 'Issued', return: 'Returned', count: 'Physical count' }
 
 export async function partsPage(env: Bindings, actor: Actor, url: URL) {
+  if(url.searchParams.has('number')) { const part=await lookupPart(env,actor,url); return new Response(null,{status:303,headers:{location:`/app/parts/${part.id}`}}) }
   const parts = await partList(env, actor)
   const manage = can(actor, 'register.manage')
   const list = parts.length ? table(['Part', 'On hand', 'Available', 'Minimum', 'Location', ''], parts.map(part => [
@@ -28,7 +31,7 @@ export async function partsPage(env: Bindings, actor: Actor, url: URL) {
   // PART-007: the stock's value and the period reconciliation download.
   const valuation = card('Stock value', h`<p><span class="gk-big">${usd(parts.reduce((sum, part) => sum + part.valueCents, 0))}</span></p><p class="gk-muted">${POLICY}</p>
     ${can(actor, 'history.export') ? h`<form method="get" action="/app/parts/valuation.csv" class="gk-form"><div class="gk-grid">${field('From', 'from', { type: 'date', value: `${actor.today.slice(0, 8)}01` })}${field('To', 'to', { type: 'date', value: actor.today })}</div><div class="gk-actions"><button type="submit" class="gk-secondary">Download reconciliation</button></div></form>` : ''}`, { id: 'valuation' })
-  return page(env, 'Parts', actor, h`<div class="gk-columns"><div class="gk-col-main"><div class="gk-head"><div><h1>Parts</h1><p class="gk-lede">Spares on the shelf, what work used them, and physical counts.</p></div></div>${list}</div><div class="gk-col-side">${create}${await countsCard(env, actor, parts)}${valuation}${kitCard}</div></div>`, { url })
+  return page(env, 'Parts', actor, h`<div class="gk-columns"><div class="gk-col-main"><div class="gk-head"><div><h1>Parts</h1><p class="gk-lede">Spares on the shelf, what work used them, and physical counts.</p></div></div>${card('Find a part number',h`<form method="get" action="/app/parts" class="gk-form">${field('Scan or enter a part, manufacturer or vendor number','number')}<div class="gk-actions"><button type="submit" class="gk-secondary">Find part</button></div></form>`)}${list}</div><div class="gk-col-side">${create}${await catalogImportCard(env,actor)}${await countsCard(env, actor, parts)}${valuation}${kitCard}</div></div>`, { url })
 }
 
 export async function partPage(env: Bindings, actor: Actor, id: string, url: URL) {
@@ -50,5 +53,5 @@ export async function partPage(env: Bindings, actor: Actor, id: string, url: URL
   const side = manage ? h`${card('Receive stock', form('part.receive', back, h`${hidden('part', part.id)}${field(`Quantity (${part.unit})`, 'quantity', { attrs: 'inputmode="decimal"' })}<div class="gk-grid">${field(`Unit price (USD per ${part.unit})`, 'unitPrice', { required: false, attrs: 'inputmode="decimal"', hint: part.price_cents === null ? 'Leave blank if unknown.' : `Blank uses the vendor price, ${usd(part.price_cents)}.` })}${field('Freight (USD)', 'freight', { required: false, attrs: 'inputmode="decimal"' })}${field('Sales tax (USD)', 'tax', { required: false, attrs: 'inputmode="decimal"' })}</div>${field('Note', 'note', { required: false, hint: 'Supplier, docket or reason.' })}`, 'Receive', { secondary: true }), { id: 'receive' })}
     ${card('Vendor price', form('part.price', back, h`${hidden('part', part.id)}${field('Price per unit (USD)', 'price', { required: false, value: part.price_cents === null ? '' : (part.price_cents / 100).toFixed(2), attrs: 'inputmode="decimal"', hint: 'Changing it never revalues stock or work already done.' })}`, 'Save price', { secondary: true }), { id: 'price' })}
     ${card('Record a physical count', form('part.count', back, h`${hidden('part', part.id)}${hidden('seen', part.seen)}${field(`Counted on the shelf (${part.unit})`, 'counted', { attrs: 'inputmode="decimal"' })}${field('Note', 'note', { required: false })}`, 'Record count', { secondary: true }), { id: 'count', extra: h`<span class="gk-count">Records the difference from ${amount(part.onHand, part.unit)}</span>` })}` : ''
-  return page(env, part.name, actor, h`${backLink('/app/parts', 'Parts')}${band}<div class="gk-columns"><div class="gk-col-main">${held}${moves}</div><div class="gk-col-side">${side}${subs}</div></div>`, { url })
+  return page(env, part.name, actor, h`${backLink('/app/parts', 'Parts')}${band}<div class="gk-columns"><div class="gk-col-main">${catalogCard(part,actor)}${held}${moves}${mergeCard(part,others,actor)}</div><div class="gk-col-side">${photosCard(part,actor)}${side}${subs}</div></div>`, { url })
 }

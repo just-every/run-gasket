@@ -1,3 +1,6 @@
+import { catalogPreview, importCatalog, undoCatalog, receiveCatalogPack, preferCatalogItem } from './catalogs'
+import { mergePreview, approveMerge } from './part-merge'
+import { addPartPhoto } from './part-photos'
 import { askFollowUp, answerFollowUp, escalateFollowUp, recommendClosure } from './agent-follow-up'
 import { saveReplenishmentPolicy, saveReplenishmentEnvelope, approveReplenishmentEnvelope, revokeReplenishmentEnvelope } from './replenishment'
 // Every state change in Gasket, by name. The same handler serves the HTML form
@@ -24,7 +27,7 @@ import { addClosure, removeClosure } from './calendar'
 import { raiseBlocker, resolveBlocker, respond, setChaseRule } from './chasing'
 import { decideException, editSchedule, requestDeferral, requestSkip } from './exceptions'
 import { acknowledge, setRule } from './corrections'
-import type { Input } from './input'
+import { Input } from './input'
 import { adjustMeter, feedReading, setFeedWindow } from './meters'
 import { moveCode, retireCode, setCode } from './codes'
 import { declareState } from './states'
@@ -57,6 +60,9 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'catalog.preview':catalogPreview, 'catalog.undo':undoCatalog,
+  'catalog.apply':(env,actor,input)=>importCatalog(env,actor,Input.of({supplier:input.text('supplier'),fingerprint:input.text('fingerprint'),file:{filename:input.text('filename'),base64:input.text('base64',{max:2_000_000}),type:input.text('mediaType',{optional:true})}})),
+  'catalog.prefer':preferCatalogItem, 'catalog.import':importCatalog, 'catalog.receive':receiveCatalogPack, 'part.merge.preview':mergePreview, 'part.merge.approve':approveMerge, 'part.photo':addPartPhoto,
   'agent.query': askFollowUp, 'agent.answer': answerFollowUp, 'agent.escalate': escalateFollowUp, 'agent.closure': recommendClosure,
   'replenishment.policy': saveReplenishmentPolicy, 'replenishment.envelope': saveReplenishmentEnvelope,
   'replenishment.envelope.approve': approveReplenishmentEnvelope, 'replenishment.envelope.revoke': revokeReplenishmentEnvelope,

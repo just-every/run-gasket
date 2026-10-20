@@ -71,7 +71,7 @@ export async function receivePurchaseOrder(env: Bindings, actor: Actor, input: I
   }
   for (const row of lines) {
     const lineId = newId()
-    if (row.serial) statements.push(guard(env, 'stale', "NOT EXISTS(SELECT 1 FROM gk_receipt_lines WHERE part_id=? AND serial=?)", row.part, row.serial))
+    if (row.serial) statements.push(guard(env, 'stale', "NOT EXISTS(SELECT 1 FROM gk_stock_receipt_lines WHERE part_id=? AND serial=?)", row.part, row.serial))
     statements.push(stmt(env, `INSERT INTO gk_receipt_lines(id,receipt_id,line_index,part_id,quantity_milli,quarantine_milli,bin,lot,serial,unit_price_cents,extended_cents,freight_cents,tax_cents,value_cents,quarantine_value_cents,quarantine_freight_cents,quarantine_tax_cents) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       lineId,id,row.line,row.part,row.quantity,row.quarantine,row.bin,row.lot,row.serial,row.unitPrice,row.extended,row.freight,row.tax,row.value,row.quarantineValue,row.quarantineFreight,row.quarantineTax))
     if (row.part && row.quantity > row.quarantine) statements.push(receiptStockMove(env, actor.id,
@@ -105,11 +105,11 @@ export async function inspectReceipt(env: Bindings, actor: Actor, input: Input) 
   const statements = [authorized(env, actor), guard(env, 'stale', '(SELECT COUNT(*) FROM gk_receipt_events WHERE receipt_line_id=?)=?', line.id, line.event_count)]
   let stockValue = kind === 'release' ? value : 0
   if (!quarantine && line.part_id) {
-    const stock = await one(env, `SELECT COALESCE(SUM(quantity_milli),0) AS quantity,COALESCE(SUM(value_cents),0) AS value,COALESCE(MAX(seq),0) AS seen FROM gk_part_moves WHERE part_id=?`, line.part_id)
+    const stock = await one(env, `SELECT COALESCE(SUM(quantity_milli),0) AS quantity,COALESCE(SUM(value_cents),0) AS value,COALESCE(MAX(seq),0) AS seen FROM gk_stock_moves WHERE part_id=?`, line.part_id)
     insist(stock.quantity >= quantity, 'insufficient_stock', 409)
     stockValue = -portion(stock.value, quantity, stock.quantity)
-    statements.push(guard(env, 'stale', '(SELECT COALESCE(MAX(seq),0) FROM gk_part_moves WHERE part_id=?)=?', line.part_id, stock.seen),
-      guard(env, 'insufficient_stock', `(SELECT COALESCE(SUM(quantity_milli),0) FROM gk_part_moves WHERE part_id=?)-(SELECT ${RESERVED} FROM gk_parts p WHERE p.id=?)>=?`, line.part_id, line.part_id, quantity))
+    statements.push(guard(env, 'stale', '(SELECT COALESCE(MAX(seq),0) FROM gk_stock_moves WHERE part_id=?)=?', line.part_id, stock.seen),
+      guard(env, 'insufficient_stock', `(SELECT COALESCE(SUM(quantity_milli),0) FROM gk_stock_moves WHERE part_id=?)-(SELECT ${RESERVED} FROM gk_parts p WHERE p.id=?)>=?`, line.part_id, line.part_id, quantity))
   }
   statements.push(stmt(env, `INSERT INTO gk_receipt_events(id,receipt_line_id,kind,source,quantity_milli,usable_delta,quarantine_delta,usable_value_cents,quarantine_value_cents,quarantine_freight_cents,quarantine_tax_cents,reason,actor,at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     id,line.id,kind,source,quantity,kind === 'release' ? quantity : quarantine ? 0 : -quantity,quarantine ? -quantity : 0,stockValue,quarantine ? -value : 0,quarantine ? -freight : 0,quarantine ? -tax : 0,reason,actor.id,now()))

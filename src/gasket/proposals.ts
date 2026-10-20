@@ -1,3 +1,4 @@
+import { canonicalPart } from './part-identity'
 // Agent preparation, human approval. An agent (or a lead) prepares a schedule,
 // a corrective work order or a parts count; a lead or the owner approves it.
 // Approval re-checks the record versions the proposal relied on, runs the
@@ -29,9 +30,9 @@ async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string
     return { workOrder: state.workOrder, version: state.version, rule: state.rule, blockers: state.blockers, queries: state.queries, linked: state.linked }
   }
   if (kind === 'count') {
-    const part = await one(env, 'SELECT id, revision FROM gk_parts WHERE id = ?', payload.part)
+    const part = await canonicalPart(env, payload.part)
     insist(part, 'part_not_found', 404)
-    const seq = (await one<{ seq: number | null }>(env, 'SELECT MAX(seq) AS seq FROM gk_part_moves WHERE part_id = ?', part.id))!.seq ?? 0
+    const seq = (await one<{ seq: number | null }>(env, 'SELECT MAX(seq) AS seq FROM gk_stock_moves WHERE part_id = ?', part.id))!.seq ?? 0
     return { part: part.id, partRevision: part.revision, moves: seq }
   }
   const asset = await one(env, 'SELECT id, revision FROM gk_assets WHERE id = ?', payload.asset)

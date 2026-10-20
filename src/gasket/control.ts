@@ -24,7 +24,7 @@ const unchanged = (env: Bindings, id: string, version: number) => guard(env, 'st
 async function consequences(env: Bindings, order: Record<string, any>, action: typeof BULK[number], today: string, due: string | null) {
   const notes: string[] = []
   if (action === 'cancel') {
-    const held = await one<{ held: number }>(env, 'SELECT COALESCE(SUM(quantity_milli), 0) AS held FROM gk_part_moves WHERE work_order_id = ?', order.id)
+    const held = await one<{ held: number }>(env, 'SELECT COALESCE(SUM(quantity_milli), 0) AS held FROM gk_stock_moves WHERE work_order_id = ?', order.id)
     if (held!.held !== 0) return { refused: 'parts_still_issued', notes }
     if (await one(env, 'SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL', order.id)) return { refused: 'downtime_open', notes }
   }
@@ -77,7 +77,7 @@ export async function bulk(env: Bindings, actor: Actor, input: Input) {
       : action === 'reschedule' ? [stmt(env, 'UPDATE gk_work_orders SET due_date = ?, version = version + 1 WHERE id = ?', due, id)]
       : [stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", now(), actor.id, id), releaseWithWork(env, actor, id, `Work order cancelled: ${reason}`)]
     const checks = action === 'cancel' ? [
-      guard(env, 'parts_still_issued', '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE work_order_id = ?) = 0', id),
+      guard(env, 'parts_still_issued', '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_stock_moves WHERE work_order_id = ?) = 0', id),
       guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', id)] : []
     const detail = action === 'assign' ? { from: order.assignee_id, to: assignee } : action === 'reschedule' ? { from: order.due_date, to: due } : { reason }
     try {
@@ -121,7 +121,7 @@ export async function merge(env: Bindings, actor: Actor, input: Input) {
   await commit(env, [
     unchanged(env, duplicate.id, duplicate.version),
     guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, into.id, into.version),
-    guard(env, 'parts_still_issued', '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE work_order_id = ?) = 0', duplicate.id),
+    guard(env, 'parts_still_issued', '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_stock_moves WHERE work_order_id = ?) = 0', duplicate.id),
     guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', duplicate.id),
     stmt(env, "UPDATE gk_work_orders SET status = 'cancelled', merged_into = ?, version = version + 1, closed_at = ?, closed_by = ? WHERE id = ?", into.id, now(), actor.id, duplicate.id),
     stmt(env, 'UPDATE gk_work_orders SET version = version + 1 WHERE id = ?', into.id),

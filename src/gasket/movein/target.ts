@@ -32,7 +32,7 @@ const ASSET_DEPENDENTS = `((SELECT COUNT(*) FROM gk_work_orders WHERE asset_id =
   + (SELECT COUNT(*) FROM gk_work_history h WHERE h.asset_id = ? AND NOT EXISTS(SELECT 1 FROM ik_provenance pw JOIN ik_provenance pa ON pa.job_id = pw.job_id AND pa.target_kind = 'asset' AND pa.target_id = h.asset_id AND pa.reversed = 0 WHERE pw.target_kind = 'work' AND pw.target_id = h.id AND pw.reversed = 0)))`
 const METER_DEPENDENTS = "((SELECT COUNT(*) FROM gk_readings WHERE meter_id = ? AND origin = 'native') + (SELECT COUNT(*) FROM gk_schedules WHERE meter_id = ?) + (SELECT COUNT(*) FROM gk_meter_adjustments WHERE meter_id = ?))"
 const READING_DEPENDENTS = '(SELECT COUNT(*) FROM gk_meter_adjustments WHERE reading_id = ?)'
-const PART_DEPENDENTS = "(SELECT COUNT(*) FROM gk_part_moves WHERE part_id = ? AND origin = 'native')"
+const PART_DEPENDENTS = "((SELECT COUNT(*) FROM gk_part_moves WHERE part_id = ? AND origin = 'native') + (SELECT COUNT(*) FROM gk_part_canonical WHERE part_id=? OR canonical_id=?) + (SELECT COUNT(*) FROM gk_supplier_items WHERE part_id=?))"
 const ASSET_FIELDS = ['tag', 'name', 'serial', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
 
 const asset: Kind = {
@@ -97,7 +97,7 @@ const part: Kind = {
     sql("INSERT INTO gk_parts (id, number, name, unit, minimum_milli, location, origin, import_revision, created_at) VALUES (?, ?, ?, ?, ?, ?, 'import', ?, ?)", id, value.number, value.name, value.unit, value.minimumMilli, value.location, revision, Date.now()),
     sql("INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, note, actor, at, origin) VALUES (?, ?, 'opening', ?, 'Opening stock from MaintainX', 'import', ?, 'import')", `${id}:opening`, id, value.openingMilli, Date.now()),
   ],
-  remove: id => [sql("DELETE FROM gk_part_moves WHERE id = ? AND origin = 'import'", `${id}:opening`), sql("DELETE FROM gk_parts WHERE id = ? AND origin = 'import'", id)],
+  remove: id => [sql("DELETE FROM gk_part_aliases WHERE part_id=? AND kind='part' AND EXISTS(SELECT 1 FROM gk_parts WHERE id=? AND origin='import')",id,id),sql("DELETE FROM gk_part_moves WHERE id = ? AND origin = 'import'", `${id}:opening`), sql("DELETE FROM gk_parts WHERE id = ? AND origin = 'import'", id)],
   ids: db => idsOf(db, 'gk_parts'),
   count: "(SELECT COUNT(*) FROM gk_parts WHERE origin = 'import')",
 }

@@ -16,9 +16,9 @@ export { saveReplenishmentPolicy, saveReplenishmentEnvelope, approveReplenishmen
 export { previewReplenishment, openReplenishments } from './replenishment-state'
 
 function policyGuards(env: Bindings, row: Row) {
-  return [guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_replenishment_policies h JOIN gk_replenishment_policy_revisions v ON v.part_id=h.part_id AND v.revision=h.current_revision WHERE v.id=?)`, row.id),
+  return [guard(env, 'stale', 'NOT EXISTS(SELECT 1 FROM gk_part_canonical WHERE part_id=?)', row.part.id),guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_replenishment_policies h JOIN gk_replenishment_policy_revisions v ON v.part_id=h.part_id AND v.revision=h.current_revision WHERE v.id=?)`, row.id),
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_parts WHERE id=? AND location IS ?)', row.part.id, row.policy.location),
-    guard(env, 'stale', '(SELECT COALESCE(MAX(seq),0) FROM gk_part_moves WHERE part_id=?)=?', row.part.id, row.part.seen),
+    guard(env, 'stale', '(SELECT COALESCE(MAX(seq),0) FROM gk_stock_moves WHERE part_id=?)=?', row.part.id, row.part.seen),
     guard(env, 'stale', `(SELECT ${RESERVED} FROM gk_parts p WHERE p.id=?)=?`, row.part.id, row.part.reserved)]
 }
 function noticeStatements(env: Bindings, recipients: Row[], row: Row, id: string, order: string, occasion: string, text: string) {
@@ -62,7 +62,7 @@ async function automaticOrder(env: Bindings, actor: Actor, row: Row) {
   const job = automationAuthority()!
   const sent = await withReplenishmentPurchase({ operation:'send',actor:actor.id,
     before:[...policyGuards(env,row),
-      guard(env,'stale','EXISTS(SELECT 1 FROM gk_replenishments WHERE id=? AND revision_id=? AND closed_at IS NULL)',doc.id,order.current.id),
+      guard(env,'stale','EXISTS(SELECT 1 FROM gk_stock_replenishments WHERE id=? AND revision_id=? AND closed_at IS NULL)',doc.id,order.current.id),
       guard(env,'stale',`EXISTS(SELECT 1 FROM gk_replenishment_envelopes e JOIN gk_replenishment_envelope_approvals a ON a.envelope_id=e.id JOIN gk_members m ON m.id=a.approved_by WHERE e.id=? AND e.supplier_id=? AND e.cost_center_id=? AND e.from_on<=? AND e.to_on>=? AND e.per_order_cents>=? AND a.approved_by NOT IN (?,?,?,?) AND m.status='active' AND m.role IN ('owner','supervisor') AND NOT EXISTS(SELECT 1 FROM gk_replenishment_envelope_revocations r WHERE r.envelope_id=e.id))`,envelope.id,policy.supplier,policy.costCenter,actor.today,actor.today,amount,envelope.created_by,actor.id,row.created_by,order.current.created_by),
       guard(env,'stale',`COALESCE((SELECT SUM(amount_cents) FROM gk_replenishment_envelope_uses WHERE envelope_id=? AND booked_on BETWEEN ? AND ?),0)+?<=?`,envelope.id,envelope.from_on,envelope.to_on,amount,envelope.period_limit_cents)],
     after:(_order,revision)=>[stmt(env,'INSERT INTO gk_replenishment_envelope_uses(revision_id,envelope_id,amount_cents,booked_on,at,automation_job_id,automation_revision) VALUES (?,?,?,?,?,?,?)',revision,envelope.id,amount,actor.today,now(),job.job,job.revision)] },()=>sendPurchaseOrder(env,actor,Input.of({order:order.id,revision:order.current_revision})))
@@ -85,7 +85,7 @@ export async function runReplenishment(env: Bindings, day: string) {
       const supplier = await one(env,'SELECT tax_treatment,tax_note FROM gk_suppliers WHERE id=?',row.policy.supplier)
       insist(supplier,'supplier_not_found',404)
       const result = await withReplenishmentPurchase({operation:'draft',actor:actor.id,
-        before:[...policyGuards(env,row),guard(env,'stale','NOT EXISTS(SELECT 1 FROM gk_replenishments WHERE part_id=? AND closed_at IS NULL)',row.part.id)],
+        before:[...policyGuards(env,row),guard(env,'stale','NOT EXISTS(SELECT 1 FROM gk_stock_replenishments WHERE part_id=? AND closed_at IS NULL)',row.part.id)],
         after:(order,revision)=>[
           stmt(env,'INSERT INTO gk_replenishments(id,part_id,policy_revision_id,order_id,revision_id,quantity_milli,opened_at,due_on,automation_job_id,automation_revision) VALUES (?,?,?,?,?,?,?,?,?,?)',id,row.part.id,row.id,order,revision,row.quantityMilli,now(),due,job.job,job.revision),
           event(env,id,'threshold',{available:row.available,incoming:row.incoming,quantity:row.proposed,policyRevision:row.revision}),
@@ -100,7 +100,7 @@ export async function runReplenishment(env: Bindings, day: string) {
     if (!row.open) continue
     const doc=row.open
     if (doc.closed_at!==null) await commit(env,[...policyGuards(env,row),guard(env,'stale',activeOwnerSql,actor.id),
-      guard(env,'stale','NOT EXISTS(SELECT 1 FROM gk_replenishments WHERE part_id=? AND closed_at IS NULL)',row.part.id),
+      guard(env,'stale','NOT EXISTS(SELECT 1 FROM gk_stock_replenishments WHERE part_id=? AND closed_at IS NULL)',row.part.id),
       stmt(env,'UPDATE gk_replenishments SET closed_at=NULL WHERE id=?',doc.id)],{actor:actor.id,action:'replenishment.reopen',subject:doc.id,detail:{reason:'Supplier return reopened the outstanding quantity'}})
     const status=await automaticOrder(env,actor,row)
     const complete=doc.outstandingMilli===0 && doc.quarantineMilli===0 && !doc.changed

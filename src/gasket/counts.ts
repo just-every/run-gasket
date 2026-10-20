@@ -25,8 +25,8 @@ import { fromMilli, toMilli } from './quantity'
 import { cents, varianceValue } from './valuation'
 
 export const REASONS = ['lost', 'found', 'damaged'] as const
-const ON_HAND_OF = '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_part_moves WHERE part_id = ?)'
-const LATEST_OF = '(SELECT COALESCE(MAX(seq), 0) FROM gk_part_moves WHERE part_id = ?)'
+const ON_HAND_OF = '(SELECT COALESCE(SUM(quantity_milli), 0) FROM gk_stock_moves WHERE part_id = ?)'
+const LATEST_OF = '(SELECT COALESCE(MAX(seq), 0) FROM gk_stock_moves WHERE part_id = ?)'
 
 const threshold = async (env: Bindings) => (await one<{ cents: number }>(env, 'SELECT count_approval_cents AS cents FROM gk_site WHERE singleton = 1'))?.cents ?? 0
 
@@ -45,7 +45,7 @@ export async function planCount(env: Bindings, actor: Actor, input: Input) {
   const counter = await one(env, "SELECT id, name FROM gk_members WHERE id = ? AND status = 'active' AND role IN ('owner', 'lead', 'maintainer')", input.text('counter', { max: 100 }))
   insist(counter, 'invalid_counter')
   const chosen = input.list('part')
-  const found = await all<{ id: string }>(env, `SELECT id FROM gk_parts WHERE ${location ? 'location = ? OR ' : ''}id IN (SELECT value FROM json_each(?)) ORDER BY location, number`, ...(location ? [location] : []), JSON.stringify(chosen))
+  const found = await all<{ id: string }>(env, `SELECT id FROM gk_parts WHERE (${location ? 'location = ? OR ' : ''}id IN (SELECT value FROM json_each(?))) AND NOT EXISTS(SELECT 1 FROM gk_part_canonical WHERE part_id=gk_parts.id) ORDER BY location, number`, ...(location ? [location] : []), JSON.stringify(chosen))
   insist(found.length && chosen.every(id => found.some(row => row.id === id)), 'invalid_parts')
   const id = newId()
   await commit(env, [
@@ -67,7 +67,7 @@ export async function countDetail(env: Bindings, actor: Actor, id: string) {
   const count = await countOf(env, actor, id)
   const blind = count.status === 'open' && count.counter_id === actor.id
   const lines = await all(env, `SELECT l.*, p.number, p.name, p.unit, p.location, ${ON_HAND_OF.replace('?', 'l.part_id')} AS on_hand, d.name AS decided_by_name, mv.value_cents
-    FROM gk_count_lines l JOIN gk_parts p ON p.id = l.part_id LEFT JOIN gk_members d ON d.id = l.decided_by LEFT JOIN gk_part_moves mv ON mv.id = l.move_id WHERE l.count_id = ? ORDER BY l.position`, id)
+    FROM gk_count_lines l JOIN gk_parts p ON p.id = l.part_id LEFT JOIN gk_members d ON d.id = l.decided_by LEFT JOIN gk_stock_moves mv ON mv.id = l.move_id WHERE l.count_id = ? ORDER BY l.position`, id)
   return { id: count.id, number: count.number, title: count.title, location: count.location, counter: { id: count.counter_id, name: count.counter }, plannedBy: count.planned_by_name, plannedAt: count.planned_at, status: count.status, submittedAt: count.submitted_at, blind,
     thresholdCents: await threshold(env),
     lines: lines.map(line => ({ id: line.id, part: { id: line.part_id, number: line.number, name: line.name, unit: line.unit, location: line.location }, state: line.state, reason: line.reason, note: line.note,
@@ -145,7 +145,7 @@ export async function decideCountLine(env: Bindings, actor: Actor, input: Input)
       { actor: actor.id, action: 'count.reject', subject: line.count_id, detail: { line: line.id, note } })
     return { id: line.id, state: 'rejected' }
   }
-  const later = "(SELECT COUNT(*) FROM gk_part_moves WHERE part_id = ? AND kind = 'count' AND seq > ?)"
+  const later = "(SELECT COUNT(*) FROM gk_stock_moves WHERE part_id = ? AND kind = 'count' AND seq > ?)"
   insist((await one<{ n: number }>(env, `SELECT ${later} AS n`, line.part_id, line.seen_seq))!.n === 0, 'stale_count', 409)
   const variance = line.counted_milli - line.expected_milli
   const stock = (await one<{ on_hand: number; seq: number }>(env, `SELECT ${ON_HAND_OF} AS on_hand, ${LATEST_OF} AS seq`, line.part_id, line.part_id))!
