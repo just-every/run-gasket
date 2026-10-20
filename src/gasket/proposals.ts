@@ -1,3 +1,4 @@
+import { applyInterval, intervalBasis } from './intervals'
 import { canonicalPart } from './part-identity'
 // Agent preparation, human approval. An agent (or a lead) prepares a schedule,
 // a corrective work order or a parts count; a lead or the owner approves it.
@@ -13,13 +14,14 @@ import { assign, createCorrective } from './work'
 import { assigneeFits } from './crew'
 import { auditFence, auditRevision, followUpCase } from './agent-follow-up'
 import { isDate } from './dates'
-import { toMilli } from './quantity'
+import { meterNumber, toMilli } from './quantity'
 
-const KINDS = ['schedule', 'corrective', 'count', 'reassign'] as const
+const KINDS = ['schedule', 'corrective', 'count', 'reassign', 'interval'] as const
 type Kind = typeof KINDS[number]
 
 /** The versions a proposal relies on: if any changes before approval, the proposal is stale. */
 async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string>, actor: Actor) {
+  if (kind === 'interval') return intervalBasis(env, actor, payload)
   if (kind === 'reassign') {
     const state = await followUpCase(env, actor, payload.workOrder)
     insist(['open', 'in_progress', 'returned'].includes(state.status), 'work_order_not_open', 409)
@@ -45,6 +47,7 @@ function payloadOf(kind: Kind, input: Input): Record<string, string> {
     schedule: [['asset', true], ['checklist', true], ['title', true], ['everyDays', false], ['meter', false], ['everyUnits', false], ['firstDue', false], ['firstDueMeter', false], ['assignee', false]],
     corrective: [['asset', true], ['title', true], ['description', false], ['due', true], ['assignee', false]],
     count: [['part', true], ['counted', true], ['note', false]],
+    interval: [['schedule', true], ['everyDays', false], ['everyUnits', false], ['from', true], ['to', true], ['peers', true], ['rollbackPlan', true], ['rollbackOf', false]],
     reassign: [['workOrder', true], ['assignee', true], ['note', true]],
   }
   const payload: Record<string, string> = {}
@@ -52,6 +55,7 @@ function payloadOf(kind: Kind, input: Input): Record<string, string> {
     const value = input.text(name, { optional: !required, max: 2000 })
     if (value) payload[name] = value
   }
+  if (kind === 'interval' && payload.everyUnits) payload.everyUnits = meterNumber(payload.everyUnits, 'everyUnits')
   return payload
 }
 
@@ -91,16 +95,17 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   const payload = JSON.parse(proposal.payload_json) as Record<string, string>
   const basis = await basisOf(env, proposal.kind, payload, actor)
   insist(JSON.stringify(basis) === proposal.basis_json, 'proposal_stale', 409)
-  const command = Input.of(proposal.kind === 'count' ? { ...payload, seen: String(basis.moves) } : payload)
+  const command = Input.of(proposal.kind === 'count' ? { ...payload, seen: String((basis as { moves: number }).moves) } : payload)
   // The command and the decision commit in one batch: a second approver finds it decided.
   const also = (resultId: string) => [
-    ...(proposal.kind === 'reassign' ? [auditFence(env, revision)] : []),
+    ...(['reassign', 'interval'].includes(proposal.kind) ? [auditFence(env, revision)] : []),
     guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id = ? AND status = 'pending')", proposal.id),
     stmt(env, "UPDATE gk_proposals SET status = 'approved', decided_by = ?, decided_at = ?, decision_note = ?, result_id = ? WHERE id = ?", actor.id, now(), note, resultId, proposal.id),
     stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.approve', proposal.id, JSON.stringify({ hash: proposal.payload_hash, result: resultId })),
   ]
   const options = { proposal: proposal.id, also }
-  const result = proposal.kind === 'schedule' ? await createSchedule(env, actor, command, options)
+  const result = proposal.kind === 'interval' ? await applyInterval(env, actor, payload, basis as Awaited<ReturnType<typeof intervalBasis>>, proposal.id, also(payload.schedule))
+    : proposal.kind === 'schedule' ? await createSchedule(env, actor, command, options)
     : proposal.kind === 'corrective' ? await createCorrective(env, actor, command, options)
     : proposal.kind === 'reassign' ? await assign(env, actor, command, options)
     : await countPart(env, actor, command, options)

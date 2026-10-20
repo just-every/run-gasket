@@ -1,3 +1,4 @@
+import { setIntervalLimit } from './intervals'
 import { catalogPreview, importCatalog, undoCatalog, receiveCatalogPack, preferCatalogItem } from './catalogs'
 import { mergePreview, approveMerge } from './part-merge'
 import { addPartPhoto } from './part-photos'
@@ -185,6 +186,7 @@ export const actions: Record<string, Handler> = {
   'route.sign': (env, actor, input) => signRun(env, actor, input),
   'calibration.create': (env, actor, input) => createCalibration(env, actor, input),
   'workorder.tool': (env, actor, input) => recordTool(env, actor, input),
+  'interval.limit': (env, actor, input) => setIntervalLimit(env, actor, input),
   'proposal.prepare': (env, actor, input) => prepare(env, actor, input),
   'proposal.decide': (env, actor, input) => decide(env, actor, input),
   'import.preview': (env, actor, input) => previewImport(env, actor, input),

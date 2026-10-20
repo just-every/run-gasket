@@ -1,3 +1,4 @@
+import { intervalJourney } from './intervals.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
 import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
 const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued !== null) process.exit(queued)
@@ -2221,6 +2222,8 @@ try {
   await check('PART-005 reorder policies and BUY-006 per-order and period auto-buy limits', replenishmentJourney)
 
   await check('BUY-006 vendor delivery follow-up', vendorFollowUpJourney)
+
+  await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
 
   await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
 

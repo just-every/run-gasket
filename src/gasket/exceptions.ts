@@ -1,3 +1,5 @@
+import { auditFence, auditRevision } from './agent-follow-up'
+import { assertIntervalBounds } from './intervals'
 // PM-003: exceptions to a schedule and changes to its cadence. A lead asks to
 // skip a missed occurrence or defer the current one (at most the schedule's
 // max_defer_days after it), always with a reason; nothing moves until a
@@ -92,7 +94,9 @@ export async function editSchedule(env: Bindings, actor: Actor, input: Input) {
   const schedule = await scheduleFor(env, input)
   insist(schedule.every_days && schedule.nominal_date, 'no_calendar_cadence', 409)
   insist(input.integer('revision', { min: 1, max: 1_000_000 }) === schedule.revision, 'stale', 409)
+  const limitFence = await auditRevision(env)
   const everyDays = input.integer('everyDays', { min: 1, max: 3660 })!
+  await assertIntervalBounds(env, schedule.id, everyDays, schedule.every_units)
   const cadence = input.text('cadence', { optional: true, max: 12 }) || schedule.cadence
   insist(cadence === 'fixed' || cadence === 'completion', 'invalid_cadence')
   const fields = policyFields(input), maxDeferDays = input.integer('maxDeferDays', { min: 0, max: 365, optional: true }) ?? schedule.max_defer_days
@@ -106,7 +110,7 @@ export async function editSchedule(env: Bindings, actor: Actor, input: Input) {
     after: [nextDue, ...upcoming(addDays(cadence === 'completion' ? nextDue : schedule.nominal_date, everyDays), everyDays, policyOf(after), closed, { count: 4, completion: cadence === 'completion' })],
   }
   if (input.flag('preview')) return { preview: true, ...preview }
-  await commit(env, [guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_schedules WHERE id = ? AND revision = ?)', schedule.id, schedule.revision),
+  await commit(env, [auditFence(env, limitFence), guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_schedules WHERE id = ? AND revision = ?)', schedule.id, schedule.revision),
     stmt(env, 'UPDATE gk_schedules SET every_days = ?, cadence = ?, months = ?, weekdays = ?, observe_closures = ?, max_defer_days = ?, next_due_date = ?, revision = revision + 1 WHERE id = ?', everyDays, cadence, after.months, after.weekdays, after.observe_closures, maxDeferDays, nextDue, schedule.id)],
   { actor: actor.id, action: 'schedule.edit', subject: schedule.id, detail: { from: { everyDays: schedule.every_days, cadence: schedule.cadence, months: schedule.months, weekdays: schedule.weekdays, observeClosures: Boolean(schedule.observe_closures), maxDeferDays: schedule.max_defer_days }, to: { everyDays, cadence, months: after.months, weekdays: after.weekdays, observeClosures: fields.observeClosures, maxDeferDays } } })
   return { preview: false, ...preview }
