@@ -1,3 +1,4 @@
+import { agentStockJourney } from './agent-stock.mjs'
 import { outcomeJourney } from './outcomes.mjs'
 import { intervalJourney } from './intervals.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
@@ -2229,6 +2230,7 @@ try {
   await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
 
   await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
+  await check('AGENT-006 source-bound duplicate merge proposals', agentStockJourney)
 
   await check('BUY-003 spend approval and purchasing separation', async () => { await spendJourney(h,cookie,{...ids,asset:ids.compressor}) })
 

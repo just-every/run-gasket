@@ -4,6 +4,8 @@ import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, sha256Hex, stmt } from './core'
 import type { Input } from './input'
 import { canonicalId, groupIds } from './part-identity'
+import type { FromProposal } from './schedules'
+import { fromMilli } from './quantity'
 
 const REFERENCES: Record<string, string[]> = {
   gk_part_merges:['source_id','canonical_id'], gk_part_canonical:['part_id','canonical_id'], gk_part_moves: ['part_id'], gk_part_substitutes: ['part_id','substitute_id'], gk_kit_lines: ['part_id'],
@@ -14,6 +16,11 @@ const REFERENCES: Record<string, string[]> = {
 }
 export async function mergePreview(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'register.manage')
+  return mergeSnapshot(env, input)
+}
+
+// Internal snapshot: only the guarded preview and proposal projection expose it.
+async function mergeSnapshot(env: Bindings, input: Input) {
   const source = input.text('source'), canonical = input.text('canonical')
   insist(source !== canonical, 'same_part')
   insist(await canonicalId(env,source) === source && await canonicalId(env,canonical) === canonical, 'already_merged',409)
@@ -40,7 +47,30 @@ export async function mergePreview(env: Bindings, actor: Actor, input: Input) {
     consequence:'Keep original records and numbers. Combine stock and value in the chosen stocking unit; retain the canonical shelf, minimum and replenishment policy. Source policies become historical. Existing purchasing documents remain open and prevent duplicate replenishment.'}
   return {...snapshot,fingerprint:await sha256Hex(JSON.stringify(snapshot))}
 }
-export async function approveMerge(env: Bindings, actor: Actor, input: Input) {
+/** AGENT-006: retain the full dependency fingerprint, expose only existing part-read facts. */
+export async function mergeProposalBasis(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'proposal.prepare')
+  const snapshot = await mergeSnapshot(env, input)
+  insist(snapshot.compatibleUnits, 'merge_units_differ', 409)
+  insist(!snapshot.blockers.length, 'merge_count_in_progress', 409, snapshot.blockers)
+  insist(!snapshot.conflicts.length, 'merge_compatibility_conflict', 409, snapshot.conflicts)
+  const balances = await all(env, `SELECT p.id,p.number,p.unit,
+    COALESCE(SUM(m.quantity_milli),0) AS quantity_milli,COALESCE(SUM(m.value_cents),0) AS value_cents
+    FROM gk_parts p LEFT JOIN gk_stock_moves m ON m.part_id=p.id
+    WHERE p.id IN (?,?) GROUP BY p.id ORDER BY p.id`, snapshot.source, snapshot.canonical)
+  const quantities = balances.reduce((sum, row) => sum + row.quantity_milli, 0)
+  const value = balances.reduce((sum, row) => sum + row.value_cents, 0)
+  return { source: snapshot.source, canonical: snapshot.canonical, fingerprint: snapshot.fingerprint,
+    balances: balances.map(row => ({ id: row.id, number: row.number, unit: row.unit, quantity: fromMilli(row.quantity_milli), valueCents: row.value_cents })),
+    combined: { quantity: fromMilli(quantities), unit: balances[0].unit, valueCents: value },
+    quantityDelta: '0', valueDeltaCents: 0,
+    movements: snapshot.dependencies.gk_part_moves.map((row: any) => ({ id: row.id, part: row.part_id, kind: row.kind, quantity: fromMilli(row.quantity_milli), valueCents: row.value_cents, workOrder: row.work_order_id, at: row.at })),
+    references: Object.fromEntries(Object.entries(snapshot.dependencies).map(([name, rows]) => [name, rows.length])),
+    consequence: snapshot.consequence,
+    boundary: 'Identity consolidation only: no physical receipt, count, stock movement or spend is inferred. Bills and missing movements are not reconciled.' }
+}
+
+export async function approveMerge(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
   const revision=(await one(env,'SELECT COALESCE(MAX(seq),0) AS seq FROM gk_audit')).seq
   const preview=await mergePreview(env,actor,input)
   insist(input.text('fingerprint')===preview.fingerprint,'merge_changed',409)
@@ -55,7 +85,8 @@ export async function approveMerge(env: Bindings, actor: Actor, input: Input) {
     stmt(env,'INSERT INTO gk_part_canonical(part_id,canonical_id) VALUES (?,?)',preview.source,preview.canonical),
     stmt(env,`UPDATE gk_supplier_items SET preferred=0 WHERE part_id IN (SELECT value FROM json_each(?)) AND part_id<>?`,JSON.stringify(preview.ids),preview.canonical),
     stmt(env,'UPDATE gk_parts SET revision=revision+1 WHERE id IN (?,?)',preview.source,preview.canonical),
+    ...(also?.(preview.canonical) ?? []),
     stmt(env,'INSERT INTO gk_part_merges(id,source_id,canonical_id,preview,fingerprint,reason,approved_by,approved_at) VALUES (?,?,?,?,?,?,?,?)',id,preview.source,preview.canonical,JSON.stringify(preview),preview.fingerprint,reason,actor.id,now()),
-  ],{actor:actor.id,action:'part.merge',subject:preview.canonical,detail:{source:preview.source,merge:id,fingerprint:preview.fingerprint,reason}})
+  ],{actor:actor.id,action:'part.merge',subject:preview.canonical,detail:{source:preview.source,merge:id,fingerprint:preview.fingerprint,reason,...(proposal?{proposal}:{})}})
   return {id:preview.canonical,merge:id}
 }

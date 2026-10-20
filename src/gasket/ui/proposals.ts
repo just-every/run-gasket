@@ -8,8 +8,8 @@ import { proposalList } from '../proposals'
 import { card, field, form, h, hidden, tag } from './html'
 import { page } from './shell'
 
-const KIND: Record<string, string> = { interval: 'PM interval change', reassign: 'Reassignment', schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
-const LABELS: Record<string, string> = { outcome: 'Outcome comparison', schedule: 'Schedule', from: 'Evidence from', to: 'Evidence through', peers: 'Peer assets', rollbackPlan: 'Rollback plan', rollbackOf: 'Original approval', workOrder: 'Work order', asset: 'Asset', checklist: 'Checklist', title: 'Title', everyDays: 'Every (days)', meter: 'Meter', everyUnits: 'Every (units)', firstDue: 'First due', firstDueMeter: 'First due at', assignee: 'Maintainer', description: 'Details', due: 'Due', part: 'Part', counted: 'Counted', note: 'Note' }
+const KIND: Record<string, string> = { merge: 'Duplicate part merge', interval: 'PM interval change', reassign: 'Reassignment', schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
+const LABELS: Record<string, string> = { source: 'Duplicate part', canonical: 'Keep as canonical part', reason: 'Merge reason', outcome: 'Outcome comparison', schedule: 'Schedule', from: 'Evidence from', to: 'Evidence through', peers: 'Peer assets', rollbackPlan: 'Rollback plan', rollbackOf: 'Original approval', workOrder: 'Work order', asset: 'Asset', checklist: 'Checklist', title: 'Title', everyDays: 'Every (days)', meter: 'Meter', everyUnits: 'Every (units)', firstDue: 'First due', firstDueMeter: 'First due at', assignee: 'Maintainer', description: 'Details', due: 'Due', part: 'Part', counted: 'Counted', note: 'Note' }
 
 export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
   const rows = await proposalList(env, actor)
@@ -25,11 +25,16 @@ export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
   const decider = can(actor, 'proposal.decide')
   // One violet primary per screen: "Approve and run" on the first proposal this person may decide, secondary below it.
   const first = rows.find(row => decider && row.status === 'pending' && row.prepared_by !== actor.id)
-  const result = (row: any) => row.kind === 'reassign' && row.status === 'approved' ? h`<p><a href="/app/work/${row.result_id}">Open the reassigned work order</a></p>` : row.status !== 'approved' || !row.result_id ? '' : row.kind === 'corrective' ? h`<p><a href="/app/work/${row.result_id}">Open the work order it raised</a></p>`
+  const result = (row: any) => row.kind === 'merge' && row.status === 'approved' ? h`<p><a href="/app/parts/${row.result_id}">Open the canonical part</a></p>` : row.kind === 'reassign' && row.status === 'approved' ? h`<p><a href="/app/work/${row.result_id}">Open the reassigned work order</a></p>` : row.status !== 'approved' || !row.result_id ? '' : row.kind === 'corrective' ? h`<p><a href="/app/work/${row.result_id}">Open the work order it raised</a></p>`
     : ['schedule', 'interval'].includes(row.kind) ? h`<p><a href="/app/schedules">${row.kind === 'interval' ? 'See the revised schedule' : 'See the schedule it created'}</a></p>` : h`<p><a href="/app/parts/${row.payload.part}">See the part's count</a></p>`
   const items = rows.map(row => card(KIND[row.kind], h`<p>${row.reasoning}</p>
     <p class="gk-eyebrow">What it will change</p><dl class="gk-pairs">${Object.entries(row.payload as Record<string, string>).map(([key, value]) => h`<div><dt>${LABELS[key] ?? key}</dt><dd>${show(key, value)}</dd></div>`)}</dl>
     ${row.kind === 'interval' ? intervalEvidenceCard(row, actor) : ''}
+    ${row.kind === 'merge' ? h`<p class="gk-eyebrow">Retained stock and value</p>
+      ${row.basis.balances.map((balance: any) => h`<p><a href="/app/parts/${balance.id}">${balance.number}</a>: ${balance.quantity} ${balance.unit}, USD ${(balance.valueCents / 100).toFixed(2)}</p>`)}
+      <p>Combined: ${row.basis.combined.quantity} ${row.basis.combined.unit}, USD ${(row.basis.combined.valueCents / 100).toFixed(2)}. Quantity adjustment: ${row.basis.quantityDelta}; value adjustment: USD ${(row.basis.valueDeltaCents / 100).toFixed(2)}.</p>
+      <p>${row.basis.consequence}</p><p>${row.basis.boundary}</p>
+      <details><summary>Source stock movements (${row.basis.movements.length})</summary>${row.basis.movements.map((move: any) => h`<p>${move.kind}: ${move.quantity}, USD ${(move.valueCents / 100).toFixed(2)} · ${showInstant(move.at, actor.zone)} · <a href="/app/parts/${move.part}">Open retained source history</a></p>`)}</details>` : ''}
     <p class="gk-sub">Prepared by ${row.prepared_by_name} · ${showInstant(row.prepared_at, actor.zone)}${row.decided_by_name ? ` · ${row.status === 'approved' ? 'approved' : 'rejected'} by ${row.decided_by_name} ${showInstant(row.decided_at, actor.zone)}` : ''}${row.decision_note ? ` · ${row.decision_note}` : ''}</p>
     ${decider && row.status === 'pending' && row.prepared_by !== actor.id ? h`<div class="gk-split">
       ${form('proposal.decide', '/app/proposals', h`${hidden('proposal', row.id)}${hidden('decision', 'approve')}${hidden('hash', row.payload_hash)}`, 'Approve and run', { secondary: row !== first })}

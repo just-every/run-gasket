@@ -1,4 +1,5 @@
 import { applyInterval, intervalBasis } from './intervals'
+import { approveMerge, mergeProposalBasis } from './part-merge'
 import { canonicalPart } from './part-identity'
 // Agent preparation, human approval. An agent (or a lead) prepares a schedule,
 // a corrective work order or a parts count; a lead or the owner approves it.
@@ -16,11 +17,12 @@ import { auditFence, auditRevision, followUpCase } from './agent-follow-up'
 import { isDate } from './dates'
 import { meterNumber, toMilli } from './quantity'
 
-const KINDS = ['schedule', 'corrective', 'count', 'reassign', 'interval'] as const
+const KINDS = ['schedule', 'corrective', 'count', 'reassign', 'interval', 'merge'] as const
 type Kind = typeof KINDS[number]
 
 /** The versions a proposal relies on: if any changes before approval, the proposal is stale. */
 async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string>, actor: Actor) {
+  if (kind === 'merge') return mergeProposalBasis(env, actor, Input.of(payload))
   if (kind === 'interval') return intervalBasis(env, actor, payload)
   if (kind === 'reassign') {
     const state = await followUpCase(env, actor, payload.workOrder)
@@ -48,11 +50,12 @@ function payloadOf(kind: Kind, input: Input): Record<string, string> {
     corrective: [['asset', true], ['title', true], ['description', false], ['due', true], ['assignee', false], ['outcome', false]],
     count: [['part', true], ['counted', true], ['note', false]],
     interval: [['schedule', true], ['everyDays', false], ['everyUnits', false], ['from', true], ['to', true], ['peers', true], ['rollbackPlan', true], ['rollbackOf', false], ['outcome', false]],
+    merge: [['source', true], ['canonical', true], ['reason', true]],
     reassign: [['workOrder', true], ['assignee', true], ['note', true]],
   }
   const payload: Record<string, string> = {}
   for (const [name, required] of fields[kind]) {
-    const value = input.text(name, { optional: !required, max: 2000 })
+    const value = input.text(name, { optional: !required, max: name === 'reason' ? 1000 : 2000 })
     if (value) payload[name] = value
   }
   if (kind === 'interval' && payload.everyUnits) payload.everyUnits = meterNumber(payload.everyUnits, 'everyUnits')
@@ -98,13 +101,14 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   const command = Input.of(proposal.kind === 'count' ? { ...payload, seen: String((basis as { moves: number }).moves) } : payload)
   // The command and the decision commit in one batch: a second approver finds it decided.
   const also = (resultId: string) => [
-    ...(['reassign', 'interval'].includes(proposal.kind) ? [auditFence(env, revision)] : []),
+    ...(['reassign', 'interval', 'merge'].includes(proposal.kind) ? [auditFence(env, revision)] : []),
     guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id = ? AND status = 'pending')", proposal.id),
     stmt(env, "UPDATE gk_proposals SET status = 'approved', decided_by = ?, decided_at = ?, decision_note = ?, result_id = ? WHERE id = ?", actor.id, now(), note, resultId, proposal.id),
     stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.approve', proposal.id, JSON.stringify({ hash: proposal.payload_hash, result: resultId })),
   ]
   const options = { proposal: proposal.id, also }
-  const result = proposal.kind === 'interval' ? await applyInterval(env, actor, payload, basis as Awaited<ReturnType<typeof intervalBasis>>, proposal.id, also(payload.schedule))
+  const result = proposal.kind === 'merge' ? await approveMerge(env, actor, Input.of({ ...payload, fingerprint: (basis as { fingerprint: string }).fingerprint }), options)
+    : proposal.kind === 'interval' ? await applyInterval(env, actor, payload, basis as Awaited<ReturnType<typeof intervalBasis>>, proposal.id, also(payload.schedule))
     : proposal.kind === 'schedule' ? await createSchedule(env, actor, command, options)
     : proposal.kind === 'corrective' ? await createCorrective(env, actor, command, options)
     : proposal.kind === 'reassign' ? await assign(env, actor, command, options)
