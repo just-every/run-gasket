@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001, PM-006, PLAN-002, REPORT-004, REPORT-003, PART-002, ASSET-006, PLAN-006, ASSET-001, REPORT-002, REPORT-005, PLAN-001, FIELD-009, FIELD-007, ASSET-007, FIELD-004, ASSET-008, FIELD-005, ASSET-003, PART-007, PART-004, PART-009, BUY-001, PM-008, PM-009, BUY-002, REPORT-009, BUY-003, BUY-004, PART-005 and BUY-006 were re-judged on 19 and 20 October 2026 at the commits that changed their rows.
+Judged from the code and tests at commit `9f940994da44f7cdf2d0973f70fc30390bbe40d4` (17 October 2026); GAS-09, GAS-11, ADMIN-006, PLAN-007, PM-004, ASSET-005, MIG-002, ASSET-004, PM-003, PM-002, PM-001, PM-006, PLAN-002, REPORT-004, REPORT-003, PART-002, ASSET-006, PLAN-006, ASSET-001, REPORT-002, REPORT-005, PLAN-001, FIELD-009, FIELD-007, ASSET-007, FIELD-004, ASSET-008, FIELD-005, ASSET-003, PART-007, PART-004, PART-009, BUY-001, PM-008, PM-009, BUY-002, REPORT-009, BUY-003, BUY-004, PART-005, BUY-006 and AGENT-005 were re-judged on 19 and 20 October 2026 at the commits that changed their rows.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 37 | 24 | 61 | 122 |
-| All | 51 | 24 | 61 | 136 |
+| Target and push further | 38 | 23 | 61 | 122 |
+| All | 52 | 23 | 61 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
