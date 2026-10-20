@@ -7,19 +7,20 @@ import { proposalList } from '../proposals'
 import { card, field, form, h, hidden, tag } from './html'
 import { page } from './shell'
 
-const KIND: Record<string, string> = { schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
-const LABELS: Record<string, string> = { asset: 'Asset', checklist: 'Checklist', title: 'Title', everyDays: 'Every (days)', meter: 'Meter', everyUnits: 'Every (units)', firstDue: 'First due', firstDueMeter: 'First due at', assignee: 'Maintainer', description: 'Details', due: 'Due', part: 'Part', counted: 'Counted', note: 'Note' }
+const KIND: Record<string, string> = { reassign: 'Reassignment', schedule: 'Preventive schedule', corrective: 'Corrective work order', count: 'Parts count' }
+const LABELS: Record<string, string> = { workOrder: 'Work order', asset: 'Asset', checklist: 'Checklist', title: 'Title', everyDays: 'Every (days)', meter: 'Meter', everyUnits: 'Every (units)', firstDue: 'First due', firstDueMeter: 'First due at', assignee: 'Maintainer', description: 'Details', due: 'Due', part: 'Part', counted: 'Counted', note: 'Note' }
 
 export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
   const rows = await proposalList(env, actor)
   // Show the records a proposal names by their business names; the ids stay in Details.
   const names = new Map<string, string>((await all(env, `SELECT id, tag || ' ' || name AS label FROM gk_assets UNION ALL SELECT id, number || ' ' || name FROM gk_parts
+    UNION ALL SELECT id, 'WO-' || number || ' ' || title FROM gk_work_orders
     UNION ALL SELECT id, name FROM gk_members UNION ALL SELECT id, name FROM gk_checklists UNION ALL SELECT id, name || ' (' || unit || ')' FROM gk_meters`)).map(row => [row.id, row.label]))
   const show = (key: string, value: string) => ['due', 'firstDue'].includes(key) ? showDate(value) : names.get(value) ?? value
   const decider = can(actor, 'proposal.decide')
   // One violet primary per screen: "Approve and run" on the first proposal this person may decide, secondary below it.
   const first = rows.find(row => decider && row.status === 'pending' && row.prepared_by !== actor.id)
-  const result = (row: any) => row.status !== 'approved' || !row.result_id ? '' : row.kind === 'corrective' ? h`<p><a href="/app/work/${row.result_id}">Open the work order it raised</a></p>`
+  const result = (row: any) => row.kind === 'reassign' && row.status === 'approved' ? h`<p><a href="/app/work/${row.result_id}">Open the reassigned work order</a></p>` : row.status !== 'approved' || !row.result_id ? '' : row.kind === 'corrective' ? h`<p><a href="/app/work/${row.result_id}">Open the work order it raised</a></p>`
     : row.kind === 'schedule' ? h`<p><a href="/app/schedules">See the schedule it created</a></p>` : h`<p><a href="/app/parts/${row.payload.part}">See the part's count</a></p>`
   const items = rows.map(row => card(KIND[row.kind], h`<p>${row.reasoning}</p>
     <p class="gk-eyebrow">What it will change</p><dl class="gk-pairs">${Object.entries(row.payload as Record<string, string>).map(([key, value]) => h`<div><dt>${LABELS[key] ?? key}</dt><dd>${show(key, value)}</dd></div>`)}</dl>

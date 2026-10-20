@@ -8,12 +8,12 @@ import { emittedWorker } from '../emitted-worker.mjs'
 import { offset } from './clock.mjs'
 import { installation as newInstallation } from './installation.mjs'
 
-export async function harness({ vars, installation } = {}) {
+export async function harness({ vars, installation, clockOffset = offset } = {}) {
   const secret = () => randomBytes(32).toString('base64url')
   vars ??= { OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: secret(), SETUP_TOKEN: secret() }
   const owned = !installation
   if (owned) { installation = await newInstallation(); await installation.migrate() }
-  const worker = await emittedWorker(vars, { installation: installation.root, offset }), origin = worker.origin
+  const worker = await emittedWorker(vars, { installation: installation.root, offset: clockOffset }), origin = worker.origin
   /** Stops the Worker and keeps the installation's data; close also removes an installation made here. */
   let stopped = false
   const stop = async () => { if (!stopped) { stopped = true; await worker.close() } }

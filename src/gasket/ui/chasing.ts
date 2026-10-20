@@ -6,7 +6,7 @@ import { showDate, showInstant } from '../dates'
 import { card, field, form, h, hidden, select, table, tag } from './html'
 import { page } from './shell'
 
-const KIND: Record<string, string> = { replenishment: 'Replenishment', reminder: 'Reminder', overdue: 'Overdue', escalation_lead: 'Escalated to leads', escalation_supervisor: 'Escalated to supervisors', blocker_missed: 'Blocker promise missed', declined: 'Declined', mention: 'Mentioned', expiry: 'Document expiry' }
+const KIND: Record<string, string> = { agent_query: 'Agent question', agent_escalation: 'Agent escalation', replenishment: 'Replenishment', reminder: 'Reminder', overdue: 'Overdue', escalation_lead: 'Escalated to leads', escalation_supervisor: 'Escalated to supervisors', blocker_missed: 'Blocker promise missed', declined: 'Declined', mention: 'Mentioned', expiry: 'Document expiry' }
 const BLOCKERS = [{ value: 'parts', label: 'Parts' }, { value: 'access', label: 'Access' }, { value: 'skill', label: 'Skill' }, { value: 'production', label: 'Production' }]
 
 export async function noticesPage(env: Bindings, actor: Actor, url: URL) {
@@ -23,10 +23,10 @@ export const blockerFields = (people: { id: string; name: string }[]) => h`<div 
 /** The chase on one work order: overdue age, responses, blockers and notices, with the assignee's and a lead's actions. */
 export function chaseCard(w: any, actor: Actor, back: string, people: { id: string; name: string }[]) {
   const chase = w.chase, open = ['open', 'in_progress', 'returned'].includes(w.status)
-  if (!chase.overdue_since && !chase.blockers.length && !chase.notices.length && !open) return ''
+  if (!chase.overdue_since && !chase.blockers.length && !chase.notices.length && !chase.queries.length && !open) return ''
   const post = (action: string, fields: unknown, label: string) => form(action, back, h`${hidden('workOrder', w.id)}${fields}`, label, { secondary: true })
   const mine = open && w.assignee_id === actor.id, lead = open && can(actor, 'work.assign')
-  return card('Chasing', h`${chase.overdue_since ? h`<p>${tag('Overdue')} since ${showDate(chase.overdue_since)}: ${chase.overdue_days} day${chase.overdue_days === 1 ? '' : 's'}. Reassigning keeps this age.</p>` : ''}
+  return card('Chasing', h`${chase.queries.map((q: any) => h`<p><b>${q.question}</b><span class="gk-sub">For ${q.recipient}${q.answered_at ? ` · Next: ${q.next_action} · Promised ${showDate(q.promised_on)}` : ' · Awaiting next action and promised date'}</span></p>${q.recipient_id === actor.id && !q.answered_at && !['closed','cancelled'].includes(w.status) ? form('agent.answer', back, h`${hidden('query', q.id)}${field('Next action', 'nextAction')}${field('Promised by', 'promisedOn', { type: 'date' })}`, 'Answer agent', { secondary: true }) : ''}`)}${chase.overdue_since ? h`<p>${tag('Overdue')} since ${showDate(chase.overdue_since)}: ${chase.overdue_days} day${chase.overdue_days === 1 ? '' : 's'}. Reassigning keeps this age.</p>` : ''}
     ${chase.responses.length ? h`<ul class="gk-plain-list">${chase.responses.map((row: any) => h`<li>${row.response === 'on_it' ? 'On it' : 'Blocked'}${row.note ? `: ${row.note}` : ''}<span class="gk-sub">${row.by ?? '—'}</span></li>`)}</ul>` : ''}
     ${chase.blockers.length ? table(['Blocker', 'Owner', 'Promised'], chase.blockers.map((row: any) => [h`${tag(BLOCKERS.find(item => item.value === row.kind)!.label)} ${row.next_action}${row.resolved_at ? h`<span class="gk-sub">Cleared: ${row.resolution}</span>` : ''}`, row.owner ?? '—',
       showDate(row.promised_on)]), 'Blockers', { wrap: [0] }) : ''}

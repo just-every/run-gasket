@@ -1,3 +1,4 @@
+import { queriesOf } from './agent-follow-up'
 // PM-006: chasing overdue work. Each scheduler run (PM-001) applies the site's
 // chase rule at the site's date: it reminds the assignee a set number of days
 // before the due date and again once it is overdue, asks them to respond (on it,
@@ -126,6 +127,7 @@ export const notices = async (env: Bindings, actor: Actor) => (await all(env, `S
 /** One work order's chase: overdue start and age, responses, blockers and every notice sent about it. */
 export async function chaseOf(env: Bindings, order: Row, today: string) {
   return {
+    queries: await queriesOf(env, order.id),
     overdue_since: order.overdue_since ?? null, overdue_days: order.overdue_since ? daysBetween(order.overdue_since, today) : 0,
     responses: await all(env, 'SELECT r.response, r.note, r.at, m.name AS by FROM gk_chase_responses r LEFT JOIN gk_members m ON m.id = r.member_id WHERE r.work_order_id = ? ORDER BY r.at, r.id', order.id),
     blockers: await all(env, 'SELECT b.id, b.kind, b.next_action, b.promised_on, b.resolved_at, b.resolution, o.name AS owner, b.owner_id FROM gk_blockers b LEFT JOIN gk_members o ON o.id = b.owner_id WHERE b.work_order_id = ? ORDER BY b.raised_at, b.id', order.id),

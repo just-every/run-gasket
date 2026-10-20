@@ -105,7 +105,7 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
 }
 
 /** PLAN-002: assign or reassign with an optional team, trade, shift and handoff note; the new assignee acknowledges afresh. */
-export async function assign(env: Bindings, actor: Actor, input: Input) {
+export async function assign(env: Bindings, actor: Actor, input: Input, { also }: FromProposal = {}) {
   requireCapability(actor, 'work.assign')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
   insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
@@ -115,6 +115,7 @@ export async function assign(env: Bindings, actor: Actor, input: Input) {
   await commit(env, [
     guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, order.version),
     ...handoffStatements(env, actor, order, assignee, crew, note),
+    ...(also?.(order.id) ?? []),
   ], { actor: actor.id, action: 'workorder.assign', subject: order.id, detail: { from: order.assignee_id, to: assignee, ...crew, note } })
   return { id: order.id }
 }

@@ -1,3 +1,4 @@
+import { askFollowUp, answerFollowUp, escalateFollowUp, recommendClosure } from './agent-follow-up'
 import { saveReplenishmentPolicy, saveReplenishmentEnvelope, approveReplenishmentEnvelope, revokeReplenishmentEnvelope } from './replenishment'
 // Every state change in Gasket, by name. The same handler serves the HTML form
 // door (/app/do/NAME) and the JSON door (/api/gasket/NAME) agents use. Each
@@ -56,6 +57,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'agent.query': askFollowUp, 'agent.answer': answerFollowUp, 'agent.escalate': escalateFollowUp, 'agent.closure': recommendClosure,
   'replenishment.policy': saveReplenishmentPolicy, 'replenishment.envelope': saveReplenishmentEnvelope,
   'replenishment.envelope.approve': approveReplenishmentEnvelope, 'replenishment.envelope.revoke': revokeReplenishmentEnvelope,
   'vendor.rule': setFollowRule,

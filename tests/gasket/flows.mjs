@@ -19,6 +19,7 @@ import { spendJourney } from './spend.mjs'
 import { metricsJourney } from './metrics.mjs'
 import { nestedJourney } from './nested.mjs'
 import { purchasingJourney } from './purchasing.mjs'
+import { agentFollowUpJourney } from './agent-follow-up.mjs'
 import { vendorFollowUpJourney } from './vendor-follow-up.mjs'
 import { now, zone } from './clock.mjs'
 
@@ -2217,6 +2218,8 @@ try {
   await check('PART-005 reorder policies and BUY-006 per-order and period auto-buy limits', replenishmentJourney)
 
   await check('BUY-006 vendor delivery follow-up', vendorFollowUpJourney)
+
+  await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
 
   await check('BUY-003 spend approval and purchasing separation', async () => { await spendJourney(h,cookie,{...ids,asset:ids.compressor}) })
 
