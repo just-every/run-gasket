@@ -55,6 +55,11 @@ export async function receivePart(env: Bindings, actor: Actor, input: Input) {
 export async function countPart(env: Bindings, actor: Actor, input: Input, { proposal, also }: FromProposal = {}) {
   requireCapability(actor, proposal ? 'proposal.decide' : 'register.manage')
   const found = await part(env, input.text('part', { max: 100 }))
+  const revision=input.integer('revision',{min:1,max:Number.MAX_SAFE_INTEGER,optional:true})
+  insist(revision===null || revision===found.revision,'stale',409)
+  // A merge can change the counted shelf without changing MAX(movement seq).
+  const merged=await one(env,'SELECT 1 FROM gk_part_canonical WHERE canonical_id=?',found.id)
+  insist(proposal || !input.has('seen') || revision!==null || !merged,'stale',409)
   const counted = toMilli(input.text('counted', { max: 20 }), 'counted', { allowZero: true })
   const latest = (await one<{ seq: number | null }>(env, 'SELECT MAX(seq) AS seq FROM gk_stock_moves WHERE part_id = ?', found.id))!.seq ?? 0
   const seen = input.has('seen') ? input.integer('seen', { min: 0, max: Number.MAX_SAFE_INTEGER })! : latest
@@ -64,6 +69,7 @@ export async function countPart(env: Bindings, actor: Actor, input: Input, { pro
   const value = await varianceValue(env, found.id, variance)
   const id = newId()
   await commit(env, [
+    guard(env,'stale','EXISTS(SELECT 1 FROM gk_parts WHERE id=? AND revision=?)',found.id,found.revision),
     guard(env, 'stale', '(SELECT COALESCE(MAX(seq), 0) FROM gk_stock_moves WHERE part_id = ?) = ?', found.id, seen),
     stmt(env, "INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, value_cents, counted_milli, note, actor, at) VALUES (?, ?, 'count', ?, ?, ?, ?, ?, ?)", id, found.id, variance, value, counted, note, actor.id, now()),
     ...(also?.(id) ?? []),
