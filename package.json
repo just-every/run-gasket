@@ -30,7 +30,8 @@
     "deps": "rer install",
     "rer": "rer",
     "test:flows": "rer queue test:flows -- sh -c \"node tests/gasket/flows.mjs\"",
-    "test:site": "node --test tests/site/*.test.mjs"
+    "test:site": "node --test tests/site/*.test.mjs",
+    "test:agent-stock": "rer queue test:agent-stock -- sh -c \"node tests/gasket/agent-stock.mjs\""
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.41",

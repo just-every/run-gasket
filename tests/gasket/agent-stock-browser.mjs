@@ -28,7 +28,8 @@ export async function agentStockBrowser({h,cookie,proposal,source,canonical}) {
     }
     await page.goto(h.origin+'/app/proposals')
     const approve=page.locator('form[action="/app/do/proposal.decide"]').filter({has:page.locator(`[name=proposal][value="${proposal.id}"]`)}).filter({has:page.locator('[name=decision][value=approve]')})
-    await Promise.all([page.waitForURL(url=>url.searchParams.has('notice')),approve.getByRole('button',{name:'Approve and run'}).click()])
+    await Promise.all([page.waitForURL(url=>url.searchParams.has('notice'),{waitUntil:'domcontentloaded'}),approve.getByRole('button',{name:'Approve and run'}).click()])
+    await page.getByText('Saved.',{exact:true}).waitFor({state:'visible'})
     assert.equal((await h.api(`parts/${source}`,cookie.lead)).id,canonical)
     for(const width of [1440,390]) {
       await page.setViewportSize({width,height:1100})
