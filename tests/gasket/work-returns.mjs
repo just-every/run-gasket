@@ -112,7 +112,20 @@ export async function workReturnsJourney() {
     const restoredCookie=await restoredHarness.signIn('return-lead@example.test')
     assert.deepEqual(await restoredHarness.api(`parts/${part}`,restoredCookie),final,'PART-003 archive restores all usable stock, quarantine, original valuation and reasons')
     assert.deepEqual((await restoredHarness.api(`work/${work}`,restoredCookie)).parts,detail.parts)
-    console.log('PART-003 damaged returns, original value, stock exclusion, reconciliation and archive passed')
+    // Canonical identity changes must retain held damaged goods and cite their
+    // offsets rather than presenting the returned quantity as available stock.
+    const canonical=(await restoredHarness.api('part.create',restoredCookie,{number:'RETURN-6205-CANON',name:'Canonical drive bearing',unit:'each'})).id
+    await restoredHarness.api('part.receive',restoredCookie,{part:canonical,quantity:'1',unitPrice:'5'})
+    const agent=await restoredHarness.signIn('return-agent@example.test')
+    const proposal=await restoredHarness.api('proposal.prepare',agent,{kind:'merge',payload:{source:part,canonical,reason:'Confirmed same stocking unit and bearing'},reasoning:'Consolidate supplier numbers, retain held damaged bearings'})
+    const retained=(await restoredHarness.api('proposals',restoredCookie)).find(row=>row.id===proposal.id)
+    assert.deepEqual(retained.basis.combined,{quantity:'1',unit:'each',valueCents:500})
+    assert.equal(retained.basis.movements.reduce((sum,move)=>sum+Number(move.quantity),0),1,'PART-003 merge citations reconcile usable quantity including quarantine offsets')
+    assert.equal(retained.basis.movements.reduce((sum,move)=>sum+move.valueCents,0),500)
+    await restoredHarness.api('proposal.decide',restoredCookie,{proposal:proposal.id,hash:proposal.hash,decision:'approve'})
+    const merged=await restoredHarness.api(`parts/${part}`,restoredCookie)
+    assert.deepEqual([merged.onHand,merged.valueCents,merged.quarantinedQuantity,merged.quarantinedValueCents],['1',500,'3',4000],'PART-003 identity merge preserves quarantine and original value without releasing it')
+    console.log('PART-003 damaged returns, original value, stock exclusion, reconciliation, archive and canonical merge passed')
   } finally {await restoredHarness?.close();await restored?.remove();await h.close()}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) await workReturnsJourney()
