@@ -29,6 +29,7 @@ async function browserReturn(h,cookie,work,part) {
       await page.getByRole('heading',{name:'Damaged work returns',exact:true}).scrollIntoViewIfNeeded()
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`PART-003 Part fits ${width}`)
       await page.screenshot({path:join(process.env.RETURN_SCREENSHOTS,`part-quarantine-${width}.png`)})
+      await page.locator('#damaged-returns').screenshot({path:join(process.env.RETURN_SCREENSHOTS,`quarantine-detail-${width}.png`)})
       assert.match(await page.locator('#damaged-returns').innerText(),/Cracked bearing cage/)
     }
     await context.close()
@@ -95,6 +96,12 @@ export async function workReturnsJourney() {
     assert.deepEqual([empty.onHand,empty.valueCents,empty.quarantinedQuantity],['0',0,'2'])
     await h.api('workorder.issue',cookie.max,{workOrder:next,part,quantity:'0.001'},409)
     assert.deepEqual(await stock(),empty,'PART-003 quarantined bearings cannot be issued after usable stock runs out')
+    const stockoutsBefore=(await h.api('stores',cookie.lead)).stockouts.events.filter(event=>event.part.id===part)
+    assert.equal(stockoutsBefore.length,2,'PART-003 both real stockouts are work issues')
+    await h.api('workorder.return',cookie.max,{workOrder:next,part,quantity:'1',condition:'damaged',reason:'Broken seal, held for disposition'})
+    const final=await stock()
+    assert.deepEqual([final.onHand,final.valueCents,final.quarantinedQuantity,final.quarantinedValueCents],['0',0,'3',4000])
+    assert.deepEqual((await h.api('stores',cookie.lead)).stockouts.events.filter(event=>event.part.id===part),stockoutsBefore,'PART-003 an atomic damaged return never creates a phantom stockout')
     // Supported archive command round trip retains the new immutable quarantine facts.
     await h.stop()
     const archive=join(h.installation.root,'exports','damaged-returns.rer')
@@ -103,7 +110,7 @@ export async function workReturnsJourney() {
     await restored.rer('import','--input',archive,'--yes')
     restoredHarness=await harness({vars:h.vars,installation:restored})
     const restoredCookie=await restoredHarness.signIn('return-lead@example.test')
-    assert.deepEqual(await restoredHarness.api(`parts/${part}`,restoredCookie),empty,'PART-003 archive restores all usable stock, quarantine, original valuation and reasons')
+    assert.deepEqual(await restoredHarness.api(`parts/${part}`,restoredCookie),final,'PART-003 archive restores all usable stock, quarantine, original valuation and reasons')
     assert.deepEqual((await restoredHarness.api(`work/${work}`,restoredCookie)).parts,detail.parts)
     console.log('PART-003 damaged returns, original value, stock exclusion, reconciliation and archive passed')
   } finally {await restoredHarness?.close();await restored?.remove();await h.close()}

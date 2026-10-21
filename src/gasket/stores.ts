@@ -64,7 +64,15 @@ export async function storesReport(env: Bindings, actor: Actor, url: URL) {
   const rows = parts.map(part => {
     let onHand = 0, stocked = false
     const stockouts: { seq: number; at: number; kind: string; workOrder: number | null }[] = []
+    // A damaged return and its quarantine offset are one atomic movement.
+    // Never treat the intermediate return as briefly usable stock or a stockout.
+    const timeline = new Map<number, Row>()
     for (const move of byPart.get(part.id)!) {
+      const prior = timeline.get(move.seq)
+      if (prior) prior.quantity_milli += move.quantity_milli
+      else timeline.set(move.seq, { ...move })
+    }
+    for (const move of timeline.values()) {
       if (inPeriod(move) && onHand > 0) stocked = true
       const before = onHand
       onHand += move.quantity_milli
