@@ -88,6 +88,8 @@ export async function workReturnsJourney() {
     assert.match(csv,/RETURN-6205,Drive bearing,each,0,0.00,4,60.00,-3,-30.00,3,30.00,0,0.00,-2,-20.00,2,40.00,20.00,0/)
     const movements=await (await h.raw('/app/stores/movements.csv',{cookie:cookie.lead})).text()
     assert.match(movements,/Damaged return quarantine,-(?:1|0.5),-(?:10.00|5.00),damaged/)
+    const history=await h.api(`assets/${asset}/history`,cookie.lead)
+    assert.ok(history.events.some(event=>event.what.includes('damaged, quarantined: Cracked bearing cage')),'PART-003 asset history names the damaged destination and reason')
     await h.api('workorder.issue',cookie.max,{workOrder:next,part,quantity:'2'})
     const empty=await stock()
     assert.deepEqual([empty.onHand,empty.valueCents,empty.quarantinedQuantity],['0',0,'2'])
@@ -95,7 +97,7 @@ export async function workReturnsJourney() {
     assert.deepEqual(await stock(),empty,'PART-003 quarantined bearings cannot be issued after usable stock runs out')
     // Supported archive command round trip retains the new immutable quarantine facts.
     await h.stop()
-    const archive=join(h.installation.root,'damaged-returns.rer')
+    const archive=join(h.installation.root,'exports','damaged-returns.rer')
     await h.installation.rer('export','--output',archive)
     restored=await installation()
     await restored.rer('import','--input',archive,'--yes')
