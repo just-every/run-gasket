@@ -182,6 +182,7 @@ export async function agentStockJourney() {
     await read(); await read()
     assert.deepEqual({part:await h.api(`parts/${discoveryPart}`,cookie.lead),audit:await h.api('audit',cookie.owner),orders:await h.api('purchase-orders',cookie.owner)},beforeRead,'AGENT-006 assessment creates no movement, proposal, purchase or audit')
     const stockInsights=await h.api(`parts/${canonical}/insights`,cookie.agent)
+    assert.deepEqual(stockInsights.duplicates,[],'AGENT-006 unknown manufacturer data is never duplicate evidence')
     assert.ok(stockInsights.countVariances.some(m=>m.quantity==='-1'&&m.valueCents===-1000),'AGENT-006 count discrepancy stays linked to its actual movement after merge')
     await h.api('purchase.approve',cookie.sam,{order:order.id,revision:order.current_revision})
     await h.api('receipt.receive',cookie.lead,{order:order.id,revisionId:order.current.id,externalId:'AGENT-STOCK-PARTIAL',lines:[{line:0,part:discoveryPart,quantity:'3',quarantine:'1',bin:'A3'}]})

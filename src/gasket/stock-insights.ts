@@ -30,6 +30,7 @@ export async function stockInsights(env: Bindings, actor: Actor, id: string) {
   const currentUse = used(recent), previousUse = used(previous)
   const variances = movements.filter(move => move.kind === 'count' && move.quantity_milli !== 0)
   const row = (await evaluateReplenishment(env, actor.today)).find(row => row.part.id === part.id)
+  const estimate = row ? (BigInt(row.quantityMilli) * BigInt(row.policy.unitPrice) + 500n) / 1000n : null
   const replenishment = row ? {
     policyRevision: row.id, active: row.eligible, minimum: fromMilli(row.policy.minimum), safetyStock: fromMilli(row.policy.safety),
     maximum: fromMilli(row.policy.maximum), incoming: row.incoming,
@@ -38,7 +39,7 @@ export async function stockInsights(env: Bindings, actor: Actor, id: string) {
       late: doc.overdue, changed: doc.changed, href: `/api/gasket/purchase-orders/${doc.order_id}` })),
     quantity: row.proposed,
     // Policy unit-price estimate excludes freight/taxes and is never authorized spend.
-    estimateCents: Number((BigInt(row.quantityMilli) * BigInt(row.policy.unitPrice) + 500n) / 1000n),
+    estimateCents: estimate !== null && estimate <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(estimate) : null,
     below: row.below,
   } : null
   return {
