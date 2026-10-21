@@ -32,6 +32,7 @@ async function mergeSnapshot(env: Bindings, input: Input) {
     const select=table==='gk_part_photos' ? 'id,part_id,filename,media_type,sha256,added_by,added_at' : '*'
     dependencies[table]=await all(env, `SELECT ${select} FROM ${table} WHERE ${columns.map(c=>`${c} IN (SELECT value FROM json_each(?))`).join(' OR ')} ORDER BY rowid`,...columns.map(()=>json))
   }
+  dependencies.quarantines=await all(env, 'SELECT q.* FROM gk_work_return_quarantine q JOIN gk_part_moves m ON m.id=q.return_id WHERE m.part_id IN (SELECT value FROM json_each(?)) ORDER BY q.return_id',json)
   dependencies.catalogImports=await all(env,`SELECT id,supplier_id,digest,filename,applied_by,applied_at,undone_at FROM gk_catalog_imports WHERE EXISTS(SELECT 1 FROM json_each(scope_json,'$.parts') a JOIN json_each(?) b ON a.value=b.value) ORDER BY id`,json)
   dependencies.imports=await all(env, "SELECT * FROM ik_provenance WHERE target_kind='part' AND target_id IN (SELECT value FROM json_each(?)) ORDER BY id", json)
   dependencies.proposals=await all(env,"SELECT * FROM gk_proposals WHERE kind='count' AND json_extract(payload_json,'$.part') IN (SELECT value FROM json_each(?)) ORDER BY id",json)
@@ -64,7 +65,7 @@ export async function mergeProposalBasis(env: Bindings, actor: Actor, input: Inp
     balances: balances.map(row => ({ id: row.id, number: row.number, unit: row.unit, quantity: fromMilli(row.quantity_milli), valueCents: row.value_cents })),
     combined: { quantity: fromMilli(quantities), unit: balances[0].unit, valueCents: value },
     quantityDelta: '0', valueDeltaCents: 0,
-    movements: snapshot.dependencies.gk_part_moves.map((row: any) => ({ id: row.id, part: row.part_id, kind: row.kind, quantity: fromMilli(row.quantity_milli), valueCents: row.value_cents, workOrder: row.work_order_id, at: row.at })),
+    movements: (await all(env, 'SELECT * FROM gk_stock_moves WHERE source_part_id IN (SELECT value FROM json_each(?)) ORDER BY seq,kind DESC', JSON.stringify(snapshot.ids))).map((row: any) => ({ id: row.id, part: row.part_id, kind: row.kind, quantity: fromMilli(row.quantity_milli), valueCents: row.value_cents, workOrder: row.work_order_id, at: row.at })),
     references: Object.fromEntries(Object.entries(snapshot.dependencies).map(([name, rows]) => [name, rows.length])),
     consequence: snapshot.consequence,
     boundary: 'Identity consolidation only: no physical receipt, count, stock movement or spend is inferred. Bills and missing movements are not reconciled.' }

@@ -106,11 +106,12 @@ export async function reconciliation(env: Bindings, actor: Actor, url: URL) {
     ${SUM(during("'receive', 'opening'"), 'm.quantity_milli')} AS received_q, ${SUM(during("'receive', 'opening'"), 'm.value_cents')} AS received_v,
     ${SUM(during("'issue'"), 'm.quantity_milli')} AS issued_q, ${SUM(during("'issue'"), 'm.value_cents')} AS issued_v,
     ${SUM(during("'return'"), 'm.quantity_milli')} AS returned_q, ${SUM(during("'return'"), 'm.value_cents')} AS returned_v,
+    ${SUM(during("'quarantine'"), 'm.quantity_milli')} AS quarantined_q, ${SUM(during("'quarantine'"), 'm.value_cents')} AS quarantined_v,
     ${SUM(during("'count'"), 'm.quantity_milli')} AS counted_q, ${SUM(during("'count'"), 'm.value_cents')} AS counted_v,
     ${SUM(`m.at < ${end}`, 'm.quantity_milli')} AS closing_q, ${SUM(`m.at < ${end}`, 'm.value_cents')} AS closing_v,
     ${SUM(`m.at < ${end} AND (m.value_cents IS NULL OR (m.kind = 'receive' AND m.unit_price_cents IS NULL AND m.catalog_item_id IS NULL))`, '1')} AS unpriced
     FROM gk_parts p LEFT JOIN gk_stock_moves m ON m.part_id = p.id WHERE ${UNMERGED} GROUP BY p.id ORDER BY p.number`)
-  const keys = ['opening', 'received', 'issued', 'returned', 'counted', 'closing'] as const
+  const keys = ['opening', 'received', 'issued', 'returned', 'counted', 'quarantined', 'closing'] as const
   const parts = rows.map(row => ({ id: row.id, number: row.number, name: row.name, unit: row.unit, unpriced: row.unpriced as number,
     ...Object.fromEntries(keys.map(key => [key, { quantity: fromMilli(row[`${key}_q`]), valueCents: row[`${key}_v`] as number }])) as Record<typeof keys[number], { quantity: string; valueCents: number }>,
     averageCents: stockValue(row.closing_q, row.closing_v).averageCents }))
@@ -122,7 +123,7 @@ const money = (value: number | null) => value === null ? '' : `${value < 0 ? '-'
 
 export async function reconciliationCsv(env: Bindings, actor: Actor, url: URL) {
   const report = await reconciliation(env, actor, url)
-  const stages = [['opening', 'Opening'], ['received', 'Received'], ['issued', 'Issued'], ['returned', 'Returned'], ['counted', 'Count adjustment'], ['closing', 'Closing']] as const
+  const stages = [['opening', 'Opening'], ['received', 'Received'], ['issued', 'Issued'], ['returned', 'Returned'], ['counted', 'Count adjustment'], ['quarantined', 'Quarantine adjustment'], ['closing', 'Closing']] as const
   const header = ['From', 'To', 'Part number', 'Part', 'Unit', ...stages.flatMap(([, label]) => [`${label} quantity`, `${label} value (USD)`]), 'Average unit cost (USD)', 'Unpriced movements']
   const lines = report.parts.map(row => [report.from, report.to, row.number, row.name, row.unit, ...stages.flatMap(([key]) => [row[key].quantity, money(row[key].valueCents)]), money(row.averageCents), row.unpriced])
   lines.push([report.from, report.to, '', 'Total', '', ...stages.flatMap(([key]) => ['', money(report.totals[key])]), '', report.parts.reduce((sum, row) => sum + row.unpriced, 0)])

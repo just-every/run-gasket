@@ -55,7 +55,7 @@ export async function storesReport(env: Bindings, actor: Actor, url: URL) {
   const p = await period(env, actor, url)
   const value = await reconciliation(env, actor, new URL(`http://gasket.invalid/?from=${p.from}&to=${p.to}`))
   const parts = await all(env, `SELECT p.id, p.number, p.name, p.unit, p.origin, ${RESERVED} AS reserved FROM gk_parts p WHERE ${UNMERGED} ORDER BY p.number`)
-  const moves = await all(env, `${MOVES} WHERE m.at < ? ORDER BY m.seq`, p.end)
+  const moves = await all(env, `${MOVES} WHERE m.at < ? ORDER BY m.seq, m.kind DESC`, p.end)
   const lines = await all(env, `SELECT ${canonicalSql('l.part_id')} AS part_id, l.counted_milli, l.expected_milli FROM gk_count_lines l JOIN gk_counts c ON c.id = l.count_id WHERE c.submitted_at >= ? AND c.submitted_at < ?`, p.start, p.end)
   const inPeriod = (move: Row) => move.at >= p.start
   const byPart = new Map<string, Row[]>(parts.map(part => [part.id as string, []]))
@@ -111,13 +111,13 @@ export async function storesReport(env: Bindings, actor: Actor, url: URL) {
   }
 }
 
-const KIND: Record<string, string> = { opening: 'Opening stock', receive: 'Received', issue: 'Issued', return: 'Returned', count: 'Count adjustment' }
+const KIND: Record<string, string> = { opening: 'Opening stock', receive: 'Received', issue: 'Issued', return: 'Returned', count: 'Count adjustment', quarantine: 'Damaged return quarantine' }
 const money = (cents: number | null) => cents === null ? '' : `${cents < 0 ? '-' : ''}${(Math.abs(cents) / 100).toFixed(2)}`
 
 /** Every source movement of the period, oldest first. */
 export async function storesMovementsCsv(env: Bindings, actor: Actor, url: URL) {
   const p = await period(env, actor, url)
-  const moves = await all(env, `${MOVES} WHERE m.at >= ? AND m.at < ? ORDER BY m.seq`, p.start, p.end)
+  const moves = await all(env, `${MOVES} WHERE m.at >= ? AND m.at < ? ORDER BY m.seq, m.kind DESC`, p.start, p.end)
   const header = ['When (site time)', 'Part number', 'Part', 'Unit', 'Movement', 'Quantity', 'Value (USD)', 'Reason', 'Work order', 'Asset tag', 'Origin', 'By']
   const rows = moves.map(move => [localNow(actor.zone, move.at).replace('T', ' '), move.number, move.part_name, move.unit, KIND[move.kind], fromMilli(move.quantity_milli), move.value_cents === null ? 'unpriced' : money(move.value_cents), move.reason ?? '',
     move.work_number ? `WO-${String(move.work_number).padStart(4, '0')}` : '', move.tag ?? '', move.origin === 'import' ? 'moved in' : 'native', move.by_name ?? (move.origin === 'import' ? 'Move-in' : '')])

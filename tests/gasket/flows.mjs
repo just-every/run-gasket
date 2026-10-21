@@ -17,6 +17,7 @@ import { installation } from './installation.mjs'
 import { automationJourney } from './automation.mjs'
 import { replenishmentJourney } from './replenishment.mjs'
 import { receivingJourney } from './receiving.mjs'
+import { workReturnsJourney } from './work-returns.mjs'
 import { purchaseOrdersJourney } from './purchase-orders.mjs'
 import { spendJourney } from './spend.mjs'
 import { metricsJourney } from './metrics.mjs'
@@ -1216,7 +1217,7 @@ try {
     assert.deepEqual(['opening', 'received', 'issued', 'returned', 'counted', 'closing'].map(key => [row[key].quantity, row[key].valueCents]), [['0', 0], ['18', 24949], ['-7', -9667], ['1', 1372], ['-0.5', -694], ['11.5', 15960]])
     assert.deepEqual([row.averageCents, row.unpriced], [1388, 0])
     const milli = text => Math.round(Number(text) * 1000)
-    for (const part of period.parts) for (const unit of [entry => milli(entry.quantity), entry => entry.valueCents]) assert.equal(unit(part.opening) + unit(part.received) + unit(part.issued) + unit(part.returned) + unit(part.counted), unit(part.closing), part.number)
+    for (const part of period.parts) for (const unit of [entry => milli(entry.quantity), entry => entry.valueCents]) assert.equal(unit(part.opening) + unit(part.received) + unit(part.issued) + unit(part.returned) + unit(part.counted) + unit(part.quarantined), unit(part.closing), part.number)
     assert.ok(period.parts.some(part => part.unpriced > 0), 'stock received without a price is reported unpriced, never costed')
     const later = (await h.api(`valuation?from=${addDays(today, 1)}&to=${addDays(today, 1)}`, cookie.lead)).parts.find(part => part.id === bearing)
     assert.deepEqual([later.opening, later.received.quantity, later.closing], [{ quantity: '11.5', valueCents: 15960 }, '0', { quantity: '11.5', valueCents: 15960 }])
@@ -1225,7 +1226,7 @@ try {
     assert.match(csv.headers.get('content-type'), /^text\/csv/)
     const lines = (await csv.text()).trim().split('\r\n')
     assert.match(lines[0], /^From,To,Part number,Part,Unit,Opening quantity,Opening value \(USD\),Received quantity,Received value \(USD\)/)
-    assert.equal(lines.find(line => line.includes('BRG-6310')), `${today},${today},BRG-6310,Motor bearing,each,0,0.00,18,249.49,-7,-96.67,1,13.72,-0.5,-6.94,11.5,159.60,13.88,0`)
+    assert.equal(lines.find(line => line.includes('BRG-6310')), `${today},${today},BRG-6310,Motor bearing,each,0,0.00,18,249.49,-7,-96.67,1,13.72,-0.5,-6.94,0,0.00,11.5,159.60,13.88,0`)
     assert.match(lines.at(-1), /,Total,/)
     // Pages: the value, average, vendor price, lot prices and the work's parts cost.
     const partPage = await (await h.raw(`/app/parts/${bearing}`, { cookie: cookie.lead })).text()
@@ -2217,6 +2218,8 @@ try {
   })
 
   await check('PART-008 supplier catalogs and approved canonical parts',async()=>{await partCatalogJourney(h,cookie)})
+
+  await check('PART-003 damaged work returns and retained value', workReturnsJourney)
 
   await check('BUY-004 partial receiving, inspection and returns', async () => { await receivingJourney(h,cookie) })
 
