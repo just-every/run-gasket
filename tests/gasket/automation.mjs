@@ -127,7 +127,7 @@ export async function connectorJourney() {
   let activeInstall=install
   const restoredInstalls=[]
   const keys=new Map(), modes=new Map(), received=[], applied=new Map(), effects={work:[],stock:[],bills:[],notices:[]}
-  let receiverClock=now(), h, cookie, captured, inFlight=0, maxInFlight=0
+  let receiverClock=now(), runtimeOffset=offset, h, cookie, captured, inFlight=0, maxInFlight=0
   const outbound=async request=>{
     const name=new URL(request.url).pathname.slice(1), config=keys.get(name)
     assert.ok(config,`expected receiver ${name}`)
@@ -143,7 +143,7 @@ export async function connectorJourney() {
       if(mode==='reject')return new Response('Synthetic invalid receiver configuration',{status:422})
       if(mode==='redirect')return new Response(null,{status:307,headers:{location:'https://other.example.test/receiver'}})
       if(mode==='unavailable')return new Response('Synthetic unavailable receiver',{status:503})
-      const response=await receiveWebhook(request,{...config,now:receiverClock,acceptOnce:async(id,event)=>{
+      const response=await receiveWebhook(request,{...config,now:Date.now()+runtimeOffset,acceptOnce:async(id,event)=>{
         if(applied.has(id))return{duplicate:true}
         // Synthetic receiver transaction: persist identity and all four kinds
         // of external effect together. It survives a sender Worker restart.
@@ -160,7 +160,7 @@ export async function connectorJourney() {
     }finally{inFlight--}
   }
   const vars={OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-gasket-1'.repeat(3),SETUP_TOKEN:'synthetic-gasket-2'.repeat(3)}
-  const start=async()=>{h=await harness({vars,installation:activeInstall,clockOffset:offset,outbound})}
+  const start=async()=>{h=await harness({vars,installation:activeInstall,clockOffset:runtimeOffset,outbound})}
   try {
     await start();cookie={owner:await h.owner()}
     await h.api('site.configure',cookie.owner,{name:'Connector plant',timezone:zone})
@@ -182,7 +182,7 @@ export async function connectorJourney() {
       assert.equal(row.paused,true,'subscription must be tested before enabling')
       return row
     }
-    const run=async at=>{receiverClock=at;await h.scheduled('*/15 * * * *',at)}
+    const run=async at=>{await h.stop();runtimeOffset=at-Date.now();receiverClock=at;await start();await h.scheduled('*/15 * * * *',at)}
     await h.api('connectors',undefined,undefined,401)
     for(const who of ['lead','max','sam','agent']) {
       await h.api('connectors',cookie[who],undefined,403)
@@ -318,6 +318,15 @@ export async function connectorJourney() {
     const quotaCount=received.filter(row=>row.name==='quota').length
     await run(now()+220_000);assert.equal(received.filter(row=>row.name==='quota').length,quotaCount)
     await run(now()+3_820_000);assert.equal(received.filter(row=>row.name==='quota').length,quotaCount+1)
+    // A delayed Cron keeps its historical business source time, while the
+    // transport signs now and cannot reset quota by replaying older slots.
+    await subscribe('delayed',['work.changed'],{cursor:0,quota:1});await control('delayed',false)
+    const delayedBefore=received.length
+    await h.scheduled('*/15 * * * *',Date.now()+runtimeOffset-3_600_000)
+    assert.equal(received.length,delayedBefore+1)
+    assert.ok(Math.abs(Number(received.at(-1).headers['gasket-timestamp'])*1000-(Date.now()+runtimeOffset))<10_000,'delayed Cron signs at current transport time')
+    await h.scheduled('*/15 * * * *',Date.now()+runtimeOffset)
+    assert.equal(received.length,delayedBefore+1,'old source slots cannot reset the live hourly quota')
     const record=(await h.api('automation/jobs',cookie.owner)).jobs.find(row=>row.rule_id==='connectors'&&row.output?.deliveries?.length)
     assert.ok(record.input.connectors.highWater>0&&record.input.connectors.limits.attempts===3)
     current=await state()

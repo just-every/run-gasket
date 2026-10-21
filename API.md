@@ -249,7 +249,9 @@ Each execution scans up to 100 events per subscription and claims at most 20
 network attempts across subscriptions. Claims atomically consume each
 subscription's hourly quota; exhausted quotas preserve queued jobs. The hour
 starts with its first attempt; the first claim at least an hour later resets it.
-Every request has a 5-second abort and a 30-second claim lease. An interrupted
+Signing timestamps, retry eligibility, leases and quota windows use the live wall
+clock, even when a delayed Cron retains an older business source time. Every
+request has a 5-second abort and a 30-second claim lease. An interrupted
 lease is recovered on a later run, visibly retained as `lease_expired`. At most
 three attempts per retry cycle occur. Network failures, timeouts, HTTP 408/429
 and 5xx responses retry with exponential minimum delays of 1 then 2 seconds;

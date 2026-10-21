@@ -355,9 +355,9 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-INT-002 is independently proved by the public-door and 1440/390 browser journeys cited in its row; the remaining audit baseline below is unchanged.
-
 Judged from the code and tests at commit `d36b2534592d1fd7e7f6cc410e8c9a6befc4bd5c` (21 October 2026); every clause judged at `d36b2534592d1fd7e7f6cc410e8c9a6befc4bd5c` (21 October 2026).
+
+INT-002 is independently proved by the public-door and 1440/390 browser journeys cited in its row; the remaining audit baseline below is unchanged.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
