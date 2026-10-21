@@ -1,21 +1,21 @@
 import { applyInterval, intervalBasis } from './intervals'
 import { approveMerge, mergeProposalBasis } from './part-merge'
-import { canonicalPart } from './part-identity'
 // Agent preparation, human approval. An agent (or a lead) prepares a schedule,
 // a corrective work order or a parts count; a lead or the owner approves it.
 // Approval re-checks the record versions the proposal relied on, runs the
 // normal command as the approver and records the exact payload hash.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
-import { AUDIT_INSERT, all, commit, guard, insist, newId, now, one, sha256Hex, stmt } from './core'
+import { AUDIT_INSERT, all, commit, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'
 import { Input } from './input'
-import { countPart } from './parts'
+import { countPart, partDetail } from './parts'
+import { varianceValue } from './valuation'
 import { createSchedule, scheduleFields } from './schedules'
 import { assign, createCorrective } from './work'
 import { assigneeFits } from './crew'
 import { auditFence, auditRevision, followUpCase } from './agent-follow-up'
 import { isDate } from './dates'
-import { meterNumber, toMilli } from './quantity'
+import { fromMilli, meterNumber, toMilli } from './quantity'
 
 const KINDS = ['schedule', 'corrective', 'count', 'reassign', 'interval', 'merge'] as const
 type Kind = typeof KINDS[number]
@@ -36,10 +36,13 @@ async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string
     return { workOrder: state.workOrder, version: state.version, rule: state.rule, blockers: state.blockers, queries: state.queries, linked: state.linked }
   }
   if (kind === 'count') {
-    const part = await canonicalPart(env, payload.part)
-    insist(part, 'part_not_found', 404)
-    const seq = (await one<{ seq: number | null }>(env, 'SELECT MAX(seq) AS seq FROM gk_stock_moves WHERE part_id = ?', part.id))!.seq ?? 0
-    return { part: part.id, partRevision: part.revision, moves: seq }
+    const part = await partDetail(env, actor, payload.part)
+    const quantityDelta = toMilli(payload.counted, 'counted', { allowZero: true }) - part.on_hand
+    return { part: part.id, partRevision: part.revision, moves: part.seen,
+      number: part.number, unit: part.unit, observed: part.onHand, counted: payload.counted, valueCents: part.valueCents,
+      quantityDelta: fromMilli(quantityDelta), valueDeltaCents: await varianceValue(env, part.id, quantityDelta),
+      movements: part.moves.map((move: Row) => ({ id: move.id, kind: move.kind, quantity: move.quantity, valueCents: move.value_cents, workOrder: move.work_order_id, at: move.at })),
+    }
   }
   const asset = await one(env, 'SELECT id, revision FROM gk_assets WHERE id = ?', payload.asset)
   insist(asset, 'asset_not_found', 404)
@@ -100,7 +103,11 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   insist(input.text('hash', { max: 64 }) === proposal.payload_hash, 'proposal_changed', 409)
   const payload = JSON.parse(proposal.payload_json) as Record<string, string>
   const basis = await basisOf(env, proposal.kind, payload, actor)
-  insist(JSON.stringify(basis) === proposal.basis_json, 'proposal_stale', 409)
+  // Pending pre-upgrade counts retain their original version-bound contract.
+  const retainedBasis = JSON.parse(proposal.basis_json)
+  const comparedBasis = proposal.kind === 'count' && !Object.hasOwn(retainedBasis, 'quantityDelta')
+    ? { part: (basis as any).part, partRevision: (basis as any).partRevision, moves: (basis as any).moves } : basis
+  insist(JSON.stringify(comparedBasis) === proposal.basis_json, 'proposal_stale', 409)
   const command = Input.of(proposal.kind === 'count' ? { ...payload, seen: String((basis as { moves: number }).moves) } : payload)
   // The command and the decision commit in one batch: a second approver finds it decided.
   const also = (resultId: string) => [

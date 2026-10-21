@@ -5,6 +5,7 @@ export const API_DOORS: [string, string][] = [
   ['^outcomes$', 'outcomes'],
   ['^outcomes/([\\w-]+)$','outcome'],
   ['^parts/lookup$', 'partLookup'],
+  ['^parts/([\\w-]+)/insights$', 'stockInsights'],
   ['^agent-follow-up/([\\w-]+)$', 'agentFollowUp'],
   ['^vendor-follow-up$', 'vendorFollowUp'],
   ['^replenishment$', 'replenishment'], ['^replenishment/preview$', 'replenishmentPreview'],

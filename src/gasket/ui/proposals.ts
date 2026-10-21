@@ -30,6 +30,11 @@ export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
   const items = rows.map(row => card(KIND[row.kind], h`<p>${row.reasoning}</p>
     <p class="gk-eyebrow">What it will change</p><dl class="gk-pairs">${Object.entries(row.payload as Record<string, string>).map(([key, value]) => h`<div><dt>${LABELS[key] ?? key}</dt><dd>${show(key, value)}</dd></div>`)}</dl>
     ${row.kind === 'interval' ? intervalEvidenceCard(row, actor) : ''}
+    ${row.kind === 'count' && row.basis.quantityDelta !== undefined ? h`<p class="gk-eyebrow">Retained count impact</p>
+      <p><a href="/api/gasket/parts/${row.basis.part}/insights">${row.basis.number}: read stock evidence</a></p>
+      <p>Recorded: ${row.basis.observed} ${row.basis.unit}, USD ${(row.basis.valueCents / 100).toFixed(2)}. Physically counted: ${row.basis.counted} ${row.basis.unit}.</p>
+      <p>Quantity adjustment: ${row.basis.quantityDelta} ${row.basis.unit}; value adjustment: USD ${(row.basis.valueDeltaCents / 100).toFixed(2)}. Approval records a count variance, never a physical receipt.</p>
+      <details><summary>Retained count sources (${row.basis.movements.length})</summary>${row.basis.movements.map((move: any) => h`<p>${move.kind}: ${move.quantity}, USD ${(move.valueCents / 100).toFixed(2)} · ${showInstant(move.at, actor.zone)}${move.workOrder ? h` · <a href="/app/work/${move.workOrder}">Open source work</a>` : ''}</p>`)}</details>` : ''}
     ${row.kind === 'merge' ? h`<p class="gk-eyebrow">Retained stock and value</p>
       ${row.basis.balances.map((balance: any) => h`<p><a href="/app/parts/${balance.id}">${balance.number}</a>: ${balance.quantity} ${balance.unit}, USD ${(balance.valueCents / 100).toFixed(2)}</p>`)}
       <p>Combined: ${row.basis.combined.quantity} ${row.basis.combined.unit}, USD ${(row.basis.combined.valueCents / 100).toFixed(2)}. Quantity adjustment: ${row.basis.quantityDelta}; value adjustment: USD ${(row.basis.valueDeltaCents / 100).toFixed(2)}.</p>

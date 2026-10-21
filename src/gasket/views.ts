@@ -1,3 +1,4 @@
+import { stockInsights } from './stock-insights'
 import { outcomeList, readOutcome } from './outcomes'
 import { lookupPart } from './catalogs'
 import { followUpView } from './agent-follow-up'
@@ -52,6 +53,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  stockInsights: (env,actor,id) => stockInsights(env,actor,id),
   outcomes: (env,actor) => outcomeList(env,actor),
   outcome:(env,actor,id)=>readOutcome(env,actor,id),
   partLookup:(env,actor,_id,url)=>lookupPart(env,actor,url),

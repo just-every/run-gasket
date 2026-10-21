@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { harness, file } from './harness.mjs'
+import { offset } from './clock.mjs'
 import { installation } from './installation.mjs'
 
 // Upgrade an existing installation with immutable outcome rows referencing proposals.
@@ -58,7 +59,12 @@ export async function agentStockJourney() {
     const work=(await h.api('workorder.create',cookie.lead,{asset,title:'Conveyor bearing replacement',due:today,assignee:ids.max})).id
     await h.api('part.receive',cookie.lead,{part:source,quantity:'5',unitPrice:'10'})
     await h.api('part.receive',cookie.lead,{part:canonical,quantity:'6',unitPrice:'8'})
+    const staleCount=await h.api('proposal.prepare',cookie.agent,{kind:'count',payload:{part:source,counted:'4',note:'Physical count before the work issue'},reasoning:'Reconcile the observed shelf count'})
     await h.api('workorder.issue',cookie.max,{workOrder:work,part:source,quantity:'2'})
+    const beforeStale=await h.api(`parts/${source}`,cookie.lead)
+    assert.equal((await h.api('proposal.decide',cookie.lead,{proposal:staleCount.id,hash:staleCount.hash,decision:'approve'},409)).error,'proposal_stale')
+    assert.deepEqual(await h.api(`parts/${source}`,cookie.lead),beforeStale,'AGENT-006 changed stock invalidates the count without any movement')
+    await h.api('proposal.decide',cookie.lead,{proposal:staleCount.id,decision:'reject',note:'Issue changed the stock after the count'})
     await h.api('workorder.reserve',cookie.lead,{workOrder:work,part:canonical,quantity:'1'})
     const prepare=(who,payload={source,canonical,reason:'Confirmed identical 6205 manufacturer and stocking unit; keep both source histories'})=>h.api('proposal.prepare',cookie[who],{kind:'merge',payload,reasoning:'Duplicate bearing numbers split stock visibility. Consolidate identity without inferring any physical delivery.'})
     const decide=(proposal,who='lead',decision='approve',status=200)=>h.api('proposal.decide',cookie[who],{proposal:proposal.id,hash:proposal.hash,decision,note:decision==='reject'?'Keep separate until physically checked':undefined},status)
@@ -81,7 +87,17 @@ export async function agentStockJourney() {
     await h.api('proposal.prepare',cookie.agent,{kind:'receive',payload:{part:source,quantity:'100'},reasoning:'An inferred receipt is unsupported'},400)
     // Staff physically count the shelf after the proposal. Changed evidence must refuse it.
     const observed=await h.api(`parts/${source}`,cookie.lead)
-    await h.api('part.count',cookie.lead,{part:source,counted:'2',seen:observed.seen,revision:observed.revision,note:'Physical shelf count: one missing bearing after issue'})
+    const count=await h.api('proposal.prepare',cookie.agent,{kind:'count',payload:{part:source,counted:'2',note:'Staff physically counted two bearings after the issue'},reasoning:'Physical count differs by one from the retained receipts and work issues; investigate, do not invent a receipt'})
+    const countRecord=(await h.api('proposals',cookie.lead)).find(p=>p.id===count.id)
+    assert.deepEqual([countRecord.basis.observed,countRecord.basis.counted,countRecord.basis.quantityDelta,countRecord.basis.valueDeltaCents],['3','2','-1',-1000])
+    assert.ok(countRecord.basis.movements.some(m=>m.kind==='issue'&&m.workOrder===work&&m.quantity==='-2'&&m.valueCents===-2000))
+    assert.deepEqual(await h.api(`parts/${source}`,cookie.lead),observed,'AGENT-006 preparing an adjustment does not receive or adjust stock')
+    if(process.env.STOCK_SCREENSHOTS) await (await import('./agent-stock-browser.mjs')).agentCountBrowser({h,cookie,proposal:count})
+    else await decide(count)
+    const afterCount=await h.api(`parts/${source}`,cookie.lead)
+    assert.deepEqual([afterCount.onHand,afterCount.valueCents],['2',2000])
+    assert.deepEqual(afterCount.moves.filter(m=>m.kind==='count').map(m=>[m.quantity,m.value_cents]),[['-1',-1000]],'AGENT-006 approved impact matches the posted variance')
+    assert.deepEqual((await h.api('proposals',cookie.agent)).find(p=>p.id===count.id).basis,countRecord.basis,'AGENT-006 approved evidence remains the prepared evidence')
     const auditBefore=(await h.api('audit',cookie.owner)).rows.length
     assert.equal((await decide(prepared,'lead','approve',409)).error,'proposal_stale')
     assert.equal((await h.api('audit',cookie.owner)).rows.length,auditBefore,'AGENT-006 failed decision has no business or audit write')
@@ -132,6 +148,59 @@ export async function agentStockJourney() {
     await prepare('agent',{source:importedPart,canonical,reason:'Review imported duplicate identity without deleting its source evidence'})
     assert.equal((await h.api('catalog.undo',cookie.owner,{job:imported.job},409)).error,'catalog_undo_blocked','AGENT-006 retained merge proposals block destructive catalog undo')
     assert.equal((await h.api(`parts/${importedPart}`,cookie.lead)).id,importedPart)
+    // Discover duplicates through catalog evidence; names or bare numbers alone prove no identity.
+    const header='number,name,unit,manufacturer,manufacturerNumber,vendorNumber,packUnit,packQuantity,price\n'
+    for(const [number,maker,unit] of [['DISC-A','Acme','each'],['DISC-B','ACME','each'],['DISC-C','Other maker','each'],['DISC-KG','Acme','kg']]) {
+      const upload={supplier,file:file(number+'.csv',header+`${number},6205 bearing,${unit},${maker},AC-DISC-6205,${number},pack,1,10.00\n`,'text/csv')}
+      const preview=await h.api('catalog.preview',cookie.owner,upload)
+      await h.api('catalog.import',cookie.owner,{...upload,fingerprint:preview.fingerprint})
+    }
+    const discoveryPart=(await h.api('parts/lookup?number=DISC-A',cookie.agent)).id
+    await h.api('part.receive',cookie.lead,{part:discoveryPart,quantity:'3',unitPrice:'10'})
+    await h.api('workorder.issue',cookie.max,{workOrder:work,part:discoveryPart,quantity:'2'})
+    const center=(await h.api('costcenter.save',cookie.owner,{code:'AGENT-STOCK',name:'Stores reconciliation',active:true})).id
+    const owner=(await h.api('me',cookie.owner)).id
+    await h.api('replenishment.policy',cookie.lead,{part:discoveryPart,minimum:'2',maximum:'10',safetyStock:'0',reorderQuantity:'4',supplier,costCenter:center,purchaser:owner,unitPrice:'10',leadDays:0,active:true,automatic:false})
+    const read=()=>h.api(`parts/${discoveryPart}/insights`,cookie.agent)
+    await h.api(`parts/${discoveryPart}/insights`,undefined,undefined,401)
+    let insights=await read()
+    assert.deepEqual(insights.duplicates.map(p=>[p.number,p.sameStockingUnit]),[['DISC-B',true],['DISC-KG',false]],'AGENT-006 discovers manufacturer matches, excludes other makers and flags unit incompatibility')
+    assert.deepEqual([insights.demand.issued,insights.demand.previousIssued,insights.demand.increased],['2','0',null],'AGENT-006 no baseline means unknown trend')
+    assert.ok(insights.demand.issues.some(m=>m.workOrder===work&&m.quantity==='-2'&&m.valueCents===-2000))
+    assert.deepEqual([insights.replenishment.quantity,insights.replenishment.estimateCents],['9',9000])
+    const rule=(await h.api('automation',cookie.owner)).rules.find(r=>r.id==='replenishment')
+    const execution=await h.api('automation.catchup',cookie.owner,{rule:'replenishment',revision:rule.revision})
+    assert.equal(execution.output.created.length,1)
+    insights=await read()
+    assert.equal(insights.replenishment.quantity,'0','AGENT-006 outstanding purchase prevents duplicate replenishment demand even when due')
+    assert.ok(insights.risks.includes('late_outstanding_purchase'))
+    assert.deepEqual([insights.replenishment.orders[0].outstanding,insights.replenishment.orders[0].received],['9','0'])
+    const order=await h.api(`purchase-orders/${insights.replenishment.orders[0].id}`,cookie.owner)
+    assert.equal(insights.replenishment.orders[0].revision,order.current.id,'AGENT-006 risk cites the retained purchasing revision')
+    assert.equal(order.current.send,null,'AGENT-006 risk inspection authorizes no spend or send')
+    const beforeRead={part:await h.api(`parts/${discoveryPart}`,cookie.lead),audit:await h.api('audit',cookie.owner),orders:await h.api('purchase-orders',cookie.owner)}
+    await read(); await read()
+    assert.deepEqual({part:await h.api(`parts/${discoveryPart}`,cookie.lead),audit:await h.api('audit',cookie.owner),orders:await h.api('purchase-orders',cookie.owner)},beforeRead,'AGENT-006 assessment creates no movement, proposal, purchase or audit')
+    const stockInsights=await h.api(`parts/${canonical}/insights`,cookie.agent)
+    assert.ok(stockInsights.countVariances.some(m=>m.quantity==='-1'&&m.valueCents===-1000),'AGENT-006 count discrepancy stays linked to its actual movement after merge')
+    await h.api('purchase.approve',cookie.sam,{order:order.id,revision:order.current_revision})
+    await h.api('receipt.receive',cookie.lead,{order:order.id,revisionId:order.current.id,externalId:'AGENT-STOCK-PARTIAL',lines:[{line:0,part:discoveryPart,quantity:'3',quarantine:'1',bin:'A3'}]})
+    insights=await read()
+    assert.deepEqual([insights.replenishment.orders[0].received,insights.replenishment.orders[0].quarantine,insights.replenishment.orders[0].outstanding],['3','1','6'],'AGENT-006 cites received, quarantined and outstanding quantities without inferring another receipt')
+    await h.api('part.receive',cookie.lead,{part:discoveryPart,quantity:'6',unitPrice:'10'})
+    await h.stop()
+    // Adjacent site-day windows through the same persisted public doors, not direct DB writes.
+    const future=await harness({vars:h.vars,installation:h.installation,clockOffset:offset+30*86_400_000})
+    try {
+      const max=await future.signIn('max@example.test'),agent=await future.signIn('agent@example.test')
+      await future.api('workorder.issue',max,{workOrder:work,part:discoveryPart,quantity:'5'})
+      await future.api('workorder.return',max,{workOrder:work,part:discoveryPart,quantity:'1'})
+      const demand=(await future.api(`parts/${discoveryPart}/insights`,agent)).demand
+      assert.deepEqual([demand.previousIssued,demand.issued,demand.increased],['2','5',true],'AGENT-006 adjacent 30-site-day gross-issue increase is evidence-backed; returns do not erase use')
+      assert.equal(demand.previousTo,today)
+      const risk=(await future.api(`parts/${discoveryPart}/insights`,agent)).risks
+      assert.ok(risk.includes('gross_issues_more_than_doubled'))
+    } finally { await future.close() }
     console.log('AGENT-006 cited duplicate proposals, physical count staleness, independent approval and conserved history passed')
   } finally {await h.close()}
 }
