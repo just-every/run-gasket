@@ -188,3 +188,107 @@ New `proposal.prepare` count proposals retain `observed`, `counted`, `quantityDe
 ### Damaged work returns (PART-003 slice)
 
 `workorder.return` accepts `condition: "usable"` (the default) or `"damaged"`. Damaged returns require a nonempty `reason` (up to 300 characters). Existing work-recording authorization and held-quantity limits apply. The returned amount credits its original work issue value; a separate immutable quarantine adjustment removes the same quantity/value from usable stock. Part detail exposes `quarantines`, `quarantinedQuantity`, and `quarantinedValueCents`; work parts expose `quarantined`. The valuation JSON/CSV adds a `quarantined` adjustment: opening + received + issued + returned + counted + quarantined = closing. Quarantine disposition is not yet implemented.
+
+## Signed maintenance webhooks and connector recovery
+
+The installation owner creates and operates subscriptions through the same signed-in
+JSON door as other maintenance actions (send the installation's `Origin` header).
+No provider account is needed. Subscriptions start paused. Work mutations and
+purchase receipts atomically append immutable events in the same D1 transaction;
+a rolled-back mutation or an idempotent receipt replay creates no second event.
+The event history starts with the connector migration, not earlier records.
+
+`POST /api/gasket/webhook.subscribe` takes `name`, an HTTPS `endpoint`, an `events`
+array containing `work.changed` and/or `receipt.created`, optional `asset` (one
+asset, otherwise this installation), optional `cursor` (0 through the current
+high-water cursor; defaults to current), and optional hourly attempt `quota`
+(1–1000; default 100). Endpoints must be DNS names, with no embedded credentials,
+query string or fragment; IP literals, local hostnames and redirects are refused.
+Use a public HTTPS receiver you control. The response returns `id`, `secret`,
+`secretVersion`, `paused` and `cursor`. Copy the random 32-byte signing secret
+securely into your receiver now: it is returned once and never included in reads,
+audit or job evidence. Gasket stores it encrypted with a purpose-separated key
+derived from the installation's `SESSION_SECRET`. Preserve that installation
+secret across restarts; a restore with a different secret needs owner key rotation
+and an explicit retry of any `signing_key_unavailable` dead letter.
+
+`GET /api/gasket/connectors` exposes scopes, revisions, cursor/high-water,
+last receiver acceptance, quota/remaining attempts, last error, immutable events,
+deliveries, attempts and a read-only next-scan preview. Event pagination uses
+`?after=<cursor>` and returns at most 100 events and `next`; deliveries and
+attempts remain retained. The owner sees the summary and actionable dead letters
+on **Automation → Maintenance webhooks**. Other roles cannot inspect or operate
+subscriptions. An acceptance is an HTTP 2xx response, not remote business
+acknowledgment. Receiver bodies and signing headers are never retained.
+
+Owner actions:
+
+- `webhook.control`: `subscription`, current `revision`, `paused` and `reason`.
+  Pausing retains every pending event/delivery. Resume by setting `paused:false`.
+- `webhook.rotate`: `subscription`, current `revision` and `reason`. Returns the
+  replacement secret once and increments the signing-key version immediately.
+  Install it in the receiver before resuming a paused subscription. Already sent
+  attempts retain their key version; later attempts use the new key.
+- `webhook.resume`: `subscription`, current `revision`, a `cursor` at or behind
+  its current cursor, and `reason`. Reconciles the retained source log; stable
+  event/delivery IDs and unique jobs prevent delivered events being sent again.
+- `webhook.retry`: `delivery` and `reason`, only for a dead letter. Repair the
+  receiver or rotate its key first. Starts a new bounded retry cycle with the
+  original event/delivery identity and preserves every earlier attempt.
+
+PM-008's **Maintenance webhooks** job runs on the quarter-hour Cron Trigger.
+`automation.control` pauses/resumes the entire job under its current grant
+revision; `automation.catchup` executes it now. Its retained input names the
+source high-water, subscription revisions/cursors and limits, and each attempt
+names the exact automation job, grant, subscription and signing-key revisions.
+Previewing connector state sends nothing and changes no business data or jobs.
+The source cursor advances transactionally with durable delivery creation and
+never depends on a later network success.
+
+Each execution scans up to 100 events per subscription and claims at most 20
+network attempts across subscriptions. Claims atomically consume each
+subscription's hourly quota; exhausted quotas preserve queued jobs. The hour
+starts with its first attempt; the first claim at least an hour later resets it.
+Every request has a 5-second abort and a 30-second claim lease. An interrupted
+lease is recovered on a later run, visibly retained as `lease_expired`. At most
+three attempts per retry cycle occur. Network failures, timeouts, HTTP 408/429
+and 5xx responses retry with exponential minimum delays of 1 then 2 seconds;
+`Retry-After` seconds or HTTP dates extend the delay, bounded to 24 hours.
+Other 3xx/4xx responses become dead letters immediately; redirects are never
+followed. Cron cadence may delay an eligible retry until the next job. Repeated
+failure becomes a retained dead letter with its source, HTTP status and error.
+Quota and outcome measures are defined in `connectors.quota` in the existing
+versioned measure registry; no provider acceptance or historical completeness is
+invented.
+
+### Receiver byte protocol
+
+Every POST contains JSON `{id,cursor,type,sourceId,sourceVersion,assetId,
+occurredAt,data}`. `work.changed` carries the retained work number/status and
+source version; `receipt.created` carries the PO id, immutable PO revision id and
+supplier receipt identity. Event ids are globally random and retained; source
+ids always name actual Gasket records. `gasket-id` is the stable delivery id,
+`gasket-key-version` the signing version, and `gasket-timestamp` integer Unix
+seconds. `gasket-signature` is `v1=` plus lowercase hex HMAC-SHA256 over these
+UTF-8 bytes, with the **exact unparsed body**:
+
+```
+<gasket-timestamp>.<gasket-id>.<body>
+```
+
+The reference receiver is `scripts/webhooks/receiver.mjs` (`receiveWebhook`).
+It refuses a timestamp more than 300 seconds old or in the future, unknown key
+versions, malformed signatures and changed bytes before calling the receiver's
+`acceptOnce(eventId,event)` transaction. Use the receiver's independent clock,
+not the supplied timestamp, for verification.
+
+Delivery is **at least once**: a receiver may commit just before its response is
+lost. In one durable transaction, insert a unique event id and apply its work,
+stock, bill or notification effects; an existing event id returns the original
+receipt without applying effects again. Persist deduplication across restarts
+and key rotation. Never use only a process-local Set in a real receiver. A
+freshly signed retry retains the same event identity, while expired captured
+requests must be refused. Return 2xx only after the transaction commits.
+INT-003 through INT-017 inherit these event identities, durable cursors,
+reconciliation, delivery-outcome and PM-008 controls when their adapters ship;
+this framework does not assert those provider integrations already exist.

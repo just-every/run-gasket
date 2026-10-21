@@ -1,3 +1,4 @@
+import { runConnectors } from './connector-jobs'
 // PM-001: the installation's own scheduler. A Cron Trigger runs it every 15
 // minutes, deployed and under `rer dev`, with no one pressing a button. Each run
 // issues the work every schedule is due for (calendar work seven days ahead of
@@ -27,6 +28,7 @@ export const SCHEDULER = { id: 'scheduler', name: 'Gasket scheduler', cron: '*/1
 export async function executeRule(env: Bindings, rule: AutomationRule, day: string, source: Source, { revision, instant = now() }: { revision?: number; instant?: number } = {}) {
   const input = await automationInputs(env, rule, day)
   return await runJob<{ created: any[]; runs: any[]; notices: any[] }>(env, rule, source, input, async () => {
+    if (rule === 'connectors') return await runConnectors(env, input.connectors!)
     if (rule === 'replenishment') return await runReplenishment(env, day)
     if (rule === 'vendor') return await runVendorFollowUp(env, day)
     if (rule === 'pm') return { ...await issueDue(env, { id: SCHEDULER.id, today: day }, input.schedules!, 'workorder.schedule', { automatic: true }), runs: [], notices: [] }
@@ -51,6 +53,7 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
       await executeRule(env, 'expiry', day, 'cron', { instant: at })
       await executeRule(env, 'replenishment', day, 'cron', { instant: at })
       await executeRule(env, 'vendor', day, 'cron', { instant: at })
+      await executeRule(env, 'connectors', day, 'cron', { instant: at })
       const created = pm.output?.created.length ?? 0
       const runs = routes.output && 'runs' in routes.output ? routes.output.runs : []
       await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET created=?,finished_at=?,state='completed' WHERE id=?", created + runs.reduce((sum: number, run: any) => sum + run.workOrders.length, 0), now(), id)])

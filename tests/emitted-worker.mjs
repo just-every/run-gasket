@@ -27,7 +27,7 @@ async function freePort() {
  * With `offset` (ms), the Worker's clock runs that far from the machine's: an entry module replaces Date before the
  * built Worker loads, so the test, not the hour it happens to run at, decides what day it is.
  */
-export async function emittedWorker(vars, { installation, offset } = {}) {
+export async function emittedWorker(vars, { installation, offset, outbound } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort(), origin = `https://127.0.0.1:${port}`
@@ -48,6 +48,7 @@ export async function emittedWorker(vars, { installation, offset } = {}) {
       d1Databases: { DB: installation ? config.d1_databases[0].database_id : 'gasket-test' },
       bindings,
       outboundService: async request => {
+        if (outbound && request.url !== 'https://api.resend.com/emails') return await outbound(request)
         if (request.url !== 'https://api.resend.com/emails') throw new Error(`Unexpected test network destination ${new URL(request.url).origin}`)
         mails.push(await request.json())
         if (mailOutcome === 'rejected') return Response.json({ message: 'Test provider refused the request' }, { status: 400 })

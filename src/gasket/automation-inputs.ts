@@ -1,3 +1,4 @@
+import { connectorInputs } from './webhooks'
 // The current automatic jobs' source facts, retained before an execution.
 import type { Bindings } from '../auth.server'
 import { all } from './core'
@@ -9,6 +10,7 @@ import type { AutomationRule } from './automation-jobs'
 import { followUps } from './vendor-follow-up'
 
 export async function automationInputs(env: Bindings, rule: AutomationRule, day: string) {
+  if (rule === 'connectors') return { day, connectors: await connectorInputs(env) }
   if (rule === 'vendor') return { day, vendor: await followUps(env, day) }
   if (rule === 'replenishment') return { day, replenishment: await replenishmentInputs(env, day) }
   if (rule === 'pm') {

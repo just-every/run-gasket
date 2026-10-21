@@ -1,3 +1,4 @@
+import { connectors } from './webhooks'
 import { stockInsights } from './stock-insights'
 import { outcomeList, readOutcome } from './outcomes'
 import { lookupPart } from './catalogs'
@@ -53,6 +54,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  connectors: (env,actor,_id,url) => connectors(env,actor,url),
   stockInsights: (env,actor,id) => stockInsights(env,actor,id),
   outcomes: (env,actor) => outcomeList(env,actor),
   outcome:(env,actor,id)=>readOutcome(env,actor,id),

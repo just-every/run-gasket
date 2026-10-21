@@ -1,3 +1,4 @@
+import { subscribeWebhook, controlWebhook, rotateWebhook, resumeWebhook, retryWebhook } from './webhooks'
 import { assessOutcome } from './outcomes'
 import { planOutcome, outcomeFollowUp } from './outcomes-plan'
 import { setIntervalLimit } from './intervals'
@@ -63,6 +64,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'webhook.subscribe': subscribeWebhook, 'webhook.control': controlWebhook, 'webhook.rotate': rotateWebhook, 'webhook.resume': resumeWebhook, 'webhook.retry': retryWebhook,
   'catalog.preview':catalogPreview, 'catalog.undo':undoCatalog,
   'catalog.apply':(env,actor,input)=>importCatalog(env,actor,Input.of({supplier:input.text('supplier'),fingerprint:input.text('fingerprint'),file:{filename:input.text('filename'),base64:input.text('base64',{max:2_000_000}),type:input.text('mediaType',{optional:true})}})),
   'catalog.prefer':preferCatalogItem, 'catalog.import':importCatalog, 'catalog.receive':receiveCatalogPack, 'part.merge.preview':mergePreview, 'part.merge.approve':(env,actor,input)=>approveMerge(env,actor,input), 'part.photo':addPartPhoto,

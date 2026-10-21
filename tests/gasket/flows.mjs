@@ -14,7 +14,7 @@ import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
 import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, workCsv } from './fixtures.mjs'
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
-import { automationJourney } from './automation.mjs'
+import { automationJourney, connectorJourney } from './automation.mjs'
 import { replenishmentJourney } from './replenishment.mjs'
 import { receivingJourney } from './receiving.mjs'
 import { workReturnsJourney } from './work-returns.mjs'
@@ -2212,6 +2212,7 @@ try {
   await check('BUY-002 quotes and numbered purchase orders', async () => { await purchaseOrdersJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm }) })
   await check('PM-009 nested programs', nestedJourney)
   await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
+  await check('INT-002 signed events and durable connector delivery', connectorJourney)
 
   await check('BUY-001 vendor records and maintenance requisitions', async () => {
     await purchasingJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm })

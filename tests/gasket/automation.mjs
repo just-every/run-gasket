@@ -114,4 +114,233 @@ export async function automationJourney() {
     assert.ok(!supervisorPage.includes('/app/do/automation.control'))
   } finally { await h.close() }
 }
-if(process.argv[1]===fileURLToPath(import.meta.url)){await automationJourney();console.log('PM-008 scheduler controls and retained execution evidence passed')}
+if(process.argv[1]===fileURLToPath(import.meta.url)&&!process.argv.includes('--connectors')){await automationJourney();console.log('PM-008 scheduler controls and retained execution evidence passed')}
+
+// INT-002 uses the actual emitted Worker/D1 and public source, subscription,
+// automation and inspection doors. Only the receiver network edge is fake.
+export async function connectorJourney() {
+  const { receiveWebhook } = await import('../../scripts/webhooks/receiver.mjs')
+  const { createHmac } = await import('node:crypto')
+  const { installation: makeInstallation } = await import('./installation.mjs')
+  const { offset } = await import('./clock.mjs')
+  const install=await makeInstallation();await install.migrate()
+  const keys=new Map(), modes=new Map(), received=[], applied=new Map(), effects={work:[],stock:[],bills:[],notices:[]}
+  let receiverClock=now(), h, cookie, captured, inFlight=0, maxInFlight=0
+  const outbound=async request=>{
+    const name=new URL(request.url).pathname.slice(1), config=keys.get(name)
+    assert.ok(config,`expected receiver ${name}`)
+    inFlight++;maxInFlight=Math.max(maxInFlight,inFlight)
+    try {
+      const body=await request.clone().text(), headers=Object.fromEntries(request.headers)
+      const expected=createHmac('sha256',config.secret).update(`${headers['gasket-timestamp']}.${headers['gasket-id']}.${body}`).digest('hex')
+      assert.equal(headers['gasket-signature'],`v1=${expected}`,'receiver independently verifies exact signed bytes')
+      const mode=modes.get(name)
+      received.push({name,body:JSON.parse(body),headers})
+      captured={body,headers}
+      if(mode==='rate')return new Response('Synthetic rate limit',{status:429,headers:{'retry-after':'120'}})
+      if(mode==='reject')return new Response('Synthetic invalid receiver configuration',{status:422})
+      if(mode==='redirect')return new Response(null,{status:307,headers:{location:'https://other.example.test/receiver'}})
+      if(mode==='unavailable')return new Response('Synthetic unavailable receiver',{status:503})
+      const response=await receiveWebhook(request,{...config,now:receiverClock,acceptOnce:async(id,event)=>{
+        if(applied.has(id))return{duplicate:true}
+        // Synthetic receiver transaction: persist identity and all four kinds
+        // of external effect together. It survives a sender Worker restart.
+        applied.set(id,event)
+        if(event.type==='work.changed')effects.work.push(event.id)
+        if(event.type==='receipt.created'){effects.stock.push(event.id);effects.bills.push(event.id)}
+        effects.notices.push(event.id)
+        return{duplicate:false}
+      }})
+      assert.equal(response.status,200,'receiver accepts the signature, version and replay age')
+      if(mode==='timeout')await new Promise(resolve=>setTimeout(resolve,6000))
+      if(mode==='disconnect')throw new Error('Synthetic connection lost after receiver commit')
+      return response
+    }finally{inFlight--}
+  }
+  const vars={OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-gasket-1'.repeat(3),SETUP_TOKEN:'synthetic-gasket-2'.repeat(3)}
+  const start=async()=>{h=await harness({vars,installation:install,clockOffset:offset,outbound})}
+  try {
+    await start();cookie={owner:await h.owner()}
+    await h.api('site.configure',cookie.owner,{name:'Connector plant',timezone:zone})
+    const ids={}
+    for(const [who,role]of[['lead','lead'],['max','maintainer'],['sam','supervisor'],['agent','agent']]){
+      ids[who]=(await h.api('access.give',cookie.owner,{name:who,email:`${who}@example.test`,role})).id
+      cookie[who]=await h.signIn(`${who}@example.test`)
+    }
+    const today=(await h.api('me',cookie.owner)).today
+    const asset=(await h.api('asset.create',cookie.lead,{tag:'CON-1',name:'Conveyor',location:'Line 1'})).id
+    const other=(await h.api('asset.create',cookie.lead,{tag:'CON-2',name:'Other conveyor',location:'Line 2'})).id
+    const state=()=>h.api('connectors',cookie.owner)
+    const grant=async()=>(await h.api('automation',cookie.owner)).rules.find(row=>row.id==='connectors')
+    const sub=async name=>(await state()).subscriptions.find(row=>row.name===name)
+    const control=async(name,paused)=>{const row=await sub(name);return h.api('webhook.control',cookie.owner,{subscription:row.id,revision:row.revision,paused,reason:paused?'Receiver maintenance':'Receiver verified'})}
+    const subscribe=async(name,events,extra={})=>{
+      const row=await h.api('webhook.subscribe',cookie.owner,{name,endpoint:`https://receiver.example.test/${name}`,events,asset,...extra})
+      keys.set(name,{secret:row.secret,keyVersion:row.secretVersion})
+      assert.equal(row.paused,true,'subscription must be tested before enabling')
+      return row
+    }
+    const run=async at=>{receiverClock=at;await h.scheduled('*/15 * * * *',at)}
+    await h.api('connectors',undefined,undefined,401)
+    for(const who of ['lead','max','sam','agent']) {
+      await h.api('connectors',cookie[who],undefined,403)
+      for(const action of ['webhook.subscribe','webhook.control','webhook.rotate','webhook.resume','webhook.retry'])await h.api(action,cookie[who],{},403)
+    }
+    for(const endpoint of ['http://receiver.example.test/work','https://127.0.0.1/work','https://localhost/work','https://receiver.internal/work','https://user:pass@receiver.example.test/work','https://receiver.example.test/work?token=synthetic-gasket-3'])await h.api('webhook.subscribe',cookie.owner,{name:'invalid',endpoint,events:['work.changed']},400)
+    await h.api('webhook.subscribe',cookie.owner,{name:'invalid',endpoint:'https://receiver.example.test/work',events:['bill.paid']},400)
+    const workSub=await subscribe('work',['work.changed']), receiptSub=await subscribe('receipt',['receipt.created'])
+    const work=(await h.api('workorder.create',cookie.lead,{asset,title:'Replace conveyor bearing',due:today,assignee:ids.max})).id
+    await h.api('workorder.create',cookie.lead,{asset:other,title:'Outside this scope',due:today,assignee:ids.max})
+    const unchanged=await state(),ledger=await h.api('automation/jobs',cookie.owner),audit=await h.api('audit',cookie.owner)
+    assert.equal(unchanged.preview.find(row=>row.subscription===workSub.id).events.length,1)
+    assert.equal(unchanged.preview.find(row=>row.subscription===receiptSub.id).events.length,0)
+    assert.deepEqual(await state(),unchanged,'preview never enqueues or sends')
+    assert.deepEqual(await h.api('automation/jobs',cookie.owner),ledger)
+    assert.deepEqual(await h.api('audit',cookie.owner),audit)
+    await run(now());assert.equal(received.length,0,'paused subscriptions retain source events')
+    await control('work',false);await control('receipt',false)
+    const rule=await grant()
+    await h.api('automation.control',cookie.owner,{rule:'connectors',revision:rule.revision,paused:true,reason:'Test global pause'})
+    await run(now()+1000);assert.equal(received.length,0,'automation pause also prevents delivery')
+    await h.api('automation.control',cookie.owner,{rule:'connectors',revision:(await grant()).revision,paused:false,reason:'Ready'})
+    await h.api('automation.catchup',cookie.owner,{rule:'connectors',revision:1},409)
+    await Promise.all([h.api('automation.catchup',cookie.owner,{rule:'connectors',revision:(await grant()).revision}),h.api('automation.catchup',cookie.owner,{rule:'connectors',revision:(await grant()).revision})])
+    assert.equal(received.length,1,'overlapping jobs claim exactly one attempt')
+    assert.equal(received[0].body.sourceId,work);assert.equal(received[0].body.sourceVersion,1)
+    assert.equal(maxInFlight,1)
+    let current=await state()
+    assert.equal(current.deliveries[0].state,'delivered')
+    assert.ok(current.subscriptions.find(row=>row.id===workSub.id).last_success)
+    assert.ok(!JSON.stringify(current).includes(workSub.secret),'secret is absent from GET state')
+    assert.ok(!JSON.stringify(await h.api('automation/jobs',cookie.owner)).includes(workSub.secret))
+    assert.ok(!JSON.stringify(await h.api('audit',cookie.owner)).includes(workSub.secret))
+    await h.api('webhook.resume',cookie.owner,{subscription:workSub.id,revision:(await sub('work')).revision,cursor:0,reason:'Reconcile from start'})
+    await run(now()+2000);assert.equal(received.length,1,'cursor rewind does not resend delivered events')
+    await h.api('webhook.resume',cookie.owner,{subscription:workSub.id,revision:(await sub('work')).revision,cursor:999999,reason:'Cannot skip accepted events'},400)
+    // A real approved purchase and idempotent receipt supply the other source.
+    const supplier=(await h.api('supplier.save',cookie.owner,{name:'Bearing supplier',contact:'Nia',email:'orders@example.test',phone:'+1 216 555 0177',street:'2200 Superior Avenue',city:'Cleveland',state:'OH',zip:'44114',taxTreatment:'sales_tax',taxNote:'Destination tax',paymentTerms:'Net 30',leadDays:3,active:true})).id
+    const costCenter=(await h.api('costcenter.save',cookie.owner,{code:'CON',name:'Connectors',active:true})).id
+    const part=(await h.api('part.create',cookie.lead,{number:'CON-P1',name:'Bearing',unit:'each',minimum:'0',location:'Stores'})).id
+    const order=(await h.api('purchase.save',cookie.owner,{supplier,costCenter,asset,workOrder:work,deliveryOn:today,taxTreatment:'sales_tax',kind:['part'],description:['Bearing'],quantity:['10'],unit:['each'],unitPrice:['12.00'],reason:'Conveyor repair'})).id
+    await h.api('purchase.approve',cookie.sam,{order,revision:1})
+    const revisionId=(await h.api(`purchase-orders/${order}`,cookie.owner)).current.id
+    const receiptInput={order,revisionId,externalId:'synthetic-gasket-4',freight:'0',salesTax:'0',lines:[{line:0,part,quantity:'6',quarantine:'0',bin:'A1'}]}
+    const receipt=await h.api('receipt.receive',cookie.lead,receiptInput)
+    assert.equal((await h.api('receipt.receive',cookie.lead,receiptInput)).replayed,true)
+    await h.api('receipt.receive',cookie.lead,{...receiptInput,lines:[{line:0,part,quantity:'5',quarantine:'0',bin:'A1'}]},409)
+    await run(now()+3000)
+    const receiptEvent=received.find(row=>row.name==='receipt')
+    assert.equal(receiptEvent.body.sourceId,receipt.receipt)
+    assert.deepEqual(receiptEvent.body.data,{orderId:order,revisionId,externalId:'synthetic-gasket-4'})
+    assert.equal(received.filter(row=>row.name==='receipt').length,1)
+    assert.deepEqual([effects.stock.length,effects.bills.length],[1,1])
+    const domainBefore={work:await h.api(`work/${work}`,cookie.lead),part:await h.api(`parts/${part}`,cookie.lead),orders:await h.api('purchase-orders',cookie.owner),notices:await h.api('notices',cookie.max)}
+    // Rate-limit this real work revision, honor Retry-After, then rotate while
+    // pending. The retained payload and source ID survive a Worker restart.
+    modes.set('work','rate')
+    await h.api('workorders.bulk',cookie.lead,{workOrder:[work],version:['1'],action:'reschedule',due:today})
+    await run(now()+4000)
+    current=await state();let pending=current.deliveries.find(row=>row.state==='retry')
+    assert.equal(pending.error,'rate_limited');assert.equal(pending.attempts,1)
+    const count=received.length
+    await run(now()+60_000);assert.equal(received.length,count,'no retry before receiver Retry-After')
+    const rotated=await h.api('webhook.rotate',cookie.owner,{subscription:workSub.id,revision:(await sub('work')).revision,reason:'Planned receiver key rotation'})
+    keys.set('work',{secret:rotated.secret,keyVersion:2});modes.delete('work')
+    assert.notEqual(rotated.secret,workSub.secret)
+    await h.api('webhook.control',cookie.owner,{subscription:workSub.id,revision:1,paused:false,reason:'Stale control'},409)
+    await h.stop();await start()
+    assert.equal((await state()).deliveries.find(row=>row.id===pending.id).state,'retry')
+    await run(now()+130_000)
+    const retried=received.at(-1)
+    assert.equal(retried.headers['gasket-id'],pending.id)
+    assert.equal(retried.headers['gasket-key-version'],'2')
+    assert.equal(retried.body.sourceVersion,2)
+    assert.equal((await state()).deliveries.find(row=>row.id===pending.id).state,'delivered')
+    const oldKey=await receiveWebhook(new Request('https://receiver.example.test/work',{method:'POST',headers:captured.headers,body:captured.body}),{secret:workSub.secret,keyVersion:1,acceptOnce:()=>{throw Error('must not apply')},now:receiverClock})
+    assert.equal(oldKey.status,401)
+    const expired=await receiveWebhook(new Request('https://receiver.example.test/work',{method:'POST',headers:captured.headers,body:captured.body}),{...keys.get('work'),acceptOnce:()=>{throw Error('must not apply')},now:Number(captured.headers['gasket-timestamp'])*1000+301_000})
+    assert.equal(expired.status,401);assert.equal((await expired.json()).error,'expired_replay')
+    const forged=await receiveWebhook(new Request('https://receiver.example.test/work',{method:'POST',headers:captured.headers,body:captured.body+' '}),{...keys.get('work'),acceptOnce:()=>{throw Error('must not apply')},now:receiverClock})
+    assert.equal(forged.status,401)
+    // Simulate a timeout after the receiver commits. A new signed attempt has
+    // the same event identity and is deduplicated by the durable receiver edge.
+    await control('work',true);await control('receipt',true)
+    await subscribe('timeout',['receipt.created'],{cursor:0});await control('timeout',false);modes.set('timeout','timeout')
+    const effectsBefore=[effects.work.length,effects.stock.length,effects.bills.length,effects.notices.length]
+    await run(now()+140_000)
+    const timeoutSub=await sub('timeout')
+    pending=(await state()).deliveries.find(row=>row.subscription_id===timeoutSub.id)
+    assert.equal(pending.state,'retry');assert.equal(pending.error,'receiver_timeout')
+    const firstTimeout=received.at(-1)
+    await h.stop();await start();modes.delete('timeout')
+    await run(now()+150_000)
+    assert.equal(received.at(-1).headers['gasket-id'],firstTimeout.headers['gasket-id'])
+    assert.equal((await state()).deliveries.find(row=>row.id===pending.id).state,'delivered')
+    assert.deepEqual([effects.work.length,effects.stock.length,effects.bills.length,effects.notices.length],effectsBefore,'neither source replay nor network timeout duplicates external effects')
+    await control('timeout',true)
+    // Bounded retries produce an actionable dead letter; explicit repair
+    // starts another bounded cycle with the same event/delivery IDs.
+    await subscribe('dead',['receipt.created'],{cursor:0});await control('dead',false);modes.set('dead','unavailable')
+    for(const advance of [160_000,170_000,180_000])await run(now()+advance)
+    const deadSub=await sub('dead');let dead=(await state()).deliveries.find(row=>row.subscription_id===deadSub.id)
+    assert.deepEqual([dead.state,dead.attempts,dead.error],['dead',3,'receiver_http_503'])
+    const deadCount=received.length;await run(now()+190_000);assert.equal(received.length,deadCount)
+    const html=await(await h.raw('/app/automation',{cookie:cookie.owner})).text()
+    for(const text of ['Maintenance webhooks','Dead letter:','receiver http 503','Reason for retry','Retry delivery','Cursor'])assert.ok(html.includes(text),text)
+    assert.ok(!(await(await h.raw('/app/automation',{cookie:cookie.sam})).text()).includes('Dead letter:'))
+    if(process.env.CONNECTOR_SCREENSHOTS)await connectorBrowser({h,cookie})
+    modes.delete('dead')
+    await h.api('webhook.retry',cookie.owner,{delivery:dead.id,reason:'Receiver repaired'})
+    await run(now()+200_000)
+    dead=(await state()).deliveries.find(row=>row.id===dead.id)
+    assert.equal(dead.state,'delivered');assert.equal(dead.attempts,1)
+    assert.equal((await state()).attempts.filter(row=>row.delivery_id===dead.id).length,4,'all retry cycles keep their attempt history')
+    await control('dead',true)
+    // Quota persists across runs and never drops queued events. Rewinding
+    // keeps every already delivered job; exhausted quota resets after an hour.
+    await subscribe('quota',['work.changed'],{cursor:0,quota:1});await control('quota',false)
+    await run(now()+210_000)
+    const quotaSub=await sub('quota')
+    assert.equal(quotaSub.quota_used,1);assert.equal(quotaSub.last_error,'quota_exhausted')
+    assert.equal((await state()).deliveries.filter(row=>row.subscription_id===quotaSub.id&&row.state==='pending').length,1)
+    const quotaCount=received.filter(row=>row.name==='quota').length
+    await run(now()+220_000);assert.equal(received.filter(row=>row.name==='quota').length,quotaCount)
+    await run(now()+3_820_000);assert.equal(received.filter(row=>row.name==='quota').length,quotaCount+1)
+    const record=(await h.api('automation/jobs',cookie.owner)).jobs.find(row=>row.rule_id==='connectors'&&row.output?.deliveries?.length)
+    assert.ok(record.input.connectors.highWater>0&&record.input.connectors.limits.attempts===3)
+    current=await state()
+    assert.ok(current.attempts.every(row=>row.automation_job_id&&row.automation_revision>0&&row.subscription_revision>0&&row.finished_at))
+    assert.ok((await h.api('metrics?metric=connectors.quota',cookie.owner)).definitions[0].sourceDoor==='/api/gasket/connectors')
+    assert.equal((await h.api('work',cookie.lead)).length,2)
+    assert.deepEqual(await h.api(`parts/${part}`,cookie.lead),domainBefore.part)
+    assert.deepEqual(await h.api('purchase-orders',cookie.owner),domainBefore.orders)
+    assert.deepEqual(await h.api('notices',cookie.max),domainBefore.notices)
+    console.log('INT-002 signed events and durable connector delivery passed')
+  }finally{if(h)await h.close();await install.remove()}
+}
+
+async function connectorBrowser({h,cookie}) {
+  const {chromium}=await import('@playwright/test')
+  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  try {
+    const context=await browser.newContext({ignoreHTTPSErrors:true})
+    await context.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+    const page=await context.newPage()
+    for(const width of [1440,390]) {
+      await page.setViewportSize({width,height:1000})
+      await page.goto(h.origin+'/app/automation')
+      const card=page.locator('#webhooks')
+      await card.getByRole('button',{name:'Retry delivery'}).count() // Still behind its native disclosure.
+      await card.locator('summary').click()
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`connector card fits ${width}`)
+      await card.screenshot({path:`${process.env.CONNECTOR_SCREENSHOTS}/webhooks-${width}.png`})
+      await page.screenshot({path:`${process.env.CONNECTOR_SCREENSHOTS}/automation-${width}.png`,fullPage:true})
+      assert.ok(await card.getByRole('link',{name:'Open source record'}).isVisible())
+      const form=card.locator('form[action="/app/do/webhook.retry"]')
+      await form.locator('[name=reason]').fill('Receiver configuration inspected')
+      assert.ok(await form.getByRole('button',{name:'Retry delivery'}).isEnabled())
+    }
+    await context.close()
+  }finally{await browser.close()}
+}
+if(process.argv.includes('--connectors'))await connectorJourney()

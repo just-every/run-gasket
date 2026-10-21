@@ -13,7 +13,7 @@ export type MetricDefinition = Readonly<{
   id: string
   name: string
   version: 1
-  requiredCapability?: 'work.review'
+  requiredCapability?: 'work.review' | 'site.manage'
   formula: string
   eventTime: string
   exclusions: string
@@ -41,6 +41,13 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
   ...INTERVENTION_METRICS,
   ...PURCHASE_METRICS,
   ...RECEIVING_METRICS,
+  { id:'connectors.quota', name:'Connector attempt quota', version:1, requiredCapability:'site.manage', clause:'INT-002',
+    formula:'Remaining = quota minus atomically claimed attempts in the current one-hour window, floored at zero. A window starts at its first claim and resets on the first claim at least one hour later. Every network attempt and signing-key failure uses one slot. Inspect retained delivery/attempt states rather than inferring business success.',
+    eventTime:'Claim time in milliseconds; receiver acceptance time is distinct from source event time and business acknowledgment.',
+    exclusions:'No delivery promise or remote business effect is inferred. A dead letter or an expired lease remains retained; explicit retries keep the same event and delivery IDs. Historical events before the connector migration are unavailable.',
+    freshness:'Read from current subscription counters and retained attempts at request time. No background rollup; automation jobs keep their input high-water cursor, subscription revisions and execution results.',
+    sourceDoor:'/api/gasket/connectors' },
+
   ...REPLENISHMENT_METRICS,
   ...VENDOR_METRICS,
   // board.ts intentionally has different status and time policies from performance.ts.
