@@ -9,7 +9,7 @@ async function browserReturn(h,cookie,work,part) {
   const {chromium}=await import('@playwright/test')
   const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
   try {
-    const context=await browser.newContext()
+    const context=await browser.newContext({ignoreHTTPSErrors:true})
     await context.addCookies(cookie.max.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
     const page=await context.newPage()
     for(const width of [1440,390]) {
