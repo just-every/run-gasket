@@ -1,5 +1,5 @@
 // The run site's styles: the frame and shared pieces, the hero, the story
-// sections and the docs. Every colour and face is a token from public/rer-theme.css.
+// sections and the docs. Every colour and face is a token from public/rer-theme.css and public/look.css.
 import './site.css'
 import './hero.css'
 import './story.css'

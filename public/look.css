@@ -1,0 +1,160 @@
+/* Gasket's look beside its theme. public/rer-theme.css holds only what Base's
+   theme grammar allows (the --rer-* tokens and the faces), so everything else
+   every document wears is here: the page font, Gasket's own tokens and Base's
+   documents in Gasket's look. Linked with the theme through src/base/font-head.ts
+   (the root document, /setup, sign-in and its confirmation, and the development
+   sign-in and hand-off pages through src/server.dev.ts), the edition identity's
+   stylesheet (the Lobby and Base's Run, contract and not-found pages), the app
+   shell (src/gasket/ui/shell.ts) and the run site (src/site/pages.tsx). */
+
+/* The page font, form controls included. */
+:root {
+  --font-body: Inter, 'Inter Fallback', Arial, sans-serif;
+  font-family: var(--font-body);
+}
+button, input, select, textarea { font-family: inherit; }
+
+/* Gasket's tokens, defined once: the app (gasket.css), the run site and the
+   rules below read them with the --rer-* tokens. */
+:root {
+  --rer-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --rer-button-radius: 10px;
+  --rer-code-background: #0f1a3d;
+  --rer-code-text: #e6ebf8;
+  --rer-wordmark-weight: 800;
+  --rer-wordmark-tracking: -.035em;
+
+  /* The mark's own colours (public/brand/mark.svg). */
+  --mark-navy: #0b1a40;
+  --mark-cobalt: #1740e1;
+  --mark-copper: #c8693a;
+  --mark-yellow: #f8d810;
+
+  --ink: var(--rer-text);
+  --body: #3b4561;
+  --muted: var(--rer-muted);
+  --soft: #6b7590;
+  --line: #e3e8f2;
+  --line-strong: #cfd7e6;
+  --pale: #f3f6fc;
+  --row: #f6f8fc;
+  --blue: #1a40e2;
+  --blue-strong: #1432b8;
+  --blue-tint: #edf1fe;
+  --blue-line: #c3cffa;
+  --copper: #d9561f;
+  --copper-text: #b4441a;
+  --copper-tint: #fdefe7;
+  --copper-line: #f6c9b2;
+  --yellow: #f2c418;
+  --yellow-tint: #fdf6d6;
+  --green: #1f9d55;
+  --green-ink: #157a3f;
+  --green-tint: #e7f6ed;
+  --green-line: #b8e2c8;
+  --red: #e0262d;
+  --red-ink: #c21d24;
+  --red-tint: #fdecec;
+  --red-line: #f5c2c4;
+  --band: #0c1b4b;
+  --band-ink: #e9edfb;
+  --band-muted: #b9c3e6;
+  --terminal: var(--rer-code-background);
+  --shadow-card: 0 1px 2px rgba(14, 22, 48, .05), 0 14px 34px -20px rgba(14, 22, 48, .22);
+  --shadow-float: 0 2px 6px rgba(14, 22, 48, .08), 0 22px 48px -22px rgba(14, 22, 48, .32);
+  --radius-card: 14px;
+  --radius-chip: 8px;
+  --wrap: 1280px;
+  --gutter: clamp(16px, 8.34vw - 0px, 128px);
+
+  /* The app's names for the same tokens (public/gasket.css). */
+  --gk-paper: var(--rer-page);
+  --gk-line: var(--line);
+  --gk-accent: var(--blue);
+  --gk-accent-strong: var(--blue-strong);
+  --gk-accent-soft: var(--blue-tint);
+  --gk-seg: #eef1f7;
+  --gk-ok: var(--green-ink); --gk-ok-bg: var(--green-tint);
+  --gk-warn: #7a5600; --gk-warn-bg: var(--yellow-tint);
+  --gk-bad: var(--red-ink); --gk-bad-bg: var(--red-tint);
+  --gk-info: var(--blue-strong); --gk-info-bg: var(--blue-tint);
+  --gk-shadow: 0 1px 2px rgb(14 22 48 / 5%);
+  /* The app pick's own values: the cool ground, the hairline, the warm red-orange of an overdue row. */
+  --gk-ground: #f3f5fa;
+  --gk-hairline: #e1e6f2;
+  --gk-field-line: #c6cfdf;
+  --gk-late: #c8410f; --gk-late-bg: #ffe2d6; --gk-late-row: #fff2ec; --gk-late-edge: #f0602e;
+  --gk-pending: #8a5a00; --gk-pending-bg: #fff1bf; --gk-pending-dot: var(--yellow);
+  --gk-done: #127046; --gk-done-bg: #dff4e9;
+  --gk-rail: 240px;
+  --gk-panel: 388px;
+}
+
+/* Base's frames (sign in, its confirmation, Finish setup) in the app pick's
+   look: a centred 440px white card with a hairline on the cool pale ground,
+   the mark beside the heavy wordmark at its head, a heavy tight heading, quiet
+   1px fields with an ultramarine focus ring and one full-width ultramarine
+   button. html.rer-themed outranks each frame's own hashed style, which comes
+   before or after this file depending on the document. */
+html.rer-themed body { font-family: var(--rer-font-body); background: var(--gk-ground); }
+html.rer-themed main { max-width: 440px; width: 100%; margin-inline: auto; padding: 30px 30px 32px; background: var(--rer-surface); border: 1px solid var(--gk-hairline); border-radius: var(--rer-radius); box-shadow: 0 1px 2px rgb(14 22 48 / 5%), 0 18px 40px -28px rgb(14 22 48 / 35%); }
+html.rer-themed .brand, html.rer-themed .rer-brand { display: flex; align-items: center; gap: 10px; margin: 0 0 26px; font-size: 26px; line-height: 30px; font-weight: 800; letter-spacing: -.045em; color: var(--rer-text); }
+html.rer-themed .brand::before, html.rer-themed .rer-brand::before { width: 36px; height: 36px; }
+html.rer-themed h1 { margin: 0 0 10px; font-size: 34px; line-height: 1.15; font-weight: 800; letter-spacing: -.045em; text-align: left; }
+html.rer-themed p { color: var(--rer-muted); }
+html.rer-themed label { font-weight: 600; font-size: 14px; color: #2b3754; }
+html.rer-themed input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { min-height: 46px; padding: 10px 14px; border: 1px solid var(--gk-field-line); border-radius: 10px; background: var(--rer-surface); font-size: 16px; }
+html.rer-themed input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):focus-visible { border-color: var(--rer-accent); outline: 3px solid color-mix(in srgb, var(--rer-focus) 30%, transparent); outline-offset: 0; }
+html.rer-themed input[type="checkbox"] { accent-color: var(--rer-accent); }
+html.rer-themed button, html.rer-themed .action { display: block; width: 100%; min-height: 48px; border: 0; border-radius: var(--rer-button-radius); background: var(--rer-accent); color: var(--rer-accent-text); font-weight: 700; }
+html.rer-themed button.secondary { background: transparent; color: var(--rer-text); border: 1px solid #6c7995; }
+html.rer-themed button:hover, html.rer-themed .action:hover { background: var(--gk-accent-strong); box-shadow: none; }
+html.rer-themed button.secondary:hover { background: var(--gk-accent-soft); }
+html.rer-themed :focus-visible { outline: 3px solid var(--rer-focus); outline-offset: 2px; }
+/* Finish setup shows the owner as two read-only pairs: plain text, not inputs. */
+html.rer-themed dl { display: block; margin: 20px 0 24px; padding-top: 16px; border-top: 1px solid var(--gk-hairline); }
+html.rer-themed dt { margin: 0; font-size: 13px; color: var(--rer-muted); }
+html.rer-themed dd { margin: 4px 0 16px; font-size: 17px; line-height: 24px; color: var(--rer-text); }
+html.rer-themed body:has(main > .brand), html.rer-themed body:has(main > .rer-brand) { align-content: center; }
+@media (max-width: 480px) {
+  html.rer-themed main { padding: 24px 20px 26px; }
+  html.rer-themed h1 { font-size: 28px; }
+}
+
+/* The Lobby (installed /): the same card on the pale page as sign in, with the
+   equipment row standing along the floor. */
+html[data-state] body { background: var(--gk-ground); }
+html[data-state] .door { padding-top: 16vh; }
+html[data-state] .door-card { max-width: 560px; padding: 40px 44px 36px; background: var(--rer-surface); border: 1px solid var(--gk-line); border-radius: var(--rer-radius); box-shadow: var(--shadow-card); }
+html[data-state] h1 { font-size: 44px; font-weight: 800; letter-spacing: -.035em; }
+html[data-state] .line { font-size: 19px; line-height: 28px; color: var(--rer-muted); }
+html[data-state] .btn { background: var(--rer-accent); box-shadow: none; min-height: 52px; font-size: 17px; }
+html[data-state] .btn:hover { background: var(--gk-accent-strong); }
+html[data-state] .door-art { height: 34vh; }
+html[data-state] .door-art img { object-fit: contain; object-position: center bottom; }
+@media (max-width: 640px) {
+  html[data-state] .door { padding-top: 64px; }
+  html[data-state] .door-card { padding: 28px 22px; }
+  html[data-state] h1 { font-size: 36px; }
+}
+/* The Lobby keeps the closing band's equipment row on its plinth. */
+html[data-state] .door-art { background: url('/brand/band.svg') center bottom / contain no-repeat; }
+html[data-state] .door-art img { visibility: hidden; }
+
+/* Base's run-site pages (/run, /contract, the not-found page) in the homepage's
+   look: the lockup in the heavy wordmark, ultramarine headings, white step
+   cards on the pale page, ultramarine numerals and navy code cards. Base's own
+   style follows this file, so each rule is scoped one step deeper than Base's. */
+body:has(> header.bar) { background: var(--pale); }
+body > header.bar .brand { font-weight: 800; letter-spacing: -.035em; line-height: 1.2; }
+body > header.bar nav a { color: var(--blue); }
+body > main > .intro > h1, body > main > .hero > h1 { padding-bottom: .08em; color: var(--blue); font-weight: 800; letter-spacing: -.045em; line-height: 1.1; }
+body > main .step { background: #fff; border-color: var(--line); box-shadow: var(--shadow-card); backdrop-filter: none; }
+body > main .step h2 { font-weight: 750; }
+body > main .num { background: var(--blue); color: #fff; font-weight: 750; }
+body > main .code { background: var(--terminal); color: var(--rer-code-text); }
+/* Under 900px the command keeps one line and scrolls inside its card, so no wrapped line starts mid-command; Copy sits above it. */
+@media (max-width: 900px) {
+  body > main .code pre { padding: 46px 14px 14px; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+  body > main .code .copy { top: 8px; right: 8px; transform: none; }
+}

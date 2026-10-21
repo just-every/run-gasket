@@ -16,6 +16,7 @@ export const identity: EditionIdentity = {
   installedHome: 'lobby',
   theme: '/rer-theme.css',
   mark: '/brand/mark.svg',
-  fonts: '/fonts/fonts.css',
+  // Linked before the theme on the Lobby and the Run pages: Gasket's look (the faces are in the theme).
+  fonts: '/look.css',
   accentColor: branding.primaryColor,
 }
