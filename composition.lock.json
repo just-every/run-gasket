@@ -385,7 +385,7 @@
       "source": "editions/gasket/.node-version"
     },
     "ACCEPTANCE.md": {
-      "sha256": "190428aaee4c52e7af091f774b1ca910ba04f74582d42d8ac8de16a413c4a77d",
+      "sha256": "16434314ebeac14c1c1e2a59ae8129abcae143e9314a8475b8b40c2f39e1576c",
       "mode": 420,
       "component": "gasket",
       "repository": "family",
@@ -399,7 +399,7 @@
       "source": "editions/gasket/AGENTS.md"
     },
     "CONTRACT.md": {
-      "sha256": "9e91218af05ec9d170b13be2d6091386caf2451797f008bfe0eea4c47f0c8d11",
+      "sha256": "adefd8128c674630a22fddf2617d3fd5dab5869d996a678e6259eeff74150bd5",
       "mode": 420,
       "component": "gasket",
       "repository": "family",
