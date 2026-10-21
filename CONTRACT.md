@@ -355,13 +355,13 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `bf313095cc0312b60b29917a6c443461995c0811` (21 October 2026); every clause judged at `bf313095cc0312b60b29917a6c443461995c0811` (21 October 2026).
+Judged from the code and tests at commit `e13a7236bb69fd04ae5dab79dfc56448945c5bee` (21 October 2026); every clause judged at `e13a7236bb69fd04ae5dab79dfc56448945c5bee` (21 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 40 | 32 | 50 | 122 |
-| All | 54 | 32 | 50 | 136 |
+| Target and push further | 41 | 31 | 50 | 122 |
+| All | 55 | 31 | 50 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -462,7 +462,7 @@ Judged from the code and tests at commit `bf313095cc0312b60b29917a6c443461995c08
 | `REPORT-006` | Scheduled reports and CSV PDF delivery | target | partial | `src/gasket/history.ts`; `src/gasket/valuation.ts`; `src/gasket/bad-actors.ts`; `src/gasket/metric-definitions.ts`; `tests/gasket/flows.mjs` | On-demand source-linked history, valuation and Pareto CSV downloads and KPI definitions exist; saved report schedules, site-local email delivery, PDF packs and delivery-time recipient authorization remain absent. |
 | `REPORT-007` | Custom dashboards and cross-site comparisons | target | missing |  | No report builder, saved custom charts or site comparisons. |
 | `REPORT-008` | Maintenance budgets and repair replacement planning | target | partial | `src/gasket/purchase-policy.ts`; `src/gasket/purchase-report.ts`; `src/gasket/lifecycle.ts`; `tests/gasket/spend.mjs`; `tests/gasket/flows.mjs` | Dated site/cost-center purchasing budgets, source-linked commitments and asset repair-versus-recorded-replacement comparisons exist; maintenance actual/commitment forecasts by asset/period, approved replacement scenarios and PO-to-posted-bill reconciliation remain absent. |
-| `REPORT-009` | Reliable measure definitions and data quality | target | partial | `src/gasket/metric-definitions.ts`; `src/gasket/metrics.ts`; `src/gasket/interval-evidence.ts`; `src/gasket/outcomes.ts`; `tests/gasket/metrics.mjs`; `tests/gasket/intervals.mjs`; `tests/gasket/outcomes.mjs` | Existing registered measures retain numbered definitions, source doors, freshness and data-quality provenance; AGENT-003 interval/cohort measures and AGENT-004 exposure-normalized outcome measures have explanatory text but no numbered entries in the Measure definitions registry, despite this clause requiring every new KPI to inherit that registry before shipping. |
+| `REPORT-009` | Reliable measure definitions and data quality | target | done | `src/gasket/metric-definitions.ts`; `src/gasket/intervention-metrics.ts`; `src/gasket/metrics.ts`; `src/gasket/outcomes.ts`; `tests/gasket/metrics.mjs`; `tests/gasket/intervals.mjs`; `tests/gasket/outcomes.mjs`; `tests/gasket/outcomes-browser.mjs` | Numbered definitions include the retained AGENT-003 cohort and AGENT-004 outcome measures, exact event/coverage policies, unknown inputs and observational limits; authenticated source lists open retained proposals and both interval/work outcome assessments without altering them. Existing quality/recomputation journey and interval/outcome HTTP and browser journeys assert the acceptance points. |
 | `REPORT-010` | Completed work-order PDF | target | missing |  | Work evidence and asset history CSV exist, but no single work-order PDF with results, photos, signatures, review and audit, role-aware cost redaction or bulk ZIP download. |
 | `INT-001` | Documented maintenance REST API | target | partial | `src/gasket/http.ts`; `API.md`; `tests/gasket/flows.mjs` | Authenticated JSON doors are documented and exercised; no complete target entities, versioning, service scopes, pagination or general write idempotency keys. |
 | `INT-002` | Signed webhooks and reliable connector jobs | target | missing |  | No maintenance outbound webhook or durable connector job framework. |

@@ -107,6 +107,29 @@ export async function outcomeJourney() {
     } else await h.api('proposal.decide',cookie.lead,{proposal:reversal.id,hash:reversal.hash,decision:'approve'})
     assert.equal((await h.api('schedules',cookie.lead)).find(s=>s.id===schedule).every_days,30)
     assert.deepEqual(await h.api(`outcomes/${worse.id}`,cookie.lead),worse,'AGENT-004 retained assessment is immutable')
+    // REPORT-009: discover every retained comparison through the definition's public source list.
+    const registry=await h.api('metrics?metric=outcome.rates',cookie.lead)
+    const definition=registry.definitions[0]
+    for(const key of ['formula','eventTime','exclusions','freshness'])assert.ok(definition[key])
+    assert.deepEqual((await h.api(`metrics?metric=outcome.rates&version=${definition.version}`,cookie.lead)).definitions,[definition])
+    const source=await h.raw(definition.sourceDoor,{cookie:cookie.lead})
+    assert.equal(source.status,200)
+    const assessments=await source.json()
+    for(const expected of [improved,reduced,gap,worse,repair]) {
+      const retained=assessments.find(row=>row.id===expected.id)
+      assert.ok(retained,'REPORT-009 source list includes interval and work interventions, missing telemetry and worsening')
+      assert.deepEqual(await (await h.raw(retained.sourceDoor,{cookie:cookie.lead})).json(),expected)
+    }
+    assert.equal(improved.subject.post.rates.failuresPerHour,improved.subject.post.rateInputs.failures/improved.subject.post.operatingHours)
+    assert.equal(improved.comparison.post.failuresPerHour,improved.peers.reduce((sum,p)=>sum+p.post.rateInputs.failures,0)/improved.peers.reduce((sum,p)=>sum+p.post.operatingHours,0))
+    assert.equal(gap.subject.post.rates.failuresPerHour,null,'REPORT-009 missing counter coverage remains unknown in retained sources')
+    await h.api('outcomes',undefined,undefined,401)
+    assert.deepEqual(await h.api('outcomes',cookie.max),assessments,'REPORT-009 source directory retains the source-record read scope')
+    if(process.env.OUTCOME_SCREENSHOTS) {
+      const {registryBrowser}=await import('./outcomes-browser.mjs')
+      await registryBrowser(h,cookie,improved)
+    }
+
     console.log('AGENT-004 approved intervention, matched exposure, telemetry gap, production reduction, notices and human-approved reversal passed')
   } finally {await h.close();if(h!==initial)await initial.close()}
 }

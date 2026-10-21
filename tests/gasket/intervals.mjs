@@ -78,6 +78,17 @@ export async function intervalJourney() {
     assert.equal(row.basis.assets[0].failuresPer1000Hours,50,'AGENT-003 exposure-normalized comparison')
     assert.ok(JSON.stringify(row.basis).includes(jobs[0]),'AGENT-003 source work is cited')
     assert.equal(row.basis.limits.length,3)
+    // REPORT-009: a lead opens the numbered definition and follows it to the retained cohort.
+    const registry = await h.api('metrics?metric=interval.failure-rate',cookie.lead)
+    for (const key of ['formula','eventTime','exclusions','freshness']) assert.ok(registry.definitions[0][key])
+    const numbered = await h.api(`metrics?metric=interval.failure-rate&version=${registry.definitions[0].version}`,cookie.lead)
+    assert.deepEqual(numbered.definitions,registry.definitions)
+    const source = await h.raw(registry.definitions[0].sourceDoor,{cookie:cookie.lead})
+    assert.equal(source.status,200)
+    const retained = (await source.json()).find(item=>item.id===p.id).basis
+    assert.deepEqual(retained,row.basis,'REPORT-009 source opens the unchanged evidence snapshot')
+    assert.equal(retained.assets[0].failuresPer1000Hours,Math.round(retained.assets[0].coveredFailures / retained.assets[0].operatingHours * 10000)/10)
+
     await decide(p,'agent','approve',403)
     await h.api('proposal.decide',cookie.lead,{proposal:p.id,hash:'altered',decision:'approve'},409)
     // Any source change makes this human decision stale, even when work is closed.

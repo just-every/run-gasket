@@ -14,6 +14,7 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 
 | Path | Returns |
 | --- | --- |
+| `outcomes`, `outcomes/ID` | Retained AGENT-004 assessments, newest first, each with a source-record door; one immutable assessment with agreed windows, exposure, source records, uncertainty and comparisons. These are recorded snapshots, not live recomputations. |
 | `me` | The signed-in person, their role, the site's date and time zone |
 | `site` | Site name, time zone and `lead_days` (PM-001: whole days ahead of its due date that calendar PM work is issued; `site.configure` takes optional `leadDays`, 0 to 90, 7 by default) |
 | `members` | People with access (owner only) |

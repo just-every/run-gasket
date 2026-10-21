@@ -22,6 +22,11 @@ const delta = (before: Rates, after: Rates): Rates => Object.fromEntries(keys.ma
 const sign = (value: number) => Math.abs(value) <= Number.EPSILON * Math.max(1, Math.abs(value)) * 8 ? 0 : Math.sign(value)
 
 // The authenticated internal record-read scope is the same as work and proposals.
+export async function outcomeList(env: Bindings, _actor: Actor) {
+  const rows = await all<Row>(env, 'SELECT id,report_json FROM gk_outcome_assessments ORDER BY recorded_at DESC,id')
+  return rows.map(row => ({ ...JSON.parse(row.report_json), sourceDoor: `/api/gasket/outcomes/${row.id}` }))
+}
+
 export async function readOutcome(env: Bindings, _actor: Actor, id: string) {
   const stored = await one<Row>(env, 'SELECT report_json FROM gk_outcome_assessments WHERE id=?', id)
   insist(stored, 'outcome_not_found', 404)

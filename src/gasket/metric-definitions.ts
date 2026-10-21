@@ -3,6 +3,7 @@
 // Report source doors accept their existing from/to and scope query parameters.
 // Record-specific measures link to their public JSON directory; use its ids
 // with /api/gasket/assets/:id, requisitions/:id or suppliers/:id for details.
+import { INTERVENTION_METRICS } from './intervention-metrics'
 import { REPLENISHMENT_METRICS } from './replenishment-metrics'
 import { RECEIVING_METRICS } from './receiving-metrics'
 import { PURCHASE_METRICS } from './purchase-metrics'
@@ -37,6 +38,7 @@ function definitions(sourceDoor: string, clause: string, eventTime: string, excl
 
 /** Frozen array and frozen scalar-only records; this is the immutable version-1 catalog. */
 export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
+  ...INTERVENTION_METRICS,
   ...PURCHASE_METRICS,
   ...RECEIVING_METRICS,
   ...REPLENISHMENT_METRICS,
