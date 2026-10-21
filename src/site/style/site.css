@@ -1,5 +1,5 @@
 /* The run site's frame and the pieces every section shares. Every colour,
-   face and size token comes from public/rer-theme.css and public/look.css. */
+   face and size token comes from public/rer-theme.css and public/fonts/fonts.css. */
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 body { margin: 0; background: var(--rer-page); color: var(--ink); font: 400 17px/1.55 var(--rer-font-body); -webkit-font-smoothing: antialiased; font-optical-sizing: auto; }
 .site, .site *, .site *::before, .site *::after { box-sizing: border-box; }

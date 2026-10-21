@@ -1,11 +1,11 @@
-/* Gasket's look beside its theme. public/rer-theme.css holds only what Base's
-   theme grammar allows (the --rer-* tokens and the faces), so everything else
-   every document wears is here: the page font, Gasket's own tokens and Base's
-   documents in Gasket's look. Linked with the theme through src/base/font-head.ts
-   (the root document, /setup, sign-in and its confirmation, and the development
-   sign-in and hand-off pages through src/server.dev.ts), the edition identity's
-   stylesheet (the Lobby and Base's Run, contract and not-found pages), the app
-   shell (src/gasket/ui/shell.ts) and the run site (src/site/pages.tsx). */
+/* Gasket's look beyond its theme. /rer-theme.css holds only what Base's theme
+   grammar allows (the --rer-* tokens and the faces; the installer reads it), so
+   everything else every document wears is here: the page font, Gasket's own
+   tokens and Base's documents in Gasket's look. Base links this file before the
+   theme in the root document, /setup and sign-in (src/base/font-head.ts), the
+   Lobby and the Run pages (the edition identity's fonts) and the hosted demo's
+   gate; the app shell, the run site and the development sign-in and hand-off
+   pages (src/server.dev.ts) link it too. */
 
 /* The page font, form controls included. */
 :root {

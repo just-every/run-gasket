@@ -14,6 +14,8 @@ Self-hosted under the SIL Open Font License 1.1; each folder keeps its licence.
 `/rer-theme.css` declares both faces and the size-matched `Inter Fallback`
 (Arial scaled to Inter's advance widths; ascent and descent from Inter's
 1984/-494 per 2048 units, divided by the scale) and names the stacks, so the
-installer serves them too; `/look.css` sets the page font. The app, Base's
-frames, the run site and /run read them from there. Do not import either file
-from a component.
+installer serves them too. `/fonts/fonts.css` sets the page font and carries
+Gasket's own tokens and Base's documents in Gasket's look, which the theme
+grammar keeps out of `/rer-theme.css`; Base links it before the theme. The app,
+Base's frames, the run site and /run read them from there. Do not import either
+file from a component.
