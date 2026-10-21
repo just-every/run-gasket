@@ -355,13 +355,15 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
+INT-002 is independently proved by the public-door and 1440/390 browser journeys cited in its row; the remaining audit baseline below is unchanged.
+
 Judged from the code and tests at commit `d36b2534592d1fd7e7f6cc410e8c9a6befc4bd5c` (21 October 2026); every clause judged at `d36b2534592d1fd7e7f6cc410e8c9a6befc4bd5c` (21 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 41 | 31 | 50 | 122 |
-| All | 55 | 31 | 50 | 136 |
+| Target and push further | 42 | 31 | 49 | 122 |
+| All | 56 | 31 | 49 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -465,7 +467,7 @@ Judged from the code and tests at commit `d36b2534592d1fd7e7f6cc410e8c9a6befc4bd
 | `REPORT-009` | Reliable measure definitions and data quality | target | done | `src/gasket/metric-definitions.ts`; `src/gasket/intervention-metrics.ts`; `src/gasket/metrics.ts`; `src/gasket/outcomes.ts`; `tests/gasket/metrics.mjs`; `tests/gasket/intervals.mjs`; `tests/gasket/outcomes.mjs`; `tests/gasket/outcomes-browser.mjs` | Numbered definitions include the retained AGENT-003 cohort and AGENT-004 outcome measures, exact event/coverage policies, unknown inputs and observational limits; authenticated source lists open retained proposals and both interval/work outcome assessments without altering them. Existing quality/recomputation journey and interval/outcome HTTP and browser journeys assert the acceptance points. |
 | `REPORT-010` | Completed work-order PDF | target | missing |  | Work evidence and asset history CSV exist, but no single work-order PDF with results, photos, signatures, review and audit, role-aware cost redaction or bulk ZIP download. |
 | `INT-001` | Documented maintenance REST API | target | partial | `src/gasket/http.ts`; `API.md`; `tests/gasket/flows.mjs` | Authenticated JSON doors are documented and exercised; no complete target entities, versioning, service scopes, pagination or general write idempotency keys. |
-| `INT-002` | Signed webhooks and reliable connector jobs | target | missing |  | No maintenance outbound webhook or durable connector job framework. |
+| `INT-002` | Signed webhooks and reliable connector jobs | target | done | `tests/gasket/automation.mjs` — connectorJourney (flow: INT-002 signed events and durable connector delivery): owner subscriptions to scoped work/receipt events and retained source IDs; independent receiver-edge HMAC verification, secret rotation, tampered/expired replay refusal; 429 Retry-After and actual request timeout; cursor rewind, concurrent claims, receiver deduplication and pending-job restart/export/import recovery without duplicated work, stock, bills or notices; quota, last success/error, bounded retries and retained actionable dead letters. connectorBrowser in the same file proves Automation inspection and the retry form at 1440/390. `src/gasket/webhooks.ts`; `src/gasket/connector-jobs.ts`; `scripts/webhooks/receiver.mjs`; `API.md`. |  |
 | `INT-003` | QuickBooks Online maintenance spend sync | target | missing |  | No QuickBooks OAuth, financial mappings, bill posting or reconciliation. |
 | `INT-004` | Email and APNs FCM push delivery | target | partial | `src/mail.server.mjs`; `src/gasket/purchase-orders.ts`; `src/gasket/vendor-reminders.ts`; `tests/gasket/purchase-orders.mjs`; `tests/gasket/vendor-follow-up.mjs` | Purchasing order/reminder email uses the installation mail provider (including SendGrid), with retained submission outcomes and provider-edge assertions; SES, APNs/FCM, localized maintenance/request/report events, recipient preferences, bounce/complaint and device-token lifecycle remain absent or unproved. |
 | `INT-005` | Slack maintenance intake and alerts | target | missing |  | No Slack connection, intake, delivery or interactive authorization. |
