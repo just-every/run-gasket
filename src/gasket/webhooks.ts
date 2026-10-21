@@ -1,7 +1,7 @@
 // INT-002: owner-controlled event subscriptions and durable reconciliation.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
-import { all, commit, guard, insist, newId, now, one, stmt } from './core'
+import { all, commit, guard, insist, newId, now, one, sha256Hex, stmt } from './core'
 import type { Input } from './input'
 import { generateSecret, sealSecret } from './webhook-signing'
 
@@ -86,7 +86,9 @@ export async function connectors(env: Bindings, actor: Actor, url?: URL) {
     const scan = await all(env,'SELECT * FROM gk_connector_events WHERE seq>? ORDER BY seq LIMIT 100',sub.cursor)
     return { subscription: sub.id, paused: Boolean(sub.paused), cursor: sub.cursor, nextCursor: scan.at(-1)?.seq ?? sub.cursor, events: scan.filter(event=>matchesEvent(sub,event)).map(eventEnvelope) }
   }))
-  return { highWater: await eventCursor(env), limits: CONNECTOR_LIMITS,
+  const highWater = await eventCursor(env), source = await one<{ sourceRevision: number; latestChangeAt: number | null }>(env, 'SELECT COALESCE(MAX(seq),0) AS sourceRevision,MAX(at) AS latestChangeAt FROM gk_audit')
+  const inputFingerprint = await sha256Hex(JSON.stringify({ highWater, subscriptions, deliveries, attempts }))
+  return { highWater, ...source, inputFingerprint, limits: CONNECTOR_LIMITS,
     subscriptions: subscriptions.map(sub=>({...sub,events:eventTypes(sub),paused:Boolean(sub.paused),quotaRemaining:now()-sub.quota_start>=CONNECTOR_LIMITS.quotaWindowMs?sub.quota:Math.max(0,sub.quota-sub.quota_used)})),
     events: events.slice(0,100).map(eventEnvelope), next: events.length>100?events[99].seq:null,
     deliveries, attempts, preview,

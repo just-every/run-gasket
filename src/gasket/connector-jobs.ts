@@ -75,9 +75,12 @@ export async function runConnectors(env: Bindings, input: Awaited<ReturnType<typ
       // Record an already-attempted network outcome even if an owner paused the
       // grant during the request. The claim fences off late/duplicate writers.
       await env.DB.batch([
+        stmt(env,`INSERT INTO gk_audit(at,actor,role,action,subject,detail)
+          SELECT ?,?,(SELECT role FROM gk_members WHERE id=?),'webhook.outcome',?,?
+          WHERE EXISTS(SELECT 1 FROM gk_connector_deliveries WHERE id=? AND claim=? AND state='running')`,now(),sub.created_by,sub.created_by,sub.id,JSON.stringify({delivery:delivery.id,state,error,status,automation:authority}),delivery.id,claim),
         stmt(env,"UPDATE gk_connector_attempts SET finished_at=?,outcome=?,http_status=? WHERE id=? AND outcome='running'",now(),accepted?'accepted':error,status,claim),
         stmt(env,'UPDATE gk_connector_deliveries SET state=?,error=?,http_status=?,available_at=?,delivered_at=?,lease_until=NULL WHERE id=? AND claim=? AND state=\'running\'',state,error,status,available,accepted?now():null,delivery.id,claim),
-        stmt(env,'UPDATE gk_connector_subscriptions SET last_success=CASE WHEN ? THEN ? ELSE last_success END,last_error=? WHERE id=?',Number(accepted),now(),error,sub.id),
+        stmt(env,'UPDATE gk_connector_subscriptions SET last_success=CASE WHEN ? THEN ? ELSE last_success END,last_error=? WHERE id=? AND EXISTS(SELECT 1 FROM gk_connector_deliveries WHERE id=? AND claim=? AND state=?)',Number(accepted),now(),error,sub.id,delivery.id,claim,state),
       ])
       results.push({delivery:delivery.id,state,error})
     }

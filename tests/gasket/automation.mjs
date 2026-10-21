@@ -124,6 +124,8 @@ export async function connectorJourney() {
   const { installation: makeInstallation } = await import('./installation.mjs')
   const { offset } = await import('./clock.mjs')
   const install=await makeInstallation();await install.migrate()
+  let activeInstall=install
+  const restoredInstalls=[]
   const keys=new Map(), modes=new Map(), received=[], applied=new Map(), effects={work:[],stock:[],bills:[],notices:[]}
   let receiverClock=now(), h, cookie, captured, inFlight=0, maxInFlight=0
   const outbound=async request=>{
@@ -158,7 +160,7 @@ export async function connectorJourney() {
     }finally{inFlight--}
   }
   const vars={OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-gasket-1'.repeat(3),SETUP_TOKEN:'synthetic-gasket-2'.repeat(3)}
-  const start=async()=>{h=await harness({vars,installation:install,clockOffset:offset,outbound})}
+  const start=async()=>{h=await harness({vars,installation:activeInstall,clockOffset:offset,outbound})}
   try {
     await start();cookie={owner:await h.owner()}
     await h.api('site.configure',cookie.owner,{name:'Connector plant',timezone:zone})
@@ -248,7 +250,16 @@ export async function connectorJourney() {
     keys.set('work',{secret:rotated.secret,keyVersion:2});modes.delete('work')
     assert.notEqual(rotated.secret,workSub.secret)
     await h.api('webhook.control',cookie.owner,{subscription:workSub.id,revision:1,paused:false,reason:'Stale control'},409)
-    await h.stop();await start()
+    const beforeRestore=await state()
+    await h.stop()
+    const {join}=await import('node:path'), archive=join(install.root,'exports','connectors.rer')
+    await install.rer('export','--output',archive)
+    const destination=await makeInstallation();restoredInstalls.push(destination)
+    await destination.rer('import','--input',archive,'--yes')
+    activeInstall=destination;await start()
+    for(const who of Object.keys(cookie))cookie[who]=await h.signIn(`${who}@example.test`)
+    assert.equal((await h.raw('/setup',{cookie:cookie.owner,form:new URLSearchParams({confirm:'yes'})})).status,303)
+    assert.deepEqual(await state(),beforeRestore,'source IDs, pending delivery, rotated key and all attempt evidence survive archive restore')
     assert.equal((await state()).deliveries.find(row=>row.id===pending.id).state,'retry')
     await run(now()+130_000)
     const retried=received.at(-1)
@@ -290,7 +301,8 @@ export async function connectorJourney() {
     assert.ok(!(await(await h.raw('/app/automation',{cookie:cookie.sam})).text()).includes('Dead letter:'))
     if(process.env.CONNECTOR_SCREENSHOTS)await connectorBrowser({h,cookie})
     modes.delete('dead')
-    await h.api('webhook.retry',cookie.owner,{delivery:dead.id,reason:'Receiver repaired'})
+    if(!process.env.CONNECTOR_SCREENSHOTS)await h.api('webhook.retry',cookie.owner,{delivery:dead.id,reason:'Receiver repaired'})
+    assert.equal((await state()).deliveries.find(row=>row.id===dead.id).state,'retry')
     await run(now()+200_000)
     dead=(await state()).deliveries.find(row=>row.id===dead.id)
     assert.equal(dead.state,'delivered');assert.equal(dead.attempts,1)
@@ -309,6 +321,7 @@ export async function connectorJourney() {
     const record=(await h.api('automation/jobs',cookie.owner)).jobs.find(row=>row.rule_id==='connectors'&&row.output?.deliveries?.length)
     assert.ok(record.input.connectors.highWater>0&&record.input.connectors.limits.attempts===3)
     current=await state()
+    assert.ok(current.sourceRevision>0&&current.latestChangeAt>0&&/^[a-f0-9]{64}$/.test(current.inputFingerprint))
     assert.ok(current.attempts.every(row=>row.automation_job_id&&row.automation_revision>0&&row.subscription_revision>0&&row.finished_at))
     assert.ok((await h.api('metrics?metric=connectors.quota',cookie.owner)).definitions[0].sourceDoor==='/api/gasket/connectors')
     assert.equal((await h.api('work',cookie.lead)).length,2)
@@ -316,7 +329,7 @@ export async function connectorJourney() {
     assert.deepEqual(await h.api('purchase-orders',cookie.owner),domainBefore.orders)
     assert.deepEqual(await h.api('notices',cookie.max),domainBefore.notices)
     console.log('INT-002 signed events and durable connector delivery passed')
-  }finally{if(h)await h.close();await install.remove()}
+  }finally{if(h)await h.close();for(const destination of restoredInstalls)await destination.remove();await install.remove()}
 }
 
 async function connectorBrowser({h,cookie}) {
@@ -330,7 +343,6 @@ async function connectorBrowser({h,cookie}) {
       await page.setViewportSize({width,height:1000})
       await page.goto(h.origin+'/app/automation')
       const card=page.locator('#webhooks')
-      await card.getByRole('button',{name:'Retry delivery'}).count() // Still behind its native disclosure.
       await card.locator('summary').click()
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`connector card fits ${width}`)
       await card.screenshot({path:`${process.env.CONNECTOR_SCREENSHOTS}/webhooks-${width}.png`})
@@ -339,6 +351,7 @@ async function connectorBrowser({h,cookie}) {
       const form=card.locator('form[action="/app/do/webhook.retry"]')
       await form.locator('[name=reason]').fill('Receiver configuration inspected')
       assert.ok(await form.getByRole('button',{name:'Retry delivery'}).isEnabled())
+      if(width===390)await Promise.all([page.waitForURL(url=>url.searchParams.has('notice')),form.getByRole('button',{name:'Retry delivery'}).click()])
     }
     await context.close()
   }finally{await browser.close()}
