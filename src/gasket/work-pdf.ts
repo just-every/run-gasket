@@ -71,6 +71,8 @@ export async function workPdfBytes(env: Bindings, actor: Actor, id: string) {
   for (const r of w.readings) line(`${r.meter}: ${r.value} ${r.unit}; taken ${r.taken_on}; by ${r.entered_by}`)
   heading('Parts issued and returned')
   for (const p of w.parts) line(`${p.number} ${p.name}: issued ${p.issued}, returned ${p.returned}, used ${p.used} ${p.unit}${costs ? `; cost ${money(p.usedCents)}` : ''}`)
+  heading('Time entries')
+  for (const t of w.timeEntries) line(`${t.worked_on}: ${t.minutes} minutes; ${t.recorded_by}; ${t.note}; recorded ${stamp(t.recorded_at)}`)
   heading('Comments and notes')
   for (const c of w.comments.comments) { line(`${c.author ?? 'Former member'} at ${stamp(c.created_at)} (${c.kind})`); line(c.body) }
   for (const f of w.findings) line(`Finding: ${f.text}; severity ${f.severity}; step ${f.item === null ? 'whole work' : f.item + 1}`)

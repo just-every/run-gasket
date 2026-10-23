@@ -63,6 +63,15 @@ export async function workPdfJourney() {
     await h.api('work.cost', cookie.lead, { workOrder: work, category: 'labor', amount: '123.45', note: 'Private labor rate marker' })
     await h.api('work.cost', cookie.lead, { workOrder: work, category: 'contractor', amount: '67.89', note: 'Private contractor charge marker' })
     await h.api('comment.post', cookie.tech, { workOrder: work, body: 'Replaced gasket; verified cabinet temperature.\n' + 'Inspection note repeated for pagination.\n'.repeat(30) })
+    const timedVersion = (await detail()).version
+    const timed = { workOrder: work, version: timedVersion, workedOn: today, minutes: 45, note: 'Original technician inspection time' }
+    for (const who of ['lead', 'supervisor', 'agent']) await h.api('workorder.time', cookie[who], timed, 403)
+    await h.api('workorder.time', cookie.tech, { ...timed, minutes: 0 }, 400)
+    await h.api('workorder.time', cookie.tech, { ...timed, workedOn: '2099-01-01' }, 400)
+    await h.api('workorder.time', cookie.tech, timed)
+    await h.api('workorder.time', cookie.tech, timed, 409)
+    assert.equal((await detail()).timeEntries.length, 1)
+    assert.equal((await detail()).version, timedVersion + 1)
     await h.api('workorder.sign', cookie.tech, { workOrder: work, version: (await detail()).version, role: 'customer', name: 'Customer Morgan' })
     const photos = []
     for (const filename of ['seal-before.png', 'seal-after.png']) photos.push((await h.api('workorder.evidence', cookie.tech, { workOrder: work, file: file(filename, png, mime('image', 'png')) })).evidence)
@@ -71,7 +80,7 @@ export async function workPdfJourney() {
     await h.api('workorder.submit', cookie.tech, { workOrder: work, version: (await detail()).version })
     await h.api('workorder.review', cookie.supervisor, { workOrder: work, version: (await detail()).version, decision: 'approve', reason: 'Inspection and evidence accepted' })
     const full = await report('supervisor'), restricted = await report('tech'), source = await detail()
-    for (const text of ['Chiller', 'Cold room', 'Procedure: Chiller inspection; revision 1', 'Inspect door seal', 'fail', 'Seal torn; replaced', 'Inspect fan', 'Fan clear', 'Cabinet temperature: -18 °C', 'Supply pressure: 2 bar', 'issued 2, returned 1, used 1 each', 'USD 12.34', 'Customer Morgan', 'CURRENT', 'approved', 'Inspection and evidence accepted', 'Private labor rate marker', 'USD 123.45', 'USD 67.89', 'workorder.approve']) assert.ok(full.text.includes(text), text)
+    for (const text of ['Chiller', 'Cold room', 'Procedure: Chiller inspection; revision 1', 'Inspect door seal', 'fail', 'Seal torn; replaced', 'Inspect fan', 'Fan clear', 'Cabinet temperature: -18 °C', 'Supply pressure: 2 bar', 'issued 2, returned 1, used 1 each', 'USD 12.34', 'Customer Morgan', 'CURRENT', 'approved', 'Inspection and evidence accepted', '45 minutes; tech; Original technician inspection time', 'Private labor rate marker', 'USD 123.45', 'USD 67.89', 'workorder.approve']) assert.ok(full.text.includes(text), text)
     for (const text of ['123.45', '67.89', '12.34', 'Private labor rate marker', 'Private contractor charge marker', '"cents"']) assert.equal(restricted.text.includes(text), false, `restricted PDF withholds ${text}`)
     const audit = (await h.api('audit?limit=500', cookie.supervisor)).rows.filter(row => row.subject === work)
     for (const entry of audit) {
@@ -79,6 +88,7 @@ export async function workPdfJourney() {
       assert.ok(full.text.includes(entry.action))
       assert.ok(full.text.replace(/\s/g, '').includes(entry.detail.replace(/\s/g, '')), `audit payload ${entry.seq}`)
     }
+    for (const time of source.timeEntries) assert.ok(full.text.includes(`${time.minutes} minutes; ${time.recorded_by}; ${time.note}`))
     for (const step of source.items) assert.ok(full.text.includes(step.text) && full.text.includes(step.result.outcome))
     for (const entry of source.reviews) assert.ok(full.text.includes(entry.decision))
     assert.ok(full.pages >= 2 && full.images === 2, 'pagination and two embedded photos')
@@ -110,6 +120,15 @@ export async function workPdfJourney() {
     assert.equal(entries.length, 3)
     assert.equal(new Set(entries.map(([name]) => name)).size, 3)
     assert.ok(entries.every(([name, pdf]) => /^WO-\d+\.pdf$/.test(name) && pdf.pages > 0))
+    // Recording time still disqualifies a reviewer after the work is handed to somebody else.
+    const ownerId = (await h.api('me', cookie.owner)).id, handed = others[1]
+    await h.api('workorder.assign', cookie.lead, { workOrder: handed, assignee: ownerId })
+    await h.api('workorder.time', cookie.owner, { workOrder: handed, version: (await h.api(`work/${handed}`, cookie.owner)).version, workedOn: today, minutes: 5, note: 'Original owner time before reassignment' })
+    await h.api('workorder.assign', cookie.lead, { workOrder: handed, assignee: ids.tech })
+    await h.api('workorder.submit', cookie.tech, { workOrder: handed, version: (await h.api(`work/${handed}`, cookie.tech)).version })
+    const handedVersion = (await h.api(`work/${handed}`, cookie.supervisor)).version
+    await h.api('workorder.review', cookie.owner, { workOrder: handed, version: handedVersion, decision: 'approve' }, 403)
+    await h.api('workorder.review', cookie.supervisor, { workOrder: handed, version: handedVersion, decision: 'approve' })
     if (process.env.REPORT_SCREENSHOTS) {
       await mkdir(process.env.REPORT_SCREENSHOTS, { recursive: true })
       const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain', '--password-store=basic'] })
@@ -133,6 +152,18 @@ export async function workPdfJourney() {
           await page.getByRole('button', { name: 'Download PDFs as ZIP', exact: true }).click()
           assert.equal((await bundleDownload).suggestedFilename(), 'work-orders.zip')
           await page.screenshot({ path: `${process.env.REPORT_SCREENSHOTS}/work-report-${width}.png`, fullPage: true })
+        }
+        await context.clearCookies()
+        await context.addCookies(cookie.tech.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
+        for (const width of [1440, 390]) {
+          await page.setViewportSize({ width, height: 1000 })
+          assert.equal((await page.goto(h.origin + `/app/work/${others[0]}`)).status(), 200)
+          const form = page.locator('form[action="/app/do/workorder.time"]')
+          await form.getByLabel('Minutes worked').fill('15')
+          await form.getByLabel('Time note').fill(`Field note at width ${width}`)
+          await Promise.all([page.waitForURL(url => url.searchParams.has('notice')), form.getByRole('button', { name: 'Record time', exact: true }).click()])
+          assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+          await page.screenshot({ path: `${process.env.REPORT_SCREENSHOTS}/work-time-${width}.png`, fullPage: true })
         }
       } finally { await browser.close() }
     }

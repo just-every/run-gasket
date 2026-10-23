@@ -332,7 +332,7 @@ notes. Existing membership and session revocation apply at every download.
 Agent export remains refused pending approval; REPORT-010 stays partial.
 ADMIN-003 inherits granular rate permissions, ADMIN-002 inherits cross-site
 checks, ADMIN-004 inherits external identity admission, FIELD-006 inherits
-native time entries, and ADMIN-013 inherits viewer-language report labels.
+timers, corrected-time review and authorized labor rates, and ADMIN-013 inherits viewer-language report labels.
 Current report labels are US English; supported authored text stays as entered.
 
 Owners and leads use the work-detail disclosure to download several reports.
@@ -341,3 +341,12 @@ Repeated `work=ID` query parameters are also supported. One to twenty distinct
 orders produce one numbered PDF each. Missing orders, invalid selections and
 bundles exceeding 30 MB fail explicitly before a ZIP response is returned.
 The ZIP is created on demand and is never published or retained by the server.
+
+`POST /api/gasket/workorder.time` records original manual time on open work for
+the assignee or a current collaborator: `workOrder`, required current `version`,
+site-local `workedOn` date, integer `minutes` from 1 to 1440, and `note`. Future
+dates are refused. The form on the work page uses the same action. Acceptance
+bumps the work revision, makes prior signatures stale, and retains the named
+contributor for independent review. A retry with the old version writes nothing.
+These minutes are original entries and are not approved hours or automatic
+labor charges; timers, corrections, overlap review and rates remain FIELD-006.

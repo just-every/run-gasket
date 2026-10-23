@@ -62,7 +62,7 @@ import { sign } from './signatures'
 import { createSchedule, evaluateMeter, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole, setTechnicianWork } from './site'
 import { retireField, saveField, saveStatus, setFieldValue, setWaiting } from './work-fields'
-import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, doorOf, recordFinding, recordReadings, recordResults } from './work'
+import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, doorOf, recordFinding, recordReadings, recordResults, recordTime } from './work'
 
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
@@ -165,6 +165,7 @@ export const actions: Record<string, Handler> = {
   'comment.post': (env, actor, input) => postComment(env, actor, input),
   'comment.edit': (env, actor, input) => editComment(env, actor, input),
   'comment.read': (env, actor, input) => markRead(env, actor, input),
+  'workorder.time': recordTime,
   'workorder.readings': async (env, actor, input) => { const kept = await recordReadings(env, actor, input); const created = []; for (const meter of kept.meters) created.push(...await evaluateMeter(env, actor, meter)); return { id: kept.id, created } },
   'workorder.issue': (env, actor, input) => issue(env, actor, input),
   'workorder.return': (env, actor, input) => giveBack(env, actor, input),
