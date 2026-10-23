@@ -90,7 +90,7 @@ export async function costingReport(env: Bindings, actor: Actor, url: URL) {
   requireCapability(actor, 'board.read')
   const from = url.searchParams.get('from') || null, to = url.searchParams.get('to') || null
   insist((!from || isDate(from)) && (!to || isDate(to)) && (!from || !to || from <= to), 'invalid_period')
-  const selectedAsset = url.searchParams.get('asset') || null, selectedWork = url.searchParams.get('workOrder') || null, selectedCenter = url.searchParams.get('costCenter') || null
+  const selectedAsset = url.searchParams.get('asset') || null, selectedWork = url.searchParams.get('workOrder') || url.searchParams.get('work') || null, selectedCenter = url.searchParams.get('costCenter') || null
   const [assets, works, actuals, comparisons, history, centers, commitments, excludedCommitments, labor, audit, site] = await Promise.all([
     all(env, 'SELECT id,parent_id,tag,name,level FROM gk_assets ORDER BY tag'),
     all(env, 'SELECT id,number,title,status,asset_id,location,cost_center_id,version FROM gk_work_orders ORDER BY number'),
@@ -99,7 +99,7 @@ export async function costingReport(env: Bindings, actor: Actor, url: URL) {
     all(env, 'SELECT id,asset_id,source_ref,title,completed_on,created_at,parts_cents,labor_cents,other_cents FROM gk_work_history ORDER BY id'),
     all(env, 'SELECT id,code,name,active FROM gk_cost_centers ORDER BY code'),
     all(env, `SELECT c.*,r.order_id,r.snapshot,p.number FROM gk_live_purchase_commitments c JOIN gk_purchase_revisions r ON r.id=c.revision_id JOIN gk_purchase_orders p ON p.id=r.order_id ORDER BY c.booked_on,c.revision_id`),
-    all(env, `SELECT c.revision_id,c.amount_cents,c.booked_on,r.order_id,r.snapshot,CASE WHEN x.id IS NOT NULL THEN 'released' ELSE 'superseded_unsent' END AS exclusion FROM gk_purchase_commitments c JOIN gk_purchase_revisions r ON r.id=c.revision_id LEFT JOIN gk_purchase_commitment_releases x ON x.revision_id=c.revision_id WHERE NOT EXISTS(SELECT 1 FROM gk_live_purchase_commitments live WHERE live.revision_id=c.revision_id) ORDER BY c.revision_id`),
+    all(env, `SELECT c.revision_id,c.amount_cents,c.booked_on,c.cost_center_id,r.order_id,r.snapshot,CASE WHEN x.id IS NOT NULL THEN 'released' ELSE 'superseded_unsent' END AS exclusion FROM gk_purchase_commitments c JOIN gk_purchase_revisions r ON r.id=c.revision_id LEFT JOIN gk_purchase_commitment_releases x ON x.revision_id=c.revision_id WHERE NOT EXISTS(SELECT 1 FROM gk_live_purchase_commitments live WHERE live.revision_id=c.revision_id) ORDER BY c.revision_id`),
     all(env, 'SELECT id,work_order_id,state FROM gk_labor_entries ORDER BY id'),
     one(env, 'SELECT COALESCE(MAX(seq),0) AS sequence,MAX(at) AS latestAt FROM gk_audit'),
     one(env, 'SELECT name,timezone FROM gk_site WHERE singleton=1'),

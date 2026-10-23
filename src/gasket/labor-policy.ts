@@ -27,20 +27,19 @@ function daySegments(row: Row, zone: string) {
 
 export async function reviewLabor(env: Bindings, actor: Actor, input: Input) {
   insist(managesLabor(actor),'forbidden',403)
+  const revision=await one(env,'SELECT COALESCE(MAX(seq),0) AS seq FROM gk_audit')
   const entry=await one(env,'SELECT * FROM gk_labor_entries WHERE id=?',input.text('entry',{max:100}))
   insist(entry,'entry_not_found',404);insist(entry.state==='pending','already_reviewed',409)
   insist(!await one(env,"SELECT 1 FROM gk_labor_entries WHERE supersedes_id=? AND state='pending'",entry.id),'correction_pending',409)
   const decision=input.text('decision',{max:20}),reason=input.text('reason',{max:500})
   insist(['approve','reject'].includes(decision),'invalid_decision')
   const flags=await entryFlags(env,entry)
-  const guards=[pendingGuard(env,entry)]
+  const guards=[pendingGuard(env,entry),guard(env,'stale','(SELECT COALESCE(MAX(seq),0) FROM gk_audit)=?',revision.seq)]
   let cents:number|null=null,regular:number|null=null,overtime:number|null=null,rate:Row|null=null
   if(decision==='approve') {
     rate=await one(env,'SELECT * FROM gk_labor_rates WHERE person_id=? ORDER BY recorded_at DESC,rowid DESC LIMIT 1',entry.person_id)
     insist(rate,'labor_rate_required',409)
     // Snapshot isolation across every approval, correction and rate policy update.
-    const revision=await one(env,'SELECT COALESCE(MAX(seq),0) AS seq FROM gk_audit')
-    guards.push(guard(env,'stale','(SELECT COALESCE(MAX(seq),0) FROM gk_audit)=?',revision.seq))
     const approved=await all(env,"SELECT * FROM gk_labor_entries WHERE person_id=? AND state='approved' AND id<>?",entry.person_id,entry.supersedes_id??'')
     regular=0;overtime=0
     for(const segment of daySegments(entry,actor.zone)) {

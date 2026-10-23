@@ -20,9 +20,10 @@ export async function laborBrowser({h,cookie,work,people,today}) {
         await Promise.all([page.waitForURL(url=>url.searchParams.has('notice')||url.searchParams.has('error')),form.getByRole('button',{name,exact:true}).click()])
         assert.equal(new URL(page.url()).searchParams.has('error'),false,new URL(page.url()).searchParams.get('error')??name)
       }
-      await as('max')
+      await as('lead')
       await page.goto(`${h.origin}/app`)
       await capture('work-list')
+      await as('max')
       await page.goto(`${h.origin}/app/work/${work}`)
       await capture('technician-time','#labor')
       assert.equal(await page.getByText('Pay rates and overtime policy · owner only',{exact:true}).count(),0)

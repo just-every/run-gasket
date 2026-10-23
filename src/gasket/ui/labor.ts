@@ -31,6 +31,7 @@ interface LaborEntry {
   cents?: number | null
   review_reason: string | null
   reviewed_by: string | null
+  reviewer?: string | null
   invoice_ref?: string | null
 }
 
@@ -78,7 +79,7 @@ function entryHistory(labor: LaborView, actor: Actor, work: WorkContext, owner: 
       h`${entry.person ?? 'Former member'}<span class="gk-sub">${label(entry.category)}</span>`,
       h`${showInstant(entry.started_at, actor.zone)}<span class="gk-sub">to ${showInstant(entry.ended_at, actor.zone)}</span>`,
       h`${minutes((entry.ended_at - entry.started_at) / 60_000)}${entry.state === 'approved' && owner ? h`<span class="gk-sub">${minutes(entry.regular_minutes ?? 0)} regular · ${minutes(entry.overtime_minutes ?? 0)} overtime</span>` : ''}`,
-      h`${tag(stateLabel(entry.state))}${flags}${entry.review_reason ? h`<span class="gk-sub">${entry.review_reason}</span>` : ''}${entry.reviewed_by ? h`<span class="gk-sub">Reviewed by ${entry.reviewed_by}</span>` : ''}${review}`,
+      h`${tag(stateLabel(entry.state))}${flags}${entry.review_reason ? h`<span class="gk-sub">${entry.review_reason}</span>` : ''}${entry.reviewed_by ? h`<span class="gk-sub">Reviewed by ${entry.reviewer ?? 'Owner'}</span>` : ''}${review}`,
       ...(owner ? [entry.state === 'approved' && !correctedBy ? (entry.cents == null ? 'Unpriced' : usd(entry.cents)) : 'Not counted'] : []),
       h`${entry.reason ? h`<p>${entry.reason}</p>` : ''}${entry.supersedes_id ? h`<p class="gk-sub">Corrects an earlier entry.</p>` : ''}${correctedBy ? h`<p class="gk-sub">A later correction is retained below; it replaces this entry only after approval.</p>` : ''}${entry.invoice_ref ? h`<p class="gk-sub">Invoice ${entry.invoice_ref}</p>` : ''}${correction}`,
     ]

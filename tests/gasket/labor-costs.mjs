@@ -9,7 +9,7 @@ export async function laborJourney(h,cookie,people) {
   const today=localNow(zone,now()).slice(0,10),yesterday=addDays(today,-1)
   const asset=(await h.api('asset.create',cookie.lead,{tag:'LAB-100',name:'Conveyor drive',location:'Packing hall'})).id
   const work=(await h.api('workorder.create',cookie.lead,{asset,title:'Replace conveyor drive bearing',due:today,assignee:people.max})).id
-  const other=(await h.api('workorder.create',cookie.lead,{asset,title:'Inspect belt tracking',due:today,assignee:people.mo})).id
+  const other=(await h.api('workorder.create',cookie.lead,{asset,title:'Inspect belt tracking',due:yesterday,assignee:people.mo})).id
   const detail=(who='owner')=>h.api(`work/${work}`,cookie[who])
   const rate={person:people.max,amount:'60.00',overtimeAfterMinutes:60,overtimeMultiplier:150}
   await h.api('labor.rate',cookie.lead,rate,403)

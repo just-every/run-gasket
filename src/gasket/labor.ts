@@ -11,7 +11,7 @@ export async function recordLabor(env: Bindings, actor: Actor, input: Input) {
   insist(managesLabor(actor) || person === actor.id, 'forbidden', 403)
   insist(await one(env, "SELECT 1 FROM gk_members WHERE id=? AND status='active' AND role IN ('owner','lead','maintainer')", person), 'person_not_found', 404)
   const started = laborInstant(actor,input,'started'), ended = laborInstant(actor,input,'ended')
-  insist(ended > started && ended-started <= 7*86400_000, 'invalid_duration')
+  insist(ended > started, 'invalid_duration')
   const supersedes = input.text('supersedes', { max: 100, optional: true }) || null
   const original = supersedes ? await one(env, 'SELECT * FROM gk_labor_entries WHERE id=?', supersedes) : null
   const guards: D1PreparedStatement[] = []
@@ -40,7 +40,7 @@ export async function recordContractorInvoice(env: Bindings, actor: Actor, input
 
 export async function laborView(env: Bindings, actor: Actor, workOrder: string) {
   const mayManage=managesLabor(actor)
-  const rows=await all(env,'SELECT e.*,m.name AS person FROM gk_labor_entries e JOIN gk_members m ON m.id=e.person_id WHERE e.work_order_id=? ORDER BY e.started_at,e.recorded_at,e.id',workOrder)
+  const rows=await all(env,'SELECT e.*,m.name AS person,r.name AS reviewer FROM gk_labor_entries e JOIN gk_members m ON m.id=e.person_id LEFT JOIN gk_members r ON r.id=e.reviewed_by WHERE e.work_order_id=? ORDER BY e.started_at,e.recorded_at,e.id',workOrder)
   const entries=await Promise.all(rows.filter(row=>mayManage || row.person_id===actor.id).map(async row=>{
     const pendingFlags=row.state==='pending' ? await entryFlags(env,row) : []
     if(mayManage) return {...row,pendingFlags}
