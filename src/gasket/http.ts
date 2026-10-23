@@ -1,3 +1,5 @@
+import { submitRequest, requestFile } from './requests'
+import { requestPortalPage, requestReceiptPage, requestSettingsPage, requestsPage, requestPage } from './ui/requests'
 import { catalogPreviewPage } from './ui/catalog-preview'
 import { partMergePage } from './ui/part-merge'
 import { partPhoto } from './part-photos'
@@ -69,22 +71,41 @@ function failure(error: unknown): { code: string; status: number; detail?: unkno
 export async function gasketResponse(request: Request, original: Bindings): Promise<Response | null> {
   const env = runtimeBindings(original)
   const url = new URL(request.url)
+  const publicRequest=url.pathname.match(/^\/request\/([\w-]+)(?:\/received\/([\w-]+))?$/)
   const api = url.pathname.startsWith('/api/gasket/')
-  if (!api && url.pathname !== '/app' && !url.pathname.startsWith('/app/')) return null
+  if (!publicRequest && !api && url.pathname !== '/app' && !url.pathname.startsWith('/app/')) return null
   if (request.method === 'POST' && request.headers.get('origin') !== env.AUTH_ORIGIN) return api ? json({ error: 'invalid_origin' }, 403) : new Response('Forbidden', { status: 403 })
   if (!['GET', 'HEAD', 'POST'].includes(request.method)) return new Response(null, { status: 405, headers: { allow: 'GET, HEAD, POST' } })
   let actor: Actor | null = null
   try {
     actor = await currentActor(env, request)
+    if(publicRequest) {
+      const [,id,key]=publicRequest
+      if(request.method==='POST') {
+        if(key) throw new GasketError('not_found',404)
+        const result=await submitRequest(env,actor,id,await requestIntakeInput(request),request)
+        if(request.headers.get('accept')?.includes('application/json')) return json(result)
+        return new Response(null,{status:303,headers:{location:result.receipt,'cache-control':'no-store'}})
+      }
+      return key ? await requestReceiptPage(env,url,id,key) : await requestPortalPage(env,actor,url,id)
+    }
     if (!actor) return api ? json({ error: 'authentication_required' }, 401) : new Response(null, { status: 303, headers: { location: `/signin?returnTo=${encodeURIComponent(url.pathname)}`, 'cache-control': 'no-store' } })
     if (api) return await apiResponse(env, actor, request, url)
     return await pageResponse(env, actor, request, url)
   } catch (error) {
     const { code, status, detail } = failure(error)
-    if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
+    if (api || (publicRequest && request.headers.get('accept')?.includes('application/json'))) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
     if (status === 404) return page(env, 'Not found', actor, h`<h1>Not found</h1><p>There is nothing here you can open.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status: 404 })
     return page(env, 'That did not work', actor, h`<h1>That did not work</h1><p>${code.replace(/_/g, ' ')}.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status })
   }
+}
+
+// Bound streamed bodies before multipart/JSON parsing, including chunked uploads.
+async function requestIntakeInput(request:Request) {
+  const reader=request.body?.getReader(),chunks:Uint8Array[]=[];let size=0
+  if(reader) while(true) {const {done,value}=await reader.read();if(done)break;size+=value.byteLength;if(size>8_000_000){await reader.cancel();throw new GasketError('request_too_large',413)}chunks.push(value)}
+  const bytes=new Uint8Array(size);let at=0;for(const chunk of chunks){bytes.set(chunk,at);at+=chunk.length}
+  return Input.from(new Request(request.url,{method:request.method,headers:request.headers,body:bytes}))
 }
 
 async function apiResponse(env: Bindings, actor: Actor, request: Request, url: URL) {
@@ -139,6 +160,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  requestPortals:(env,actor,url)=>requestSettingsPage(env,actor,url), requests:(env,actor,url)=>requestsPage(env,actor,url), request:(env,actor,url,id)=>requestPage(env,actor,url,id), requestFile:(env,actor,_url,id)=>requestFile(env,actor,id),
   partMerge:(env,actor,url)=>partMergePage(env,actor,url),
   partPhoto:(env,actor,_url,id)=>partPhoto(env,actor,id),
   vendorFollowUp: (env,actor,url) => vendorFollowUpPage(env,actor,url),

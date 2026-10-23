@@ -535,3 +535,7 @@ td .gk-inline .gk-actions { margin: 0; }
   td .gk-inline { flex-wrap: wrap; }
   td .gk-inline select, td .gk-role { min-width: 0; }
 }
+
+/* Operator faults retain authored text and long original-file digests. */
+#request-form input, #request-form textarea { min-width: 0; }
+.gk-main:has(#request-form), .gk-main:has(a[href^="/app/request-files/"]) { overflow-wrap: anywhere; }
