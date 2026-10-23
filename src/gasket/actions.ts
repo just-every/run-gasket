@@ -50,7 +50,7 @@ import { workFromTemplate } from './template-work'
 import { approveSubstitute, createKit, release, reserve } from './reservations'
 import { reviseBom } from './bom'
 import { applyImport, importAction, previewImport } from './movein/maintainx'
-import { countPart, createPart, receivePart } from './parts'
+import { countPart, createPart, disposeWorkQuarantine, receivePart } from './parts'
 import { setVendorPrice } from './valuation'
 import { decideCountLine, planCount, setCountApproval, submitCount } from './counts'
 import { decide, prepare } from './proposals'
@@ -123,6 +123,7 @@ export const actions: Record<string, Handler> = {
   'code.move': (env, actor, input) => moveCode(env, actor, input),
   'code.retire': (env, actor, input) => retireCode(env, actor, input),
   'part.create': (env, actor, input) => createPart(env, actor, input),
+  'part.quarantine.dispose': disposeWorkQuarantine,
   'part.receive': (env, actor, input) => receivePart(env, actor, input),
   'part.count': (env, actor, input) => countPart(env, actor, input),
   'part.price': (env, actor, input) => setVendorPrice(env, actor, input),
