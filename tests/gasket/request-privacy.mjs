@@ -74,14 +74,19 @@ export async function installationLimit(f) {
   assert.equal(over.status,429)
   assert.equal((await h.api('requests',cookie.lead)).length,100)
 }
-export async function erasePrivateRequest(f,id,workId) {
+export async function erasePrivateRequest(f,id,workId,page) {
   const {h,cookie,payload}=f
   const record=await h.api(`requests/${id}`,cookie.lead),files=record.files.map(f=>f.id)
   const body={request:id,version:record.version,confirm:true}
   await h.api('request.erase',cookie.lead,body,403)
   await h.api('request.erase',cookie.owner,{...body,confirm:false},400)
   await h.api('request.erase',cookie.owner,{...body,version:record.version+1},409)
-  await h.api('request.erase',cookie.owner,body)
+  if(page) {
+    await page.goto(`${h.origin}/app/requests/${id}`)
+    const form=page.locator('form[action="/app/do/request.erase"]')
+    await form.getByRole('checkbox').check()
+    await Promise.all([page.waitForURL(url=>url.searchParams.has('notice')),form.getByRole('button',{name:'Erase request data',exact:true}).click()])
+  } else await h.api('request.erase',cookie.owner,body)
   const erased=await h.api(`requests/${id}`,cookie.owner)
   assert.equal(erased.contact,'');assert.equal(erased.description,'');assert.equal(erased.requester_id,null)
   assert.deepEqual(erased.answers,{});assert.deepEqual(erased.files,[]);assert.deepEqual(erased.timeline,[])

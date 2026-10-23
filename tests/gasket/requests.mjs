@@ -101,7 +101,8 @@ export async function requestPortalJourney() {
     try {jpeg=Buffer.from(await camera.page.evaluate(()=>{const c=document.createElement('canvas');c.width=2;c.height=2;return c.toDataURL('image/jpeg').split(',')[1]}),'base64')} finally {await camera.context.close();await camera.browser.close()}
     await photoPrivacy(f,jpeg)
     await installationLimit(f)
-    await erasePrivateRequest(f,r.id)
+    const erasure=await browserContext(h,cookie.owner)
+    try {await erasePrivateRequest(f,r.id,null,erasure.page)} finally {await erasure.context.close();await erasure.browser.close()}
     await post(payload,cookie.tech,410)
     if(process.env.REQUEST_SCREENSHOTS)await requestScreens(f,r.id)
     console.log('REQ-001 typed authenticated/public intake, required answers, originals, privacy, consent and concurrent abuse limits passed')
