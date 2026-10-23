@@ -1,6 +1,6 @@
 // Operator intake through the built Worker's HTTP doors; no direct DB writes.
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
@@ -17,7 +17,7 @@ export async function requestFixture() {
   const fields=[{key:'stopped',label:'Is the line stopped?',type:'choice',required:true,options:['Yes','No']},{key:'reading',label:'Gauge reading',type:'number',required:false},{key:'noticed',label:'First noticed',type:'date',required:false},{key:'detail',label:'Shift detail',type:'text',required:false},{key:'nameplate',label:'Nameplate photo',type:'photo',required:false}]
   const portal=(await h.api('request.portal',cookie.owner,{name:'Assembly fault report',fields})).id
   const target=(await h.api('request.target',cookie.owner,{portal,kind:'asset',asset,name:'PUMP-22 · Assembly pump',publishConsent:true})).id
-  const payload={submissionKey:randomUUID(),target,description:'Noisy motor at startup',urgency:'high',contact:'Operator at extension 22',field_stopped:'Yes',field_reading:'12.50',field_noticed:'2026-10-22',field_detail:'Night shift <unaltered>',photo:file('leak.png',png,'image/png'),field_nameplate:file('nameplate.png',png,'image/png')}
+  const payload={submissionKey:randomUUID(),target,description:'Noisy motor at startup',urgency:'high',contact:'Operator at extension 22',field_stopped:'Yes',field_reading:'12.50',field_noticed:'2026-10-22',field_detail:'Night shift <unaltered>',photo:file('leak.png',png,'image/png'),field_nameplate:file('铭牌.png',png,'image/png')}
   async function post(data=payload,who=cookie.tech,status=200,pid=portal) {
     const response=await h.raw(`/request/${pid}`,{cookie:who,body:data})
     // The native form falls back to a redirect; API-like clients ask JSON below.
@@ -49,8 +49,10 @@ export async function requestPortalJourney() {
     assert.deepEqual(record.form,fields);assert.equal(record.contact,payload.contact)
     assert.equal(record.files.length,2)
     for(const photo of record.files) {
+      assert.equal(photo.sha256,createHash('sha256').update(png).digest('hex'),'independent original-file digest')
       const response=await h.raw(`/app/request-files/${photo.id}`,{cookie:cookie.tech})
       assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),png)
+      assert.ok(response.headers.get('content-disposition').includes(encodeURIComponent(photo.filename)),'original UTF-8 filename is downloadable')
       assert.equal((await h.raw(`/app/request-files/${photo.id}`,{cookie:cookie.other})).status,403)
       assert.equal((await h.raw(`/app/request-files/${photo.id}`)).status,303)
     }
@@ -84,6 +86,9 @@ export async function requestPortalJourney() {
     assert.ok(results.filter(r=>r.status===429).length===4)
     assert.equal((await h.api('requests',cookie.lead)).length,5)
     assert.equal((await post()).receipt,first.receipt,'an already accepted submission can retry after the rate ceiling')
+    await h.api('request.portal',cookie.owner,{portal,revision:2,name:'Assembly fault report',mode:'public',publicConsent:true,fields:[...fields,{key:'safe_access',label:'Is access safe?',type:'text',required:true}]})
+    assert.equal((await post()).receipt,first.receipt,'accepted retries use the original form after required fields change')
+    await post({...payload,submissionKey:randomUUID()},cookie.tech,400)
     if(process.env.REQUEST_SCREENSHOTS)await requestScreens(f,r.id)
     console.log('REQ-001 typed authenticated/public intake, required answers, originals, privacy, consent and concurrent abuse limits passed')
   } finally {await h.close()}

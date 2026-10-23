@@ -94,12 +94,18 @@ async function photo(input:Input,name:string,optional:boolean) {
   return {id:newId(),field:name==='photo'?null:name.slice(6),filename:file.filename,mediaType:type,sha256:await sha256Hex(file.bytes),bytes:file.bytes}
 }
 export async function submitRequest(env:Bindings,actor:Actor|null,portalId:string,input:Input,request:Request) {
-  const {portal,target}=await intake(env,actor,portalId,input.text('target',{max:100}))
-  const key=input.text('submissionKey',{max:100});insist(UUID.test(key),'invalid_submission_key')
-  const keyHash=await sha256Hex(key), description=input.text('description',{max:2000}),contact=input.text('contact',{max:200})
+  const targetId=input.text('target',{max:100}),key=input.text('submissionKey',{max:100});insist(UUID.test(key),'invalid_submission_key')
+  const keyHash=await sha256Hex(key)
+  const prior=await one(env,'SELECT id,number,fingerprint,form_json FROM gk_requests WHERE portal_id=? AND submission_key=?',portalId,keyHash)
+  // Accepted requests keep their original form revision. A later required field,
+  // closed intake or retired asset must not turn a lost-response retry into a
+  // second business event. Only a matching original payload returns its receipt.
+  const {portal,target}=prior?{portal:await getPortal(env,portalId),target:await one(env,'SELECT * FROM gk_request_targets WHERE id=? AND portal_id=?',targetId,portalId)}:await intake(env,actor,portalId,targetId)
+  insist(target,'label_unknown',404)
+  const description=input.text('description',{max:2000}),contact=input.text('contact',{max:200})
   const urgency=input.text('urgency');insist(['normal','high','emergency'].includes(urgency),'invalid_urgency')
   insist(!input.text('website',{optional:true,max:500}),'intake_refused',429)
-  const fields=portal.fields, answers:Record<string,string>={}, files=[]
+  const fields:RequestField[]=prior?JSON.parse(prior.form_json):portal.fields, answers:Record<string,string>={}, files=[]
   const main=await photo(input,'photo',true);if(main) files.push(main)
   for(const f of fields) {
     if(f.type==='photo') {const file=await photo(input,`field_${f.key}`,!f.required);if(file) files.push(file);continue}
@@ -113,7 +119,6 @@ export async function submitRequest(env:Bindings,actor:Actor|null,portalId:strin
   }
   insist(files.length<=5,'too_many_photos')
   const fingerprint=await sha256Hex(JSON.stringify({target:target.id,description,contact,urgency,answers,files:files.map(f=>[f.field,f.filename,f.sha256]),requester:actor?.id??null}))
-  const prior=await one(env,'SELECT id,number,fingerprint FROM gk_requests WHERE portal_id=? AND submission_key=?',portalId,keyHash)
   const receipt=(row:Row)=>({id:row.id,number:row.number,receipt:`/request/${portalId}/received/${key}`})
   if(prior) {insist(prior.fingerprint===fingerprint,'submission_key_reused',409);return receipt(prior)}
   const id=newId(),bucket=Math.floor(now()/3_600_000),network=await sha256Hex(`${env.SESSION_SECRET}:${request.headers.get('cf-connecting-ip') || 'unknown'}:${bucket}`)
@@ -151,7 +156,7 @@ export async function requestFile(env:Bindings,actor:Actor,id:string) {
   const file=await one(env,'SELECT * FROM gk_request_files WHERE id=?',id);insist(file,'file_not_found',404)
   const r=await one(env,'SELECT requester_id,work_order_id FROM gk_requests WHERE id=?',file.request_id)
   insist(can(actor,'work.assign') || r?.requester_id===actor.id || (r?.work_order_id && await requestWorkAccess(env,actor,r.work_order_id)),'forbidden',403)
-  return new Response(new Uint8Array(file.bytes),{headers:{'content-type':file.media_type,'content-disposition':`inline; filename="${file.filename.replace(/["\\]/g,'_')}"`,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; sandbox"}})
+  return new Response(new Uint8Array(file.bytes),{headers:{'content-type':file.media_type,'content-disposition':`inline; filename="${file.filename.replace(/[^\x20-\x7e]|["\\]/g,'_')}"; filename*=UTF-8''${encodeURIComponent(file.filename)}`,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; sandbox"}})
 }
 
 export async function addRequestField(env:Bindings,actor:Actor,input:Input) {
