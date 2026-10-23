@@ -1,7 +1,6 @@
 import { inflateSync } from 'node:zlib'
 import { GasketError, insist } from './core'
 
-const MAX_PIXELS = 16_000_000
 const MAX_INFLATED = 64 * 1024 * 1024
 const PNG_SIGNATURE = [137, 80, 78, 71, 13, 10, 26, 10]
 function check(condition: unknown): asserts condition { insist(condition, 'invalid_photo') }
@@ -43,7 +42,7 @@ function png(bytes: Uint8Array): Uint8Array {
       check(at === 8 && length === 13)
       width = u32(data, 0); height = u32(data, 4); depth = data[8]; colour = data[9]; interlace = data[12]
       const depths: Record<number, number[]> = { 0: [1, 2, 4, 8, 16], 2: [8, 16], 3: [1, 2, 4, 8], 4: [8, 16], 6: [8, 16] }
-      check(width > 0 && height > 0 && width * height <= MAX_PIXELS && depths[colour]?.includes(depth))
+      check(width > 0 && height > 0 && depths[colour]?.includes(depth))
       check(data[10] === 0 && data[11] === 0 && interlace <= 1)
     } else if (type === 'PLTE') {
       check(!compressed.length && !seen.has('tRNS') && colour !== 0 && colour !== 4)
@@ -113,7 +112,7 @@ function jpeg(bytes: Uint8Array): Uint8Array {
     if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2) {
       check(!frame && !scans && data.length >= 9 && data[0] === 8)
       const height = u16(data, 1), width = u16(data, 3), count = data[5]
-      check(width > 0 && height > 0 && width * height <= MAX_PIXELS && count >= 1 && count <= 4 && data.length === 6 + count * 3)
+      check(width > 0 && height > 0 && count >= 1 && count <= 4 && data.length === 6 + count * 3)
       let blocks = 0
       for (let i = 6; i < data.length; i += 3) {
         const id = data[i], h = data[i + 1] >> 4, v = data[i + 1] & 15, q = data[i + 2]
