@@ -28,8 +28,9 @@ export async function requestPortalPage(env:Bindings,actor:Actor|null,url:URL,id
       ${hidden('submissionKey',newId())}${target?hidden('target',target.id):actor?select('Asset or location','target',targets.map(t=>({value:t.id,label:t.name})),'',{blank:'Choose…'}):field('Label code','target',{hint:'The code printed below the QR label.'})}
       ${area('What is wrong?','description')}${select('Urgency','urgency',[{value:'normal',label:'Normal'},{value:'high',label:'High'},{value:'emergency',label:'Emergency'}],'normal')}
       ${field('Your name and contact','contact',{hint:'Contact details are kept for the maintenance team. They do not create or verify an account.'})}
-      ${fileField('Photo (optional)','photo',{accept:'image/png,image/jpeg',hint:'Use your camera or choose a PNG/JPEG, up to 1.5 MB.'})}
+      ${raw(fileField('Photo (optional)','photo',{accept:'image/png,image/jpeg',hint:'Use your camera or choose a PNG/JPEG, up to 1.5 MB.'}).html.replace('type="file"','type="file" capture="environment"'))}
       ${p.fields.map(customField)}<div class="gk-visually-hidden" aria-hidden="true">${field('Leave empty','website',{required:false,attrs:'tabindex="-1" autocomplete="off"'})}</div>
+      ${checkbox('Save this draft and photos on this private device','saveOnDevice')}
       <p role="status" id="draft-status">Your draft can be saved on this device. Use a private device for contact details and photos.</p>
       <div class="gk-actions"><button type="submit">Send request</button><button type="button" class="gk-secondary" id="save-request-draft">Save draft</button><button type="button" class="gk-secondary" id="clear-request-draft">Clear draft</button></div>
     </form>`)}<p><a href="/signin">Maintenance team sign in</a></p>`

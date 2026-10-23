@@ -1,3 +1,4 @@
+import { labelsPage, scanPage } from './ui/labels'
 import { submitRequest, requestFile } from './requests'
 import { requestPortalPage, requestReceiptPage, requestSettingsPage, requestsPage, requestPage } from './ui/requests'
 import { catalogPreviewPage } from './ui/catalog-preview'
@@ -71,14 +72,20 @@ function failure(error: unknown): { code: string; status: number; detail?: unkno
 export async function gasketResponse(request: Request, original: Bindings): Promise<Response | null> {
   const env = runtimeBindings(original)
   const url = new URL(request.url)
+  const scan=url.pathname.match(/^\/scan(?:\/([\w-]+))?$/)
   const publicRequest=url.pathname.match(/^\/request\/([\w-]+)(?:\/received\/([\w-]+))?$/)
   const api = url.pathname.startsWith('/api/gasket/')
-  if (!publicRequest && !api && url.pathname !== '/app' && !url.pathname.startsWith('/app/')) return null
+  if (!scan && !publicRequest && !api && url.pathname !== '/app' && !url.pathname.startsWith('/app/')) return null
   if (request.method === 'POST' && request.headers.get('origin') !== env.AUTH_ORIGIN) return api ? json({ error: 'invalid_origin' }, 403) : new Response('Forbidden', { status: 403 })
   if (!['GET', 'HEAD', 'POST'].includes(request.method)) return new Response(null, { status: 405, headers: { allow: 'GET, HEAD, POST' } })
   let actor: Actor | null = null
   try {
     actor = await currentActor(env, request)
+    if(scan) {
+      if(request.method==='POST') throw new GasketError('not_found',404)
+      const code=scan[1] || url.searchParams.get('code') || ''
+      try {return await scanPage(env,actor,url,code || undefined)} catch(error) {if(error instanceof GasketError && error.code==='label_unknown') return page(env,'Unknown label',actor,h`<h1>Unknown label</h1><p>This code does not identify a published Gasket label.</p><p><a href="/scan">Scan another label</a></p>`,{url,status:404});throw error}
+    }
     if(publicRequest) {
       const [,id,key]=publicRequest
       if(request.method==='POST') {
@@ -160,6 +167,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  labels:(env,actor,url)=>labelsPage(env,actor,url),
   requestPortals:(env,actor,url)=>requestSettingsPage(env,actor,url), requests:(env,actor,url)=>requestsPage(env,actor,url), request:(env,actor,url,id)=>requestPage(env,actor,url,id), requestFile:(env,actor,_url,id)=>requestFile(env,actor,id),
   partMerge:(env,actor,url)=>partMergePage(env,actor,url),
   partPhoto:(env,actor,_url,id)=>partPhoto(env,actor,id),

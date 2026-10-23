@@ -87,7 +87,7 @@ export async function requestPortalJourney() {
 }
 async function browserContext(h,cookie) {
   const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
-  const context=await browser.newContext({ignoreHTTPSErrors:true})
+  const context=await browser.newContext({ignoreHTTPSErrors:true,deviceScaleFactor:3})
   if(cookie)await context.addCookies(cookie.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
   return {browser,context,page:await context.newPage()}
 }
@@ -109,4 +109,66 @@ async function requestScreens(f,requestId) {
   try {for(const [path,name] of [[`/app/request-portals`,'request-settings'],[`/app/requests`,'request-queue'],[`/app/requests/${requestId}`,'request-detail'],[`/request/${f.portal}?target=${f.target}`,'fault-form']])await capture(page,f.h,path,name)}
   finally {await context.close();await browser.close()}
 }
-if(process.argv[1]===fileURLToPath(import.meta.url))await requestPortalJourney()
+if(process.argv[1]===fileURLToPath(import.meta.url)){const task=process.env.REQUEST_JOURNEY || 'portal';if(task==='portal')await requestPortalJourney();else if(task==='drafts')await requestDraftJourney();}
+
+async function decodeSymbol(page,selector,format) {
+  const {PNG}=await import('pngjs'),{RGBLuminanceSource,BinaryBitmap,HybridBinarizer,MultiFormatReader,DecodeHintType,BarcodeFormat}=await import('@zxing/library')
+  const image=PNG.sync.read(await page.locator(selector).screenshot({scale:'device'}))
+  const pixels=new Uint8ClampedArray(image.width*image.height)
+  for(let i=0;i<pixels.length;i++)pixels[i]=(image.data[i*4]*299+image.data[i*4+1]*587+image.data[i*4+2]*114)/1000
+  const reader=new MultiFormatReader();reader.setHints(new Map([[DecodeHintType.POSSIBLE_FORMATS,[BarcodeFormat[format]]]]))
+  return reader.decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(pixels,image.width,image.height)))).getText()
+}
+export async function requestDraftJourney() {
+  const f=await requestFixture(),{h,cookie,portal,target,asset}=f
+  let browser,context
+  try {
+    await h.api('request.portal',cookie.owner,{portal,revision:1,name:'Assembly fault report',mode:'public',publicConsent:true})
+    const signed=await browserContext(h,cookie.lead)
+    let scanned
+    try {
+      await signed.page.goto(`${h.origin}/app/labels?target=${target}`)
+      scanned=await decodeSymbol(signed.page,'.gk-label-qr svg','QR_CODE')
+      assert.equal(new URL(scanned).pathname,`/scan/${target}`,'a real decoder reads the printed QR')
+    } finally {await signed.context.close();await signed.browser.close()}
+    ;({browser,context}=await browserContext(h))
+    let page=await context.newPage();await page.setViewportSize({width:390,height:1100});await page.goto(scanned)
+    assert.equal(new URL(page.url()).pathname,`/request/${portal}`)
+    await page.locator('[name=description]').fill('Leak around the pump seal')
+    await page.locator('[name=contact]').fill('Night shift operator')
+    await page.locator('[name=field_stopped]').selectOption('Yes')
+    await page.locator('[name=photo]').setInputFiles({name:'leak.png',mimeType:'image/png',buffer:png})
+    assert.equal(await page.locator('[name=photo]').getAttribute('capture'),'environment')
+    await page.getByLabel('Save this draft and photos on this private device').check()
+    await page.getByRole('button',{name:'Save draft',exact:true}).click()
+    await page.getByRole('status').filter({hasText:'Draft saved'}).waitFor()
+    const submissionKey=await page.locator('[name=submissionKey]').inputValue()
+    if(process.env.REQUEST_SCREENSHOTS){await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true});await capture(page,h,`/request/${portal}?target=${target}`,'phone-draft')}
+    await context.setOffline(true)
+    await page.getByRole('button',{name:'Send request',exact:true}).click()
+    await page.getByRole('status').filter({hasText:'Not confirmed'}).waitFor()
+    assert.equal((await h.api('requests',cookie.lead)).length,0,'offline send stores no request')
+    // Close/reopen the tab, restoring original File bytes and the immutable key.
+    await page.close();await context.setOffline(false);page=await context.newPage();await page.setViewportSize({width:390,height:1100});await page.goto(scanned)
+    await page.getByRole('status').filter({hasText:'Saved draft restored'}).waitFor()
+    assert.equal(await page.locator('[name=description]').inputValue(),'Leak around the pump seal')
+    assert.equal(await page.locator('[name=submissionKey]').inputValue(),submissionKey)
+    assert.equal(await page.locator('[name=target]').inputValue(),target)
+    assert.equal(await page.locator('[name=photo]').evaluate(n=>n.files[0].name),'leak.png')
+    // The server accepts the request but its response is lost before the phone
+    // receives it. This is an edge failure, never a product test bypass.
+    let lost=false
+    await page.route(`**/request/${portal}`,async route=>{if(route.request().method()==='POST'&&!lost){lost=true;const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed')}else await route.continue()})
+    await page.getByRole('button',{name:'Send request',exact:true}).click();await page.getByRole('status').filter({hasText:'Not confirmed'}).waitFor()
+    assert.equal((await h.api('requests',cookie.lead)).length,1,'the response was lost after persistence')
+    await Promise.all([page.waitForURL(`**/received/${submissionKey}`),page.getByRole('button',{name:'Send request',exact:true}).click()])
+    await page.reload();assert.match(await page.getByRole('status').textContent(),/R-1 is saved/)
+    const rows=await h.api('requests',cookie.lead);assert.equal(rows.length,1);assert.equal(rows[0].asset_id,asset)
+    const r=await h.api(`requests/${rows[0].id}`,cookie.lead);assert.equal(r.files.length,1)
+    assert.deepEqual(Buffer.from(await (await h.raw(`/app/request-files/${r.files[0].id}`,{cookie:cookie.lead})).arrayBuffer()),png)
+    if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,new URL(page.url()).pathname,'phone-confirmation')
+    await page.goto(scanned);await page.getByRole('link',{name:'Open confirmation',exact:true}).waitFor()
+    assert.equal(await page.locator('[name=contact]').inputValue(),'','confirmed drafts retain no private contact')
+    console.log('REQ-002 decoded QR, camera photo, durable offline draft, lost-response retry, one original-mapped request and durable confirmation passed')
+  } finally {await context?.close();await browser?.close();await h.close()}
+}

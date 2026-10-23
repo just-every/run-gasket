@@ -362,8 +362,8 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 42 | 32 | 48 | 122 |
-| All | 56 | 32 | 48 | 136 |
+| Target and push further | 42 | 33 | 47 | 122 |
+| All | 56 | 33 | 47 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -406,7 +406,7 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | `ASSET-008` | Inspections, rounds and calibration | target | done | `src/gasket/routes.ts`; `src/gasket/calibration.ts`; `src/gasket/tools.ts`; `src/gasket/ui/schedules.ts`; `src/gasket/ui/calibration.ts`; `migrations/core/0049_routes.sql`; `migrations/core/0050_calibration.sql`; `tests/gasket/flows.mjs` |  |
 | `ASSET-009` | Custom asset and part fields | target | missing |  | Assets and parts have fixed columns only; no custom field definitions, typed validation, value history or custom-field search, export and import mapping. |
 | `REQ-001` | Web operator request portal | target | partial | `tests/gasket/requests.mjs` — requestPortalJourney: site choice/text/number/date/photo configuration and typed/refused answers; signed-in and explicit public intake; persisted answer, contact and original-photo download; invalid asset/label, file size/type, private-data/referrer-safe receipt and cross-person refusal; concurrent bounded abuse. requestScreens proves settings, queue, detail and scoped form at 1440/390. `src/gasket/requests.ts`; `src/gasket/ui/requests.ts`; `API.md`. | Awaiting ct approval of the adopted conservative default: owner-only audited opt-in and published target names, unverified contacts, private details/photos for creator and leads only, number-only receipt capability, five submissions per portal/network/hour and 100 per installation/hour, five PNG/JPEG photos of 1.5 MB. ADMIN-013 carries display-language obligations at the existing portal and QR form; ADMIN-004 carries future requester identities. |
-| `REQ-002` | QR mobile fault reporting | target | missing |  | No QR intake, camera request form or request draft/idempotency workflow. |
+| `REQ-002` | QR mobile fault reporting | target | partial | `tests/gasket/requests.mjs` — requestDraftJourney: independently decoded printed QR at 390 opens the scoped form; camera file and private-device opt-in; offline send, tab reopen and restored original photo/key; response lost after server persistence, reconnect/retry creates exactly one original-mapped request; durable number-only confirmation after reload. capture proves draft and receipt at 1440/390. `public/request-drafts.js`; `src/gasket/labels.ts`; `API.md`. | Awaiting ct approval of the inherited REQ-001 conservative public/privacy default and explicit private-device draft opt-in; draft contacts/photos are cleared after confirmation, retaining only its receipt. ADMIN-013 carries complete display-language, preference and fallback proof at this existing QR form. |
 | `REQ-003` | Triage, duplicate linking and corrective conversion | target | missing |  | No request triage, deduplication or request-to-work conversion. |
 | `REQ-004` | Requester status and two-way updates | target | missing |  | No requester status page, conversation or lifecycle notifications. |
 | `REQ-005` | Response targets and escalation | target | missing |  | No request targets, business calendars or escalation engine. |
