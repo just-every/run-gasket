@@ -555,3 +555,5 @@ td .gk-inline .gk-actions { margin: 0; }
   .gk-label { width: 100mm; min-height: 70mm; margin-bottom: 5mm; }
   .gk-label a { display: none; }
 }
+
+.gk-digest, #operator-reports { overflow-wrap: anywhere; }

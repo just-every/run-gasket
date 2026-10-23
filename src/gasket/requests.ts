@@ -1,3 +1,4 @@
+import { requestWorkAccess } from './request-sources'
 // Opt-in operator intake. Anonymous traffic has no register/list/detail door.
 import type { Bindings } from '../auth.server'
 import { can, requireCapability, type Actor } from './actor'
@@ -68,11 +69,12 @@ export async function intake(env:Bindings,actor:Actor|null,id:string,targetId:st
 }
 export async function requestQueue(env:Bindings,actor:Actor,url:URL) {
   triager(actor)
+  const impact=url.searchParams.get('impact') || ''
   const status=url.searchParams.get('status') || '', urgency=url.searchParams.get('urgency') || '', criticality=url.searchParams.get('criticality') || '', target=url.searchParams.get('target') || ''
-  return await all(env,`SELECT r.id,r.number,r.status,r.urgency,r.description,r.created_at,r.version,r.asset_id,r.location,a.criticality,t.name AS target,p.name AS portal,
+  return await all(env,`SELECT r.id,r.number,r.status,r.urgency,r.description,r.created_at,r.version,r.asset_id,r.location,r.impact,a.criticality,t.name AS target,p.name AS portal,
     r.duplicate_of,r.work_order_id FROM gk_requests r JOIN gk_request_targets t ON t.id=r.target_id JOIN gk_request_portals p ON p.id=r.portal_id LEFT JOIN gk_assets a ON a.id=r.asset_id
-    WHERE (?='' OR r.status=?) AND (?='' OR r.urgency=?) AND (?='' OR a.criticality=?) AND (?='' OR r.target_id=?)
-    ORDER BY CASE r.urgency WHEN 'emergency' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,r.created_at,r.number`,status,status,urgency,urgency,criticality,criticality,target,target)
+    WHERE (?='' OR r.impact=?) AND (?='' OR r.status=?) AND (?='' OR r.urgency=?) AND (?='' OR a.criticality=?) AND (?='' OR r.target_id=?)
+    ORDER BY CASE r.impact WHEN 'stopped' THEN 0 WHEN 'reduced' THEN 1 ELSE 2 END,CASE r.urgency WHEN 'emergency' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,r.created_at,r.number`,impact,impact,status,status,urgency,urgency,criticality,criticality,target,target)
 }
 export async function requestDetail(env:Bindings,actor:Actor,id:string) {
   const row=await one(env,`SELECT r.*,t.name AS target,a.criticality FROM gk_requests r JOIN gk_request_targets t ON t.id=r.target_id LEFT JOIN gk_assets a ON a.id=r.asset_id WHERE r.id=?`,id)
@@ -146,7 +148,8 @@ export async function confirmation(env:Bindings,portal:string,key:string) {
 }
 export async function requestFile(env:Bindings,actor:Actor,id:string) {
   const file=await one(env,'SELECT * FROM gk_request_files WHERE id=?',id);insist(file,'file_not_found',404)
-  await requestDetail(env,actor,file.request_id)
+  const r=await one(env,'SELECT requester_id,work_order_id FROM gk_requests WHERE id=?',file.request_id)
+  insist(can(actor,'work.assign') || r?.requester_id===actor.id || (r?.work_order_id && await requestWorkAccess(env,actor,r.work_order_id)),'forbidden',403)
   return new Response(new Uint8Array(file.bytes),{headers:{'content-type':file.media_type,'content-disposition':`inline; filename="${file.filename.replace(/["\\]/g,'_')}"`,'cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; sandbox"}})
 }
 

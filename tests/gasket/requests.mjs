@@ -109,7 +109,7 @@ async function requestScreens(f,requestId) {
   try {for(const [path,name] of [[`/app/request-portals`,'request-settings'],[`/app/requests`,'request-queue'],[`/app/requests/${requestId}`,'request-detail'],[`/request/${f.portal}?target=${f.target}`,'fault-form']])await capture(page,f.h,path,name)}
   finally {await context.close();await browser.close()}
 }
-if(process.argv[1]===fileURLToPath(import.meta.url)){const task=process.env.REQUEST_JOURNEY || 'portal';if(task==='portal')await requestPortalJourney();else if(task==='drafts')await requestDraftJourney();else if(task==='labels')await labelsJourney();}
+if(process.argv[1]===fileURLToPath(import.meta.url)){const task=process.env.REQUEST_JOURNEY || 'portal';if(task==='portal')await requestPortalJourney();else if(task==='drafts')await requestDraftJourney();else if(task==='labels')await labelsJourney();else if(task==='triage')await requestTriageJourney();}
 
 async function decodeSymbol(page,selector,format) {
   const {PNG}=await import('pngjs'),{RGBLuminanceSource,BinaryBitmap,HybridBinarizer,MultiFormatReader,DecodeHintType,BarcodeFormat}=await import('@zxing/library')
@@ -234,5 +234,77 @@ export async function labelsJourney() {
       for(const [path,name,status] of [[`/scan/${target}`,'retired-label',410],[`/scan/${randomUUID()}`,'unknown-label',404]])for(const width of [1440,390]){await page.setViewportSize({width,height:1100});assert.equal((await page.goto(h.origin+path)).status(),status);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:`${process.env.REQUEST_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})}
     }
     console.log('ASSET-002 independently decoded QR/Code128, asset/location/bin print and scan, public scope, authorized mapped work, revocation and stable retired/unknown states passed')
+  } finally {await context?.close();await browser?.close();await h.close()}
+}
+
+export async function requestTriageJourney() {
+  const f=await requestFixture(),{h,cookie,portal,target,asset,payload,post}=f
+  let browser,context
+  try {
+    await post();await post({...payload,submissionKey:randomUUID(),description:'Same noisy motor reported by second shift'},cookie.other)
+    await post({...payload,submissionKey:randomUUID(),description:'Third unrelated report'},cookie.tech)
+    let rows=await h.api('requests',cookie.lead)
+    const root=rows.find(r=>r.description===payload.description).id,duplicate=rows.find(r=>r.description.startsWith('Same')).id,third=rows.find(r=>r.description.startsWith('Third')).id
+    const detail=id=>h.api(`requests/${id}`,cookie.lead)
+    const decide=async(id,decision,extra={})=>h.api('request.triage',cookie.lead,{request:id,version:(await detail(id)).version,decision,reason:'Recorded lead decision',...extra})
+    await h.api('request.triage',cookie.tech,{request:root,version:1,decision:'approve',reason:'Unauthorized'},403)
+    await h.api('request.convert',cookie.tech,{request:root,version:1},403)
+    await h.api('request.convert',cookie.lead,{request:root,version:1},409)
+    await h.api('request.triage',cookie.lead,{request:root,version:1,decision:'decline'},400)
+    await decide(root,'ask_details',{reason:'Does the noise continue after warmup?',impact:'stopped'})
+    assert.equal((await detail(root)).status,'needs_details')
+    await h.api('request.reply',cookie.other,{request:root,version:2,text:'Pretended answer'},403)
+    const creator=await h.api(`requests/${root}`,cookie.tech)
+    assert.ok(creator.timeline.some(e=>e.kind==='ask_details' && e.text==='Does the noise continue after warmup?'))
+    await h.api('request.reply',cookie.tech,{request:root,version:creator.version,text:'Yes, the noise continues and the line is stopped.'})
+    assert.equal((await detail(root)).status,'new')
+    await h.api('request.triage',cookie.lead,{request:root,version:1,decision:'approve',reason:'Stale decision'},409)
+    // Reject self/chain/cross-target linking before linking the two real reports.
+    await h.api('request.triage',cookie.lead,{request:root,version:(await detail(root)).version,decision:'duplicate',canonical:root,reason:'Self link'},409)
+    const otherLocation=(await h.api('request.target',cookie.owner,{portal,kind:'location',name:'Other room',publishConsent:true})).id
+    await post({...payload,target:otherLocation,submissionKey:randomUUID(),description:'Other target'})
+    const elsewhere=(await h.api('requests',cookie.lead)).find(r=>r.description==='Other target').id
+    await h.api('request.triage',cookie.lead,{request:elsewhere,version:1,decision:'duplicate',canonical:root,reason:'Wrong target'},409)
+    await decide(duplicate,'duplicate',{canonical:root,reason:'Both shifts describe the same pump bearing noise'})
+    assert.equal((await detail(duplicate)).duplicate_of,root)
+    assert.ok((await detail(root)).timeline.some(e=>e.kind==='duplicate_linked'))
+    await h.api('request.triage',cookie.lead,{request:root,version:(await detail(root)).version,decision:'duplicate',canonical:elsewhere,reason:'Cannot turn a root with children into a duplicate'},409)
+    await decide(root,'approve',{reason:'Confirmed bearing fault; repair is authorized for scheduling',impact:'stopped'})
+    assert.equal((await h.api('requests?criticality=critical&urgency=high&impact=stopped',cookie.lead)).find(r=>r.id===root).impact,'stopped')
+    await decide(third,'decline',{reason:'Explained: this report describes the already scheduled cosmetic repair'})
+    assert.equal((await detail(third)).status,'declined');assert.match((await detail(third)).timeline.at(-1).text,/Explained/)
+    await h.api('request.convert',cookie.lead,{request:third,version:(await detail(third)).version},409)
+    await h.api('request.convert',cookie.lead,{request:duplicate,version:(await detail(duplicate)).version},409)
+    const before=(await h.api('work?state=open',cookie.lead)).length
+    ;({browser,context}=await browserContext(h,cookie.lead));const page=await context.newPage()
+    if(process.env.REQUEST_SCREENSHOTS){await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true});await capture(page,h,'/app/requests?impact=stopped','triage-queue');await capture(page,h,`/app/requests/${root}`,'approved-request')}
+    await page.goto(`${h.origin}/app/requests/${root}`)
+    const convert=page.locator('form[action="/app/do/request.convert"]')
+    await Promise.all([page.waitForURL('**/app/work/*'),convert.getByRole('button',{name:'Create one corrective order'}).click()])
+    const workId=new URL(page.url()).pathname.split('/').pop()
+    assert.equal((await h.api('request.convert',cookie.lead,{request:root,version:1})).id,workId,'retry returns existing work')
+    assert.equal((await h.api('work?state=open',cookie.lead)).length,before+1)
+    for(const id of [root,duplicate]) {
+      const r=await detail(id);assert.equal(r.work_order_id,workId);assert.ok(r.timeline.some(e=>e.kind==='work_created'))
+      assert.equal(r.files.length,2,'neither report loses any original photo')
+    }
+    let work=await h.api(`work/${workId}`,cookie.lead)
+    assert.equal(work.asset_id,asset);assert.equal(work.description,payload.description);assert.equal(work.priority,payload.urgency)
+    assert.equal(work.requestSources.length,2);assert.equal(work.requestSources.flatMap(r=>r.files).length,4)
+    assert.ok(work.requestSources.some(r=>r.requester_name==='tech'));assert.ok(work.requestSources.some(r=>r.requester_name==='other'))
+    assert.equal(work.requestSources[0].answers.stopped,'Yes')
+    // The converted work authorizes necessary source evidence for its assigned
+    // technician, never private contacts or an unrelated member's browsing.
+    const tech=(await h.api('me',cookie.tech)).id
+    await h.api('workorder.assign',cookie.lead,{workOrder:workId,assignee:tech})
+    const assigned=await h.api(`work/${workId}`,cookie.tech);assert.equal(assigned.requestSources.length,2)
+    const secondFile=assigned.requestSources.find(r=>r.id===duplicate).files[0]
+    const response=await h.raw(`/app/request-files/${secondFile.id}`,{cookie:cookie.tech});assert.equal(response.status,200);assert.deepEqual(Buffer.from(await response.arrayBuffer()),png)
+    assert.equal((await h.api(`work/${workId}`,cookie.agent)).requestSources.length,0)
+    assert.equal((await h.raw(`/app/request-files/${secondFile.id}`,{cookie:cookie.agent})).status,403)
+    assert.ok(!JSON.stringify(assigned.requestSources).includes(payload.contact),'necessary work evidence exposes no contact')
+    const audit=await h.api('audit?action=request.convert',cookie.owner);assert.ok(audit.rows.some(e=>e.subject===root))
+    if(process.env.REQUEST_SCREENSHOTS){await capture(page,h,`/app/requests/${root}`,'converted-request');await capture(page,h,`/app/requests/${duplicate}`,'duplicate-timeline');await capture(page,h,`/app/requests/${third}`,'declined-request');await capture(page,h,`/app/work/${workId}`,'corrective-source-evidence')}
+    console.log('REQ-003 lead triage/filtering, request/reply, reasoned rejection, duplicate preservation and one no-retyping corrective order with original linked evidence passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }

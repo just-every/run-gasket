@@ -1,0 +1,3 @@
+import type { Row } from '../core'
+import { card, h } from './html'
+export const requestSourcesCard=(sources:Row[])=>sources.length?card('Original operator reports',h`<p>These reports and original photos stay linked to this work. Contact details stay on the private request.</p>${sources.map(r=>h`<section><h3>R-${r.number} · ${r.target}</h3><p>Reported by ${r.requester_name || 'a public operator (contact unverified)'}</p><p>${r.description}</p>${r.form.filter((f:Row)=>f.type!=='photo').map((f:Row)=>h`<p><strong>${f.label}:</strong> ${r.answers[f.key] || '—'}</p>`)}<ul>${r.files.map((f:Row)=>h`<li><a href="/app/request-files/${f.id}">${f.filename}</a><span class="gk-sub gk-digest">SHA-256 ${f.sha256}</span></li>`)}</ul></section>`)}`,{id:'operator-reports'}):''
