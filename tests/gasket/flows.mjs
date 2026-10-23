@@ -1,4 +1,4 @@
-import { requestPortalJourney, requestDraftJourney } from './requests.mjs'
+import { requestPortalJourney, requestDraftJourney, labelsJourney } from './requests.mjs'
 import { outcomeJourney } from './outcomes.mjs'
 import { intervalJourney } from './intervals.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
@@ -2235,6 +2235,7 @@ try {
 
   await check('REQ-001 bounded configurable operator intake', requestPortalJourney)
   await check('REQ-002 durable mobile request submission', requestDraftJourney)
+  await check('ASSET-002 scoped durable labels', labelsJourney)
   await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
 
   await check('BUY-003 spend approval and purchasing separation', async () => { await spendJourney(h,cookie,{...ids,asset:ids.compressor}) })

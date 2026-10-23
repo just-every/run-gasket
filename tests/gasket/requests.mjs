@@ -109,7 +109,7 @@ async function requestScreens(f,requestId) {
   try {for(const [path,name] of [[`/app/request-portals`,'request-settings'],[`/app/requests`,'request-queue'],[`/app/requests/${requestId}`,'request-detail'],[`/request/${f.portal}?target=${f.target}`,'fault-form']])await capture(page,f.h,path,name)}
   finally {await context.close();await browser.close()}
 }
-if(process.argv[1]===fileURLToPath(import.meta.url)){const task=process.env.REQUEST_JOURNEY || 'portal';if(task==='portal')await requestPortalJourney();else if(task==='drafts')await requestDraftJourney();}
+if(process.argv[1]===fileURLToPath(import.meta.url)){const task=process.env.REQUEST_JOURNEY || 'portal';if(task==='portal')await requestPortalJourney();else if(task==='drafts')await requestDraftJourney();else if(task==='labels')await labelsJourney();}
 
 async function decodeSymbol(page,selector,format) {
   const {PNG}=await import('pngjs'),{RGBLuminanceSource,BinaryBitmap,HybridBinarizer,MultiFormatReader,DecodeHintType,BarcodeFormat}=await import('@zxing/library')
@@ -170,5 +170,69 @@ export async function requestDraftJourney() {
     await page.goto(scanned);await page.getByRole('link',{name:'Open confirmation',exact:true}).waitFor()
     assert.equal(await page.locator('[name=contact]').inputValue(),'','confirmed drafts retain no private contact')
     console.log('REQ-002 decoded QR, camera photo, durable offline draft, lost-response retry, one original-mapped request and durable confirmation passed')
+  } finally {await context?.close();await browser?.close();await h.close()}
+}
+
+export async function labelsJourney() {
+  const f=await requestFixture(),{h,cookie,portal,target,asset,payload}=f
+  let browser,context
+  try {
+    await h.api('request.portal',cookie.owner,{portal,revision:1,name:'Assembly fault report',mode:'public',publicConsent:true})
+    const location=(await h.api('request.target',cookie.owner,{portal,kind:'location',name:'West loading bay',publishConsent:true})).id
+    const bin=(await h.api('request.target',cookie.owner,{portal,kind:'bin',name:'Stores bin B-22',publishConsent:true})).id
+    assert.equal((await h.raw('/app/labels')).status,303)
+    assert.equal((await h.raw('/app/labels',{cookie:cookie.tech})).status,403)
+    ;({browser,context}=await browserContext(h,cookie.lead));let page=await context.newPage()
+    await page.goto(`${h.origin}/app/labels`)
+    assert.equal(await page.locator('.gk-label').count(),3)
+    const label=page.locator('.gk-label').filter({has:page.getByRole('link',{name:'Open PUMP-22 · Assembly pump',exact:true})})
+    const index=await label.evaluate(n=>[...n.parentElement.children].indexOf(n)+1)
+    const qr=await decodeSymbol(page,`.gk-label:nth-child(${index}) .gk-label-qr svg`,'QR_CODE')
+    const barcode=await decodeSymbol(page,`.gk-label:nth-child(${index}) .gk-label-barcode svg`,'CODE_128')
+    assert.equal(new URL(qr).pathname,`/scan/${target}`);assert.equal(barcode,target)
+    // A scanner keyboard and a phone camera resolve the same published identity.
+    await page.goto(`${h.origin}/scan`);await page.getByLabel('Label code').fill(barcode)
+    await Promise.all([page.waitForURL(url=>url.searchParams.get('code')===target),page.getByRole('button',{name:'Open label',exact:true}).click()])
+    assert.equal(await page.getByRole('heading',{name:'PUMP-22 · Assembly pump',exact:true}).count(),1)
+    if(process.env.REQUEST_SCREENSHOTS) {
+      await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true})
+      await capture(page,h,'/app/labels','print-labels');await capture(page,h,`/scan/${target}`,'authorized-scan');await capture(page,h,'/scan','scanner-code')
+    }
+    await context.close();await browser.close();({browser,context}=await browserContext(h,cookie.tech));page=await context.newPage();await page.setViewportSize({width:390,height:1100});await page.goto(qr)
+    assert.equal(await page.getByRole('link',{name:'Open authorized asset record'}).getAttribute('href'),`/app/assets/${asset}`)
+    const form=page.locator('form[action="/app/do/label.work"]')
+    await form.locator('[name=title]').fill('Inspect leaking pump seal');await form.locator('[name=description]').fill('Seal leak photographed at the label');await form.locator('[name=priority]').selectOption('high')
+    await form.locator('[name=photo]').setInputFiles({name:'seal.png',mimeType:'image/png',buffer:png})
+    await Promise.all([page.waitForURL('**/app/work/*'),form.getByRole('button',{name:'Create corrective work'}).click()])
+    const workId=new URL(page.url()).pathname.split('/').pop(),work=await h.api(`work/${workId}`,cookie.lead)
+    assert.equal(work.asset_id,asset);assert.equal(work.priority,'high');assert.equal(work.description,'Seal leak photographed at the label');assert.equal(work.assignee_id,work.created_by);assert.equal(work.created_via,'web');assert.equal(work.evidence.length,1)
+    await h.api('site.technicianWork',cookie.owner,{allowed:false})
+    await h.api('label.work',cookie.tech,{target,title:'Must fail',due:work.due_date},403)
+    const denied=await (await h.raw(`/scan/${target}`,{cookie:cookie.tech})).text();assert.ok(!denied.includes('Create corrective work'))
+    await h.api('label.work',cookie.agent,{target,title:'Must fail',due:work.due_date},403)
+    await h.api('site.technicianWork',cookie.owner,{allowed:true})
+    const rogue=(await h.api('asset.create',cookie.lead,{tag:'OTHER-22',name:'Other asset',location:'Elsewhere'})).id
+    const bound=await h.api('label.work',cookie.tech,{target,asset:rogue,title:'Still the scanned pump',due:work.due_date,unassigned:true})
+    assert.equal((await h.api(`work/${bound.id}`,cookie.lead)).asset_id,asset,'forged asset input cannot change scan mapping')
+    // A location label, without an asset, really submits a persisted fault.
+    const reported=await h.raw(`/request/${portal}`,{body:{...payload,target:location,submissionKey:randomUUID(),description:'Loading bay drain blocked'}});assert.equal(reported.status,303)
+    const request=(await h.api('requests',cookie.lead)).find(r=>r.description==='Loading bay drain blocked');assert.equal(request.asset_id,null);assert.equal(request.location,'West loading bay')
+    assert.equal((await h.raw(`/scan/${bin}`)).status,303)
+    const binWork=await h.api('label.work',cookie.tech,{target:bin,title:'Inspect stores bin',due:work.due_date,unassigned:true});assert.equal((await h.api(`work/${binWork.id}`,cookie.lead)).location,'Stores bin B-22')
+    for(const id of [workId,bound.id])await h.api('workorder.cancel',cookie.lead,{workOrder:id,reason:'Inspection cancelled before retirement'})
+    await h.api('asset.retire',cookie.lead,{asset,reason:'Pump removed from service'})
+    await page.goto(`${h.origin}/app/labels?target=${target}`) // technician cannot print
+    assert.equal((await h.raw(`/scan/${target}`)).status,410)
+    assert.match(await (await h.raw(`/scan/${target}`)).text(),/Retired label/)
+    assert.equal((await h.raw(`/scan/${randomUUID()}`)).status,404)
+    await h.api('label.work',cookie.tech,{target,title:'Retired',due:work.due_date},410)
+    await context.close();await browser.close();({browser,context}=await browserContext(h,cookie.lead));page=await context.newPage();await page.goto(`${h.origin}/app/labels?target=${target}`)
+    assert.equal(await decodeSymbol(page,'.gk-label-qr svg','QR_CODE'),qr,'retired reprint preserves original QR')
+    assert.equal(await decodeSymbol(page,'.gk-label-barcode svg','CODE_128'),barcode)
+    if(process.env.REQUEST_SCREENSHOTS) {
+      await capture(page,h,`/app/labels?target=${target}`,'retired-reprint')
+      for(const [path,name,status] of [[`/scan/${target}`,'retired-label',410],[`/scan/${randomUUID()}`,'unknown-label',404]])for(const width of [1440,390]){await page.setViewportSize({width,height:1100});assert.equal((await page.goto(h.origin+path)).status(),status);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:`${process.env.REQUEST_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})}
+    }
+    console.log('ASSET-002 independently decoded QR/Code128, asset/location/bin print and scan, public scope, authorized mapped work, revocation and stable retired/unknown states passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }
