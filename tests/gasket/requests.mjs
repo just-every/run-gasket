@@ -127,6 +127,15 @@ if(process.argv[1]===fileURLToPath(import.meta.url)) {
 async function decodeSymbol(page,selector,format) {
   const {PNG}=await import('pngjs'),{RGBLuminanceSource,BinaryBitmap,HybridBinarizer,MultiFormatReader,DecodeHintType,BarcodeFormat}=await import('@zxing/library')
   const image=PNG.sync.read(await page.locator(selector).screenshot({scale:'device'}))
+  if(format==='QR_CODE') {
+    // jsQR scans the rendered RGBA pixels without an expected payload or an
+    // aligned-image hint. ZXing 0.21's finder can miss valid QR masks; retain
+    // its independent Code128 reader for the printed keyboard-scanner code.
+    const {default:jsQR}=await import('jsqr')
+    const scanned=jsQR(new Uint8ClampedArray(image.data),image.width,image.height)
+    assert.ok(scanned,'a general QR scanner reads the printed pixels')
+    return scanned.data
+  }
   const pixels=new Uint8ClampedArray(image.width*image.height)
   for(let i=0;i<pixels.length;i++)pixels[i]=(image.data[i*4]*299+image.data[i*4+1]*587+image.data[i*4+2]*114)/1000
   const reader=new MultiFormatReader();reader.setHints(new Map([[DecodeHintType.POSSIBLE_FORMATS,[BarcodeFormat[format]]]]))
