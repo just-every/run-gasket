@@ -71,15 +71,19 @@ export async function giveAccess(env: Bindings, actor: Actor, input: Input, requ
   insist(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), 'invalid_email')
   const member = await one(env, 'SELECT * FROM gk_members WHERE email = ?', email)
   insist(!member || member.status === 'ended', 'already_has_access', 409)
-  const auth = operatorAuth(env), operator = await operatorByEmail(env, request, email)
+  const auth = operatorAuth(env)
+  let operator = await operatorByEmail(env, request, email)
+  const invited = !operator
   insist(operator?.role !== 'owner', 'owner_access_fixed', 409)
   if (!operator) await auth.invite(request, { email, displayName: name, role: 'member', returnTo: '/app' })
   else if (operator.status === 'inactive') await auth.setOperatorStatus(request, operator.id, 'active')
+  operator ??= await operatorByEmail(env, request, email)
+  insist(operator && (!member?.operator_id || member.operator_id === operator.id), 'account_mismatch', 409)
   const id = member?.id ?? newId()
   await commit(env, [member
-    ? stmt(env, "UPDATE gk_members SET name = ?, role = ?, status = 'active' WHERE id = ?", name, chosen, id)
-    : stmt(env, "INSERT INTO gk_members (id, email, name, role, status, created_at) VALUES (?, ?, ?, ?, 'active', ?)", id, email, name, chosen, now())],
-  { actor: actor.id, action: 'access.give', subject: id, detail: { email, role: chosen, invited: !operator } })
+    ? stmt(env, "UPDATE gk_members SET operator_id = ?, name = ?, role = ?, status = 'active' WHERE id = ?", operator.id, name, chosen, id)
+    : stmt(env, "INSERT INTO gk_members (id, operator_id, email, name, role, status, created_at) VALUES (?, ?, ?, ?, ?, 'active', ?)", id, operator.id, email, name, chosen, now())],
+  { actor: actor.id, action: 'access.give', subject: id, detail: { email, role: chosen, invited } })
   return { id, email, role: chosen }
 }
 
@@ -101,7 +105,7 @@ export async function endAccess(env: Bindings, actor: Actor, input: Input, reque
   insist(member, 'member_not_found', 404)
   insist(member.role !== 'owner', 'owner_access_fixed', 409)
   insist(member.status === 'active', 'access_ended', 409)
-  const auth = operatorAuth(env), operator = await operatorByEmail(env, request, member.email)
+  const auth = operatorAuth(env), operator = (await auth.listOperators(request)).find(operator => operator.id === member.operator_id)
   if (operator && operator.status !== 'inactive') {
     await auth.setOperatorStatus(request, operator.id, 'inactive')
     for (const session of await auth.listSessions(request, operator.id)) if (session.active) await auth.revokeSession(request, session.id)

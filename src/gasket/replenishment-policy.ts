@@ -9,7 +9,7 @@ import { usdCents } from './purchase-policy'
 import { fromMilli, toMilli } from './quantity'
 
 export const CURRENT_REPLENISHMENT = `FROM gk_replenishment_policies h JOIN gk_replenishment_policy_revisions v ON v.part_id=h.part_id AND v.revision=h.current_revision AND NOT EXISTS(SELECT 1 FROM gk_part_canonical c WHERE c.part_id=h.part_id)`
-export const activeOwnerSql = `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON lower(o.email)=m.email WHERE m.id=? AND m.status='active' AND m.role='owner' AND o.status='active' AND o.role='owner')`
+export const activeOwnerSql = `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=? AND m.status='active' AND m.role='owner' AND o.status='active' AND o.role='owner')`
 const session = (env: Bindings, actor: Actor, capability: 'register.manage'|'site.manage'|'work.review') => {
   requireCapability(actor, capability)
   const check = capabilitySql(actor.sessionId, capability)

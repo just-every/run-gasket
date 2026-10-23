@@ -7,6 +7,7 @@ const queued=await queuedEntrypoint(import.meta.url,'verify:email-link');if(queu
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
 import { emittedWorker } from './emitted-worker.mjs'
+import { harness } from './gasket/harness.mjs'
 
 const secret = () => randomBytes(32).toString('base64url'), owner = 'owner@example.test'
 const vars = { OWNER_EMAIL: owner, SESSION_SECRET: secret(), SETUP_TOKEN: secret() }
@@ -29,4 +30,48 @@ try {
   console.log('Email-link sign-in passed against the emitted Worker: claim, provider-edge mail, confirmation, session')
 } finally {
   await worker.close()
+}
+
+// Sign-in email changes preserve membership authority.
+const h = await harness()
+try {
+  const ownerCookie = await h.owner()
+  await h.api('site.configure', ownerCookie, { name: 'Synthetic plant', timezone: 'UTC' })
+  const originalOwner = await h.api('me', ownerCookie)
+  const member = await h.api('access.give', ownerCookie, { name: 'Technician', email: 'synthetic-gasket-1@example.test', role: 'maintainer' })
+  const memberCookie = await h.signIn(member.email)
+  const originalSession = await (await h.raw('/auth/session', { cookie: memberCookie })).json()
+  for (const [cookie, email] of [[ownerCookie, 'synthetic-gasket-2@example.test'], [memberCookie, owner]]) {
+    assert.equal((await h.raw('/auth/email', { cookie, body: { email } })).status, 200)
+  }
+  await h.api('site.configure', memberCookie, { name: 'Changed plant', timezone: 'UTC' }, 403)
+  assert.equal((await h.api('site', ownerCookie)).name, 'Synthetic plant')
+  const currentMember = await h.api('me', memberCookie)
+  assert.equal(currentMember.id, member.id)
+  assert.equal(currentMember.role, 'maintainer')
+  assert.equal(currentMember.email, owner)
+  const currentSession = await (await h.raw('/auth/session', { cookie: memberCookie })).json()
+  assert.equal(currentSession.id, originalSession.id)
+  assert.equal(currentSession.operator.id, originalSession.operator.id)
+  assert.equal(currentSession.operator.role, 'member')
+  assert.equal((await h.api('me', ownerCookie)).id, originalOwner.id)
+  await h.api('site.configure', ownerCookie, { name: 'Owner plant', timezone: 'UTC' })
+  await h.api('access.role', ownerCookie, { member: member.id, role: 'lead' })
+  assert.equal((await h.api('me', memberCookie)).role, 'lead')
+  const people = await h.api('members', ownerCookie)
+  assert.equal(people.find(person => person.id === member.id).email, owner)
+  assert.equal(people.find(person => person.id === originalOwner.id).email, 'synthetic-gasket-2@example.test')
+  await h.api('access.end', ownerCookie, { member: member.id })
+  assert.ok([401, 403].includes((await h.raw('/api/gasket/assets', { cookie: memberCookie })).status))
+  assert.equal((await h.raw('/auth/invite', { cookie: ownerCookie, body: { email: 'synthetic-gasket-3@example.test', displayName: 'Other owner', role: 'owner' } })).status, 202)
+  const otherOwner = await h.signIn('synthetic-gasket-3@example.test')
+  assert.equal((await h.api('me', otherOwner)).role, 'owner')
+  const ownerSession = await (await h.raw('/auth/session', { cookie: ownerCookie })).json()
+  assert.equal((await h.raw('/auth/operator/role', { cookie: otherOwner, body: { operatorId: ownerSession.operator.id, role: 'member' } })).status, 200)
+  const formerOwner = await h.signIn('synthetic-gasket-2@example.test')
+  await h.api('me', formerOwner, undefined, 403)
+  await h.api('site.configure', formerOwner, { name: 'Former owner plant', timezone: 'UTC' }, 403)
+  console.log('Sign-in email changes preserve membership authority passed')
+} finally {
+  await h.close()
 }

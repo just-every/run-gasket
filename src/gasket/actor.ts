@@ -54,13 +54,14 @@ export async function currentActor(env: Bindings, request: Request): Promise<Act
   if (!session) return null
   const email = session.operator.email.toLowerCase()
   const owner = session.operator.role === 'owner'
-  let member = await one<{ id: string; name: string; role: Role; status: string }>(env, 'SELECT id, name, role, status FROM gk_members WHERE email = ?', email)
+  let member = await one<{ id: string; name: string; role: Role; status: string }>(env, 'SELECT id, name, role, status FROM gk_members WHERE operator_id = ?', session.operator.id)
   if (!member && owner) {
-    await env.DB.batch([stmt(env, "INSERT INTO gk_members (id, email, name, role, created_at) VALUES (?, ?, ?, 'owner', ?) ON CONFLICT(email) DO NOTHING", newId(), email, session.operator.displayName || email, now())])
-    member = await one(env, 'SELECT id, name, role, status FROM gk_members WHERE email = ?', email)
+    await env.DB.batch([stmt(env, "INSERT INTO gk_members (id, operator_id, email, name, role, created_at) VALUES (?, ?, ?, ?, 'owner', ?) ON CONFLICT DO NOTHING", newId(), session.operator.id, email, session.operator.displayName || email, now())])
+    member = await one(env, 'SELECT id, name, role, status FROM gk_members WHERE operator_id = ?', session.operator.id)
   }
   if (!member) throw new GasketError('not_a_member', 403)
   insist(member.status === 'active' && session.operator.status === 'active', 'access_ended', 403)
+  insist(owner || member.role !== 'owner', 'forbidden', 403)
   const zone = await siteZone(env)
   return { id: member.id, sessionId: session.id, email, name: member.name, role: owner ? 'owner' : member.role, zone, today: today(zone) }
 }
@@ -74,7 +75,7 @@ export function capabilitySql(sessionId: string, capability: Capability) {
   const roles = (Object.keys(GRANTS) as Role[]).filter(role => role !== 'owner' && GRANTS[role].includes(capability))
   return {
     sql: `EXISTS(SELECT 1 FROM oa_sessions s JOIN oa_operators o ON o.id = s.operator_id WHERE s.id = ? AND s.revoked_at IS NULL AND s.expires_at > CAST(strftime('%s','now') AS INTEGER) * 1000 AND o.version = s.operator_version AND o.status = 'active'
-      AND (o.role = 'owner' OR EXISTS(SELECT 1 FROM gk_members m WHERE m.email = lower(o.email) AND m.status = 'active' AND m.role IN (${roles.map(() => '?').join(', ') || "''"}))))`,
+      AND EXISTS(SELECT 1 FROM gk_members m WHERE m.operator_id = o.id AND m.status = 'active' AND (o.role = 'owner' OR m.role IN (${roles.map(() => '?').join(', ') || "''"}))))`,
     params: [sessionId, ...roles],
   }
 }

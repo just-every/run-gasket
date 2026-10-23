@@ -65,5 +65,7 @@ export async function seedDemo(env: Bindings, { ownerEmail, now }: { ownerEmail:
   audit(received, 'brenda', 'part.receive', id('part-bearing'), { quantity: '2' })
   rows.push(env.DB.prepare('INSERT INTO oa_first_run (singleton,completed_by,completed_at) SELECT 1,id,? FROM oa_operators WHERE email=? AND role=\'owner\' ON CONFLICT DO NOTHING').bind(at, ownerEmail))
   await env.DB.batch(rows)
+  // Demo accounts are created lazily by the local persona door.
+  await env.DB.prepare(`UPDATE gk_members SET operator_id=(SELECT o.id FROM oa_operators o WHERE lower(o.email)=gk_members.email AND (gk_members.role<>'owner' OR o.role='owner')) WHERE operator_id IS NULL`).run()
   await demoActivity(env, story, saturday)
 }
