@@ -19,3 +19,10 @@ Gasket's own tokens and Base's documents in Gasket's look, which the theme
 grammar keeps out of `/rer-theme.css`; Base links it before the theme. The app,
 Base's frames, the run site and /run read them from there. Do not import either
 file from a component.
+
+`./inter/inter-report.ttf` is a static TrueType conversion of the bundled Inter
+font at its default axis values, made with fontTools 4.61.1. Work PDFs embed it
+without asynchronous font subsetting so reports also work in the Worker runtime.
+It retains the same character coverage and SIL Open Font License. Glyph
+substitution is disabled to preserve exact text extraction of punctuation and
+user-entered text.

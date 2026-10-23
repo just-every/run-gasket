@@ -357,13 +357,15 @@ These primary references establish the source formats, not Gasket implementation
 
 Judged from the code and tests at commit `d36b2534592d1fd7e7f6cc410e8c9a6befc4bd5c` (21 October 2026); every clause judged at `d36b2534592d1fd7e7f6cc410e8c9a6befc4bd5c` (21 October 2026).
 
+REPORT-010 has the tested PDF implementation slice cited below and remains partial; this does not rejudge the remaining clauses.
+
 INT-002 is independently proved by the public-door and 1440/390 browser journeys cited in its row; the remaining audit baseline below is unchanged.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 44 | 33 | 45 | 122 |
-| All | 58 | 33 | 45 | 136 |
+| Target and push further | 44 | 34 | 44 | 122 |
+| All | 58 | 34 | 44 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -465,7 +467,7 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | `REPORT-007` | Custom dashboards and cross-site comparisons | target | missing |  | No report builder, saved custom charts or site comparisons. |
 | `REPORT-008` | Maintenance budgets and repair replacement planning | target | partial | `src/gasket/purchase-policy.ts`; `src/gasket/purchase-report.ts`; `src/gasket/lifecycle.ts`; `tests/gasket/spend.mjs`; `tests/gasket/flows.mjs` | Dated site/cost-center purchasing budgets, source-linked commitments and asset repair-versus-recorded-replacement comparisons exist; maintenance actual/commitment forecasts by asset/period, approved replacement scenarios and PO-to-posted-bill reconciliation remain absent. |
 | `REPORT-009` | Reliable measure definitions and data quality | target | done | `src/gasket/metric-definitions.ts`; `src/gasket/intervention-metrics.ts`; `src/gasket/metrics.ts`; `src/gasket/outcomes.ts`; `tests/gasket/metrics.mjs`; `tests/gasket/intervals.mjs`; `tests/gasket/outcomes.mjs`; `tests/gasket/outcomes-browser.mjs` | Numbered definitions include the retained AGENT-003 cohort and AGENT-004 outcome measures, exact event/coverage policies, unknown inputs and observational limits; authenticated source lists open retained proposals and both interval/work outcome assessments without altering them. Existing quality/recomputation journey and interval/outcome HTTP and browser journeys assert the acceptance points. |
-| `REPORT-010` | Completed work-order PDF | target | missing |  | Work evidence and asset history CSV exist, but no single work-order PDF with results, photos, signatures, review and audit, role-aware cost redaction or bulk ZIP download. |
+| `REPORT-010` | Completed work-order PDF | target | partial | `tests/gasket/work-pdf.mjs` — workPdfJourney: open and reviewed work, pinned step results, two unit-bearing readings, issued and returned parts, embedded photos and original digests, named signatures with stale and current state, each audit payload, restricted-viewer cost redaction, three PDFs in a ZIP, invalid selection refusal, and work-detail browser downloads at 1440 and 390. | Native time entries and labor rates, viewer-language text, requester and other-site refusal remain unproved (FIELD-006, ADMIN-003, ADMIN-013, ADMIN-004 and ADMIN-002). WebP and HEIC originals are attached but have no inline preview. Characters outside the bundled font are explicitly refused. Current agent members are denied PDF export pending approval to align with the anyone-with-work-access requirement. |
 | `INT-001` | Documented maintenance REST API | target | partial | `src/gasket/http.ts`; `API.md`; `tests/gasket/flows.mjs` | Authenticated JSON doors are documented and exercised; no complete target entities, versioning, service scopes, pagination or general write idempotency keys. |
 | `INT-002` | Signed webhooks and reliable connector jobs | target | done | `tests/gasket/automation.mjs` — connectorJourney (flow: INT-002 signed events and durable connector delivery): owner subscriptions to scoped work/receipt events and retained source IDs; independent receiver-edge HMAC verification, secret rotation, tampered/expired replay refusal; 429 Retry-After and actual request timeout; cursor rewind, concurrent claims, receiver deduplication and pending-job restart/export/import recovery without duplicated work, stock, bills or notices; quota, last success/error, bounded retries and retained actionable dead letters. connectorBrowser in the same file proves Automation inspection and the retry form at 1440/390. `src/gasket/webhooks.ts`; `src/gasket/connector-jobs.ts`; `scripts/webhooks/receiver.mjs`; `API.md`. |  |
 | `INT-003` | QuickBooks Online maintenance spend sync | target | missing |  | No QuickBooks OAuth, financial mappings, bill posting or reconciliation. |

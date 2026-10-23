@@ -314,3 +314,30 @@ The phone form has a camera-capture hint and optional, explicit private-device d
 Owner/lead `request.triage` takes `request`, the seen `version`, a required `reason`, `decision` (assess, ask_details, approve, decline, duplicate) and optional `impact` (unknown/running/reduced/stopped). Duplicate decisions name a canonical request with the same asset/location; self links, chains, terminal sources and moving a group root are refused. Both timelines retain the linkage and all originals. A creator answers a needs-details request with `request.reply` (`request`, `version`, `text`); other people cannot impersonate that creator. Questions are retained in-app; requester communications/delivery remain REQ-004, with no outbound claim.
 
 After approval, `request.convert` (`request`, `version`, optional `due`, default current site day) creates one unassigned corrective work without retyping the original description, target or urgency. Linking every source report and recording source timeline/audit events happen in the same transaction as work creation. Retrying returns the existing work. The work's `requestSources` retains original reporters, answers, file links and digests for its planners/reviewers/current assignee/collaborators. File downloads enforce the same necessary-work scope, while contacts stay private to the original creator and lead/owner. Every report remains distinct; no source photo or history is rewritten. Queue filters include impact, criticality, urgency, status and target at the current site. ADMIN-002 inherits future site separation.
+
+## Work-order PDF downloads
+
+Current human members download open or completed work at
+`GET /app/work/ID/report.pdf`; the work-detail page provides the same link.
+The report uses the pinned procedure revision, current results and readings,
+parts issued and returned, comments, named signatures with version and stale
+state, review decisions, and numbered audit entries. Original evidence and
+comment photos are attached with SHA-256 digests; PNG and JPEG also render
+inline. An invalid image or unsupported character returns an explicit refusal.
+No report download changes the work record.
+
+Owners, leads and supervisors see structured costs. Other permitted viewers
+receive no structured costs or audit payloads, which can contain financial
+notes. Existing membership and session revocation apply at every download.
+Agent export remains refused pending approval; REPORT-010 stays partial.
+ADMIN-003 inherits granular rate permissions, ADMIN-002 inherits cross-site
+checks, ADMIN-004 inherits external identity admission, FIELD-006 inherits
+native time entries, and ADMIN-013 inherits viewer-language report labels.
+Current report labels are US English; supported authored text stays as entered.
+
+Owners and leads use the work-detail disclosure to download several reports.
+`GET /app/work-reports.zip?numbers=1,2,3` takes comma-separated work numbers.
+Repeated `work=ID` query parameters are also supported. One to twenty distinct
+orders produce one numbered PDF each. Missing orders, invalid selections and
+bundles exceeding 30 MB fail explicitly before a ZIP response is returned.
+The ZIP is created on demand and is never published or retained by the server.

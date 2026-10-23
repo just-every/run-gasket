@@ -1,3 +1,4 @@
+import { workPdfJourney } from './work-pdf.mjs'
 import { outcomeJourney } from './outcomes.mjs'
 import { intervalJourney } from './intervals.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
@@ -2237,6 +2238,8 @@ try {
   await check('BUY-003 spend approval and purchasing separation', async () => { await spendJourney(h,cookie,{...ids,asset:ids.compressor}) })
 
   await check('REPORT-009 definitions and data quality', async () => { await metricsJourney(h, cookie, ids) })
+
+  await check('REPORT-010 work PDF and bulk ZIP', workPdfJourney)
 
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.

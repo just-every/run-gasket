@@ -26,6 +26,8 @@ export const API_DOORS: [string, string][] = [
 ]
 
 export const PAGE_DOORS: [string, string][] = [
+  ['^/app/work/([\\w-]+)/report\\.pdf$', 'workPdf'],
+  ['^/app/work-reports\\.zip$', 'workPdfZip'],
   ['^/app/labels$', 'labels'],
   ['^/app/request-portals$', 'requestPortals'], ['^/app/requests$', 'requests'], ['^/app/requests/([\\w-]+)$', 'request'], ['^/app/request-files/([\\w-]+)$', 'requestFile'],
   ['^/app/part-photos/([\\w-]+)$','partPhoto'],
