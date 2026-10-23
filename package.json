@@ -31,7 +31,8 @@
     "rer": "rer",
     "test:flows": "rer queue test:flows -- sh -c \"node tests/gasket/flows.mjs\"",
     "test:site": "node --test tests/site/*.test.mjs",
-    "test:agent-stock": "rer queue test:agent-stock -- sh -c \"node tests/gasket/agent-stock.mjs\""
+    "test:agent-stock": "rer queue test:agent-stock -- sh -c \"node tests/gasket/agent-stock.mjs\"",
+    "test:requests": "rer queue test:requests -- sh -c \"node tests/gasket/requests.mjs\""
   },
   "dependencies": {
     "@bwip-js/generic": "4.7.0",

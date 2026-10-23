@@ -117,7 +117,12 @@ async function requestScreens(f,requestId) {
   try {for(const [path,name] of [[`/app/request-portals`,'request-settings'],[`/app/requests`,'request-queue'],[`/app/requests/${requestId}`,'request-detail'],[`/request/${f.portal}?target=${f.target}`,'fault-form']])await capture(page,f.h,path,name)}
   finally {await context.close();await browser.close()}
 }
-if(process.argv[1]===fileURLToPath(import.meta.url)){const task=process.env.REQUEST_JOURNEY || 'portal';if(task==='portal')await requestPortalJourney();else if(task==='drafts')await requestDraftJourney();else if(task==='labels')await labelsJourney();else if(task==='triage')await requestTriageJourney();}
+if(process.argv[1]===fileURLToPath(import.meta.url)) {
+  const journeys={portal:requestPortalJourney,drafts:requestDraftJourney,labels:labelsJourney,triage:requestTriageJourney}
+  const task=process.env.REQUEST_JOURNEY || 'all'
+  assert.ok(task==='all' || Object.hasOwn(journeys,task),`Unknown request journey: ${task}`)
+  for(const journey of task==='all'?Object.values(journeys):[journeys[task]])await journey()
+}
 
 async function decodeSymbol(page,selector,format) {
   const {PNG}=await import('pngjs'),{RGBLuminanceSource,BinaryBitmap,HybridBinarizer,MultiFormatReader,DecodeHintType,BarcodeFormat}=await import('@zxing/library')
