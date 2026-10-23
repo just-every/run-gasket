@@ -104,7 +104,6 @@ export async function requestPortalJourney() {
     const erasure=await browserContext(h,cookie.owner)
     try {await erasePrivateRequest(f,r.id,null,erasure.page)} finally {await erasure.context.close();await erasure.browser.close()}
     await post(payload,cookie.tech,410)
-    if(process.env.REQUEST_SCREENSHOTS)await requestScreens(f,r.id)
     console.log('REQ-001 typed authenticated/public intake, required answers, originals, privacy, consent and concurrent abuse limits passed')
   } finally {await h.close()}
 }
