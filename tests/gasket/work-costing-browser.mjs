@@ -39,6 +39,7 @@ export async function costingBrowser({h,cookie,work,asset,parent,center,actual})
         await page.goto(`${h.origin}/app/costing${scope?'?'+scope:''}`)
         await capture(`costing-${name}`)
       }
+      await capture('costing-coverage','section:has(h2:text("Coverage and source records"))')
       await page.getByText(/^Retained cost sources \(/).click()
       await capture('costing-sources','details:has(summary:text("Retained cost sources"))')
       await page.goto(`${h.origin}/app/assets/${asset}`)
