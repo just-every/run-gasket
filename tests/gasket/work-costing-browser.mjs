@@ -9,7 +9,12 @@ export async function costingBrowser({h,cookie,work,asset,parent,center,actual})
       await context.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
       const page=await context.newPage()
       const capture=async(name,selector)=>{
-        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
+        const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)
+        if(overflow) {
+          await page.screenshot({path:`${process.env.LABOR_SCREENSHOTS}/${name}-overflow-${width}.png`,fullPage:true})
+          console.log('Cost page overflow',await page.locator('body *').evaluateAll(nodes=>nodes.filter(node=>node.getBoundingClientRect().right>innerWidth+1).map(node=>({tag:node.tagName,classes:node.className,text:node.textContent?.slice(0,100),width:node.getBoundingClientRect().width,right:node.getBoundingClientRect().right})).slice(0,12)))
+        }
+        assert.equal(overflow,false,`${name} fits ${width}`)
         if(selector) await page.locator(selector).scrollIntoViewIfNeeded()
         await page.screenshot({path:`${process.env.LABOR_SCREENSHOTS}/${name}-${width}.png`})
       }
