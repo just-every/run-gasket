@@ -7,6 +7,8 @@ import { now, zone } from './clock.mjs'
 
 export async function laborJourney(h,cookie,people) {
   const today=localNow(zone,now()).slice(0,10),yesterday=addDays(today,-1)
+  await h.api('access.role',cookie.owner,{member:people.mo,role:'maintainer'})
+  assert.equal((await h.api('me',cookie.mo)).role,'maintainer')
   const asset=(await h.api('asset.create',cookie.lead,{tag:'LAB-100',name:'Conveyor drive',location:'Packing hall'})).id
   const work=(await h.api('workorder.create',cookie.lead,{asset,title:'Replace conveyor drive bearing',due:today,assignee:people.max})).id
   const other=(await h.api('workorder.create',cookie.lead,{asset,title:'Inspect belt tracking',due:yesterday,assignee:people.mo})).id
