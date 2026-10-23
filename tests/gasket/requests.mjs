@@ -69,6 +69,10 @@ export async function requestPortalJourney() {
     assert.equal((await h.api('requests',cookie.lead)).length,1)
     // Explicitly open bounded public intake, retaining the required site form.
     await h.api('request.portal',cookie.owner,{portal,revision:1,name:'Assembly fault report',mode:'public',publicConsent:true,fields:fields.map(f=>f.key==='nameplate'?{...f,required:true}:f)})
+    const publicConsent=(await h.api('audit?action=request.portal',cookie.owner)).rows.find(e=>e.subject===portal)
+    assert.equal(publicConsent.role,'owner');assert.equal(JSON.parse(publicConsent.detail).publicConsent,true)
+    const publishedName=(await h.api('audit?action=request.target',cookie.owner)).rows.find(e=>e.subject===target)
+    assert.equal(publishedName.role,'owner');assert.equal(JSON.parse(publishedName.detail).name,'PUMP-22 · Assembly pump');assert.equal(JSON.parse(publishedName.detail).publishConsent,true)
     await post({...payload,submissionKey:randomUUID(),field_nameplate:undefined},null,400)
     assert.equal((await h.raw(`/request/${portal}`,{method:'POST'})).status,403,'missing same-origin proof is refused')
     const publicPage=await (await h.raw(`/request/${portal}?target=${target}`)).text()
