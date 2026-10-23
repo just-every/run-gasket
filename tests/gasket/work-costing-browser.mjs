@@ -9,6 +9,8 @@ export async function costingBrowser({h,cookie,work,asset,parent,center,actual})
       await context.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
       const page=await context.newPage()
       const capture=async(name,selector)=>{
+        await page.waitForLoadState('load')
+        await page.evaluate(async()=>{await document.fonts.ready})
         const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)
         if(overflow) {
           await page.screenshot({path:`${process.env.LABOR_SCREENSHOTS}/${name}-overflow-${width}.png`,fullPage:true})
