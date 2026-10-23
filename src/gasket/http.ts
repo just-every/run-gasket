@@ -9,7 +9,9 @@ import { receiptEvidence } from './receiving'
 import { vendorFollowUpPage } from './ui/vendor-follow-up'
 // Gasket's public doors: /app pages, /app/do/ACTION form posts, /api/gasket
 // JSON and evidence downloads. Every request resolves the signed-in member
-// first; nothing is served to a signed-out request.
+// first; private pages/API/downloads refuse signed-out requests. Only opted-in
+// scoped intake, number-only receipt capabilities and public scan states bypass
+// that private boundary.
 import { spendPolicyPage } from './ui/spend-policy'
 import { metricsPage } from './ui/metrics'
 import { purchaseAttachment } from './quotes'

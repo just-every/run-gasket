@@ -135,7 +135,8 @@ export async function submitRequest(env:Bindings,actor:Actor|null,portalId:strin
   } catch(error) {
     const raced=await one(env,'SELECT id,number,fingerprint FROM gk_requests WHERE portal_id=? AND submission_key=?',portalId,keyHash)
     if(raced) {insist(raced.fingerprint===fingerprint,'submission_key_reused',409);return receipt(raced)}
-    if(error instanceof GasketError && error.code==='precondition_failed') throw new GasketError('intake_rate_limited',429)
+    if(error instanceof GasketError && error.code==='intake_rate_limited') throw new GasketError('intake_rate_limited',429)
+    if(error instanceof GasketError && error.code==='label_retired') throw new GasketError('label_retired',410)
     throw error
   }
   return receipt((await one(env,'SELECT id,number FROM gk_requests WHERE id=?',id))!)

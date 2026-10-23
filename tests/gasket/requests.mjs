@@ -64,7 +64,9 @@ export async function requestPortalJourney() {
     await post({...payload,description:'Changed payload'},cookie.tech,409)
     assert.equal((await h.api('requests',cookie.lead)).length,1)
     // Explicitly open bounded public intake, retaining the required site form.
-    await h.api('request.portal',cookie.owner,{portal,revision:1,name:'Assembly fault report',mode:'public',publicConsent:true})
+    await h.api('request.portal',cookie.owner,{portal,revision:1,name:'Assembly fault report',mode:'public',publicConsent:true,fields:fields.map(f=>f.key==='nameplate'?{...f,required:true}:f)})
+    await post({...payload,submissionKey:randomUUID(),field_nameplate:undefined},null,400)
+    assert.equal((await h.raw(`/request/${portal}`,{method:'POST'})).status,403,'missing same-origin proof is refused')
     const publicPage=await (await h.raw(`/request/${portal}?target=${target}`)).text()
     for(const privateText of ['Private financial pump name','Private room','Private maintenance notes','gk_assets'])assert.ok(!publicPage.includes(privateText))
     const noCode=await (await h.raw(`/request/${portal}`)).text();assert.ok(!noCode.includes('PUMP-22'),'public portal never enumerates targets')
@@ -81,6 +83,7 @@ export async function requestPortalJourney() {
     assert.equal(results.filter(r=>r.status===303).length,3)
     assert.ok(results.filter(r=>r.status===429).length===4)
     assert.equal((await h.api('requests',cookie.lead)).length,5)
+    assert.equal((await post()).receipt,first.receipt,'an already accepted submission can retry after the rate ceiling')
     if(process.env.REQUEST_SCREENSHOTS)await requestScreens(f,r.id)
     console.log('REQ-001 typed authenticated/public intake, required answers, originals, privacy, consent and concurrent abuse limits passed')
   } finally {await h.close()}
@@ -275,6 +278,15 @@ export async function requestTriageJourney() {
     assert.equal((await detail(third)).status,'declined');assert.match((await detail(third)).timeline.at(-1).text,/Explained/)
     await h.api('request.convert',cookie.lead,{request:third,version:(await detail(third)).version},409)
     await h.api('request.convert',cookie.lead,{request:duplicate,version:(await detail(duplicate)).version},409)
+    // Concurrent conversion claims still create exactly one corrective record.
+    await post({...payload,submissionKey:randomUUID(),description:'Separate bearing fault for concurrent conversion'})
+    const race=(await h.api('requests',cookie.lead)).find(r=>r.description.startsWith('Separate')).id
+    await decide(race,'approve',{reason:'Independent fault accepted'})
+    const raceBody={request:race,version:(await detail(race)).version}
+    const raceBefore=(await h.api('work?state=open',cookie.lead)).length
+    const conversions=await Promise.all([1,2].map(()=>h.raw('/api/gasket/request.convert',{cookie:cookie.lead,body:raceBody})))
+    assert.ok(conversions.some(r=>r.status===200));assert.ok(conversions.every(r=>[200,409].includes(r.status)))
+    assert.equal((await h.api('work?state=open',cookie.lead)).length,raceBefore+1)
     const before=(await h.api('work?state=open',cookie.lead)).length
     ;({browser,context}=await browserContext(h,cookie.lead));const page=await context.newPage()
     if(process.env.REQUEST_SCREENSHOTS){await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true});await capture(page,h,'/app/requests?impact=stopped','triage-queue');await capture(page,h,`/app/requests/${root}`,'approved-request')}
