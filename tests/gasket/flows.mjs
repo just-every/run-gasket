@@ -2242,6 +2242,9 @@ try {
   await check('REPORT-009 definitions and data quality', async () => { await metricsJourney(h, cookie, ids) })
 
   await check('REPORT-010 work PDF and bulk ZIP', workPdfJourney)
+  let laborContext
+  await check('Reviewed person time and protected labor costs', async () => { laborContext = await laborJourney(h,cookie,ids) })
+  await check('Reconciled work and maintenance cost downloads', async () => { await costingJourney(h,cookie,laborContext) })
 
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
@@ -2300,9 +2303,6 @@ try {
       } finally { await restored.close() }
     } finally { await empty.remove() }
   })
-  let laborContext
-  await check('Reviewed person time and protected labor costs', async () => { laborContext = await laborJourney(h,cookie,ids) })
-  await check('Reconciled work and maintenance cost downloads', async () => { await costingJourney(h,cookie,laborContext) })
   console.log('Gasket flows: 14 clauses passed')
 } finally {
   await h.close()
