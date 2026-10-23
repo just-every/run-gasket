@@ -77,7 +77,7 @@ export async function costingJourney(h,cookie,{work,other,asset,today,people}) {
   const facts={supplier:vendor,costCenter:center,asset,workOrder:work,deliveryOn:today,taxTreatment:'sales_tax',kind:['service'],description:['Post-repair vibration analysis'],quantity:['1'],unit:['visit'],unitPrice:['150.00'],reason:'Verify repair under production load',freight:'0',salesTax:'0',useTax:'0'}
   const order=(await h.api('purchase.save',cookie.owner,facts)).id
   const po=await h.api(`purchase-orders/${order}`,cookie.owner)
-  await h.api('purchase.approve',cookie.sam,{order,revision:1,step:po.route.required[0].id,note:'Independent scope review'})
+  for(const step of po.route.required) await h.api('purchase.approve',cookie.sam,{order,revision:1,step:step.id,note:'Independent scope review'})
   const committed=await get(`workOrder=${work}`)
   assert.equal(committed.totals.amounts.commitment.cents,40000)
   assert.equal(committed.totals.amounts.actual.cents,actual,'authorized purchase remains a commitment')
