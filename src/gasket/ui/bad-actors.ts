@@ -13,7 +13,7 @@ import { card, field, form, h, hidden, select, table, woNumber } from './html'
 import { page } from './shell'
 
 const pct = (value: number | null) => value === null ? '—' : `${value.toFixed(1)}%`
-const CATEGORY = { parts: 'Parts', labor: 'Labor', contractor: 'Contractor', other: 'Other' }
+const CATEGORY = { parts: 'Parts', labor: 'Labor', contractor: 'Contractor', tools: 'Tools', other: 'Other' }
 type Report = Awaited<ReturnType<typeof badActors>>
 
 const money = (cents: number | null, unknown: number, noun: string) => h`${cents === null ? h`<span class="gk-muted">Unknown</span>` : usd(cents)}${unknown ? h`<span class="gk-sub">${unknown} ${noun} unknown</span>` : ''}`

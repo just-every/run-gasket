@@ -1,3 +1,4 @@
+import { costingReport } from './costing'
 import { portalSettings, requestQueue, requestDetail } from './requests'
 import { connectors } from './webhooks'
 import { stockInsights } from './stock-insights'
@@ -55,6 +56,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  costing: (env,actor,_id,url) => costingReport(env,actor,url),
   requestPortals: (env,actor) => portalSettings(env,actor), requests:(env,actor,_id,url)=>requestQueue(env,actor,url), request:(env,actor,id)=>requestDetail(env,actor,id),
   connectors: (env,actor,_id,url) => connectors(env,actor,url),
   stockInsights: (env,actor,id) => stockInsights(env,actor,id),

@@ -2,16 +2,18 @@
 import type { Bindings } from '../auth.server'
 import { can, requireCapability, type Actor } from './actor'
 import { all, insist, now, one, sha256Hex } from './core'
-import { METRIC_DEFINITIONS } from './metric-definitions'
+import { METRIC_DEFINITIONS, currentMetricDefinitions } from './metric-definitions'
 import { meterState } from './meters'
 import { reliability } from './reliability'
 
 export async function metrics(env: Bindings, actor: Actor, url: URL) {
   requireCapability(actor, 'board.read')
-  const version = url.searchParams.get('version') || '1'
-  insist(version === '1', 'metric_version_not_found', 404)
+  const requested = url.searchParams.get('version')
+  insist(!requested || /^\d+$/.test(requested), 'metric_version_not_found', 404)
+  const catalog = requested ? METRIC_DEFINITIONS.filter(row=>row.version===Number(requested)) : currentMetricDefinitions()
+  insist(catalog.length, 'metric_version_not_found', 404)
   const id = url.searchParams.get('metric')
-  const permitted = METRIC_DEFINITIONS.filter(row => !row.requiredCapability || can(actor,row.requiredCapability))
+  const permitted = catalog.filter(row => !row.requiredCapability || can(actor,row.requiredCapability))
   const definitions = id ? permitted.filter(row => row.id === id) : permitted
   insist(definitions.length, 'metric_not_found', 404)
   const report = await reliability(env, actor, url)
@@ -21,7 +23,7 @@ export async function metrics(env: Bindings, actor: Actor, url: URL) {
     all(env, "SELECT m.*,a.tag FROM gk_meters m JOIN gk_assets a ON a.id=m.asset_id WHERE m.kind='counter' ORDER BY m.id"),
     all(env, `SELECT mv.id,mv.part_id,mv.kind,mv.quantity_milli,mv.at,p.number,p.name,p.unit FROM gk_stock_moves mv JOIN gk_parts p ON p.id=mv.part_id WHERE mv.value_cents IS NULL OR (mv.kind='receive' AND mv.unit_price_cents IS NULL AND mv.catalog_item_id IS NULL) ORDER BY mv.id`),
     all(env, 'SELECT j.id,j.state,j.error,q.reviewed_json,q.recorded_at FROM ik_jobs j LEFT JOIN gk_import_quality q ON q.job_id=j.id WHERE j.destination=? AND j.state NOT IN (?,?) ORDER BY j.id', 'register', 'undone', 'rolled_back'),
-    all(env, 'SELECT w.id,w.number,w.status FROM gk_work_orders w WHERE NOT EXISTS(SELECT 1 FROM gk_work_costs c WHERE c.work_order_id=w.id) ORDER BY w.id'),
+    all(env, 'SELECT w.id,w.number,w.status FROM gk_work_orders w WHERE NOT EXISTS(SELECT 1 FROM gk_work_actual_costs c WHERE c.work_order_id=w.id) ORDER BY w.id'),
     one(env, 'SELECT COALESCE(MAX(seq),0) AS sequence,MAX(at) AS latestAt FROM gk_audit'),
   ])
   const counterGaps = []

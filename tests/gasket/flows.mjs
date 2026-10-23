@@ -1,4 +1,5 @@
 import { workPdfJourney } from './work-pdf.mjs'
+import { laborJourney } from './labor-costs.mjs'
 import { outcomeJourney } from './outcomes.mjs'
 import { intervalJourney } from './intervals.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
@@ -2298,6 +2299,7 @@ try {
       } finally { await restored.close() }
     } finally { await empty.remove() }
   })
+  await check('Reviewed person time and protected labor costs', async () => { await laborJourney(h,cookie,ids) })
   console.log('Gasket flows: 14 clauses passed')
 } finally {
   await h.close()

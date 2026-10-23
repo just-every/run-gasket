@@ -10,9 +10,9 @@
 //   one), failure mode (latest classification; "Unclassified") and reason (the
 //   recorded reason, ignoring case and outer spaces), most minutes first, with
 //   each row's share and the cumulative share of the ranked total.
-// - Repair cost is the sum of the cost entries a lead records on the failures'
-//   work orders (each work order once per row); a work order with none is
-//   unknown, never zero.
+// - Repair cost reconciles retained work entries, valued stock issues and
+//   returns, approved labor and contractor invoices, each work once per row.
+//   A work order with no known cost remains unknown.
 // - Lost production is counted minutes times the documented USD rate per
 //   production hour of the failed entry or, when it has none, its nearest entry
 //   above with one; the latest documented rate counts. With no rate, or a rate
@@ -23,11 +23,12 @@ import { requireCapability, type Actor } from './actor'
 import { cell } from './audit'
 import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import type { Input } from './input'
+import { COSTING_CATEGORIES, reconciledWorkCosts, reconciledWorkCostTotals } from './costing'
 import { woDigits } from './quantity'
 import { outagePeriod, percent, type Outage } from './outages'
 import { intersect, minutes, subtract } from './spans'
 
-export const COST_CATEGORIES = ['parts', 'labor', 'contractor', 'other'] as const
+export const COST_CATEGORIES = COSTING_CATEGORIES
 const DOLLARS = /^-?\d{1,9}(\.\d{1,2})?$/
 const toCents = (text: string) => { const [whole, part = ''] = text.replace('-', '').split('.'); const cents = Number(whole) * 100 + Number(part.padEnd(2, '0')); return text.startsWith('-') ? -cents : cents }
 export const usd = (cents: number | null) => cents === null ? 'unknown' : `${cents < 0 ? '-' : ''}$${(Math.abs(cents) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -36,7 +37,7 @@ export const DEFINITIONS = [
   ['Downtime', 'Production minutes (REPORT-002) of failure stops in the period. Planned stops and degraded operation are left out and counted.'],
   ['Duplicate time', 'Where failures of an entry and of an entry above or below it overlap, the shared minutes count once, for the failure that started first (then the higher entry). Failures of unrelated entries are separate losses.'],
   ['Pareto', 'Rows by asset, line, failure mode and reason, most minutes first, with each row\'s share and the cumulative share of the ranked total. A reason groups recorded reasons ignoring case and outer spaces.'],
-  ['Repair cost', 'The cost entries a lead recorded on the failures\' work orders, each work order once per row. A work order with none is unknown, never zero.'],
+  ['Repair cost', 'Reconciled work actuals: retained repair entries, valued issues less returns, approved labor and contractor invoices. Each work order counts once per row. No known amount remains unknown; unpriced movements remain gaps.'],
   ['Lost production', 'Counted minutes times the documented USD rate per production hour of the failed entry, or its nearest entry above with one; the latest documented rate counts. Without a rate the loss is unknown and never estimated.'],
   ['Repeat failure', 'Two or more failures of one asset with the same failure mode in the period.'],
   ['Rounding', 'Money in whole cents and percentages to one decimal, rounded half up. Times are the site\'s own clock.'],
@@ -61,12 +62,8 @@ export async function recordWorkCost(env: Bindings, actor: Actor, input: Input) 
   return { id }
 }
 
-/** A work order's repair cost entries in the order they were recorded, with the total and each category's sum. */
-export async function workCosts(env: Bindings, workOrder: string) {
-  const entries = await all(env, 'SELECT c.id, c.category, c.cents, c.note, c.recorded_at, m.name AS by FROM gk_work_costs c LEFT JOIN gk_members m ON m.id = c.recorded_by WHERE c.work_order_id = ? ORDER BY c.recorded_at, c.id', workOrder)
-  const sum = (rows: typeof entries) => rows.reduce((total, row) => total + row.cents, 0)
-  return { entries, totalCents: entries.length ? sum(entries) : null, byCategory: Object.fromEntries(COST_CATEGORIES.map(category => [category, sum(entries.filter(row => row.category === category))])) }
-}
+/** Reconciled actuals preserve the existing work-cost response shape. */
+export const workCosts = reconciledWorkCosts
 
 /** A lead documents the lost-production rate of a register entry (USD per production hour), or that it is unknown (no rate), with its basis. */
 export async function documentLossRate(env: Bindings, actor: Actor, input: Input) {
@@ -145,7 +142,7 @@ export async function badActors(env: Bindings, actor: Actor, url: URL) {
   requireCapability(actor, 'board.read')
   const p = await outagePeriod(env, actor, url)
   const { current } = await lossRates(env)
-  const costs = new Map((await all(env, 'SELECT work_order_id, SUM(cents) AS cents FROM gk_work_costs GROUP BY work_order_id')).map(row => [row.work_order_id as string, row.cents as number]))
+  const costs = new Map((await reconciledWorkCostTotals(env)).filter(row => row.priced > 0).map(row => [row.work_order_id as string, row.cents as number]))
   const failures = countedFailures(p, current, costs)
   const total = failures.reduce((sum, row) => sum + row.minutes, 0)
   const all5 = rank(failures, total, () => 'all', () => 'All failures')[0]

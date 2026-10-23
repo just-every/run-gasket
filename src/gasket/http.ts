@@ -1,4 +1,6 @@
 import { workPdf, workPdfZip } from './work-pdf'
+import { costingPage } from './ui/costing'
+import { costingCsv } from './costing'
 import { labelsPage, scanPage } from './ui/labels'
 import { submitRequest, requestFile } from './requests'
 import { requestPortalPage, requestReceiptPage, requestSettingsPage, requestsPage, requestPage } from './ui/requests'
@@ -172,6 +174,8 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 const pages: Record<string, Page> = {
   workPdf: (env, actor, _url, id) => workPdf(env, actor, id),
   workPdfZip: (env, actor, url) => workPdfZip(env, actor, url),
+  costing: (env,actor,url) => costingPage(env,actor,url),
+  costingCsv: async (env,actor,url) => new Response(await costingCsv(env,actor,url), {headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="maintenance-costs.csv"','cache-control':'private, no-store','x-content-type-options':'nosniff'}}),
   labels:(env,actor,url)=>labelsPage(env,actor,url),
   requestPortals:(env,actor,url)=>requestSettingsPage(env,actor,url), requests:(env,actor,url)=>requestsPage(env,actor,url), request:(env,actor,url,id)=>requestPage(env,actor,url,id), requestFile:(env,actor,_url,id)=>requestFile(env,actor,id),
   partMerge:(env,actor,url)=>partMergePage(env,actor,url),

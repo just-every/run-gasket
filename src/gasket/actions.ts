@@ -1,3 +1,7 @@
+import { recordCostComparison, setWorkCostCenter } from './costing'
+import { recordLabor, recordContractorInvoice } from './labor'
+import { setLaborRate, reviewLabor } from './labor-policy'
+import { laborTimer } from './labor-timers'
 import { triageRequest, replyToRequest, convertRequest } from './triage'
 import { createLabelWork } from './labels'
 import { savePortal, saveTarget, addRequestField } from './requests'
@@ -174,6 +178,13 @@ export const actions: Record<string, Handler> = {
   'downtime.classify': (env, actor, input) => classifyStop(env, actor, input),
   'production.hours.add': (env, actor, input) => addProductionHours(env, actor, input),
   'production.hours.remove': (env, actor, input) => removeProductionHours(env, actor, input),
+  'labor.timer': (env,actor,input) => laborTimer(env,actor,input),
+  'labor.entry': (env,actor,input) => recordLabor(env,actor,input),
+  'labor.rate': (env,actor,input) => setLaborRate(env,actor,input),
+  'labor.review': (env,actor,input) => reviewLabor(env,actor,input),
+  'labor.invoice': (env,actor,input) => recordContractorInvoice(env,actor,input),
+  'work.cost_comparison': (env,actor,input) => recordCostComparison(env,actor,input),
+  'work.cost_center': (env,actor,input) => setWorkCostCenter(env,actor,input),
   'work.cost': (env, actor, input) => recordWorkCost(env, actor, input),
   'loss.rate': (env, actor, input) => documentLossRate(env, actor, input),
   'template.save': (env, actor, input) => saveTemplate(env, actor, input),

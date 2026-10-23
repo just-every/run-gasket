@@ -2,8 +2,8 @@
 // its purchase (date, cost, supplier), commissioning, warranty, replacement
 // value with its basis and service agreements; retiring it records the
 // disposal. Each change is a numbered revision kept in the asset's history.
-// The replacement comparison sets the actual repair cost (REPORT-005 cost
-// entries on the asset's own work orders: unknown, never zero, when none) and
+// The replacement comparison uses reconciled actuals on its own work orders
+// (unknown when no source has a known amount) and
 // its failure downtime against the replacement value. Depreciation stays in
 // the connected ledger: the handoff CSV carries the facts, never a book value.
 import type { Bindings } from '../auth.server'
@@ -13,6 +13,7 @@ import { isDate } from './dates'
 import type { Input } from './input'
 import { classifiedStops } from './reliability'
 import { cell } from './audit'
+import { reconciledWorkCostTotals } from './costing'
 
 export const DISPOSAL_METHODS = ['sold', 'scrapped', 'returned', 'transferred', 'donated', 'other'] as const
 const DOLLARS = /^\d{1,9}(\.\d{1,2})?$/
@@ -96,11 +97,13 @@ export async function lifecycleOf(env: Bindings, actor: Actor, assetId: string) 
   const facts = await one(env, 'SELECT l.*, m.name AS updated_by_name FROM gk_asset_lifecycle l LEFT JOIN gk_members m ON m.id = l.updated_by WHERE l.asset_id = ?', assetId)
   const agreements = (await all(env, 'SELECT a.*, m.name AS recorded_by_name FROM gk_service_agreements a LEFT JOIN gk_members m ON m.id = a.recorded_by WHERE a.asset_id = ? ORDER BY a.starts_on, a.recorded_at', assetId))
     .map(row => ({ ...row, active: row.starts_on <= actor.today && actor.today <= row.ends_on }))
-  // Repair cost: every cost entry on the asset's own work orders (any status); failure downtime: its ended failure stops, by their latest classification.
-  const costs = await one(env, 'SELECT COUNT(DISTINCT w.id) AS orders, COUNT(c.id) AS entries, SUM(c.cents) AS cents, COUNT(DISTINCT c.work_order_id) AS costed FROM gk_work_orders w LEFT JOIN gk_work_costs c ON c.work_order_id = w.id WHERE w.asset_id = ?', assetId)
+  const orders = await all(env, 'SELECT id FROM gk_work_orders WHERE asset_id=?', assetId)
+  const ids = new Set(orders.map(row => row.id))
+  const costs = (await reconciledWorkCostTotals(env)).filter(row => ids.has(row.work_order_id))
+  const priced = costs.filter(row => row.priced > 0)
   const failures = (await classifiedStops(env, 'd.asset_id = ? AND d.ended_on IS NOT NULL AND d.degraded = 0', assetId)).filter(stop => !stop.planned)
-  const repairCents = costs?.entries ? costs.cents as number : null, replacementCents = (facts?.replacement_cents ?? null) as number | null
-  const comparison = { repairCents, workOrders: costs?.orders ?? 0, costedWorkOrders: costs?.costed ?? 0, failures: failures.length, failureMinutes: failures.reduce((sum, stop) => sum + (stop.minutes as number), 0), replacementCents,
+  const repairCents = priced.length ? priced.reduce((sum, row) => sum + row.cents, 0) : null, replacementCents = (facts?.replacement_cents ?? null) as number | null
+  const comparison = { repairCents, workOrders: orders.length, costedWorkOrders: priced.length, unpricedMovements: costs.reduce((sum, row) => sum + row.unpriced, 0), failures: failures.length, failureMinutes: failures.reduce((sum, stop) => sum + (stop.minutes as number), 0), replacementCents,
     repairPercentOfReplacement: repairCents !== null && replacementCents ? Math.round(repairCents / replacementCents * 1000) / 10 : null }
   return { facts: facts ?? null, agreements, comparison }
 }

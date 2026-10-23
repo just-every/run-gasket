@@ -1,0 +1,47 @@
+// REPORT-001: maintenance amounts, approved time and retained source evidence.
+import type { Bindings } from '../../auth.server'
+import type { Actor } from '../actor'
+import { COMPARISON_KINDS, COSTING_CATEGORIES, costingReport } from '../costing'
+import { usd } from '../bad-actors'
+import { showDate } from '../dates'
+import { area, card, field, form, h, hidden, select, table, woNumber } from './html'
+import { page } from './shell'
+
+const label = (value: string) => value === 'other' ? 'Miscellaneous' : value[0].toUpperCase() + value.slice(1)
+const hours = (minutes: number) => `${(minutes / 60).toFixed(2)} h`
+const amount = (row: { cents: number | null; unknown: number }) => `${usd(row.cents)}${row.unknown ? ` (${row.unknown} unknown)` : ''}`
+const summaryRows = (rows: any[], name: (row: any) => unknown) => rows.map(row => [name(row), amount(row.amounts.actual), amount(row.amounts.estimate), amount(row.amounts.commitment), amount(row.amounts.posted), hours(row.approvedMinutes), hours(row.contractorMinutes)])
+const headings = ['Scope', 'Actual USD', 'Estimate USD', 'Commitment USD', 'Posted USD', 'Approved labor', 'Contractor time']
+
+export async function costingPage(env: Bindings, actor: Actor, url: URL) {
+  const r = await costingReport(env, actor, url), back = `/app/costing${url.search}`
+  const download = (group: string, text: string) => { const query = new URLSearchParams(url.searchParams); query.set('groupBy', group); return h`<a class="gk-button gk-secondary" href="/app/costing.csv?${query.toString()}">${text}</a>` }
+  const filters = h`<form method="get" action="/app/costing" class="gk-form"><div class="gk-grid">
+    ${field('From', 'from', { type: 'date', required: false, value: r.from ?? '', hint: 'Leave dates empty for lifetime costs.' })}${field('To', 'to', { type: 'date', required: false, value: r.to ?? '' })}
+    ${select('Asset and descendants', 'asset', r.assets.map(row => ({ value: row.id, label: `${row.tag} ${row.name}` })), r.asset ?? '', { required: false, blank: 'Whole site' })}
+    ${select('Work order', 'workOrder', r.byWork.map(row => ({ value: row.id, label: `${woNumber(row.number)} ${row.title}` })), r.workOrder ?? '', { required: false, blank: 'All work' })}
+    ${select('Cost center', 'costCenter', [{ value: 'unassigned', label: 'Unassigned' }, ...r.costCenters.map(row => ({ value: row.id, label: `${row.code} ${row.name}` }))], r.costCenter ?? '', { required: false, blank: 'All cost centers' })}
+    </div><div class="gk-actions"><button type="submit" class="gk-secondary">Show costs</button></div></form>`
+  const totals = card('Selected scope', h`${table(headings, summaryRows([r.totals], () => r.site?.name ?? 'The site'), 'Selected maintenance costs')}
+    <p class="gk-sub">Actuals, estimates, commitments and posted amounts are separate comparisons. Do not add them together. Known amounts may be partial; unknown costs remain visible below.</p>
+    ${table(['Category', 'Actual USD', 'Estimate USD', 'Commitment USD', 'Posted USD'], COSTING_CATEGORIES.map(category => [label(category), ...(['actual', ...COMPARISON_KINDS] as const).map(kind => amount(r.totals.byCategory[category][kind]))]), 'Cost categories')}
+    <p>Approved employee time: ${hours(r.totals.approvedMinutes)}. ${Object.entries(r.totals.approvedByCategory).map(([category, minutes]) => `${label(category)}: ${hours(minutes)}`).join(' · ')}. Contractor invoice time: ${hours(r.totals.contractorMinutes)}.</p>`)
+  const work = card('Work orders', h`${r.byWork.length ? table(headings, summaryRows(r.byWork, row => h`<a href="/app/work/${row.id}">${woNumber(row.number)}</a> ${row.title}<span class="gk-sub">${r.costCenters.find(center => center.id === row.cost_center_id)?.code ?? 'Unassigned cost center'}</span>`), 'Work costs', { wrap: [0] }) : h`<p>No work matches these filters.</p>`}${download('work', 'Download work costs (CSV)')}`)
+  const assets = card('Assets and parents', h`<p class="gk-sub">Direct costs belong to the named asset. A parent includes itself and every descendant once. Parent rows overlap; do not sum them.</p>
+    ${table(['Asset', 'Direct actual USD', 'Subtree actual USD', 'Subtree approved labor'], r.byAsset.map(row => { const subtree = r.bySubtree.find(item => item.id === row.id)!; return [h`<a href="/app/assets/${row.id}">${row.tag}</a> ${row.name}`, amount(row.amounts.actual), amount(subtree.amounts.actual), hours(subtree.approvedMinutes)] }), 'Asset maintenance costs', { wrap: [0] })}
+    <div class="gk-actions">${download('asset', 'Download direct asset costs (CSV)')}${download('subtree', 'Download parent costs (CSV)')}</div>`)
+  const centers = card('Cost centers', h`${table(headings, summaryRows(r.byCostCenter, row => h`${row.code}<span class="gk-sub">${row.name}</span>`), 'Cost-center costs', { wrap: [0] })}
+    <p class="gk-sub">Work costs follow the current work cost center. Purchase commitments keep their recorded cost center; imported history remains unassigned.</p>${download('costCenter', 'Download cost-center costs (CSV)')}${download('site', 'Download selected site costs (CSV)')}`)
+  const selected = r.byWork.find(row => row.id === r.workOrder)
+  const edits = actor.role === 'owner' && selected ? card('Record financial comparisons', h`<p>For ${woNumber(selected.number)}. Estimates and posted amounts do not change actual costs. Record external commitments here; linked purchase commitments already appear automatically.</p>
+    ${form('work.cost_comparison', back, h`${hidden('workOrder', selected.id)}<div class="gk-grid">${select('Comparison', 'kind', COMPARISON_KINDS.map(value => ({ value, label: label(value) })), 'estimate')}${select('Category', 'category', COSTING_CATEGORIES.map(value => ({ value, label: label(value) })), 'other')}${field('Signed amount (USD)', 'amount', { hint: 'A negative amount credits an earlier entry.' })}${field('Source reference', 'reference', { required: false, hint: 'Required for posted amounts. These records do not verify an external ledger.' })}${field('Original comparison ID for a credit', 'corrects', { required: false })}</div>${area('Reason and evidence', 'note')}`, 'Record comparison', { secondary: true })}
+    ${form('work.cost_center', back, h`${hidden('workOrder', selected.id)}${hidden('version', selected.version)}${select('Work cost center', 'costCenter', r.costCenters.filter(row => row.active || row.id === selected.cost_center_id).map(row => ({ value: row.id, label: `${row.code} ${row.name}` })), selected.cost_center_id ?? '', { required: false, blank: 'Unassigned' })}`, 'Save cost center', { secondary: true })}`) : actor.role === 'owner' ? h`<p class="gk-sub">Select one work order to record an estimate, external commitment or posted amount, or change its cost center.</p>` : ''
+  const coverage = card('Coverage and source records', h`<p>${r.coverage.workWithoutActuals.length} work orders have no known actual amount in this scope. ${r.coverage.unpricedMovements.length} part movements are unpriced. ${r.coverage.importedMissingAmounts.length} moved-in cost components are missing.</p>
+    <p>Current time-entry states: ${Object.entries(r.coverage.laborStates).map(([state, count]) => `${label(state)} ${count}`).join(' · ')}. Only approved entries contribute time or cost.</p>
+    ${r.coverage.workWithoutActuals.length ? h`<p>Without known actuals: ${r.coverage.workWithoutActuals.map((row, index) => h`${index ? ', ' : ''}<a href="/app/work/${row.id}">${woNumber(row.number)}</a>`)}.</p>` : ''}
+    <details class="gk-details"><summary>Retained cost sources (${r.sources.length})</summary>${table(['Source ID', 'Work or history', 'Measure', 'Category', 'USD', 'Evidence'], r.sources.map(row => [row.id, row.workOrderId ? h`<a href="/app/work/${row.workOrderId}">${woNumber(r.byWork.find(work => work.id === row.workOrderId)?.number ?? 0)}</a>` : row.historyId ?? 'Site purchase', label(row.kind), label(row.category), usd(row.cents), h`${row.note}<span class="gk-sub">${row.reference} ${row.eventDay}</span><a href="${row.sourceDoor}">Source JSON</a>`]), 'Retained cost source records', { wrap: [0, 5] })}</details>
+    ${r.excludedCommitments.length ? h`<details class="gk-details"><summary>Excluded purchasing commitments (${r.excludedCommitments.length})</summary>${table(['Revision', 'Amount USD', 'Exclusion', 'Source'], r.excludedCommitments.map(row => [row.revision_id, usd(row.amount_cents), row.exclusion, h`<a href="${row.sourceDoor}">Purchase JSON</a>`]), 'Excluded obligations')}</details>` : ''}
+    ${download('sources', 'Download cost source records (CSV)')}<p class="gk-sub">Audit revision ${r.sourceRevision}. Latest change ${r.latestChangeAt ? new Date(r.latestChangeAt).toISOString() : 'none'}. Input fingerprint ${r.inputFingerprint}.</p>`)
+  const definitions = card('Definitions', h`<p>${r.policy}</p><dl>${r.definitions.filter(row => row.clause === 'REPORT-001').map(row => h`<dt>${row.name} (version ${row.version})</dt><dd>${row.formula}</dd>`)}</dl><p><a href="/app/metrics">Measure definitions and data quality</a></p>`)
+  return page(env, 'Maintenance costs', actor, h`<h1>Maintenance costs</h1><p class="gk-lede">${r.site?.name ?? 'The site'} · ${r.from ? showDate(r.from) : 'All retained history'} to ${r.to ? showDate(r.to) : 'present'} · USD.</p>${filters}${totals}${edits}${work}${assets}${centers}${coverage}${definitions}`, { url })
+}

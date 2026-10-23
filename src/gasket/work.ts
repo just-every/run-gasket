@@ -1,3 +1,4 @@
+import { laborView } from './labor'
 import { requestSources } from './request-sources'
 // Clauses 6–8: work orders, assignment and the assigned person's record of the
 // work: checklist results, evidence, readings, parts, downtime and findings.
@@ -358,7 +359,7 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
 
 /** FIELD-004: a step of the pinned revision with its answer, whether it applies, its photos and a supervisor's exception. */
 export type Step = ChecklistItem & { index: number; kind: StepKind; summary: string; result: Row | null; applies: boolean; photos: number; exception: Row | null }
-export type WorkView = Row & { requestSources: Awaited<ReturnType<typeof requestSources>>; crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: Step[]; meters: Row[]; readings: Row[]; parts: Row[]; timeEntries: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; tools: Row[]; signatures: Awaited<ReturnType<typeof signaturesOf>>; documents: Awaited<ReturnType<typeof workDocuments>>; calibration: Row | null; costs: Awaited<ReturnType<typeof workCosts>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
+export type WorkView = Row & { requestSources: Awaited<ReturnType<typeof requestSources>>; crew: Awaited<ReturnType<typeof crewOf>>; collaborating: boolean; items: Step[]; meters: Row[]; readings: Row[]; parts: Row[]; timeEntries: Row[]; reservations: Awaited<ReturnType<typeof reservations>>; bom: Awaited<ReturnType<typeof bomOf>> | null; downtime: Row[]; findings: Row[]; evidence: Row[]; reviews: Row[]; decisions: Row[]; control: Row[]; merged: Row[]; origin: Awaited<ReturnType<typeof correctionOrigin>>; comments: Awaited<ReturnType<typeof thread>>; tools: Row[]; signatures: Awaited<ReturnType<typeof signaturesOf>>; documents: Awaited<ReturnType<typeof workDocuments>>; calibration: Row | null; costs: Awaited<ReturnType<typeof workCosts>>; labor: Awaited<ReturnType<typeof laborView>>; fields: Awaited<ReturnType<typeof fieldsOf>>; mine: boolean; missing: string[] }
 
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
@@ -406,7 +407,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const crew = await crewOf(env, order, actor)
   const { items_json: _items, ...rest } = order
   // PLAN-006: the work order's comments, with this person's unread state.
-  const comments = await thread(env, actor, 'work', id), costs = await workCosts(env, id)
+  const comments = await thread(env, actor, 'work', id), costs = await workCosts(env, id, actor)
   // PLAN-001: custom field values, and what the fields and the template require before review.
   const fields = await fieldsOf(env, order)
   // ASSET-008: the tools this work needs and which were used; a calibration's grace window and certificate.
@@ -417,7 +418,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const signatures = await signaturesOf(env, order)
   const calibration = order.calibration_task ? { grace_days: order.grace_days, overdue_after: addDays(order.due_date, order.grace_days ?? 0), certificate: evidence.filter(file => file.certificate).at(-1) ?? null } : null
   const timeEntries = await all(env, 'SELECT t.id, t.worked_on, t.minutes, t.note, t.recorded_at, m.name AS recorded_by FROM gk_time_entries t LEFT JOIN gk_members m ON m.id = t.recorded_by WHERE t.work_order_id = ? ORDER BY t.recorded_at, t.id', id)
-  return { ...rest, timeEntries, requestSources:await requestSources(env,actor,id), trigger, tools, signatures, documents: await workDocuments(env, id), calibration, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length, tools, certificateRequired: Boolean(calibration && !calibration.certificate), resign: resignBlockers(signatures, order.version) }) }
+  return { ...rest, timeEntries, requestSources:await requestSources(env,actor,id), trigger, tools, signatures, documents: await workDocuments(env, id), calibration, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, labor: await laborView(env, actor, id), fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length, tools, certificateRequired: Boolean(calibration && !calibration.certificate), resign: resignBlockers(signatures, order.version) }) }
 }
 
 /**

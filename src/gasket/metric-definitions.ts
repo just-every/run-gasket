@@ -1,3 +1,5 @@
+import { COSTING_METRICS } from './costing-metrics'
+import { LABOR_METRICS } from './labor-metrics'
 // REPORT-009: versioned descriptions of the calculations that ship today.
 // Keep a changed calculation as a new version; do not rewrite version 1.
 // Report source doors accept their existing from/to and scope query parameters.
@@ -12,7 +14,7 @@ import { VENDOR_METRICS } from './vendor-follow-up-metrics'
 export type MetricDefinition = Readonly<{
   id: string
   name: string
-  version: 1
+  version: number
   requiredCapability?: 'work.review' | 'site.manage'
   formula: string
   eventTime: string
@@ -38,6 +40,8 @@ function definitions(sourceDoor: string, clause: string, eventTime: string, excl
 
 /** Frozen array and frozen scalar-only records; this is the immutable version-1 catalog. */
 export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
+  ...COSTING_METRICS,
+  ...LABOR_METRICS,
   ...INTERVENTION_METRICS,
   ...PURCHASE_METRICS,
   ...RECEIVING_METRICS,
@@ -186,3 +190,6 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
     ['automation.notice-failed', 'Failed notice jobs', 'Count chase and expiry jobs with state failed across retained history.', 'Not limited to recent 50 jobs; other rule jobs excluded.'],
   ]),
 ])
+
+/** Current definitions retain earlier numbered formulas in the registry. */
+export const currentMetricDefinitions = () => [...new Map([...METRIC_DEFINITIONS].sort((a,b)=>a.version-b.version).map(row=>[row.id,row])).values()]
