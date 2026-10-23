@@ -69,10 +69,17 @@ export async function automationHealth(env: Bindings, actor: Actor) {
 export async function ledgerView(env: Bindings, actor: Actor, url?: URL) {
   requireCapability(actor, 'board.read')
   const ledger = await automationLedger(env), job = url?.searchParams.get('job')
-  if (!can(actor,'work.review')) ledger.jobs = ledger.jobs.map(row=>{
-    if (row.rule_id!=='replenishment' || !row.input.replenishment) return row
-    const {uses:_uses,envelopes,...facts}=row.input.replenishment
-    return {...row,input:{...row.input,replenishment:{...facts,envelopes:envelopes.map((entry: any)=>visibleEnvelope(entry,false)),envelopeBudgetAccess:false}}}
+  if (!can(actor, 'work.review')) ledger.jobs = ledger.jobs.map(row => {
+    if (row.rule_id !== 'replenishment' || !row.input.replenishment) return row
+    const facts = row.input.replenishment
+    return { ...row, input: { day: row.input.day, replenishment: {
+      day: facts.day, policies: facts.policies, parts: facts.parts, documents: facts.documents,
+      receipts: facts.receipts, receiptLines: facts.receiptLines, receiptEvents: facts.receiptEvents,
+      envelopes: facts.envelopes.map((entry: any) => visibleEnvelope(entry, false)),
+      approvals: facts.approvals, revocations: facts.revocations, orders: facts.orders,
+      orderRevisions: facts.orderRevisions, members: facts.members, suppliers: facts.suppliers,
+      costCenters: facts.costCenters, envelopeBudgetAccess: false,
+    } } }
   })
   if (!job) return ledger
   const record = ledger.jobs.find(row => row.id === job); insist(record, 'job_not_found', 404); return record

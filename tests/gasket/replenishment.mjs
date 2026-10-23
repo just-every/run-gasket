@@ -71,10 +71,23 @@ export async function replenishmentJourney() {
     }
     const restricted=(await h.api('replenishment',cookie.lead)).envelopes.find(row=>row.id===grant)
     for(const field of ['per_order_cents','period_limit_cents','used_cents']) assert.equal(Object.hasOwn(restricted,field),false,'lead envelope metadata omits financial bounds and consumption')
+    // Automation history respects purchasing budget access.
+    await h.api('spend-report',cookie.lead,undefined,403)
     const leadLedger=await h.api('automation/jobs',cookie.lead)
     for(const record of leadLedger.jobs.filter(row=>row.rule_id==='replenishment')) {
-      assert.equal(Object.hasOwn(record.input.replenishment,'uses'),false)
+      assert.equal(record.input.replenishment.envelopeBudgetAccess,false)
+      for(const field of ['uses','spendPolicies','spendSteps','commitments']) assert.equal(Object.hasOwn(record.input.replenishment,field),false,`restricted history omits ${field}`)
       for(const envelope of record.input.replenishment.envelopes) for(const field of ['per_order_cents','period_limit_cents']) assert.equal(Object.hasOwn(envelope,field),false)
+      assert.deepEqual(await h.api(`automation/jobs?job=${record.id}`,cookie.lead),record,'individual job uses the same permitted projection')
+    }
+    for(const who of ['owner','sam']) {
+      const ledger=await h.api('automation/jobs',cookie[who])
+      const retained=ledger.jobs.find(row=>row.rule_id==='replenishment'&&row.input.replenishment.commitments.length)
+      assert.ok(retained,'reviewers retain purchase commitment evidence')
+      assert.ok(retained.input.replenishment.spendPolicies.some(row=>row.budget_cents===50000))
+      assert.ok(retained.input.replenishment.spendSteps.some(row=>row.threshold_cents===100000))
+      assert.ok(retained.input.replenishment.uses.length)
+      assert.deepEqual(await h.api(`automation/jobs?job=${retained.id}`,cookie[who]),retained)
     }
     const receipt={order:doc.order_id,revisionId:po.current.id,externalId:'NC-4008',freight:'0',salesTax:'0',backorderNote:'Five bearings expected on the next delivery',packingSlip:file('NC-4008.txt','Three bearings, one damaged packaging','text/plain'),lines:[{line:0,part,quantity:'3',quarantine:'1',bin:'A3',lot:'NC-LOT-4'}]}
     await h.api('receipt.receive',cookie.lead,receipt)
