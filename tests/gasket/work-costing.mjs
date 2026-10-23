@@ -70,7 +70,7 @@ export async function costingJourney(h,cookie,{work,other,asset,today,people}) {
     if(group==='sources') assert.match(csv,/stock_return/)
     else assert.ok(csv.includes('330.00'),'labor actual includes retained manual entry once')
     if(['work','asset','costCenter','site'].includes(group)) {
-      const [header,...rows]=csv.trimEnd().split('\r\n').map(line=>line.slice(1,-1).split('","').map(cell=>cell.replaceAll('""','"')))
+      const [header,...rows]=csv.trimEnd().split('\r\n').map(line=>Array.from(line.matchAll(/(?:^|,)(?:"((?:""|[^"])*)"|([^",]*))/g),([,quoted,plain])=>quoted===undefined?plain:quoted.replaceAll('""','"')))
       const labor=header.indexOf('Approved labor hours'),contractor=header.indexOf('Contractor hours')
       assert.equal(rows.reduce((sum,row)=>sum+Number(row[labor]),0),4.25,'approved time appears once per additive export grouping')
       assert.equal(rows.reduce((sum,row)=>sum+Number(row[contractor]),0),2,'contractor time appears once per additive export grouping')
