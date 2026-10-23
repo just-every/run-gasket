@@ -69,6 +69,12 @@ export async function costingJourney(h,cookie,{work,other,asset,today,people}) {
     assert.match(csv,/USD/)
     if(group==='sources') assert.match(csv,/stock_return/)
     else assert.ok(csv.includes('330.00'),'labor actual includes retained manual entry once')
+    if(['work','asset','costCenter','site'].includes(group)) {
+      const [header,...rows]=csv.trimEnd().split('\r\n').map(line=>line.slice(1,-1).split('","').map(cell=>cell.replaceAll('""','"')))
+      const labor=header.indexOf('Approved labor hours'),contractor=header.indexOf('Contractor hours')
+      assert.equal(rows.reduce((sum,row)=>sum+Number(row[labor]),0),4.25,'approved time appears once per additive export grouping')
+      assert.equal(rows.reduce((sum,row)=>sum+Number(row[contractor]),0),2,'contractor time appears once per additive export grouping')
+    }
     assert.equal((await h.raw(`/app/costing.csv?groupBy=${group}`,{cookie:cookie.max})).status,403)
   }
   const vendor=(await h.api('supplier.save',cookie.owner,{name:'Precision Drive Service',contact:'Alex Kim',email:'service@example.test',phone:'+1 216 555 0118',street:'100 Service Road',city:'Cleveland',state:'OH',zip:'44115',taxTreatment:'sales_tax',taxNote:'Recorded tax only',paymentTerms:'Net 30',leadDays:2,active:true})).id
