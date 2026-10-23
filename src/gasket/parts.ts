@@ -4,12 +4,13 @@ import { catalogView } from './catalogs'
 // physical counts. On-hand is the sum of append-only movements; every write
 // checks inside its batch that on-hand stays at or above zero.
 import type { Bindings } from '../auth.server'
-import { requireCapability, type Actor } from './actor'
-import { all, commit, guard, insist, newId, now, one, stmt } from './core'
+import { capabilitySql, requireCapability, type Actor } from './actor'
+import { all, commit, guard, insist, newId, now, one, sha256Hex, stmt } from './core'
 import type { Input } from './input'
 import { fromMilli, toMilli } from './quantity'
 import type { FromProposal } from './schedules'
 import { RESERVED, RESERVED_FOR_OTHERS, reservations, substituteList } from './reservations'
+import { portion } from './receipt-stock'
 import { issueInsert, receiptValue, returnInsert, stockValue, varianceValue } from './valuation'
 
 export const ON_HAND = '(SELECT COALESCE(SUM(m.quantity_milli), 0) FROM gk_stock_moves m WHERE m.part_id = p.id)'
@@ -108,6 +109,45 @@ export async function returnPart(env: Bindings, actor: Actor, input: Input, work
   ] }
 }
 
+/** Owner-confirmed inspection releases or writes off held work returns. */
+export async function disposeWorkQuarantine(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'site.manage')
+  const returnId = input.text('returnId', { max: 100 }), id = input.text('identity', { max: 100 })
+  const kind = input.text('kind'), quantity = toMilli(input.text('quantity', { max: 20 }))
+  const reason = input.text('reason', { max: 300 })
+  insist(kind === 'release' || kind === 'write_off', 'invalid_disposition')
+  insist(input.flag('confirmed'), 'disposition_confirmation_required')
+  const fingerprint = await sha256Hex(JSON.stringify({ returnId, kind, quantity, reason }))
+  const original = await one(env, `SELECT m.* FROM gk_stock_moves m JOIN gk_work_return_quarantine q ON q.return_id=m.id WHERE m.id=?`, returnId)
+  insist(original, 'quarantine_not_found', 404)
+  const replay = (row: { fingerprint: string }) => {
+    insist(row.fingerprint === fingerprint, 'disposition_identity_conflict', 409)
+    return { id: original.part_id, disposition: id, replayed: true }
+  }
+  const existing = await one(env, 'SELECT fingerprint FROM gk_work_quarantine_dispositions WHERE id=?', id)
+  if (existing) return replay(existing)
+  const disposed = await one(env, 'SELECT COALESCE(SUM(quantity_milli),0) AS quantity,COALESCE(SUM(value_cents),0) AS value FROM gk_work_quarantine_dispositions WHERE return_id=?', returnId)
+  const remaining = original.quantity_milli - disposed.quantity
+  insist(quantity <= remaining, 'quarantine_quantity_unavailable', 409)
+  const value = portion((original.value_cents ?? 0) - disposed.value, quantity, remaining)
+  const move = kind === 'release' ? newId() : null, authority = capabilitySql(actor.sessionId, 'site.manage')
+  const statements = [
+    guard(env, 'stale', authority.sql, ...authority.params),
+    guard(env, 'stale', '(SELECT COALESCE(SUM(quantity_milli),0) FROM gk_work_quarantine_dispositions WHERE return_id=?)=?', returnId, disposed.quantity),
+    ...(move ? [stmt(env, `INSERT INTO gk_part_moves(id,part_id,kind,quantity_milli,value_cents,note,actor,at) VALUES (?,?,'receive',?,?,?,?,?)`, move, original.source_part_id, quantity, value, `Work return quarantine released: ${reason}`, actor.id, now())] : []),
+    stmt(env, 'INSERT INTO gk_work_quarantine_dispositions(id,return_id,kind,quantity_milli,value_cents,reason,fingerprint,actor,at,move_id) VALUES (?,?,?,?,?,?,?,?,?,?)', id, returnId, kind, quantity, value, reason, fingerprint, actor.id, now(), move),
+  ]
+  try {
+    await commit(env, statements, { actor: actor.id, action: 'part.disposition', subject: original.part_id,
+      detail: { disposition: id, returnId, workOrder: original.work_order_id, kind, quantity: fromMilli(quantity), valueCents: value, reason, confirmed: true } })
+  } catch (error) {
+    const concurrent = await one(env, 'SELECT fingerprint FROM gk_work_quarantine_dispositions WHERE id=?', id)
+    if (concurrent) return replay(concurrent)
+    throw error
+  }
+  return { id: original.part_id, disposition: id, replayed: false }
+}
+
 export async function partList(env: Bindings, _actor: Actor) {
   const rows = await all(env, `SELECT p.id, p.number, p.name, p.unit, p.minimum_milli, p.location, p.origin, p.price_cents, ${ON_HAND} AS on_hand, ${STOCK_VALUE} AS stock_value, ${RESERVED} AS reserved,
     (SELECT MAX(seq) FROM gk_stock_moves m WHERE m.part_id = p.id) AS seen,
@@ -130,5 +170,12 @@ export async function partDetail(env: Bindings, _actor: Actor, id: string) {
   const quarantines = await all(env, `SELECT m.id, m.work_order_id, w.number AS work_order_number, m.quantity_milli, m.value_cents, m.at, q.reason, mb.name AS actor
     FROM gk_stock_moves m JOIN gk_work_return_quarantine q ON q.return_id=m.id
     JOIN gk_work_orders w ON w.id=m.work_order_id LEFT JOIN gk_members mb ON mb.id=m.actor WHERE m.part_id=? ORDER BY m.seq DESC`, id)
-  return { ...found, catalog, photos, merges, quarantines: quarantines.map(row => ({ ...row, quantity: fromMilli(row.quantity_milli) })), quarantinedQuantity: fromMilli(quarantines.reduce((sum,row) => sum+row.quantity_milli,0)), quarantinedValueCents: quarantines.reduce((sum,row) => sum+(row.value_cents ?? 0),0), ...stockValue(found.on_hand, found.stock_value), onHand: fromMilli(found.on_hand), reserved: fromMilli(reserved), available: fromMilli(found.on_hand - reserved), reservations: held, substitutes, minimum: fromMilli(found.minimum_milli), seen: moves[0]?.seq ?? 0, moves: moves.map(move => ({ ...move, quantity: fromMilli(move.quantity_milli), counted: move.counted_milli === null ? null : fromMilli(move.counted_milli) })) }
+  const dispositions = await all(env, `SELECT d.*,mb.name AS actor_name FROM gk_work_quarantine_dispositions d JOIN gk_stock_moves m ON m.id=d.return_id LEFT JOIN gk_members mb ON mb.id=d.actor WHERE m.part_id=? ORDER BY d.at,d.id`, id)
+  for (const row of quarantines) {
+    row.dispositions = dispositions.filter(event => event.return_id === row.id).map(event => ({ ...event, quantity: fromMilli(event.quantity_milli) }))
+    row.remaining_milli = row.quantity_milli - row.dispositions.reduce((sum: number, event: any) => sum + event.quantity_milli, 0)
+    row.remaining_value_cents = (row.value_cents ?? 0) - row.dispositions.reduce((sum: number, event: any) => sum + event.value_cents, 0)
+    row.remaining = fromMilli(row.remaining_milli)
+  }
+  return { ...found, catalog, photos, merges, quarantines: quarantines.map(row => ({ ...row, quantity: fromMilli(row.quantity_milli) })), quarantinedQuantity: fromMilli(quarantines.reduce((sum,row) => sum+row.remaining_milli,0)), quarantinedValueCents: quarantines.reduce((sum,row) => sum+row.remaining_value_cents,0), ...stockValue(found.on_hand, found.stock_value), onHand: fromMilli(found.on_hand), reserved: fromMilli(reserved), available: fromMilli(found.on_hand - reserved), reservations: held, substitutes, minimum: fromMilli(found.minimum_milli), seen: moves[0]?.seq ?? 0, moves: moves.map(move => ({ ...move, quantity: fromMilli(move.quantity_milli), counted: move.counted_milli === null ? null : fromMilli(move.counted_milli) })) }
 }

@@ -379,7 +379,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const readings = await all(env, 'SELECT r.value, r.taken_on, g.name AS meter, g.unit, g.kind, m.name AS entered_by FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id LEFT JOIN gk_members m ON m.id = r.entered_by WHERE r.work_order_id = ? ORDER BY r.taken_on, g.name', id)
   const parts = (await all(env, `SELECT p.id, p.number, p.name, p.unit,
     -SUM(CASE WHEN mv.kind = 'issue' THEN mv.quantity_milli ELSE 0 END) AS issued, SUM(CASE WHEN mv.kind = 'return' THEN mv.quantity_milli ELSE 0 END) AS returned,
-    SUM(CASE WHEN EXISTS(SELECT 1 FROM gk_work_return_quarantine q WHERE q.return_id=mv.id) THEN mv.quantity_milli ELSE 0 END) AS quarantined,
+    SUM(CASE WHEN EXISTS(SELECT 1 FROM gk_work_return_quarantine q WHERE q.return_id=mv.id) THEN mv.quantity_milli-(SELECT COALESCE(SUM(d.quantity_milli),0) FROM gk_work_quarantine_dispositions d WHERE d.return_id=mv.id) ELSE 0 END) AS quarantined,
     -SUM(CASE WHEN mv.kind = 'issue' THEN mv.value_cents ELSE 0 END) AS issued_cents, SUM(CASE WHEN mv.kind = 'return' THEN mv.value_cents ELSE 0 END) AS returned_cents, SUM(mv.value_cents IS NULL) AS unpriced
     FROM gk_stock_moves mv JOIN gk_parts p ON p.id = mv.part_id WHERE mv.work_order_id = ? GROUP BY p.id ORDER BY p.number`, id))
     // PART-007: each issue keeps the value it was taken at and each return credits that value, so later prices and returns never rewrite this cost.
