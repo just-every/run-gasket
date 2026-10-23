@@ -13,6 +13,8 @@ export async function laborJourney(h,cookie,people) {
   const work=(await h.api('workorder.create',cookie.lead,{asset,title:'Replace conveyor drive bearing',due:today,assignee:people.max})).id
   const other=(await h.api('workorder.create',cookie.lead,{asset,title:'Inspect belt tracking',due:yesterday,assignee:people.mo})).id
   const detail=(who='owner')=>h.api(`work/${work}`,cookie[who])
+  const originalMinutes=await h.api('workorder.time',cookie.max,{workOrder:work,version:(await detail()).version,workedOn:today,minutes:90,note:'Original work-duration note with no declared performer or interval'})
+  assert.equal((await detail()).timeEntries.find(row=>row.id===originalMinutes.timeEntry).minutes,90)
   const rate={person:people.max,amount:'60.00',overtimeAfterMinutes:60,overtimeMultiplier:150}
   await h.api('labor.rate',cookie.lead,rate,403)
   await h.submit('labor.rate',cookie.owner,rate,`/app/work/${work}`)

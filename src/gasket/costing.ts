@@ -91,7 +91,7 @@ export async function costingReport(env: Bindings, actor: Actor, url: URL) {
   const from = url.searchParams.get('from') || null, to = url.searchParams.get('to') || null
   insist((!from || isDate(from)) && (!to || isDate(to)) && (!from || !to || from <= to), 'invalid_period')
   const selectedAsset = url.searchParams.get('asset') || null, selectedWork = url.searchParams.get('workOrder') || url.searchParams.get('work') || null, selectedCenter = url.searchParams.get('costCenter') || null
-  const [assets, works, actuals, comparisons, history, centers, commitments, excludedCommitments, labor, audit, site] = await Promise.all([
+  const [assets, works, actuals, comparisons, history, centers, commitments, excludedCommitments, labor, originalTime, audit, site] = await Promise.all([
     all(env, 'SELECT id,parent_id,tag,name,level FROM gk_assets ORDER BY tag'),
     all(env, 'SELECT id,number,title,status,asset_id,location,cost_center_id,version FROM gk_work_orders ORDER BY number'),
     all(env, `SELECT c.*,l.person_id,l.rate_id,l.category AS labor_category,(l.ended_at-l.started_at)/60000.0 AS approved_minutes,i.minutes AS contractor_minutes FROM gk_work_actual_costs c LEFT JOIN gk_labor_entries l ON c.source='approved_labor' AND l.id=c.id LEFT JOIN gk_contractor_invoices i ON c.source='contractor_invoice' AND i.id=c.id ORDER BY c.recorded_at,c.source,c.id`),
@@ -101,6 +101,7 @@ export async function costingReport(env: Bindings, actor: Actor, url: URL) {
     all(env, `SELECT c.*,r.order_id,r.snapshot,p.number FROM gk_live_purchase_commitments c JOIN gk_purchase_revisions r ON r.id=c.revision_id JOIN gk_purchase_orders p ON p.id=r.order_id ORDER BY c.booked_on,c.revision_id`),
     all(env, `SELECT c.revision_id,c.amount_cents,c.booked_on,c.cost_center_id,r.order_id,r.snapshot,CASE WHEN x.id IS NOT NULL THEN 'released' ELSE 'superseded_unsent' END AS exclusion FROM gk_purchase_commitments c JOIN gk_purchase_revisions r ON r.id=c.revision_id LEFT JOIN gk_purchase_commitment_releases x ON x.revision_id=c.revision_id WHERE NOT EXISTS(SELECT 1 FROM gk_live_purchase_commitments live WHERE live.revision_id=c.revision_id) ORDER BY c.revision_id`),
     all(env, 'SELECT id,work_order_id,state FROM gk_labor_entries ORDER BY id'),
+    all(env, 'SELECT id,work_order_id,worked_on,minutes FROM gk_time_entries ORDER BY worked_on,id'),
     one(env, 'SELECT COALESCE(MAX(seq),0) AS sequence,MAX(at) AS latestAt FROM gk_audit'),
     one(env, 'SELECT name,timezone FROM gk_site WHERE singleton=1'),
   ])
@@ -162,13 +163,14 @@ export async function costingReport(env: Bindings, actor: Actor, url: URL) {
   const coverage = { workOrders: byWork.length, workWithoutActuals: byWork.filter(row => row.amounts.actual.cents === null).map(row => ({ id: row.id, number: row.number, sourceDoor: `/api/gasket/work/${row.id}` })),
     unpricedMovements: sources.filter(row => row.source.startsWith('stock_') && row.cents === null).map(row => ({ id: row.id, workOrderId: row.workOrderId, sourceDoor: row.sourceDoor })),
     importedMissingAmounts: sources.filter(row => row.source === 'moved_in_history' && row.cents === null).map(row => ({ historyId: row.historyId, category: row.category, sourceDoor: row.sourceDoor })),
+    originalTimeEntries: originalTime.filter(row => scopeWork(row.work_order_id) && inCenter(workMap.get(row.work_order_id)!.cost_center_id) && inPeriod(row.worked_on)).map(row => ({ id: row.id, workOrderId: row.work_order_id, workedOn: row.worked_on, minutes: row.minutes, sourceDoor: `/api/gasket/work/${row.work_order_id}` })),
     laborStates: Object.fromEntries(['pending', 'approved', 'rejected', 'superseded'].map(state => [state, laborStates.filter(row => row.state === state).length])),
     ...(actor.role === 'owner' ? { excludedLabor: laborStates.filter(row => row.state !== 'approved') } : {}) }
   const inputFingerprint = await sha256Hex(JSON.stringify({ from, to, selectedAsset, selectedWork, selectedCenter, visible, coverage, audit, works: scopedWorks, assets, excluded }))
   return { currency: 'USD', site, from, to, today: actor.today, asset: selectedAsset, workOrder: selectedWork, costCenter: selectedCenter, assets, costCenters: centers,
     computedAt: now(), sourceRevision: audit.sequence, latestChangeAt: audit.latestAt, inputFingerprint, definitions: COSTING_METRICS,
     totals: summary(visible), byWork, byAsset, bySubtree, byCostCenter, sources: visible, excludedCommitments: excluded, coverage,
-    policy: 'Known amounts are partial when sources are unpriced or missing. Actual, estimate, commitment and posted are separate measures and must never be added. Each source counts once per scope. Asset rows are direct costs; subtree rows overlap and must not be summed. Current hierarchy and work cost centers apply; purchase commitments keep their own cost center. Imported history has no cost center. Purchase commitments never assert actual bills or payment. Posted amounts are attributed owner records with references, without ledger verification. Labor outside approved state contributes no actual cost; labor-state coverage is current, independent of the event period. Individual labor details require the owner.' }
+    policy: 'Known amounts are partial when sources are unpriced or missing. Actual, estimate, commitment and posted are separate measures and must never be added. Each source counts once per scope. Asset rows are direct costs; subtree rows overlap and must not be summed. Current hierarchy and work cost centers apply; purchase commitments keep their own cost center. Imported history has no cost center. Purchase commitments never assert actual bills or payment. Posted amounts are attributed owner records with references, without ledger verification. Labor outside approved state contributes no actual cost; labor-state coverage is current, independent of the event period. Original work-minute notes retain their author but name no performer, interval, category or review. They remain separate evidence and never imply approved person time or a rate. Individual labor details require the owner.' }
 }
 
 /** Each download contains just one grouping, so subtotals cannot inflate sources. */

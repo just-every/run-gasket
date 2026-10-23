@@ -33,6 +33,7 @@ export async function costingJourney(h,cookie,{work,other,asset,today,people}) {
   const before=await get(`workOrder=${work}`),actual=64100
   assert.deepEqual(Object.fromEntries(Object.entries(before.totals.amounts).map(([key,row])=>[key,row.cents])),{actual,estimate:75000,commitment:25000,posted:10000})
   assert.equal(before.totals.approvedMinutes,255)
+  assert.equal(before.coverage.originalTimeEntries.reduce((sum,row)=>sum+row.minutes,0),90,'original work minutes remain disclosed without becoming approved person hours')
   assert.equal(before.totals.contractorMinutes,120)
   assert.deepEqual(Object.fromEntries(Object.entries(before.totals.byCategory).map(([key,row])=>[key,row.actual.cents])),{parts:2400,labor:33000,contractor:25000,tools:2500,other:1200})
   assert.equal(before.sources.filter(row=>row.source==='stock_issue').reduce((sum,row)=>sum+row.cents,0),3300)
