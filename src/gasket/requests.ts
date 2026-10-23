@@ -4,7 +4,7 @@ import type { Bindings } from '../auth.server'
 import { can, requireCapability, type Actor } from './actor'
 import { all, commit, GasketError, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'
 import { isDate } from './dates'
-import { imageSize } from './annotations'
+import { sanitiseRequestPhoto } from './request-photos'
 import { Input } from './input'
 
 export type RequestField = { key: string; label: string; type: 'text'|'choice'|'number'|'date'|'photo'; required: boolean; options?: string[] }
@@ -89,14 +89,14 @@ export async function requestDetail(env:Bindings,actor:Actor,id:string) {
 async function photo(input:Input,name:string,optional:boolean) {
   const file=await input.file(name,{optional,maxBytes:1_500_000})
   if(!file) return null
-  const ext=file.filename.split('.').pop()?.toLowerCase(),type=ext==='png'?'image/png':ext==='jpg'||ext==='jpeg'?'image/jpeg':null
-  insist(type && imageSize(file.bytes,type),'invalid_photo')
-  return {id:newId(),field:name==='photo'?null:name.slice(6),filename:file.filename,mediaType:type,sha256:await sha256Hex(file.bytes),bytes:file.bytes}
+  const clean=sanitiseRequestPhoto(file.bytes)
+  return {id:newId(),field:name==='photo'?null:name.slice(6),filename:file.filename,mediaType:clean.mediaType,sha256:await sha256Hex(clean.bytes),bytes:clean.bytes}
 }
 export async function submitRequest(env:Bindings,actor:Actor|null,portalId:string,input:Input,request:Request) {
   const targetId=input.text('target',{max:100}),key=input.text('submissionKey',{max:100});insist(UUID.test(key),'invalid_submission_key')
   const keyHash=await sha256Hex(key)
-  const prior=await one(env,'SELECT id,number,fingerprint,form_json FROM gk_requests WHERE portal_id=? AND submission_key=?',portalId,keyHash)
+  const prior=await one(env,'SELECT id,number,fingerprint,form_json,erased_at FROM gk_requests WHERE portal_id=? AND submission_key=?',portalId,keyHash)
+  insist(!prior?.erased_at,'request_erased',410)
   // Accepted requests keep their original form revision. A later required field,
   // closed intake or retired asset must not turn a lost-response retry into a
   // second business event. Only a matching original payload returns its receipt.
@@ -140,7 +140,10 @@ export async function submitRequest(env:Bindings,actor:Actor|null,portalId:strin
   } catch(error) {
     const raced=await one(env,'SELECT id,number,fingerprint FROM gk_requests WHERE portal_id=? AND submission_key=?',portalId,keyHash)
     if(raced) {insist(raced.fingerprint===fingerprint,'submission_key_reused',409);return receipt(raced)}
-    if(error instanceof GasketError && error.code==='intake_rate_limited') throw new GasketError('intake_rate_limited',429)
+    if(error instanceof GasketError && error.code==='intake_rate_limited') {
+      await commit(env,[],{actor:'anonymous',action:'request.limit',subject:portalId,detail:{code:'intake_rate_limited'}})
+      throw new GasketError('intake_rate_limited',429)
+    }
     if(error instanceof GasketError && error.code==='label_retired') throw new GasketError('label_retired',410)
     throw error
   }

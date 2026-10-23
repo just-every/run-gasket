@@ -6,6 +6,8 @@ import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
 import { harness, file } from './harness.mjs'
 import { png } from './fixtures.mjs'
+import { draftPrivacy } from './request-draft-privacy.mjs'
+import { photoPrivacy, installationLimit, erasePrivateRequest } from './request-privacy.mjs'
 
 export async function requestFixture() {
   const h=await harness(),cookie={owner:await h.owner()}
@@ -84,11 +86,23 @@ export async function requestPortalJourney() {
     const results=await Promise.all(Array.from({length:7},(_,i)=>h.raw(`/request/${portal}`,{body:{...payload,submissionKey:randomUUID(),description:`Another fault ${i}`}})))
     assert.equal(results.filter(r=>r.status===303).length,3)
     assert.ok(results.filter(r=>r.status===429).length===4)
+    for(const result of results.filter(r=>r.status===429))assert.match(await result.text(),/intake rate limited/)
+    const refusals=(await h.api('audit?action=request.limit',cookie.owner)).rows
+    assert.equal(refusals.length,4)
+    for(const entry of refusals)assert.deepEqual(JSON.parse(entry.detail),{code:'intake_rate_limited'})
     assert.equal((await h.api('requests',cookie.lead)).length,5)
     assert.equal((await post()).receipt,first.receipt,'an already accepted submission can retry after the rate ceiling')
     await h.api('request.portal',cookie.owner,{portal,revision:2,name:'Assembly fault report',mode:'public',publicConsent:true,fields:[...fields,{key:'safe_access',label:'Is access safe?',type:'text',required:true}]})
     assert.equal((await post()).receipt,first.receipt,'accepted retries use the original form after required fields change')
     await post({...payload,submissionKey:randomUUID()},cookie.tech,400)
+    if(process.env.REQUEST_SCREENSHOTS)await requestScreens(f,r.id)
+    const camera=await browserContext(h)
+    let jpeg
+    try {jpeg=Buffer.from(await camera.page.evaluate(()=>{const c=document.createElement('canvas');c.width=2;c.height=2;return c.toDataURL('image/jpeg').split(',')[1]}),'base64')} finally {await camera.context.close();await camera.browser.close()}
+    await photoPrivacy(f,jpeg)
+    await installationLimit(f)
+    await erasePrivateRequest(f,r.id)
+    await post(payload,cookie.tech,410)
     if(process.env.REQUEST_SCREENSHOTS)await requestScreens(f,r.id)
     console.log('REQ-001 typed authenticated/public intake, required answers, originals, privacy, consent and concurrent abuse limits passed')
   } finally {await h.close()}
@@ -191,6 +205,7 @@ export async function requestDraftJourney() {
     if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,new URL(page.url()).pathname,'phone-confirmation')
     await page.goto(scanned);await page.getByRole('link',{name:'Open confirmation',exact:true}).waitFor()
     assert.equal(await page.locator('[name=contact]').inputValue(),'','confirmed drafts retain no private contact')
+    await draftPrivacy(f,context,page,scanned,process.env.REQUEST_SCREENSHOTS?capture:null)
     console.log('REQ-002 decoded QR, camera photo, durable offline draft, lost-response retry, one original-mapped request and durable confirmation passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }
@@ -336,6 +351,8 @@ export async function requestTriageJourney() {
     assert.ok(!JSON.stringify(assigned.requestSources).includes(payload.contact),'necessary work evidence exposes no contact')
     const audit=await h.api('audit?action=request.convert',cookie.owner);assert.ok(audit.rows.some(e=>e.subject===root))
     if(process.env.REQUEST_SCREENSHOTS){await capture(page,h,`/app/requests/${root}`,'converted-request');await capture(page,h,`/app/requests/${duplicate}`,'duplicate-timeline');await capture(page,h,`/app/requests/${third}`,'declined-request');await capture(page,h,`/app/work/${workId}`,'corrective-source-evidence')}
+    await erasePrivateRequest(f,root,workId)
+    if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,`/app/requests/${root}`,'erased-converted-request')
     console.log('REQ-003 lead triage/filtering, request/reply, reasoned rejection, duplicate preservation and one no-retyping corrective order with original linked evidence passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }

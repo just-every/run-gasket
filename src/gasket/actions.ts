@@ -1,3 +1,4 @@
+import { eraseRequest } from './request-erasure'
 import { recordCostComparison, setWorkCostCenter } from './costing'
 import { recordLabor, recordContractorInvoice } from './labor'
 import { setLaborRate, reviewLabor } from './labor-policy'
@@ -71,7 +72,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
-  'request.triage':triageRequest, 'request.reply':replyToRequest, 'request.convert':convertRequest, 'label.work':createLabelWork, 'request.portal':savePortal, 'request.target':saveTarget, 'request.field':addRequestField,
+  'request.erase':eraseRequest, 'request.triage':triageRequest, 'request.reply':replyToRequest, 'request.convert':convertRequest, 'label.work':createLabelWork, 'request.portal':savePortal, 'request.target':saveTarget, 'request.field':addRequestField,
   'webhook.subscribe': subscribeWebhook, 'webhook.control': controlWebhook, 'webhook.rotate': rotateWebhook, 'webhook.resume': resumeWebhook, 'webhook.retry': retryWebhook,
   'catalog.preview':catalogPreview, 'catalog.undo':undoCatalog,
   'catalog.apply':(env,actor,input)=>importCatalog(env,actor,Input.of({supplier:input.text('supplier'),fingerprint:input.text('fingerprint'),file:{filename:input.text('filename'),base64:input.text('base64',{max:2_000_000}),type:input.text('mediaType',{optional:true})}})),

@@ -67,7 +67,24 @@ export async function authResponse(request: Request, original: Bindings): Promis
   const page = await createSignInHandler(operatorAuth(env), { defaultReturnTo: '/setup' })(request)
   if (page) return fontDocumentResponse(page)
  }
- if (url.pathname.startsWith('/auth/')) return fontDocumentResponse(await createAuthHandler(operatorAuth(env))(request))
+ if (url.pathname.startsWith('/auth/')) {
+  const response = await createAuthHandler(operatorAuth(env))(request)
+  if (url.pathname === '/auth/signout' && request.method === 'POST' && response?.status === 204) {
+   const headers = new Headers(response.headers)
+   // Storage clearing also applies to fetch callers. The durable generation
+   // fences stale open forms and browsers which do not implement this header.
+   headers.set('Clear-Site-Data', '"storage"')
+   const cookie = `gasket-draft-signout_${url.port || (url.protocol === 'https:' ? '443' : '80')}`
+   headers.append('Set-Cookie', `${cookie}=${crypto.randomUUID()}; Path=/; Max-Age=34560000; SameSite=Strict${url.protocol === 'https:' ? '; Secure' : ''}`)
+   if (request.headers.get('sec-fetch-mode') === 'navigate' && request.headers.get('accept')?.includes('text/html')) {
+    headers.set('content-type', 'text/html; charset=utf-8')
+    headers.set('content-security-policy', "default-src 'none'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+    return new Response('<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signed out</title><script src="/request-drafts-clear.js" defer></script></head><body><p role="status">Clearing drafts from this device…</p></body></html>', { status: 200, headers })
+   }
+   return new Response(null, { status: 204, headers })
+  }
+  return fontDocumentResponse(response)
+ }
  if (url.pathname === '/setup' || url.pathname === '/app' || url.pathname.startsWith('/app/')) {
   const setup = await firstRunResponse(request, env, operatorAuth(env), { theme })
   if (setup) return setup
