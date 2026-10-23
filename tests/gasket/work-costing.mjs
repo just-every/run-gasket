@@ -72,6 +72,7 @@ export async function costingJourney(h,cookie,{work,other,asset,today,people}) {
     assert.equal((await h.raw(`/app/costing.csv?groupBy=${group}`,{cookie:cookie.max})).status,403)
   }
   const vendor=(await h.api('supplier.save',cookie.owner,{name:'Precision Drive Service',contact:'Alex Kim',email:'service@example.test',phone:'+1 216 555 0118',street:'100 Service Road',city:'Cleveland',state:'OH',zip:'44115',taxTreatment:'sales_tax',taxNote:'Recorded tax only',paymentTerms:'Net 30',leadDays:2,active:true})).id
+  await h.api('spend.policy',cookie.owner,{costCenter:'',from:today,to:today,budget:'1000000.00',threshold:['0'],approver:[people.sam]})
   await h.api('spend.policy',cookie.owner,{costCenter:center,from:today,to:today,budget:'10000.00',threshold:['0'],approver:[people.sam]})
   const facts={supplier:vendor,costCenter:center,asset,workOrder:work,deliveryOn:today,taxTreatment:'sales_tax',kind:['service'],description:['Post-repair vibration analysis'],quantity:['1'],unit:['visit'],unitPrice:['150.00'],reason:'Verify repair under production load',freight:'0',salesTax:'0',useTax:'0'}
   const order=(await h.api('purchase.save',cookie.owner,facts)).id
