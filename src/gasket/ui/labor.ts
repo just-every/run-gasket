@@ -1,3 +1,4 @@
+import type { LaborFlag } from '../labor-records'
 import { can, type Actor } from '../actor'
 import { usd } from '../bad-actors'
 import { localNow, showInstant } from '../dates'
@@ -8,6 +9,7 @@ const CATEGORIES: { value: Category; label: string }[] = [
   { value: 'wrench', label: 'Wrench time' }, { value: 'travel', label: 'Travel' },
   { value: 'wait', label: 'Wait' }, { value: 'admin', label: 'Admin' },
 ]
+const FLAG_LABELS: Record<LaborFlag,string> = { corrected_time: 'Corrected time', implausible_duration: 'More than 16 hours', overlapping_time: 'Overlapping time', rate_required: 'Rate required before approval' }
 const ENTRY_STATES: Record<string, string> = { pending: 'Waiting for review', approved: 'Approved', rejected: 'Rejected', superseded: 'Superseded' }
 const label = (category: string) => CATEGORIES.find(item => item.value === category)?.label ?? category
 const stateLabel = (state: string) => ENTRY_STATES[state] ?? state.replace(/_/g, ' ')
@@ -25,7 +27,7 @@ interface LaborEntry {
   reason: string | null
   supersedes_id: string | null
   state: string
-  pendingFlags: string[]
+  pendingFlags: LaborFlag[]
   regular_minutes?: number | null
   overtime_minutes?: number | null
   cents?: number | null
@@ -74,7 +76,7 @@ function entryHistory(labor: LaborView, actor: Actor, work: WorkContext, owner: 
     const review = owner && entry.state === 'pending' && !correctedBy
       ? form('labor.review', work.back, h`${hidden('entry', entry.id)}${select('Decision', 'decision', [{ value: 'approve', label: 'Approve time' }, { value: 'reject', label: 'Reject time' }], '', { blank: 'Choose a decision' })}${area('Review reason', 'reason', { hint: 'Explain the decision, including any flagged overlap or duration.' })}`, 'Record review', { secondary: true }) : ''
     const correction = mayCorrect ? h`<details class="gk-details"><summary>Correct this time entry</summary><p class="gk-hint">The original entry stays in history. Its replacement needs review.</p>${form('labor.entry', work.back, h`${hidden('workOrder', work.id)}${hidden('person', entry.person_id)}${hidden('supersedes', entry.id)}${entryFields(actor, h`<p>Time for <b>${entry.person ?? 'Former member'}</b></p>`, entry)}`, 'Submit corrected time', { secondary: true })}</details>` : ''
-    const flags = entry.pendingFlags.length ? h`<ul class="gk-plain-list">${entry.pendingFlags.map(flag => h`<li>${flag.replace(/_/g, ' ')}</li>`)}</ul>` : ''
+    const flags = entry.pendingFlags.length ? h`<ul class="gk-plain-list">${entry.pendingFlags.map(flag => h`<li>${FLAG_LABELS[flag]}</li>`)}</ul>` : ''
     return [
       h`${entry.person ?? 'Former member'}<span class="gk-sub">${label(entry.category)}</span>`,
       h`${showInstant(entry.started_at, actor.zone)}<span class="gk-sub">to ${showInstant(entry.ended_at, actor.zone)}</span>`,

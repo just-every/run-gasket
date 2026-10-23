@@ -4,6 +4,7 @@ import { all, guard, insist, newId, now, one, stmt, type Row } from './core'
 import type { Input } from './input'
 import { isLocalTime, localNow, zonedInstant } from './dates'
 
+export type LaborFlag = 'corrected_time' | 'implausible_duration' | 'overlapping_time' | 'rate_required'
 export const LABOR_CATEGORIES = ['wrench', 'travel', 'wait', 'admin'] as const
 export const managesLabor = (actor: Actor) => actor.role === 'owner'
 export const duration = (row: Row) => (row.ended_at - row.started_at) / 60_000
@@ -32,12 +33,12 @@ export async function laborWork(env: Bindings, actor: Actor, id: string) {
   return order
 }
 export async function entryFlags(env: Bindings, row: Row) {
-  const flags: string[] = []
-  if (row.supersedes_id) flags.push('Corrected time')
-  if (duration(row) > 16 * 60) flags.push('More than 16 hours')
+  const flags: LaborFlag[] = []
+  if (row.supersedes_id) flags.push('corrected_time')
+  if (duration(row) > 16 * 60) flags.push('implausible_duration')
   const overlaps = await all(env, `SELECT id FROM gk_labor_entries WHERE person_id=? AND id<>? AND id<>? AND state IN ('pending','approved') AND started_at<? AND ended_at>?`, row.person_id, row.id, row.supersedes_id ?? '', row.ended_at, row.started_at)
-  if (overlaps.length) flags.push('Overlapping time')
-  if (!await one(env, 'SELECT 1 FROM gk_labor_rates WHERE person_id=?', row.person_id)) flags.push('Rate required before approval')
+  if (overlaps.length) flags.push('overlapping_time')
+  if (!await one(env, 'SELECT 1 FROM gk_labor_rates WHERE person_id=?', row.person_id)) flags.push('rate_required')
   return flags
 }
 export function entryInsert(env: Bindings, actor: Actor, row: Row) {
