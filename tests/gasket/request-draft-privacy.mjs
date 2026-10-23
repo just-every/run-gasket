@@ -60,7 +60,7 @@ export async function draftPrivacy(f,context,page,scanned,capture) {
   if(capture)await capture(page,h,new URL(page.url()).pathname,'signed-out-draft-cleared')
   // API clients retain the native 204 contract and receive the storage fence.
   await save(page,'after signout')
-  assert.equal(await page.evaluate(async()=>{const r=await fetch('/auth/signout',{method:'POST'});return r.status}),204)
+  assert.equal(await page.evaluate(async()=>{const r=await fetch('/auth/signout',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});return r.status}),204)
   await page.reload()
   assert.equal(await page.locator('[name=contact]').inputValue(),'')
   assert.ok(!(await records(page)).some(r=>r?.entries))

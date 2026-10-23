@@ -83,6 +83,11 @@ export async function erasePrivateRequest(f,id,workId,page) {
   await h.api('request.erase',cookie.owner,{...body,version:record.version+1},409)
   if(page) {
     await page.goto(`${h.origin}/app/requests/${id}`)
+    if(process.env.REQUEST_SCREENSHOTS)for(const width of [1440,390]) {
+      await page.setViewportSize({width,height:1100})
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+      await page.screenshot({path:`${process.env.REQUEST_SCREENSHOTS}/erase-request-form-${width}.png`,fullPage:true})
+    }
     const form=page.locator('form[action="/app/do/request.erase"]')
     await form.getByRole('checkbox').check()
     await Promise.all([page.waitForURL(url=>url.searchParams.has('notice')),form.getByRole('button',{name:'Erase request data',exact:true}).click()])
