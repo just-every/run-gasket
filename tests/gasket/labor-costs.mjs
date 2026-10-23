@@ -74,7 +74,8 @@ export async function laborJourney(h,cookie,people) {
     assert.deepEqual(view.invoices,[])
     assert.equal((await h.raw(`/app/work/${work}`,{cookie:cookie[who]})).status,200)
   }
-  assert.equal(technician.labor.approvedMinutes,255)
+  assert.equal(technician.labor.approvedMinutes,105)
+  assert.equal((await detail('mo')).labor.approvedMinutes,150)
   const audit=await h.api('audit?action=labor',cookie.sam)
   for(const row of audit.rows) {
     assert.equal('cents_per_hour' in JSON.parse(row.detail),false)

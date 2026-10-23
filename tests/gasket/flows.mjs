@@ -1912,7 +1912,7 @@ try {
     for (const [workOrder, category, amount] of [[compressor, 'parts', '2400'], [compressor, 'labor', '600'], [door, 'parts', '180']]) await h.api('work.cost', cookie.lead, { workOrder, category, amount, note: 'Invoice' })
     const life = (await h.api(`assets/${chiller}`, cookie.lead)).lifecycle
     assert.deepEqual([life.facts.revision, life.facts.purchase_cents, life.facts.replacement_cents, life.agreements.map(row => [row.provider, row.annual_cents, row.active])], [2, 1850000, 2400000, [['Polar Service Co', 180000, true]]])
-    assert.deepEqual(life.comparison, { repairCents: 318000, workOrders: 2, costedWorkOrders: 2, failures: 1, failureMinutes: 270, replacementCents: 2400000, repairPercentOfReplacement: 13.3 })
+    assert.deepEqual(life.comparison, { repairCents: 318000, workOrders: 2, costedWorkOrders: 2, unpricedMovements: 0, failures: 1, failureMinutes: 270, replacementCents: 2400000, repairPercentOfReplacement: 13.3 })
     const page = (await (await h.raw(`/app/assets/${chiller}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
     for (const text of ['Lifecycle and replacement', '$3,180.00', '13.3%', 'Polar Service Co', 'Depreciation and book value stay in the connected ledger']) assert.ok(page.includes(text), text)
     // Retire it with its disposal; its work and history stay, and the ledger handoff carries the facts.

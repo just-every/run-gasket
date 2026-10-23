@@ -13,7 +13,7 @@ export async function laborBrowser({h,cookie,work,people,today}) {
       }
       const capture=async(name,selector)=>{
         assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
-        if(selector) await page.locator(selector).scrollIntoViewIfNeeded()
+        if(selector) await page.locator(selector).first().scrollIntoViewIfNeeded()
         await page.screenshot({path:`${process.env.LABOR_SCREENSHOTS}/${name}-${width}.png`})
       }
       const submit=async(form,name)=>{
@@ -25,14 +25,14 @@ export async function laborBrowser({h,cookie,work,people,today}) {
       await capture('work-list')
       await as('max')
       await page.goto(`${h.origin}/app/work/${work}`)
-      await capture('technician-time','#labor')
+      await capture('technician-time','#labor h2')
       assert.equal(await page.getByText('Pay rates and overtime policy · owner only',{exact:true}).count(),0)
       const timer=page.locator('form[action="/app/do/labor.timer"]')
       await submit(timer,'Start timer')
-      await capture('timer-running','#labor')
+      await capture('timer-running','#labor form[action="/app/do/labor.timer"]')
       await page.goto(`${h.origin}/app/work/${work}`)
       await submit(page.locator('form[action="/app/do/labor.timer"]').filter({has:page.getByRole('button',{name:'Pause timer',exact:true})}),'Pause timer')
-      await capture('timer-paused','#labor')
+      await capture('timer-paused','#labor form[action="/app/do/labor.timer"]')
       await page.goto(`${h.origin}/app/work/${work}`)
       await submit(page.locator('form[action="/app/do/labor.timer"]').filter({has:page.getByRole('button',{name:'Resume timer',exact:true})}),'Resume timer')
       await page.goto(`${h.origin}/app/work/${work}`)
@@ -44,11 +44,11 @@ export async function laborBrowser({h,cookie,work,people,today}) {
       await entry.locator('[name=started]').fill(`${today}T05:00`)
       await entry.locator('[name=ended]').fill(`${today}T05:15`)
       await entry.locator('[name=reason]').fill('Travel to the conveyor for the final alignment check')
-      await capture('manual-time','#labor')
+      await capture('manual-time','#labor form[action="/app/do/labor.entry"]:has(button:text("Submit time for review"))')
       await submit(entry,'Submit time for review')
       await as('owner')
       await page.goto(`${h.origin}/app/work/${work}`)
-      await capture('owner-review','#labor')
+      await capture('owner-review','#labor form[action="/app/do/labor.review"]')
       const forms=page.locator('form[action="/app/do/labor.review"]')
       const count=await forms.count()
       for(let i=0;i<count;i++) {
@@ -63,7 +63,7 @@ export async function laborBrowser({h,cookie,work,people,today}) {
       await capture('owner-pay-policy','details:has(summary:text("Pay rates"))')
       await capture('owner-contractor','details:has(summary:text("Contractor invoices"))')
       await page.goto(`${h.origin}/app/work/${work}`)
-      await capture('approved-repair','#labor')
+      await capture('approved-repair','#labor h2')
       await context.close()
     }
   } finally {await browser.close()}

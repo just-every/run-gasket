@@ -1,6 +1,6 @@
 // FIELD-006: retained time sources, private rate policy and approved hours.
 import type { Bindings } from '../auth.server'
-import type { Actor } from './actor'
+import { can, type Actor } from './actor'
 import { all, commit, guard, insist, now, one, type Row } from './core'
 import type { Input } from './input'
 import { duration, entryFlags, entryInsert, LABOR_CATEGORIES, laborCategory, laborInstant, laborMoney, laborWork, managesLabor } from './labor-records'
@@ -47,7 +47,7 @@ export async function laborView(env: Bindings, actor: Actor, workOrder: string) 
     const {cents:_c,rate_id:_r,regular_minutes:_regular,overtime_minutes:_overtime,...safe}=row
     return {...safe,pendingFlags}
   }))
-  const approved=rows.filter(row=>row.state==='approved')
+  const approved=rows.filter(row=>row.state==='approved' && (mayManage || can(actor,'board.read') || row.person_id===actor.id))
   const people=mayManage ? await all(env,"SELECT id,name FROM gk_members WHERE status='active' AND role IN ('owner','lead','maintainer') ORDER BY name") : []
   const invoices=mayManage ? (await all(env,'SELECT * FROM gk_contractor_invoices WHERE work_order_id=? ORDER BY recorded_at,id',workOrder)).map(row=>({...row,state:'approved'})) : []
   return {entries,timer:await one(env,'SELECT * FROM gk_labor_timers WHERE person_id=?',actor.id),approvedMinutes:approved.reduce((sum,row)=>sum+duration(row),0),byCategory:Object.fromEntries(LABOR_CATEGORIES.map(category=>[category,approved.filter(row=>row.category===category).reduce((sum,row)=>sum+duration(row),0)])),people,invoices,mayManage,

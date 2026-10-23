@@ -9,6 +9,6 @@ export const LABOR_METRICS: readonly MetricDefinition[]=[
   {id:'labor.approved-cost',name:'Approved labor USD cost',version:1,clause:'FIELD-006',sourceDoor,
     formula:'At approval, split elapsed time at each site midnight. Regular minutes use remaining daily threshold after other approved time. Remaining minutes use the authorized overtime multiplier in hundredths. Round the whole entry to cents once. Preserve the selected rate and cost snapshot.',
     eventTime:'Approval snapshots the latest authorized person rate. Daily allowance follows approval order across all four categories and all work; replacing approved time excludes its original. Later rates and corrections do not reprice other approved entries.',
-    exclusions:'Unapproved time contributes no actual cost. Missing rate refuses approval. Per-person pay rates and line costs require owner access; role-visible aggregate work costs retain existing access rights.',
+    exclusions:'Unapproved time contributes no actual cost. Missing rate refuses approval. The configurable overtime review policy is not a legal wage calculation and transmits no payroll data. Per-person pay rates and line costs require owner access; role-visible aggregate work costs retain existing access rights.',
     freshness:'Approved snapshots retained permanently; totals recompute on request. Rate policy changes are prospective for later approvals only.'},
 ]

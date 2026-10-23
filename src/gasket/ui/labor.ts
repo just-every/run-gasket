@@ -88,7 +88,7 @@ function entryHistory(labor: LaborView, actor: Actor, work: WorkContext, owner: 
 
 function payPolicy(labor: LaborView, work: WorkContext) {
   const names = new Map(labor.people.map(person => [person.id, person.name]))
-  return h`<details class="gk-details"><summary>Pay rates and overtime policy · owner only</summary>
+  return h`<details class="gk-details"><summary>Pay rates and overtime policy · owner only</summary><p class="gk-hint">This configurable review policy estimates maintenance costs. It is not a legal wage calculation and sends no payroll data.</p>
     ${labor.rates?.length ? table(['Person', 'Hourly rate (USD)', 'Overtime starts after', 'Overtime multiplier'], labor.rates.map(rate => [names.get(rate.person_id) ?? 'Former member', usd(rate.cents_per_hour), minutes(rate.overtime_after_minutes), `${rate.overtime_multiplier / 100}×`]), 'Pay rates and overtime policy', { wrap: [0, 2] }) : h`<p class="gk-muted">No pay rates recorded. A rate is required before time can be approved.</p>`}
     ${form('labor.rate', work.back, h`${select('Person', 'person', labor.people.map(person => ({ value: person.id, label: person.name })), '', { blank: 'Choose a person' })}
       <div class="gk-grid">${field('Hourly rate (USD)', 'amount', { type: 'number', attrs: 'min="0" step="0.01"' })}
