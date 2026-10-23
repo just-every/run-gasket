@@ -19,7 +19,7 @@
     "test:email-link": "rer queue test:email-link -- sh -c \"node tests/email-link.mjs\"",
     "onboard": "node scripts/install.mjs",
     "build:app": "rer queue build:app -- sh -c \"vite build\"",
-    "verify:app": "rer queue verify:app -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:runtime && pnpm run test:email-link && pnpm run test:flows && pnpm run test:site\"",
+    "verify:app": "rer queue verify:app -- sh -c \"node scripts/verify-app.mjs\"",
     "reset": "rer reset",
     "export": "rer export",
     "import": "rer import",
@@ -32,7 +32,8 @@
     "test:flows": "rer queue test:flows -- sh -c \"node tests/gasket/flows.mjs\"",
     "test:site": "node --test tests/site/*.test.mjs",
     "test:agent-stock": "rer queue test:agent-stock -- sh -c \"node tests/gasket/agent-stock.mjs\"",
-    "test:requests": "rer queue test:requests -- sh -c \"node tests/gasket/requests.mjs\""
+    "test:requests": "rer queue test:requests -- sh -c \"node tests/gasket/requests.mjs\"",
+    "verify:foundation": "rer queue verify:foundation -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:runtime && pnpm run test:email-link && pnpm run test:site\""
   },
   "dependencies": {
     "@bwip-js/generic": "4.7.0",
