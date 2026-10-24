@@ -2,8 +2,10 @@ import { fileURLToPath } from 'node:url'
 // Portable inactive recovery through supported commands and authenticated HTTP.
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
-import { readFile, writeFile } from 'node:fs/promises'
-import { harness } from './harness.mjs'
+import { readFile, writeFile, copyFile, chmod } from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
+import { harness, file } from './harness.mjs'
+import { png } from './fixtures.mjs'
 import { installation } from './installation.mjs'
 
 export async function recoveryJourney() {
@@ -18,6 +20,11 @@ export async function recoveryJourney() {
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
     await h.api('webhook.control', owner, { subscription: subscription.id, revision: 1, paused: false, reason: 'Receiver confirmed' })
     const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today })
+    const portal = (await h.api('request.portal', owner, { name: 'Recovery intake', fields: [] })).id
+    const intakeTarget = (await h.api('request.target', owner, { portal, kind: 'asset', asset, name: 'Recovery pump', publishConsent: true })).id
+    assert.equal((await h.raw(`/request/${portal}`, { cookie: owner, body: { target: intakeTarget, submissionKey: randomUUID(), description: 'synthetic-gasket-private-fault', urgency: 'normal', contact: 'synthetic-gasket-private-contact', photo: file('request.png', png, 'image/png') } })).status, 303)
+    const request = (await h.api('search?kind=request&q=synthetic-gasket-private-fault', owner)).rows[0].id
+    const photo = (await h.api(`requests/${request}`, owner)).files[0].id
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
     await h.stop()
@@ -85,6 +92,37 @@ export async function recoveryJourney() {
       const signed = await source.signIn(h.vars.OWNER_EMAIL)
       assert.deepEqual(await source.api('schedules', signed), sourceSchedule, 'export leaves source schedules active')
       assert.deepEqual((await source.api('automation' + '/jobs', signed)).rules, sourceRules)
+      const current = await source.api(`requests/${request}`, signed)
+      await source.api('request.erase', signed, { request, version: current.version, confirm: true })
+      const erased = await source.api(`requests/${request}`, signed)
+      assert.equal(erased.description, '', 'erasure removes private fault text')
+      assert.equal(erased.contact, '', 'erasure removes contact text')
+      assert.deepEqual(erased.files, [], 'erasure removes file records')
+      assert.equal((await source.raw(`/app/request-files/${photo}`, { cookie: signed })).status, 404, 'erasure removes photo bytes')
+      await source.stop()
+      const later = join(h.installation.root, 'exports', 'after-erasure.rer')
+      await h.installation.rer('export', '--output', later)
+      const afterBytes = await readFile(later)
+      assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-fault')), 'anonymous archive contains no erased fault')
+      assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-contact')), 'anonymous archive contains no erased contact')
+      const fenced = await installation()
+      try {
+        const journal = join(fenced.root, 'later-erasure.rer')
+        await copyFile(later, journal)
+        await chmod(journal, 0o600)
+        await assert.rejects(fenced.rer('import', '--input', archive, '--journal', 'later-erasure.rer', '--yes'), /erasure_epoch/, 'a later erasure journal blocks an older archive before publication')
+        await fenced.rer('import', '--input', later, '--yes')
+        const clean = await harness({ vars: h.vars, installation: fenced })
+        try {
+          const cleanOwner = await clean.signIn(h.vars.OWNER_EMAIL)
+          assert.equal((await clean.raw('/setup', { cookie: cleanOwner, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
+          const retained = await clean.api(`requests/${request}`, cleanOwner)
+          assert.equal(retained.description, '', 'erased fault never reappears after restore')
+          assert.equal(retained.contact, '', 'erased contact never reappears after restore')
+          assert.deepEqual(retained.files, [], 'erased photo never reappears after restore')
+        } finally { await clean.close() }
+      } finally { await fenced.remove() }
+
     } finally { await source.close() }
     console.log('Inactive recovery: corrupt refusal, clean restore, excluded sessions, preserved work, paused PMs and connectors, and nonempty refusal passed')
   } finally { await h.close(); await target.remove(); await corruptTarget.remove() }

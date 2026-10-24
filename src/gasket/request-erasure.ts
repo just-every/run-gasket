@@ -1,3 +1,4 @@
+import { redactionStatements, invalidateTransfersStatements } from '@runeditrun/rer/modules/portability/journal'
 import { REQUEST_NOT_HELD } from './retention'
 // Explicit owner erasure keeps the request number while removing private intake.
 import type { Bindings } from '../auth.server'
@@ -16,6 +17,9 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
   await commit(env, [
     guard(env, 'retention_hold', REQUEST_NOT_HELD, id, id),
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=? AND erased_at IS NULL)', id, version),
+    // Fence older archives and invalidate export snapshots in the erasure batch.
+    ...await redactionStatements(env.DB),
+    ...await invalidateTransfersStatements(env.DB),
     stmt(env, "INSERT INTO gk_guard(code,ok) VALUES('request_erasure',1)"),
     stmt(env, 'DELETE FROM gk_request_files WHERE request_id=?', id),
     stmt(env, 'DELETE FROM gk_request_events WHERE request_id=?', id),

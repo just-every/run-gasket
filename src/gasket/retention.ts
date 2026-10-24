@@ -34,5 +34,5 @@ export async function retentionPreview(env: Bindings, actor: Actor, url: URL) {
   return { id, version: request.version, held, erased: Boolean(request.erased_at), files, linkedWork: request.work_order_id,
     holds: await all(env, "SELECT kind,record_id,held,reason,revision FROM gk_retention_holds WHERE (kind='request' AND record_id=?) OR (kind='work' AND record_id=?)", id, request.work_order_id),
     policy: 'Retain indefinitely. No automatic erasure. Explicit owner confirmation is required by the request erasure door.',
-    obligations: ['Maintenance work and its audit remain; copied request fault details are anonymized.', 'Prior downloads remain outside local erasure.', 'Restoring an older archive does not yet enforce later domain erasure decisions.'] }
+    obligations: ['Maintenance work and its audit remain; copied request fault details are anonymized.', 'Prior downloads remain outside local erasure.', 'Supply a later archive as the erasure journal when restoring. An archive older than a request erasure is refused.'] }
 }
