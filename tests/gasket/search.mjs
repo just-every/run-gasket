@@ -52,6 +52,21 @@ export async function searchJourney(h, cookie, count = 12) {
   assert.deepEqual(revoked.rows, [], 'saved filters never preserve revoked record access')
   assert.equal((await h.api('search?kind=work&q=Search pump inspection', tech)).total, 0, 'saved filter matches the current ordinary search boundary')
   await h.api('search.delete', owner, { id: sharedWork.id, revision: sharedWork.revision })
+  // Request detail and search both lose permission when the lead role is revoked.
+  await h.api('access.role', owner, { member, role: 'lead' })
+  const portal = (await h.api('request.portal', owner, { name: 'Shared search intake', fields: [] })).id
+  const target = (await h.api('request.target', owner, { portal, kind: 'asset', asset: ids[last], name: 'Search pump', publishConsent: true })).id
+  assert.equal((await h.raw(`/request/${portal}`, { cookie: owner, body: { target, submissionKey: randomUUID(), description: 'synthetic-gasket-shared-request', urgency: 'normal', contact: 'Synthetic requester' } })).status, 303)
+  const request = (await h.api('search?kind=request&q=synthetic-gasket-shared-request', owner)).rows[0].id
+  const sharedRequests = await h.api('search.save', owner, { name: 'Shared requests', filters: { kind: 'request', q: 'synthetic-gasket-shared-request' }, shared: true })
+  assert.equal((await h.api(`requests/${request}`, tech)).id, request)
+  assert.deepEqual((await h.api(`search?view=${sharedRequests.id}`, tech)).rows.map(row => row.id), [request])
+  await h.api('access.role', owner, { member, role: 'maintainer' })
+  const revokedRequests = await h.api(`search?view=${sharedRequests.id}`, tech)
+  assert.equal(revokedRequests.total, 0, 'a shared filter shows nothing on the next read after record permission is revoked')
+  assert.deepEqual(revokedRequests.rows, [], 'revoked request records never remain in shared filters')
+  await h.api(`requests/${request}`, tech, undefined, 403)
+  await h.api('search.delete', owner, { id: sharedRequests.id, revision: sharedRequests.revision })
   const updated = await h.api('search.save', owner, { id: view.id, revision: view.revision, name: 'Search pumps updated', filters, shared: true })
   await h.api('search.save', owner, { id: view.id, revision: view.revision, name: 'Stale', filters }, 409)
   const exported = [], seen = new Set(); let cursor = null, pages = 0
