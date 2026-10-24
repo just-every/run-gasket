@@ -1,3 +1,5 @@
+import { retentionPreview } from './retention'
+import { searchEstate, savedSearches } from './search'
 import { costingReport } from './costing'
 import { portalSettings, requestQueue, requestDetail } from './requests'
 import { connectors } from './webhooks'
@@ -56,6 +58,9 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  retentionPreview: (env, actor, _id, url) => retentionPreview(env, actor, url),
+  search: (env, actor, _id, url) => searchEstate(env, actor, url),
+  searchViews: (env, actor) => savedSearches(env, actor),
   costing: (env,actor,_id,url) => costingReport(env,actor,url),
   requestPortals: (env,actor) => portalSettings(env,actor), requests:(env,actor,_id,url)=>requestQueue(env,actor,url), request:(env,actor,id)=>requestDetail(env,actor,id),
   connectors: (env,actor,_id,url) => connectors(env,actor,url),

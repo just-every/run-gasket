@@ -1,3 +1,5 @@
+import { holdRecord } from './retention'
+import { saveSearch, deleteSearch } from './search'
 import { eraseRequest } from './request-erasure'
 import { recordCostComparison, setWorkCostCenter } from './costing'
 import { recordLabor, recordContractorInvoice } from './labor'
@@ -72,6 +74,9 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'retention.hold': (env, actor, input) => holdRecord(env, actor, input),
+  'search.save': (env, actor, input) => saveSearch(env, actor, input),
+  'search.delete': (env, actor, input) => deleteSearch(env, actor, input),
   'request.erase':eraseRequest, 'request.triage':triageRequest, 'request.reply':replyToRequest, 'request.convert':convertRequest, 'label.work':createLabelWork, 'request.portal':savePortal, 'request.target':saveTarget, 'request.field':addRequestField,
   'webhook.subscribe': subscribeWebhook, 'webhook.control': controlWebhook, 'webhook.rotate': rotateWebhook, 'webhook.resume': resumeWebhook, 'webhook.retry': retryWebhook,
   'catalog.preview':catalogPreview, 'catalog.undo':undoCatalog,

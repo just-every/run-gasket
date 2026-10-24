@@ -354,3 +354,17 @@ These minutes are original entries and are not approved hours or automatic
 labor charges; timers, corrections, overlap review and rates remain FIELD-006.
 
 Owner-only `request.erase` takes `request`, the seen `version` and explicit `confirm: true`. It removes request contact, photo bytes, answers and timeline details, redacts private audit payloads while preserving attribution and the erasure event, and removes fault title and description copied into corrective work. The request number remains; a retry of an erased submission returns 410. No automatic erasure runs.
+
+## Estate search and saved filters
+
+`GET /api/gasket/search` accepts `kind` (asset, work, request, procedure, part or vendor), literal substring `q`, exact `tag`, `serial`, `site`, `owner`, `status`, inclusive `from` and `to`, and a work custom `field` with its exact `value`. Site is the current site's name. Owner is an asset custodian name or a work assignee, request requester or procedure creator member id. Dates use the site clock: work due dates, other records' creation dates (vendors use their last update). Unsupported record fields do not match. Merged parts resolve through their canonical records.
+
+Each response has `rows`, `total` and `next`. Pass `next` as `cursor`, retaining the filters and signed-in person. `limit` is 1 to 200, default 100. To export the complete result, collect every page until `next` is null; never stop at the first page. These are current reads, so pause estate changes when a consistent export is needed. Requests remain restricted to triagers; technicians receive only assigned or collaborating work. No contacts, prices, attachment bytes or credentials are returned.
+
+`POST /api/gasket/search.save` takes `name`, `filters` (an object of the filter strings), optional `shared`, and optional `id` with `revision` to update. Views default to private; only the owner shares them. `GET /api/gasket/search-views` lists accessible views. `GET /api/gasket/search?view=ID` applies a saved view, with optional paging controls. Saved filters cannot be overridden on that request, and never confer permission to read records. `POST /api/gasket/search.delete` takes `id` and `revision`; only its creator or the owner can change or delete a view.
+
+## Holds and inactive recovery
+
+`POST /api/gasket/retention.hold` is owner-only and takes `kind` (request or work), `id`, current `revision` (0 initially), `held` and a `reason`. `GET /api/gasket/retention-preview?request=ID` reports request-file counts and bytes, holds and retained obligations. An active request hold or linked work hold atomically refuses the existing confirmed `request.erase` action. The conservative default is indefinite retention with no automatic erasure. A later archive can still reintroduce earlier erased domain data: the domain restore fence is unfinished.
+
+The supported `rer export` archive excludes sessions, sign-in tokens and connector signing keys, including their encrypted form. Export leaves the source active. `rer import` validates before publication, requires an empty destination and restores PM schedules, automation rules and connectors inactive. Review the existing Automation page, rotate connector keys, then deliberately resume rules and schedules. Accepted work and execution history remain. This is single-site proof; multi-site recovery and complete erasure-journal enforcement are unfinished.
