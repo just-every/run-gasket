@@ -163,7 +163,7 @@ Optional native methods are deliberately explicit:
   review. It rechecks person/version/domain policy; password issuance additionally
   requires no provider binding and a still-valid native password credential.
   The caller owns real password verification and its rate limiting.
-- `bootstrap` enables setup-token owner/session creation. It must claim exactly
+- `bootstrap` enables setup-token owner and session creation. It must claim exactly
   one native owner atomically. The service verifies configured setup token,
   origin, allow list and rate limits before invoking it. Without durable native
   dependency setup provenance it must close first-setup identity eligibility in
@@ -171,7 +171,7 @@ Optional native methods are deliberately explicit:
   provider sign-in on an ordinary owner-approved link.
 - `completeLocalSetup` runs only behind the existing local CLI proof and with a
   current owner. Its native mutation still owns its authority fence.
-- `setIdentitySettings` fences the current owner/session, audits the setting,
+- `setIdentitySettings` fences the current owner and session, audits the setting,
   increments the durable policy generation and revokes native provider sessions
   on disable. Missing `identityEnabled` storage must mean off.
 - `currentBoundSubject` is required for provider-session editor authority. No
@@ -208,7 +208,10 @@ trust/configuration change also changes the transaction fingerprint.
 
 Apply **only** `identity/oidc/schema/oidc.sql` for shared identity storage, and
 `modules/dependencies/schema/dependencies.sql` followed by
-`modules/dependencies/schema/approval-attempt.sql` if dependency linking is enabled.
+`modules/dependencies/schema/approval-attempt.sql` and
+`modules/dependencies/schema/keys-sealed.sql` if dependency linking is enabled.
+Existing adopters append `keys-sealed.sql` as a new numbered migration; it
+records completion of legacy sealing and nonsecret installation key versions.
 Existing native adopters add `approval-attempt.sql` as a new numbered migration;
 it invalidates old approvals, which must be renewed through local owner proof.
 Their `oa_oidc_*`, `oa_identity_providers` and provider-health names are identity
@@ -232,10 +235,10 @@ contributes SQL fences and D1 statements to its **same** transaction:
 - Every callback needs a fresh ten-minute app-local approval obtained through
   `/auth/dependencies/relink` with the current owner's fresh local email proof.
   Configured issuer, existing link and provider continuity never replace it.
-- `ownerFence` and `approvalFence` repeat current tenant/owner/session/version,
+- `ownerFence` and `approvalFence` repeat current tenant and owner and session and version,
   fresh local proof and provider pin/generation/24h authority inside the shared
   mutation transaction. Shared code always checks the captured `attempt_id`,
-  issuer/callback set, expiry and exact approving person/session/version both
+  issuer and callback set, expiry and exact approving person, session and version both
   before network I/O and at commit. `approvalFence` contributes native authority
   for that snapshot; it does not need to duplicate the shared pending query.
   Replacing an approval invalidates an in-flight callback without consuming the
@@ -281,7 +284,7 @@ contribution to this same protocol: unclaimed/setup-token or loopback CLI
 authority, unique attempt, native bootstrap owner/version/exact session/expiry,
 current provider policy and pin where applicable, and completion/replacement
 and unlink provenance. It must not create a parallel approval protocol or query
-OA account/session/setup tables. Until supplied, refusal is deliberate.
+OA account and session and setup tables. Until supplied, refusal is deliberate.
 
 ## Slate and HappyToHelp continuation
 
@@ -307,7 +310,7 @@ afterwards only if the product still offers passwords. Provider-issued editor
 grants require the current native owner and current bound issuer/subject.
 
 The real workerd/D1 native fixture in `tests/native/` demonstrates these
-transactions with no OA account/session tables. It is test data, not a seed
+transactions with no OA account and session tables. It is test data, not a seed
 schema to copy blindly. The declarations compile a different native role union
 in `tests/native-types.check.mts`. Each seed still must prove its own native
 adapter and applied migrations; Base verification does not certify a cutover.

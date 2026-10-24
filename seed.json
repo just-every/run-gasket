@@ -1,7 +1,7 @@
 {
   "id": "gasket",
-  "name": "gasket",
-  "version": "0.1.0",
+  "name": "Gasket",
+  "version": "0.1.1",
   "maturity": "first-release-local",
   "category": "operations",
   "spine": {
@@ -160,5 +160,10 @@
       "owner-claim",
       "import-kit"
     ]
-  }
+  },
+  "replaces": [
+    "MaintainX",
+    "UpKeep",
+    "Fiix"
+  ]
 }

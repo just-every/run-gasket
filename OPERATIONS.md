@@ -62,9 +62,15 @@ a forward migration and verified transition/recovery.
 `rer deploy --dry-run` validates the real owner-account
 deployment declaration and builds locally without provider requests. Real
 deployment requires privately supplied `CLOUDFLARE_ACCOUNT_ID` and
-`CLOUDFLARE_API_TOKEN`, the declared owner/session/setup secrets, and a real
+`CLOUDFLARE_API_TOKEN`, the declared owner and session and setup secrets, and a real
 verified mail sender in `deploy.json`. Follow the owner-account deploy-kit
 instructions under `node_modules/@runeditrun/rer/modules/deploy-kit`; account scope,
 resource ownership, migrations, receipt and health checks are defined there.
 Local validation does not prove hosted acceptance, provider delivery or remote
 health.
+
+## Hosted installation package
+
+`packaging.json` declares Gasket's Worker build, DB migrations, native sign-in and mail providers. Run `pnpm run build`, then `pnpm delivery:spec` to update the committed deployment specification. `pnpm check:deployment-spec` refuses stale source policy or build output. Package with `node scripts/delivery/base/cli.mjs package --config packaging.json --output rer-package`; the output contains the descriptor, setup manifest, dispatch-only Managed workflow and delivery artifact. Generated packages stay outside source control.
+
+Managed hosting supplies the RER mail relay URL, sender and private credential. Assisted hosting collects the selected provider's sender and private key; Cloudflare also requires its account ID. Configure a verified sender before sending production sign-in mail. Local development continues to suppress mail.

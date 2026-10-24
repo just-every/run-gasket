@@ -13,3 +13,8 @@ dist/
 
 .rer/demo/
 .rer/demo-host/
+
+rer-package/
+delivery-artifact/
+rer-package-updated/
+rer-package-final/

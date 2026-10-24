@@ -1,6 +1,6 @@
 {
   "name": "@maintenance/gasket",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -33,7 +33,9 @@
     "test:site": "node --test tests/site/*.test.mjs",
     "test:agent-stock": "rer queue test:agent-stock -- sh -c \"node tests/gasket/agent-stock.mjs\"",
     "test:requests": "rer queue test:requests -- sh -c \"node tests/gasket/requests.mjs\"",
-    "verify:foundation": "rer queue verify:foundation -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:runtime && pnpm run test:email-link && pnpm run test:site\""
+    "verify:foundation": "rer queue verify:foundation -- sh -c \"pnpm run build && pnpm run typecheck && pnpm run test:typecheck && pnpm run test:runtime && pnpm run test:email-link && pnpm run test:site\"",
+    "delivery:spec": "node scripts/build-deployment-spec.mjs",
+    "check:deployment-spec": "node scripts/build-deployment-spec.mjs --check"
   },
   "dependencies": {
     "@bwip-js/generic": "4.7.0",
@@ -50,7 +52,7 @@
     "@cloudflare/vite-plugin": "1.54.5",
     "@cloudflare/workers-types": "5.20260908.1",
     "@playwright/test": "1.63.0",
-    "@runeditrun/rer": "0.2.63",
+    "@runeditrun/rer": "0.2.79",
     "@types/node": "22.20.5",
     "@types/qrcode": "1.5.5",
     "@types/react": "19.2.18",
