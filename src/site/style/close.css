@@ -163,7 +163,8 @@
 .terminal { margin-top: 36px; padding: 16px 20px 20px; border-radius: 14px; background: var(--terminal); color: var(--rer-code-text); box-shadow: 0 20px 40px -24px rgba(12, 27, 75, .6); }
 .terminal-dots { display: flex; gap: 8px; }
 .terminal-dots span { width: 11px; height: 11px; border-radius: 999px; background: #3a4672; }
-.terminal pre { margin: 18px 0 0; padding-bottom: 4px; overflow-x: auto; font: 500 13.5px/1.9 var(--rer-font-mono); white-space: pre; }
+.terminal pre { margin: 18px 0 0; padding-bottom: 4px; overflow-x: auto; font: 500 13.5px/1.9 var(--rer-font-mono); white-space: pre-wrap; }
+.terminal .nw { white-space: nowrap; }
 .terminal-prompt { color: #8e9bc8; }
 .terminal-comment { color: #8e9bc8; }
 .import-cards { display: grid; }

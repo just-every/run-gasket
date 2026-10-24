@@ -7,11 +7,19 @@ const Row = ({ figure, label, note }: { figure: string; label: string; note?: Re
 )
 
 const moveInLead = 'Every asset, PM and work order since 2019 comes across, which is where the agent found AC-02’s 2024 failure. Also from UpKeep, Fiix, Limble or a spreadsheet.'
-// The one-line start, as on /run: the command and one plain-words comment, nothing it prints.
+// The one-line start, as on /run: the command, a plain-words comment and the npx alternative, nothing it prints.
+// Words stay whole when a line wraps, and the installer's `install.sh | sh` stays together.
+function words(line: string) {
+  return line.split(/(\S*install\.sh \| sh|\S+)/).map((part, index) => {
+    const pipe = /^(.*\/)(install\.sh \| sh)$/.exec(part)
+    if (pipe) return <span key={index}><span className="nw">{pipe[1]}</span><wbr /><span className="nw">{pipe[2]}</span></span>
+    return part.trim() ? <span key={index} className="nw">{part}</span> : part
+  })
+}
 const terminal = (
   <div className="terminal" role="group" aria-label="Start Gasket on your computer">
     <p className="terminal-dots" aria-hidden="true"><span /><span /><span /></p>
-    <pre tabIndex={0}><code><span className="terminal-prompt" aria-hidden="true">$ </span>npx -y @runeditrun/rer dev just-every/run-gasket{'\n'}<span className="terminal-comment"># clones, installs and starts Gasket on your computer</span></code></pre>
+    <pre tabIndex={0}><code><span className="terminal-prompt" aria-hidden="true">$ </span>{words('curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-gasket')}{'\n'}<span className="terminal-comment"># {words('installs rer, then gets and starts Gasket on your computer')}</span>{'\n'}<span className="terminal-comment"># {words('Already have Node 22 or later? npx -y @runeditrun/rer dev just-every/run-gasket')}</span></code></pre>
   </div>
 )
 

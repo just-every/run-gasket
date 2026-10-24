@@ -4,19 +4,13 @@ This guide runs Gasket on your computer, signs you in as its owner and sets up y
 
 ## 1. Get Gasket and start it
 
-Install `rer`, the Run Edit Run command that installs, runs and keeps Gasket. It installs for you alone, with its own Node if you have no Node 22 or later, and changes no shell settings: if its last line puts `rer` on your PATH, run that line before the next step.
+Copy this line into a terminal and press Enter. It installs `rer`, the Run Edit Run command that installs, runs and keeps Gasket, for you alone, then clones Gasket into `run-gasket` and starts it:
 
 ```sh
-curl -fsSL https://runeditrun.com/install.sh | sh
+curl -fsSL https://runeditrun.com/install.sh | sh -s -- dev just-every/run-gasket
 ```
 
-Then clone Gasket and start it:
-
-```sh
-rer dev just-every/run-gasket
-```
-
-Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-gasket` does both in one line. To start it again later, run `cd run-gasket && rer dev`. The first `rer dev` installs the pinned dependencies, asks for the owner's email address, sets up a local owner on a free port and starts the app. When it is ready it prints `RER_READY` and a line starting `RER_OPEN`. Open that address in your browser on this computer: you arrive signed in as the owner. Treat that line as a password.
+Git is required; rer brings Node and pnpm. Already have Node 22 or later? `npx -y @runeditrun/rer dev just-every/run-gasket` does the same. If the installer prints a line that puts `rer` on your PATH, run that line too. To start it again later, run the same line from the same folder, or `cd run-gasket && rer dev`. The first `rer dev` installs the pinned dependencies, asks for the owner's email address, sets up a local owner on a free port and starts the app. When it is ready it prints `RER_READY` and a line starting `RER_OPEN`. Open that address in your browser on this computer: you arrive signed in as the owner. Treat that line as a password.
 
 To stop Gasket, press Ctrl-C or run `rer dev --stop`. Run `rer dev` again to start it with your data as you left it.
 
