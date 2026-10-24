@@ -31,7 +31,9 @@ export async function replenishmentArchive(h,cookie) {
     try {
       const signed={owner:await restored.signIn(h.vars.OWNER_EMAIL),lead:await restored.signIn('lead@example.test')}
       assert.equal((await restored.raw('/setup',{cookie:signed.owner,form:new URLSearchParams({confirm:'yes'})})).status,303)
-      assert.deepEqual(await read(restored,signed),before,'PART-005 state and original evidence survive public export/import')
+      const expected = structuredClone(before)
+      for (const rule of expected.ledger.rules) { rule.paused=1; rule.reason='Restored inactive; review before resuming.' }
+      assert.deepEqual(await read(restored,signed),expected,'PART-005 records survive with restored automation paused')
     }finally{await restored.close()}
   }finally{await empty.remove()}
 }

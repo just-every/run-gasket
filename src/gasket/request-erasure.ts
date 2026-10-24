@@ -1,3 +1,4 @@
+import { REQUEST_NOT_HELD } from './retention'
 // Explicit owner erasure keeps the request number while removing private intake.
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
@@ -13,6 +14,7 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
   const version = input.integer('version', { min: 1 })
   insist(version === r.version, 'stale', 409)
   await commit(env, [
+    guard(env, 'retention_hold', REQUEST_NOT_HELD, id, id),
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=? AND erased_at IS NULL)', id, version),
     stmt(env, "INSERT INTO gk_guard(code,ok) VALUES('request_erasure',1)"),
     stmt(env, 'DELETE FROM gk_request_files WHERE request_id=?', id),

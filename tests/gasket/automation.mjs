@@ -259,12 +259,28 @@ export async function connectorJourney() {
     activeInstall=destination;await start()
     for(const who of Object.keys(cookie))cookie[who]=await h.signIn(`${who}@example.test`)
     assert.equal((await h.raw('/setup',{cookie:cookie.owner,form:new URLSearchParams({confirm:'yes'})})).status,303)
-    assert.deepEqual(await state(),beforeRestore,'source IDs, pending delivery, rotated key and all attempt evidence survive archive restore')
+    const afterRestore=await state(), expectedRestore=structuredClone(beforeRestore)
+    for(const sub of expectedRestore.subscriptions)sub.paused=true
+    for(const preview of expectedRestore.preview)preview.paused=true
+    assert.notEqual(afterRestore.inputFingerprint,beforeRestore.inputFingerprint,'restored pause state changes the source fingerprint')
+    expectedRestore.inputFingerprint=afterRestore.inputFingerprint
+    assert.deepEqual(afterRestore,expectedRestore,'source IDs, pending delivery and all attempt evidence survive inactive restore')
+    const sentBeforeReconnect=received.length
+    await run(now()+125_000)
+    assert.equal(received.length,sentBeforeReconnect,'restored connectors stay inactive until intentional reconnection')
+    for(const name of ['work','receipt']) {
+      const row=await sub(name)
+      const reconnected=await h.api('webhook.rotate',cookie.owner,{subscription:row.id,revision:row.revision,reason:'Reconnect restored installation'})
+      keys.set(name,{secret:reconnected.secret,keyVersion:reconnected.secretVersion})
+      await control(name,false)
+    }
+    const connectorRule=(await h.api('automation' + '/jobs',cookie.owner)).rules.find(row=>row.id==='connectors')
+    await h.api('automation.control',cookie.owner,{rule:'connectors',revision:connectorRule.revision,paused:false,reason:'Restored receiver keys intentionally reconnected'})
     assert.equal((await state()).deliveries.find(row=>row.id===pending.id).state,'retry')
     await run(now()+130_000)
     const retried=received.at(-1)
     assert.equal(retried.headers['gasket-id'],pending.id)
-    assert.equal(retried.headers['gasket-key-version'],'2')
+    assert.equal(retried.headers['gasket-key-version'],'3')
     assert.equal(retried.body.sourceVersion,2)
     assert.equal((await state()).deliveries.find(row=>row.id===pending.id).state,'delivered')
     const oldKey=await receiveWebhook(new Request('https://receiver.example.test/work',{method:'POST',headers:captured.headers,body:captured.body}),{secret:workSub.secret,keyVersion:1,acceptOnce:()=>{throw Error('must not apply')},now:receiverClock})

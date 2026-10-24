@@ -1,3 +1,4 @@
+import { searchJourney, retentionJourney } from './search.mjs'
 import { workPdfJourney } from './work-pdf.mjs'
 import { costingJourney } from './work-costing.mjs'
 import { laborJourney } from './labor-costs.mjs'
@@ -2246,6 +2247,9 @@ try {
   await check('Reviewed person time and protected labor costs', async () => { laborContext = await laborJourney(h,cookie,ids) })
   await check('Reconciled work and maintenance cost downloads', async () => { await costingJourney(h,cookie,laborContext) })
 
+  await check('Retention holds protect request and linked work evidence', retentionJourney)
+  await check('Estate search, saved filters and complete export', () => searchJourney(h, cookie))
+
   await check('GAS-11 rer export and rer import keep every record', async () => {
     // Everything the people of this installation can read, through the same doors, plus every attachment's bytes.
     const read = async (h, cookie) => {
@@ -2299,7 +2303,14 @@ try {
         const signedIn = { owner: await restored.signIn(h.vars.OWNER_EMAIL), sam: await restored.signIn('sam@example.test') }
         // First-run confirmation belongs to an installation, not to its archive: the owner confirms the restored one.
         assert.equal((await restored.raw('/setup', { cookie: signedIn.owner, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
-        assert.deepEqual(await read(restored, signedIn), before, 'the restored installation reads exactly as the exported one')
+        const after = await read(restored, signedIn)
+        const expected = structuredClone(before)
+        for (const schedule of expected.schedules) { schedule.active = 0; schedule.overdue = false }
+        for (const history of expected.histories) for (const schedule of history.asset.schedules) schedule.active = 0
+        expected.schedules.sort((a,b) => a.id.localeCompare(b.id))
+        after.schedules.sort((a,b) => a.id.localeCompare(b.id))
+        for (const rule of expected.automation.rules) { rule.paused = 1; rule.reason = 'Restored inactive; review before resuming.' }
+        assert.deepEqual(after, expected, 'restored records are preserved with schedules and automation inactive')
       } finally { await restored.close() }
     } finally { await empty.remove() }
   })
