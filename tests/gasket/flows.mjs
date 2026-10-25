@@ -31,8 +31,26 @@ import { agentFollowUpJourney } from './agent-follow-up.mjs'
 import { vendorFollowUpJourney } from './vendor-follow-up.mjs'
 import { now, zone } from './clock.mjs'
 
-const h = await harness()
-const check = async (id, run) => { await run(); console.log(`${id} passed`) }
+// Standalone journeys own their installations; core retains its shared fixture
+// and complete archive reconciliation in their original order.
+const independent = new Map([
+  [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
+  [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
+  [outcomeJourney, 'reports'], [intervalJourney, 'reports'], [agentFollowUpJourney, 'reports'],
+  [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
+])
+const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
+assert.ok(['all', 'core', 'automation', 'inventory', 'reports'].includes(shard), `Unknown flows shard: ${shard}`)
+const h = shard === 'all' || shard === 'core' ? await harness() : null
+let passed = 0
+const check = async (id, run) => {
+  if (shard !== 'all' && (independent.get(run) ?? 'core') !== shard) return
+  const started = performance.now()
+  console.log(`${id} started`)
+  await run()
+  passed++
+  console.log(`${id} passed (${((performance.now() - started) / 1000).toFixed(3)}s)`)
+}
 const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now()).map(part => [part.type, part.value]))
 const today = `${parts.year}-${parts.month}-${parts.day}`
 const addDays = (date, days) => { const [y, m, d] = date.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10) }
@@ -2314,7 +2332,7 @@ try {
       } finally { await restored.close() }
     } finally { await empty.remove() }
   })
-  console.log('Gasket flows: 14 clauses passed')
+  console.log(`Gasket flows: ${passed} checks passed (shard ${shard})`)
 } finally {
-  await h.close()
+  await h?.close()
 }

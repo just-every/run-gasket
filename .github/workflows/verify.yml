@@ -87,13 +87,19 @@ jobs:
           mkdir -p "$REQUEST_SCREENSHOTS"
           pnpm run test:requests
 
-  # The legacy public-door flows run unchanged, separately from foundation checks.
+  # Preserve the shared fixture and archive comparison together; standalone
+  # journeys use separate installations in required parallel shards.
   flows:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [core, automation, inventory, reports]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
+      GASKET_FLOWS_SHARD: ${{ matrix.shard }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
