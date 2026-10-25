@@ -52,11 +52,14 @@ export async function ruleSourcesJourney() {
     assert.equal((await h.api(`work/${submitted}`,owner)).status,'submitted','requesting approval never approves work')
     await h.api('rules.control',owner,{rule:approval.id,revision:approval.revision,paused:true,reason:'Keep later scope scenario open'})
     const tech=(await h.api('access.give',owner,{name:'Maya Chen',email:'scope@example.test',role:'maintainer'})).id
-    const scopeRule=await rule('work.created',[{type:'assign',person:tech}],[{field:'asset',op:'eq',value:approvalAsset}])
+    const scopeRule=await rule('work.created',[{type:'priority',value:'high'},{type:'assign',person:tech}],[{field:'asset',op:'eq',value:approvalAsset}])
     const protectedWork=(await h.api('workorder.create',owner,{asset:approvalAsset,title:'Keep original access boundary',due:'2026-10-21',assignee:me})).id
     assert.equal((await h.api(`work/${protectedWork}`,owner)).assignee_id,me)
     view=await h.api('rules',owner)
-    assert.ok(view.runs.some(r=>r.rule_id===scopeRule.id&&r.error==='rule_action_would_widen_access'))
+    const refused=view.runs.find(r=>r.rule_id===scopeRule.id&&r.error==='rule_action_would_widen_access')
+    assert.ok(refused)
+    assert.equal((await h.api(`work/${protectedWork}`,owner)).priority,'high','completed actions remain visible when a later action is refused')
+    await h.api('rules.control',owner,{rule:scopeRule.id,revision:scopeRule.revision,catchUp:true,event:refused.event_id,reason:'Do not repeat completed effects'},409)
     console.log('Documented maintenance trigger sources and bounded actions passed')
   } finally {await h.close()}
 }

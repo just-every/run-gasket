@@ -61,6 +61,7 @@ export async function controlRule(env:Bindings,actor:Actor,input:Input) {
    throw new GasketError(r.revision!==revision?'stale':'rule_paused',409)
   }
   insist(!await one(env,"SELECT 1 FROM gk_rule_runs WHERE event_id=? AND rule_id=? AND outcome='completed'",event,id),'rule_event_already_completed',409)
+  insist(!await one(env,'SELECT 1 FROM gk_rule_actions a JOIN gk_rule_runs r ON r.id=a.run_id WHERE r.event_id=? AND r.rule_id=?',event,id),'partial_rule_execution_requires_review',409)
   return runRules(env,{trigger:source.trigger,entityType:source.entity_type,entityId:source.entity_id,sourceId:`catch-up:${id}:${revision}:${source.id}`,source:'catch-up',at:source.occurred_at},{only:id,expectedRevision:revision!})
  }
  insist(r.revision===revision,'stale',409)
