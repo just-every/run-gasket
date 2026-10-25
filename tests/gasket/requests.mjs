@@ -9,8 +9,8 @@ import { png } from './fixtures.mjs'
 import { draftPrivacy } from './request-draft-privacy.mjs'
 import { photoPrivacy, installationLimit, erasePrivateRequest } from './request-privacy.mjs'
 
-export async function requestFixture() {
-  const h=await harness(),cookie={owner:await h.owner()}
+export async function requestFixture(options) {
+  const h=await harness(options),cookie={owner:await h.owner()}
   await h.api('site.configure',cookie.owner,{name:'Great Lakes Assembly',timezone:'America/New_York'})
   for(const [person,role] of [['lead','lead'],['tech','maintainer'],['other','maintainer'],['agent','agent']]) {
     await h.api('access.give',cookie.owner,{name:person,email:`${person}@example.test`,role});cookie[person]=await h.signIn(`${person}@example.test`)
@@ -136,7 +136,7 @@ async function requestScreens(f,requestId) {
   finally {await context.close();await browser.close()}
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {
-  const journeys={portal:requestPortalJourney,drafts:requestDraftJourney,labels:labelsJourney,triage:requestTriageJourney}
+  const journeys={portal:requestPortalJourney,drafts:requestDraftJourney,labels:labelsJourney,triage:requestTriageJourney,report:requestReportJourney}
   const task=process.env.REQUEST_JOURNEY || 'all'
   assert.ok(task==='all' || Object.hasOwn(journeys,task),`Unknown request journey: ${task}`)
   for(const journey of task==='all'?Object.values(journeys):[journeys[task]])await journey()
@@ -358,5 +358,103 @@ export async function requestTriageJourney() {
     await erasePrivateRequest(f,root,workId)
     if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,`/app/requests/${root}`,'erased-converted-request')
     console.log('REQ-003 lead triage/filtering, request/reply, reasoned rejection, duplicate preservation and one no-retyping corrective order with original linked evidence passed')
+  } finally {await context?.close();await browser?.close();await h.close()}
+}
+
+
+// Reconcile every measure to ordinary intake, triage and work public doors.
+export async function requestReportJourney() {
+  const f=await requestFixture({clockOffset:Date.parse('2026-10-25T16:00:00Z')-Date.now()}),{h,cookie,asset,portal,target,payload,post}=f
+  let browser,context
+  try {
+    const ids=[]
+    for(const name of ['root','duplicate','declined','unanswered','untriaged']) {
+      await post({...payload,submissionKey:randomUUID(),description:`synthetic-gasket-${name}`})
+      ids.push((await h.api('requests',cookie.lead)).find(r=>r.description===`synthetic-gasket-${name}`).id)
+    }
+    const [root,duplicate,declined,unanswered,untriaged]=ids
+    const detail=id=>h.api(`requests/${id}`,cookie.lead)
+    const decide=async(id,decision,reason,extra={})=>h.api('request.triage',cookie.lead,{request:id,version:(await detail(id)).version,decision,reason,...extra})
+    await decide(duplicate,'duplicate','Same bearing fault',{canonical:root})
+    await decide(declined,'decline','No equipment fault, cosmetic mark')
+    await decide(unanswered,'ask_details','Which operating cycle?')
+    await decide(root,'approve','Bearing inspection confirmed')
+    const work=(await h.api('request.convert',cookie.lead,{request:root,version:(await detail(root)).version})).id
+    const tech=(await h.api('me',cookie.tech)).id
+    await h.api('workorder.assign',cookie.lead,{workOrder:work,assignee:tech})
+    let w=await h.api(`work/${work}`,cookie.tech)
+    await h.api('workorder.submit',cookie.tech,{workOrder:work,version:w.version})
+    w=await h.api(`work/${work}`,cookie.owner)
+    await h.api('workorder.review',cookie.owner,{workOrder:work,version:w.version,decision:'approve'})
+    const closed=await h.api(`work/${work}`,cookie.owner)
+    const publicPortal=(await h.api('request.portal',cookie.owner,{name:'Public reporting group',mode:'public',publicConsent:true,fields:[]})).id
+    const publicTarget=(await h.api('request.target',cookie.owner,{portal:publicPortal,kind:'location',name:'Public loading bay',publishConsent:true})).id
+    await post({...payload,target:publicTarget,submissionKey:randomUUID(),description:'synthetic-gasket-public'},null,200,publicPortal)
+    await post({...payload,target:publicTarget,submissionKey:randomUUID(),description:'synthetic-gasket-abandoned'},cookie.tech,200,publicPortal)
+    const abandoned=(await h.api('requests',cookie.lead)).find(r=>r.description==='synthetic-gasket-abandoned').id
+    await decide(abandoned,'abandon','Operator withdrew the report; evidence retained')
+    const query='?from=2026-10-25&to=2026-10-25'
+    const report=()=>h.api(`request-report${query}`,cookie.lead)
+    const r=await report()
+    assert.deepEqual([r.summary.total,r.summary.untriaged,r.summary.awaitingDetails,r.summary.unresolved,r.summary.duplicates,r.summary.converted,r.summary.declined,r.summary.abandoned],[7,2,1,5,1,2,1,1])
+    const source=await Promise.all(r.rows.map(row=>detail(row.id)))
+    const ackKinds=['assess','ask_details','approve','decline','abandon','duplicate']
+    const ackTotal=source.reduce((sum,row)=>{const e=row.timeline.find(e=>ackKinds.includes(e.kind));return sum+(e?e.at-row.created_at:0)},0)
+    const resolutionTotal=source.filter(row=>row.work_order_id===work).reduce((sum,row)=>sum+closed.closed_at-row.created_at,0)
+    assert.deepEqual(r.summary.acknowledgment,{totalMs:ackTotal,measured:5,all:7,missing:2,meanMs:ackTotal/5})
+    assert.deepEqual(r.summary.resolution,{totalMs:resolutionTotal,measured:2,all:7,missing:5,meanMs:resolutionTotal/2})
+    assert.equal(r.rows.find(row=>row.id===declined).rejectionReason,'No equipment fault, cosmetic mark')
+    assert.equal(r.rows.find(row=>row.id===abandoned).abandonmentReason,'Operator withdrew the report; evidence retained')
+    assert.equal(r.rows.find(row=>row.id===root).conversionReason,'Bearing inspection confirmed')
+    assert.ok(r.rows.find(row=>row.id===untriaged).acknowledgedAt===null)
+    assert.equal(r.bySite[0].summary.total,7)
+    assert.equal(r.byAsset.find(g=>g.value===asset).summary.total,5)
+    assert.equal(r.byRequesterGroup.find(g=>g.value==='public').summary.total,1)
+    for(const row of r.rows) {
+      assert.equal((await h.raw(row.recordDoor,{cookie:cookie.lead})).status,200)
+      assert.equal((await h.api(row.sourceDoor.replace('/api/gasket/',''),cookie.lead)).id,row.id)
+      assert.ok(!JSON.stringify(row).includes(payload.contact))
+    }
+    const {readCsv}=await import('../../src/gasket/movein/csv.ts')
+    for(const filter of ['',`&site=${encodeURIComponent(r.site)}&asset=${asset}&group=signed-in`,'&group=public','&status=needs_details','&site=Other']) {
+      const selected=await h.api(`request-report${query}${filter}`,cookie.lead)
+      const csv=await h.raw(`/app/request-report.csv${query}${filter}`,{cookie:cookie.lead})
+      assert.equal(csv.status,200);assert.match(csv.headers.get('cache-control'),/no-store/)
+      const [header,...lines]=readCsv(new Uint8Array(await csv.arrayBuffer())).rows
+      assert.deepEqual(lines.map(row=>row[header.indexOf('id')]),selected.rows.map(row=>row.id))
+      for(const [index,line] of lines.entries())for(const field of ['createdAt','acknowledgedAt','acknowledgmentMs','resolvedAt','resolutionMs','rejectionReason','conversionReason'])assert.equal(line[header.indexOf(field)],String(selected.rows[index][field]??''))
+      assert.equal(lines.length,selected.summary.total)
+    }
+    assert.equal((await h.api(`request-report${query}&asset=${asset}&group=signed-in`,cookie.lead)).summary.total,5)
+    assert.equal((await h.api(`request-report${query}&group=public`,cookie.lead)).summary.total,1)
+    const defs=await h.api('metrics?metric=requests.volume',cookie.lead)
+    assert.equal(defs.definitions[0].sourceDoor,'/api/gasket/request-report')
+    assert.equal((await report()).inputFingerprint,r.inputFingerprint)
+    const empty=await h.api('request-report?from=2026-10-26&to=2026-10-26',cookie.lead)
+    assert.equal(empty.summary.total,0);assert.equal(empty.summary.acknowledgment.meanMs,null);assert.equal(empty.summary.resolution.meanMs,null)
+    for(const who of [cookie.tech,cookie.other,cookie.agent])for(const door of ['/api/gasket/request-report','/app/request-report','/app/request-report.csv'])assert.equal((await h.raw(door,{cookie:who})).status,403)
+    for(const door of ['/api/gasket/request-report','/app/request-report','/app/request-report.csv'])assert.ok([401,303].includes((await h.raw(door)).status))
+    await h.api('request-report?from=2026-02-30',cookie.lead,undefined,400)
+    ;({browser,context}=await browserContext(h,cookie.lead));const page=await context.newPage()
+    await page.goto(`${h.origin}/app/requests`)
+    await page.getByRole('link',{name:'Request reporting',exact:true}).click()
+    await page.getByLabel('From',{exact:true}).fill('2026-10-25');await page.getByLabel('To',{exact:true}).fill('2026-10-25')
+    await page.getByLabel('Asset',{exact:true}).selectOption(asset)
+    await Promise.all([page.waitForURL(/asset=/),page.getByRole('button',{name:'Show requests'}).click()])
+    assert.match(await page.locator('main').innerText(),/5 requests/)
+    const download=page.getByRole('link',{name:'Download selected requests'})
+    assert.equal((await h.raw(await download.getAttribute('href'),{cookie:cookie.lead})).status,200)
+    if(process.env.REQUEST_SCREENSHOTS) {
+      await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true})
+      await capture(page,h,`/app/request-report${query}`,'request-report')
+      await capture(page,h,`/app/request-report${query}&asset=${asset}&group=signed-in`,'request-report-filtered')
+      await capture(page,h,`/app/requests`,'request-report-entry')
+    }
+    // Every read rechecks current membership; an existing session loses report access.
+    const lead=(await h.api('me',cookie.lead)).id
+    await h.api('access.role',cookie.owner,{member:lead,role:'maintainer'})
+    for(const door of ['/api/gasket/request-report','/app/request-report','/app/request-report.csv'])assert.equal((await h.raw(door,{cookie:cookie.lead})).status,403)
+    assert.ok(lead)
+    console.log('REQ-007 requestReportJourney: lifecycle denominators, source timestamps, scoped filters and CSV, reasons, definitions, responsive pages and access revocation passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }

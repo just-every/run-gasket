@@ -1348,7 +1348,7 @@
       "executable": false
     },
     "src/gasket/doors.ts": {
-      "sha256": "17aa663cdd848aafa1059c7801b5dc5a3659dd29cf1ec902533e4ad61ee9f8a2",
+      "sha256": "7315b3e673230635292483e020f81fe62327fbafff86fe20bd2a85a879220785",
       "executable": false
     },
     "src/gasket/exceptions.ts": {
@@ -1364,7 +1364,7 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "f8d855413c46a1676aa588f22ec8d80665b809d3e73b7443719fc7d2e324ec70",
+      "sha256": "35a7eb4d87c3bcede591535c64d79f38ab45606643f85c2dfc84520781126369",
       "executable": false
     },
     "src/gasket/input.ts": {
@@ -1416,7 +1416,7 @@
       "executable": false
     },
     "src/gasket/metric-definitions.ts": {
-      "sha256": "8b5247fbe8659830f2228822fe50faf1ac1accdb6bcdb5bd6900a4119fbfe038",
+      "sha256": "bccc46c5ac825e56254d9b660bcea0a274335196348e946087684310f69ef4b9",
       "executable": false
     },
     "src/gasket/metrics.ts": {
@@ -1559,6 +1559,10 @@
       "sha256": "1b7aecdc054b832790258c5967b55c128993c1640991d270cb828139a20fdea0",
       "executable": false
     },
+    "src/gasket/request-report.ts": {
+      "sha256": "fd260a9fea5668096f4fb06d9675a49e6d20de1e246c3d578037e2fdf69fda29",
+      "executable": false
+    },
     "src/gasket/request-sources.ts": {
       "sha256": "3b5c199f0952dcd44d1602cd0d01e07f798b15e79be1862c5bc9359e7c1b0f11",
       "executable": false
@@ -1648,7 +1652,7 @@
       "executable": false
     },
     "src/gasket/triage.ts": {
-      "sha256": "e2c57b5ada96326fabd18e1808dd5b3f3dca8badfe1b055a4cc166a7687a912e",
+      "sha256": "c9c4c6eda217cbf185bb438b4a6c2d0cc524f4f0c2737c3dabc034b941e17464",
       "executable": false
     },
     "src/gasket/triggers.ts": {
@@ -1807,12 +1811,16 @@
       "sha256": "c84a09e81f64965adcd7d8b1e3ac1c7d6368bfc248967881c2b31652ea9f1fe5",
       "executable": false
     },
+    "src/gasket/ui/request-report.ts": {
+      "sha256": "5b78734e84588823f6f9478e775852d105c7ef1364777d0f7e1bcdc234cbefbe",
+      "executable": false
+    },
     "src/gasket/ui/request-sources.ts": {
       "sha256": "f9bb3bc1b68cf722f22f06b371972d5629b38ba44c35f58b101bece1cd74886d",
       "executable": false
     },
     "src/gasket/ui/requests.ts": {
-      "sha256": "b4e858ca17b1c8679712aa0b3dddc9ecd522eaf6ebece41d4eb6557402a79ccc",
+      "sha256": "d3de65fa3340bac15f0aeccdf5c80fde4034059d8687eda9c38098e05f0e77da",
       "executable": false
     },
     "src/gasket/ui/schedules.ts": {
@@ -1864,7 +1872,7 @@
       "executable": false
     },
     "src/gasket/views.ts": {
-      "sha256": "7851f8078810e8ca1878d3a9183494d9ad91f2ad72148064f6072e3f3e15b406",
+      "sha256": "07d4df1bf2fc11d769303fd0056f8c62242092d5362501504a44f871d7902c43",
       "executable": false
     },
     "src/gasket/webhook-signing.ts": {
@@ -3896,7 +3904,7 @@
       "executable": false
     },
     "tests/gasket/requests.mjs": {
-      "sha256": "9ec1e388eff5ebb2296aab55b83aeb823a38c969fb1ec341a9add02f2342454a",
+      "sha256": "b0fffaa40f99c0597e002187b1e3261afb27398ab553cb79b904768057b312c6",
       "executable": false
     },
     "tests/gasket/search.mjs": {

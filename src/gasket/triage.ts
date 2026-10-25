@@ -12,14 +12,14 @@ export async function triageRequest(env:Bindings,actor:Actor,input:Input) {
   const r=await requestDetail(env,actor,input.text('request')),version=input.integer('version',{min:1})
   insist(r.version===version,'stale',409)
   const decision=input.text('decision'),reason=input.text('reason',{max:2000}),impact=input.text('impact',{optional:true}) || r.impact
-  insist(['assess','ask_details','approve','decline','duplicate'].includes(decision),'invalid_triage_decision')
+  insist(['assess','ask_details','approve','decline','abandon','duplicate'].includes(decision),'invalid_triage_decision')
   insist(['unknown','running','reduced','stopped'].includes(impact),'invalid_impact')
-  insist(!['converted','duplicate','declined'].includes(r.status),'request_not_open',409)
+  insist(!['converted','duplicate','declined','abandoned'].includes(r.status),'request_not_open',409)
   const statements=[guard(env,'stale','EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=?)',r.id,version)]
   let canonical:any=null
   if(decision==='duplicate') {
     canonical=await requestDetail(env,actor,input.text('canonical'))
-    insist(canonical.id!==r.id && !canonical.duplicate_of && canonical.status!=='declined','invalid_duplicate',409)
+    insist(canonical.id!==r.id && !canonical.duplicate_of && !['declined','abandoned'].includes(canonical.status),'invalid_duplicate',409)
     insist((r.asset_id && r.asset_id===canonical.asset_id) || (!r.asset_id && !canonical.asset_id && r.location===canonical.location),'different_fault_target',409)
     insist(!await one(env,'SELECT 1 FROM gk_requests WHERE duplicate_of=?',r.id),'duplicate_group_has_children',409)
     statements.push(guard(env,'stale','EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=?)',canonical.id,canonical.version),
@@ -27,7 +27,7 @@ export async function triageRequest(env:Bindings,actor:Actor,input:Input) {
       stmt(env,'UPDATE gk_requests SET status=\'duplicate\',duplicate_of=?,work_order_id=?,impact=?,version=version+1 WHERE id=?',canonical.id,canonical.work_order_id,impact,r.id),
       stmt(env,"INSERT INTO gk_request_events(request_id,kind,text,actor,at) VALUES(?,'duplicate_linked',?,?,?)",canonical.id,`R-${r.number} linked as a duplicate: ${reason}`,actor.id,now()))
   } else {
-    const status=decision==='assess'?r.status:decision==='ask_details'?'needs_details':decision==='approve'?'approved':'declined'
+    const status=decision==='assess'?r.status:decision==='ask_details'?'needs_details':decision==='approve'?'approved':decision==='abandon'?'abandoned':'declined'
     statements.push(stmt(env,'UPDATE gk_requests SET status=?,impact=?,version=version+1 WHERE id=?',status,impact,r.id))
   }
   statements.push(stmt(env,'INSERT INTO gk_request_events(request_id,kind,text,actor,at) VALUES(?,?,?,?,?)',r.id,decision,`${canonical?`Duplicate of R-${canonical.number}. `:''}${reason}`,actor.id,now()))

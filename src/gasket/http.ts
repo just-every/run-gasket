@@ -1,3 +1,5 @@
+import { requestReportPage } from './ui/request-report'
+import { requestReportCsv } from './request-report'
 import { workPdf, workPdfZip } from './work-pdf'
 import { costingPage } from './ui/costing'
 import { costingCsv } from './costing'
@@ -177,6 +179,8 @@ const pages: Record<string, Page> = {
   costing: (env,actor,url) => costingPage(env,actor,url),
   costingCsv: async (env,actor,url) => new Response(await costingCsv(env,actor,url), {headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="maintenance-costs.csv"','cache-control':'private, no-store','x-content-type-options':'nosniff'}}),
   labels:(env,actor,url)=>labelsPage(env,actor,url),
+  requestReport:(env,actor,url)=>requestReportPage(env,actor,url),
+  requestReportCsv:async (env,actor,url)=>new Response(await requestReportCsv(env,actor,url),{headers:{'content-type':'text/csv; charset=utf-8','content-disposition':'attachment; filename="requests.csv"','cache-control':'private, no-store','x-content-type-options':'nosniff'}}),
   requestPortals:(env,actor,url)=>requestSettingsPage(env,actor,url), requests:(env,actor,url)=>requestsPage(env,actor,url), request:(env,actor,url,id)=>requestPage(env,actor,url,id), requestFile:(env,actor,_url,id)=>requestFile(env,actor,id),
   partMerge:(env,actor,url)=>partMergePage(env,actor,url),
   partPhoto:(env,actor,_url,id)=>partPhoto(env,actor,id),

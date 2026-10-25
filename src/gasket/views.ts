@@ -1,3 +1,4 @@
+import { requestReport } from './request-report'
 import { retentionPreview } from './retention'
 import { searchEstate, savedSearches } from './search'
 import { costingReport } from './costing'
@@ -58,6 +59,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  requestReport:(env,actor,_id,url)=>requestReport(env,actor,url),
   retentionPreview: (env, actor, _id, url) => retentionPreview(env, actor, url),
   search: (env, actor, _id, url) => searchEstate(env, actor, url),
   searchViews: (env, actor) => savedSearches(env, actor),

@@ -1,3 +1,4 @@
+import { REQUEST_POLICY } from './request-report'
 import { COSTING_METRICS } from './costing-metrics'
 import { LABOR_METRICS } from './labor-metrics'
 // REPORT-009: versioned descriptions of the calculations that ship today.
@@ -15,7 +16,7 @@ export type MetricDefinition = Readonly<{
   id: string
   name: string
   version: number
-  requiredCapability?: 'work.review' | 'site.manage'
+  requiredCapability?: 'work.review' | 'site.manage' | 'work.assign'
   formula: string
   eventTime: string
   exclusions: string
@@ -40,6 +41,8 @@ function definitions(sourceDoor: string, clause: string, eventTime: string, excl
 
 /** Frozen array and frozen scalar-only records; this is the immutable version-1 catalog. */
 export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
+  ...['volume','acknowledgment','resolution','repeat','conversion','rejection'].map(id=>Object.freeze({id:`requests.${id}`,name:`Request ${id}`,version:1,clause:'REQ-007',requiredCapability:'work.assign' as const,
+    formula:REQUEST_POLICY,eventTime:'Submission cohort in inclusive site-local dates; elapsed milliseconds use retained event timestamps.',exclusions:'No retained request is dropped from the all-request denominator. No inferred abandonment or verified public identity.',freshness:'Recomputed on read with source audit revision, latest change, retained omissions and input fingerprint.',sourceDoor:'/api/gasket/request-report'})),
   ...COSTING_METRICS,
   ...LABOR_METRICS,
   ...INTERVENTION_METRICS,
