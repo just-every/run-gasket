@@ -6,6 +6,8 @@ export interface CustomField {
   required: number; options: string | null; unit: string | null; minimum: number | null; maximum: number | null; retired: number; revision: number
 }
 export function validateCustomValue(field: CustomField, value: unknown): string | number | boolean | string[] | null {
+  if (typeof value === 'string') value = value.trim()
+  if (field.type === 'multiple' && typeof value === 'string') value = value.split(',').map(s => s.trim()).filter(Boolean)
   const empty = value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)
   insist(!empty || !field.required, 'custom_value_required', 400, { field: field.id, name: field.name })
   if (empty) return null

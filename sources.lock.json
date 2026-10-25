@@ -1368,7 +1368,7 @@
       "executable": false
     },
     "src/gasket/custom-validation.ts": {
-      "sha256": "956a9aba3726de82c6a36a135e1d79df2a18cc7277a3f562f67a7da84ef168ee",
+      "sha256": "9fe9b976d0a25c684750972d5a77dc2053b6518aa1c2a83492b9ef1c7249ff7f",
       "executable": false
     },
     "src/gasket/dates.ts": {
@@ -3908,7 +3908,7 @@
       "executable": false
     },
     "tests/gasket/custom-fields.mjs": {
-      "sha256": "a18c574fb8a54c7d0b27776d1e47ea03bdaf8426687410c393ccba393420a6c5",
+      "sha256": "59b69689c656e0ab9608c474851746583ab0863bc8d6820f6195cbf4d0c3e085",
       "executable": false
     },
     "tests/gasket/fixtures.mjs": {

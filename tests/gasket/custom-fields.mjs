@@ -20,6 +20,7 @@ export async function customFieldsJourney() {
     const categoryField=(await define({name:'Motor enclosure',entityType:'part',scope:'category',category:'Motor',required:true})).id
     let partState=await h.api(`parts/${part}`,owner)
     await h.api('part.category',owner,{part,revision:partState.revision,category:'Motor'},400)
+    await h.api('part.category',owner,{part,revision:partState.revision,category:'Motor',customValues:{[categoryField]:'   '}},400)
     await h.api('part.category',owner,{part,revision:partState.revision,category:'Motor',customValues:{[categoryField]:'IP66'}})
     assert.equal((await h.api(`parts/${part}`,tech)).customFields.find(f=>f.id===categoryField).value,'IP66')
     const update={entityType:'asset',entityId:asset,customValues:{[refrigerant]:'R-410A'}}
