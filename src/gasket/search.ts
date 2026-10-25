@@ -81,7 +81,7 @@ export async function searchEstate(env: Bindings, actor: Actor, url: URL) {
   if (filters.q) add("instr(lower(COALESCE(title,'')||' '||COALESCE(tag,'')||' '||COALESCE(serial,'')||' '||COALESCE(location,'')),lower(?))>0", filters.q)
   for (const key of ['tag', 'serial', 'owner', 'status'] as const) if (filters[key]) add(`${key}=? COLLATE NOCASE`, filters[key])
   if (filters.site) add('?=? COLLATE NOCASE', filters.site, site?.name ?? '')
-  if (filters.field) add("kind='work' AND EXISTS(SELECT 1 FROM gk_work_field_values f WHERE f.work_order_id=estate.id AND f.field_id=? AND f.value=?)", filters.field, filters.value)
+  if (filters.field) add("((kind='work' AND EXISTS(SELECT 1 FROM gk_work_field_values f WHERE f.work_order_id=estate.id AND f.field_id=? AND f.value=?)) OR (kind IN ('asset','part') AND EXISTS(SELECT 1 FROM gk_custom_values f JOIN gk_custom_fields d ON d.id=f.field_id WHERE f.entity_type=estate.kind AND f.entity_id=estate.id AND f.field_id=? AND d.retired=0 AND (CAST(json_extract(f.value,'$') AS TEXT)=? OR (json_type(f.value)='array' AND EXISTS(SELECT 1 FROM json_each(f.value) j WHERE CAST(j.value AS TEXT)=?))))))", filters.field, filters.value, filters.field, filters.value, filters.value)
   // D1 stores epoch instants; UTC bounds cover the local-day interval, including DST.
   if (filters.from) add('(CASE WHEN kind=\'work\' THEN due>=? ELSE stamp>=? END)', filters.from, zonedInstant(actor.zone, filters.from + 'T00:00'))
   if (filters.to) add('(CASE WHEN kind=\'work\' THEN due<=? ELSE stamp<? END)', filters.to, zonedInstant(actor.zone, addDays(filters.to, 1) + 'T00:00'))

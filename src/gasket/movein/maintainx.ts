@@ -14,6 +14,7 @@ import type { Input } from '../input'
 import { compareMeter, meterNumber, toMilli } from '../quantity'
 import { columns, readCsv } from './csv'
 import { WORK_NEEDS, mapWork } from './maintainx-work'
+import { assetCustomMapping, type CustomMapping } from './maintainx-custom'
 import { KINDS, gasketTargets } from './target'
 
 const namespace = 'maintainx', mappingVersion = 'maintainx-csv-1', destination = 'register'
@@ -77,11 +78,12 @@ export interface Preview {
   attention: { location: string; reason: string }[]
   gaps: string[]
   carry: Record<string, string>
+  customMapping: CustomMapping
 }
 
 /** Import authority is checked in SQL on every batch: a live session whose member may run imports. */
 function importContext(actor: Actor, env: Bindings): D1ImportContext {
-  return { destination, namespace, mappingVersion, storage: { database: env.DB as never, targets: gasketTargets }, authorization: { principalId: `role:import`, predicate: () => capabilitySql(actor.sessionId, 'import.run') }, batchSize: 25 }
+  return { destination, namespace, mappingVersion, storage: { database: env.DB as never, targets: gasketTargets(actor.id) }, authorization: { principalId: `role:import`, predicate: () => capabilitySql(actor.sessionId, 'import.run') }, batchSize: 25 }
 }
 
 
@@ -135,6 +137,8 @@ async function build(env: Bindings, actor: Actor, input: Input) {
     if (missing.length) throw new GasketError(`${name}_columns`, 400, { needs: NEEDS[name], missing })
     tables[name] = { header: sheet.rows[0], rows: sheet.rows.slice(1).map((cells, index) => ({ cells, row: index + 2 })), read, hash, filename: file.filename }
   }
+  const custom = await assetCustomMapping(env, input, tables.assets!.header)
+  carry.customMapping = custom.carry
   const record = (kind: string, sourceId: string, payload: Json, table: NonNullable<(typeof tables)[FileName]>, row: number) =>
     records.push({ namespace, kind, sourceId, payload, payloadHash: sha256(canonicalJson(payload)), artifactHash: table.hash, location: { artifact: table.filename, row } })
   const cellsOf = (table: NonNullable<(typeof tables)[FileName]>, cells: string[]) => Object.fromEntries(table.header.map((header, index) => [header || `column ${index + 1}`, cells[index] ?? '']))
@@ -232,6 +236,10 @@ async function build(env: Bindings, actor: Actor, input: Input) {
         if (!criticality) return reject(source, `criticality "${get('Criticality')}" is not a criticality level in Gasket: add it, or an import name for a level, under Codes`)
         const targetId = targetIds.asset(id)
         if (conflict('asset', targetId, source)) return reject(source, 'already moved in earlier with different values; edit the asset in Gasket instead')
+        const category = get('Types').split(',')[0]?.trim() || null
+        let customValues: Record<string, Json>
+        try { customValues = custom.values(payload.cells, category) }
+        catch (error) { if (!(error instanceof GasketError)) throw error; return reject(source, error.code) }
         tagsSeen.set(tag.toLowerCase(), payload.row)
         acceptedAssets.add(targetId)
         const notes = [get('Description'), [get('Manufacturer'), get('Model'), get('Year')].filter(Boolean).join(' '), get('Parent') ? `Parent asset in MaintainX: ${get('Parent')}` : ''].filter(Boolean).join('\n') || null
@@ -239,7 +247,7 @@ async function build(env: Bindings, actor: Actor, input: Input) {
         if (/offline/i.test(get('Status'))) attention.push({ location: at(source), reason: `${name} was Offline in MaintainX: record its downtime in Gasket if it is still down` })
         const custodian = get('Teams Assigned to').split(',')[0]?.trim() || null
         counted('asset', targetId)
-        return { effects: [effect('asset', targetId, { tag, name, serial: get('Serial Number') || null, location, custodian, category: get('Types').split(',')[0]?.trim() || null, criticality: criticality.key, notes })] }
+        return { effects: [effect('asset', targetId, { tag, name, serial: get('Serial Number') || null, location, custodian, category, criticality: criticality.key, notes, ...(Object.keys(customValues).length ? { customValues } : {}) })] }
       }
       if (source.kind === 'part') {
         const id = get('ID'), name = get('Name')
@@ -310,7 +318,8 @@ async function build(env: Bindings, actor: Actor, input: Input) {
   const preview: Preview = {
     fingerprint: plan.fingerprint, counts: plan.counts as unknown as Json, create, unchanged, rejected, attention,
     gaps: [
-      'MaintainX asset hierarchy, teams, vendors, costs, depreciation, attachments and custom fields are not carried; parents are kept as a note for a lead to place on the asset page.',
+      'MaintainX asset hierarchy, teams, vendors, costs, depreciation and attachments are not carried; parents are kept as a note for a lead to place on the asset page.',
+      'Asset custom columns move into existing Gasket fields selected below. A unique, exact field-name match is selected automatically. Unmapped columns are retained in the original export only. Choices use exact option names; multiple choices use a comma-separated cell or JSON array. Dates use YYYY-MM-DD; booleans use yes, no, true or false.',
       'The custodian is MaintainX\'s first assigned team; change it in Gasket where a named person is responsible.',
       ...(files.parts ? ['MaintainX parts have no unit column: every part arrives in "each". Change units before the first count if needed.', 'Opening stock is MaintainX\'s Quantity on the day of export: count the shelves in Gasket after moving in.'] : ['No part export: add parts in Gasket.']),
       ...(files.readings ? ['Meters whose unit is hours, kilometres, miles, cycles or starts are counters (they never go down); every other meter is a gauge.'] : ['No meter-reading export: add meters to assets in Gasket.']),
@@ -318,7 +327,7 @@ async function build(env: Bindings, actor: Actor, input: Input) {
       'MaintainX procedures and PM schedules are not moved in: write checklists and schedules in Gasket.',
       'Keep MaintainX read-only until a lead has run one full preventive cycle in Gasket.',
     ],
-    carry,
+    carry, customMapping: custom.preview,
   }
   return { plan, preview, context }
 }

@@ -29,7 +29,13 @@ export async function previewPage(env: Bindings, actor: Actor, input: Input, url
   const counts = preview.create
   const summary = h`<ul class="gk-tiles" aria-label="Would create">${[['Assets', counts.assets], ['Meters', counts.meters], ['Readings', counts.readings], ['Parts', counts.parts], ['Completed work', counts.work], ['Rejected rows', preview.rejected.length]].map(([label, n]) => h`<li><span class="gk-tile-n">${showNumber(n)}</span><span>${label}</span></li>`)}</ul>`
   const apply = form('import.apply', '/app/move-in', h`${hidden('fingerprint', preview.fingerprint)}${Object.entries(preview.carry).map(([key, value]) => hidden(key, value))}`, 'Apply this move-in')
+  const custom = preview.customMapping
+  const mapping = custom.fields.length ? card('Asset custom fields', h`<p>Columns with a unique, exact Gasket field-name match are selected automatically. Review or change the choices, then run the dry run again. A field must apply to the asset’s category.</p><details><summary>Map asset columns</summary><form method="post" action="/app/move-in/preview" class="gk-form">
+    ${Object.entries(preview.carry).filter(([key]) => key !== 'customMapping').map(([key, value]) => hidden(key, value))}
+    ${custom.columns.map(row => h`${hidden('customColumn', row.column)}${select(row.column, 'customField', [{ value: '', label: 'Do not carry as a custom field' }, ...custom.fields.map(f => ({ value: f.id, label: `${f.name} · ${f.type}${f.category ? ` · ${f.category}` : ''}` }))], row.fieldId, { required: false })}`)}
+    <div class="gk-actions"><button type="submit" class="gk-secondary">Review mapping</button></div></form></details>`, { id: 'custom-mapping' }) : ''
   return page(env, 'Dry run', actor, h`${backLink('/app/move-in', 'Move in')}<h1>Dry run: nothing has been written</h1>${summary}${preview.unchanged ? h`<p class="gk-muted">Already moved in, unchanged: ${preview.unchanged} row${preview.unchanged === 1 ? '' : 's'}. Applying again leaves them as they are.</p>` : ''}
+    ${mapping}
     ${card('Rejected rows', preview.rejected.length ? table(['Where', 'Why'], preview.rejected.map(row => [row.location, row.reason]), 'Rejected rows', { wrap: [1] }) : h`<p class="gk-muted">No rows rejected.</p>`, { id: 'rejected' })}
     ${card('Needs your attention', preview.attention.length ? table(['Where', 'What'], preview.attention.map(row => [row.location, row.reason]), 'Attention', { wrap: [1] }) : h`<p class="gk-muted">Nothing needs attention.</p>`, { id: 'attention' })}
     ${card('What is not carried', h`<ul class="gk-plain-list">${preview.gaps.map(gap => h`<li>${gap}</li>`)}</ul>`, { id: 'gaps' })}

@@ -1,3 +1,5 @@
+import { customFieldsPage, locationPage } from './ui/custom-fields'
+import { customRegisterCsv } from './custom-export'
 import { requestReportPage } from './ui/request-report'
 import { requestReportCsv } from './request-report'
 import { workPdf, workPdfZip } from './work-pdf'
@@ -174,6 +176,9 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  customFields: (env,actor,url)=>customFieldsPage(env,actor,url),
+  locationFields: (env,actor,url,id)=>locationPage(env,actor,id,url),
+  ...Object.fromEntries(['asset','part','location'].map(type => [type+'sCsv', async (env:Bindings,actor:Actor,url:URL) => new Response(await customRegisterCsv(env,actor,type,url), {headers:{'content-type':'text/csv; charset=utf-8','content-disposition':`attachment; filename="${type}s.csv"`,'cache-control':'private, no-store'}})])),
   requestResponse: (env,actor,url)=>responseSettingsPage(env,actor,url),
   workPdf: (env, actor, _url, id) => workPdf(env, actor, id),
   workPdfZip: (env, actor, url) => workPdfZip(env, actor, url),

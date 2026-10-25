@@ -1,3 +1,4 @@
+import { customStatements, customValues } from './custom-fields'
 // Clause 2: the asset register. Edits write the previous identity to
 // gk_asset_versions; retiring keeps every record. Sightings reconcile the
 // register against what is physically on the floor.
@@ -47,7 +48,8 @@ export async function createAsset(env: Bindings, actor: Actor, input: Input) {
   await checkCriticality(env, value.criticality)
   // ASSET-001: its level and parent (none: directly under the site).
   const place = await placement(env, input)
-  await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, location, custodian, category, criticality, notes, level, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, place.level, place.parent, at, at)],
+  const custom = await customStatements(env, actor, input, 'asset', id, value.category, true)
+  await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, location, custodian, category, criticality, notes, level, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, place.level, place.parent, at, at), ...custom],
     { actor: actor.id, action: 'asset.create', subject: id, detail: { ...value, ...place } })
   return { id }
 }
@@ -61,8 +63,10 @@ export async function updateAsset(env: Bindings, actor: Actor, input: Input) {
   insist(revision === asset.revision, 'stale', 409)
   const value = identity(input)
   await checkCriticality(env, value.criticality, asset.criticality)
+  const custom = await customStatements(env, actor, input, 'asset', asset.id, value.category)
   const before = Object.fromEntries(IDENTITY.map(key => [key, asset[key]]))
   await commit(env, [
+    ...custom,
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND revision = ?)', asset.id, revision),
     stmt(env, 'INSERT INTO gk_asset_versions (asset_id, revision, value_json, changed_by, changed_at) VALUES (?, ?, ?, ?, ?)', asset.id, asset.revision, JSON.stringify(before), actor.id, now()),
     stmt(env, 'UPDATE gk_assets SET tag = ?, name = ?, serial = ?, location = ?, custodian = ?, category = ?, criticality = ?, notes = ?, revision = revision + 1, updated_at = ? WHERE id = ?', value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, now(), asset.id),
@@ -118,11 +122,13 @@ export async function recordSighting(env: Bindings, actor: Actor, input: Input) 
   return { id }
 }
 
-export async function assetList(env: Bindings, _actor: Actor) {
-  const rows = await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, ${CRITICALITY_LABEL}, a.origin, ${ASSET_STATUS} AS status, a.level, a.parent_id, (SELECT p.tag FROM gk_assets p WHERE p.id = a.parent_id) AS parent_tag,
+export async function assetList(env: Bindings, _actor: Actor, url?: URL) {
+  const filter = url?.searchParams.get('field'), value = url?.searchParams.get('value')
+  const selected = filter && value ? new Set((await all(env, "SELECT v.entity_id FROM gk_custom_values v JOIN gk_custom_fields f ON f.id=v.field_id WHERE v.entity_type='asset' AND v.field_id=? AND f.retired=0 AND (CAST(json_extract(v.value,'$') AS TEXT)=? OR (json_type(v.value)='array' AND EXISTS(SELECT 1 FROM json_each(v.value) j WHERE CAST(j.value AS TEXT)=?)))", filter, value, value)).map(v=>v.entity_id)) : null
+  const rows = (await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, ${CRITICALITY_LABEL}, a.origin, ${ASSET_STATUS} AS status, a.level, a.parent_id, (SELECT p.tag FROM gk_assets p WHERE p.id = a.parent_id) AS parent_tag,
     (SELECT s.outcome || '|' || s.recorded_at FROM gk_sightings s WHERE s.asset_id = a.id ORDER BY s.recorded_at DESC LIMIT 1) AS last_sighting,
     (SELECT MIN(w.due_date) FROM gk_work_orders w WHERE w.asset_id = a.id AND w.status NOT IN ('closed', 'cancelled')) AS next_due
-    FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)
+    FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)).filter(row=>!selected || selected.has(row.id))
   // Where a declared state disagrees with open downtime or a feed counter, the register says so.
   const declared = new Set((await all(env, 'SELECT DISTINCT asset_id FROM gk_asset_states')).map(row => row.asset_id))
   return await Promise.all(rows.map(async row => ({ ...row, conflicts: declared.has(row.id) ? (await stateConflicts(env, { id: row.id, retired_at: row.status === 'retired' ? 1 : null }, await stateHistory(env, row.id))).length : 0 })))
@@ -138,5 +144,5 @@ export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
   const states = await stateHistory(env, id)
   const bom = await bomOf(env, { id: asset.id, serial: asset.serial }, await partList(env, actor))
-  return { ...asset, bom, lifecycle: await lifecycleOf(env, actor, id), documents: await documentsOf(env, actor, id), states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
+  return { ...asset, customFields: await customValues(env, 'asset', id, asset.category), bom, lifecycle: await lifecycleOf(env, actor, id), documents: await documentsOf(env, actor, id), states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
 }

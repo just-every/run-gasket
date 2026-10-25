@@ -1,3 +1,4 @@
+import { customCard, customInputs } from './custom-fields'
 // The asset register and one asset's page: identity, meters, sightings,
 // schedules and the full history with its CSV download.
 import { PRIORITIES, PRIORITY_LABELS, templateList } from '../templates'
@@ -32,7 +33,10 @@ const identityFields = (catalog: Level[], asset: Record<string, any> = {}) => h`
   ${select('Criticality', 'criticality', levels(catalog, asset.criticality), asset.criticality ?? 'normal')}</div>${area('Notes', 'notes', { value: asset.notes ?? '', required: false })}`
 
 export async function assetsPage(env: Bindings, actor: Actor, url: URL) {
-  const rows = await assetList(env, actor)
+  const rows = await assetList(env, actor, url)
+  const customFilter = url.searchParams.get('field'), customValue = url.searchParams.get('value')
+  const customDefinitions = await (await import('../custom-fields')).customFields(env,'asset')
+  const filters = customDefinitions.length ? h`<details class="gk-details"><summary>Filter custom fields</summary><form method="get" action="/app/assets" class="gk-form">${select('Field','field',customDefinitions.map(f=>({value:f.id,label:f.name})),customFilter ?? '')}${field('Value','value',{value:customValue ?? ''})}<button class="gk-secondary">Apply filter</button></form></details>` : '' 
   const manage = can(actor, 'register.manage')
   const catalog = await codeList(env, 'criticality')
   const list = rows.length ? table(['Asset', 'Location', 'Custodian', 'Criticality', 'Status', 'Next due', 'Last sighting'], rows.map(row => {
@@ -43,8 +47,8 @@ export async function assetsPage(env: Bindings, actor: Actor, url: URL) {
   }), 'Assets', { wrap: [1, 2] }) : h`<div class="gk-empty"><img src="/brand/assets/plinth.svg" alt="" width="360" height="244"><h2>No assets yet</h2><p>${manage ? 'Register the equipment you maintain below, or move in your MaintainX asset export.' : 'A maintenance lead registers the site\'s equipment.'}</p>${manage ? h`<p><a class="gk-button gk-secondary" href="/app/move-in">Move in from MaintainX</a></p>` : ''}</div>`
   // ASSET-001: where the new entry sits; the asset page moves it later.
   const where = h`<div class="gk-grid">${select('Level', 'level', LEVELS.map(level => ({ value: level, label: LEVEL_LABELS[level] })), 'machine')}${select('Under', 'parent', (await parentChoices(env, null)).map(row => ({ value: row.id, label: `${row.tag} ${row.name} (${LEVEL_LABELS[row.level as Tier]})` })), '', { required: false, blank: 'The site' })}</div>`
-  const create = manage ? card('Register an asset', form('asset.create', '/app/assets/{id}', h`${identityFields(catalog)}${where}`, 'Register asset'), { id: 'register' }) : ''
-  return page(env, 'Assets', actor, h`<div class="gk-head"><div><h1>Assets</h1><p class="gk-lede">The equipment this site owns and keeps in service.</p></div></div>${rows.length ? h`${list}${create}` : h`<div class="gk-columns gk-columns-even"><div class="gk-col-main">${list}</div><div class="gk-col-side">${create}</div></div>`}`, { url })
+  const create = manage ? card('Register an asset', form('asset.create', '/app/assets/{id}', h`${identityFields(catalog)}${where}${await customInputs(env, 'asset')}`, 'Register asset'), { id: 'register' }) : ''
+  return page(env, 'Assets', actor, h`<div class="gk-head"><div><h1>Assets</h1><p class="gk-lede">The equipment this site owns and keeps in service.</p></div></div>${filters}<p><a href="/app/assets.csv?field=${customFilter ?? ''}&amp;value=${customValue ?? ''}">Download register CSV</a></p>${rows.length ? h`${list}${create}` : h`<div class="gk-columns gk-columns-even"><div class="gk-col-main">${list}</div><div class="gk-col-side">${create}</div></div>`}`, { url })
 }
 
 export async function assetPage(env: Bindings, actor: Actor, id: string, url: URL) {
@@ -72,10 +76,10 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
     ${can(actor, 'register.manage') ? form('asset.sighting', back, h`${hidden('asset', asset.id)}<div class="gk-grid">${select('What you found', 'outcome', [{ value: 'found', label: `Found at ${asset.location}` }, { value: 'elsewhere', label: 'Found somewhere else' }, { value: 'missing', label: 'Not found' }], 'found')}${field('Where it was (if elsewhere)', 'seenLocation', { required: false })}</div>${field('Note', 'note', { required: false })}`, 'Record sighting', { secondary: true }) : ''}`, { id: 'sightings' })
   const history = card('History', h`${events.length ? table(['When', 'Work order', 'What', 'Who'], events.map(event => [event.when, event.workOrder ?? '—', event.what, event.who ?? '—']), 'History', { wrap: [2] }) : h`<p class="gk-muted">No history yet.</p>`}
     ${can(actor, 'history.export') ? h`<p><a class="gk-button gk-secondary" href="/app/assets/${asset.id}/history.csv">Download history (CSV)</a></p>` : ''}`, { id: 'history' })
-  const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(await codeList(env, 'criticality'), asset)}`, 'Save changes', { secondary: true })}
+  const edit = manage ? card('Change details', h`${form('asset.update', back, h`${hidden('asset', asset.id)}${hidden('revision', asset.revision)}${identityFields(await codeList(env, 'criticality'), asset)}${await customInputs(env, 'asset', asset.category, asset.customFields)}`, 'Save changes', { secondary: true })}
     ${form('asset.retire', '/app/assets', h`${hidden('asset', asset.id)}${field('Reason to retire', 'reason', { hint: 'Retiring keeps all history. Close or cancel its open work first.' })}${disposalFields}`, 'Retire asset', { secondary: true })}`, { id: 'edit' }) : ''
   const earlier = asset.versions.length ? details(asset.versions.map((version: any) => [`Revision ${version.revision} (${showInstant(version.changed_at, actor.zone)})`, Object.entries(version.value).map(([key, value]) => `${key}: ${value ?? '—'}`).join(' · ')])) : ''
-  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${work}${lifecycleCard(asset, manage, can(actor, 'history.export'), back)}${documentsCard(asset, actor.zone, manage, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${bomCard(asset.bom, actor.zone, manage ? bomForm(asset.bom, asset.id, back, await partList(env, actor)) : '')}${history}${commentsCard(asset.comments, actor, { field: 'asset', id: asset.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${place}${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
+  const body = h`${backLink('/app/assets', 'Assets')}${band}<div class="gk-columns"><div class="gk-col-main">${await customCard(env, actor, 'asset', asset.id, asset.category, back)}${work}${lifecycleCard(asset, manage, can(actor, 'history.export'), back)}${documentsCard(asset, actor.zone, manage, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${bomCard(asset.bom, actor.zone, manage ? bomForm(asset.bom, asset.id, back, await partList(env, actor)) : '')}${history}${commentsCard(asset.comments, actor, { field: 'asset', id: asset.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${place}${status}${meters}${readings}${sightings}${corrective}${edit}${earlier}</div></div>`
   return page(env, asset.name, actor, body, { url })
 }
 

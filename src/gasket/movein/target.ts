@@ -3,6 +3,7 @@
 // A row that a person has since edited or built on carries `dependents`, so
 // undo refuses to remove it: reverse that work in Gasket first.
 import type { D1Database, D1Sql, D1TargetAdapter, Json, TargetRow } from '../../modules/import-kit/src/d1/index'
+import { matchAssetCustom, readAssetCustom, writeAssetCustom } from './custom-target'
 
 const sql = (text: string, ...params: unknown[]): D1Sql => ({ sql: text, params })
 
@@ -29,6 +30,8 @@ const free = (expression: string, id: string) => ({ text: `${expression} = 0`, p
 // Work history moved in by a later move-in (another date range) depends on the asset; its own move-in's history does not.
 const ASSET_DEPENDENTS = `((SELECT COUNT(*) FROM gk_work_orders WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_schedules WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_meters WHERE asset_id = ? AND origin = 'native')
   + (SELECT COUNT(*) FROM gk_sightings WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_asset_versions WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_downtime WHERE asset_id = ?) + (SELECT COUNT(*) FROM gk_assets WHERE id = ? AND retired_at IS NOT NULL)
+  + (SELECT COUNT(*) FROM gk_custom_values WHERE entity_type='asset' AND entity_id=? AND revision>1)
+  + (SELECT COUNT(*) FROM gk_custom_history WHERE entity_type='asset' AND entity_id=? AND revision>1)
   + (SELECT COUNT(*) FROM gk_work_history h WHERE h.asset_id = ? AND NOT EXISTS(SELECT 1 FROM ik_provenance pw JOIN ik_provenance pa ON pa.job_id = pw.job_id AND pa.target_kind = 'asset' AND pa.target_id = h.asset_id AND pa.reversed = 0 WHERE pw.target_kind = 'work' AND pw.target_id = h.id AND pw.reversed = 0)))`
 const METER_DEPENDENTS = "((SELECT COUNT(*) FROM gk_readings WHERE meter_id = ? AND origin = 'native') + (SELECT COUNT(*) FROM gk_schedules WHERE meter_id = ?) + (SELECT COUNT(*) FROM gk_meter_adjustments WHERE meter_id = ?))"
 const READING_DEPENDENTS = '(SELECT COUNT(*) FROM gk_meter_adjustments WHERE reading_id = ?)'
@@ -38,15 +41,16 @@ const ASSET_FIELDS = ['tag', 'name', 'serial', 'location', 'custodian', 'categor
 const asset: Kind = {
   async read(db, id) {
     const row = await db.prepare("SELECT * FROM gk_assets WHERE id = ? AND origin = 'import'").bind(id).first<any>()
-    return row ? { value: withDependents(Object.fromEntries(ASSET_FIELDS.map(field => [field, row[field]])), await dependents(db, ASSET_DEPENDENTS, id)), revision: row.import_revision } : undefined
+    return row ? { value: withDependents({ ...Object.fromEntries(ASSET_FIELDS.map(field => [field, row[field]])), ...await readAssetCustom(db, id) }, await dependents(db, ASSET_DEPENDENTS, id)), revision: row.import_revision } : undefined
   },
   matches(value, id, revision) {
     const main = eq([...ASSET_FIELDS.map(field => [field, value[field]] as [string, unknown]), ['import_revision', revision], ['revision', 1]]), rest = free(ASSET_DEPENDENTS, id)
-    return sql(`EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND origin = 'import' AND ${main.text}) AND ${rest.text}`, id, ...main.params, ...rest.params)
+    const custom = matchAssetCustom(value, id)
+    return sql(`EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND origin = 'import' AND ${main.text}) AND ${rest.text} AND ${custom.sql}`, id, ...main.params, ...rest.params, ...(custom.params ?? []))
   },
   absent: id => sql('NOT EXISTS(SELECT 1 FROM gk_assets WHERE id = ?)', id),
   write: (value, id, revision) => [sql(`INSERT INTO gk_assets (id, ${ASSET_FIELDS.join(', ')}, origin, import_revision, created_at, updated_at) VALUES (?, ${ASSET_FIELDS.map(() => '?').join(', ')}, 'import', ?, ?, ?)`, id, ...ASSET_FIELDS.map(field => value[field] ?? null), revision, Date.now(), Date.now())],
-  remove: id => [sql("DELETE FROM gk_assets WHERE id = ? AND origin = 'import'", id)],
+  remove: id => [sql("DELETE FROM gk_custom_values WHERE entity_type='asset' AND entity_id=? AND EXISTS(SELECT 1 FROM gk_assets WHERE id=? AND origin='import')", id, id), sql("DELETE FROM gk_assets WHERE id = ? AND origin = 'import'", id)],
   ids: db => idsOf(db, 'gk_assets'),
   count: "(SELECT COUNT(*) FROM gk_assets WHERE origin = 'import')",
 }
@@ -125,7 +129,7 @@ const work: Kind = {
 export const KINDS: Record<string, Kind> = { asset, meter, reading, part, work }
 const kindOf = (name: string) => { const kind = KINDS[name]; if (!kind) throw new Error(`TARGET_KIND_UNKNOWN: ${name}`); return kind }
 
-export const gasketTargets: D1TargetAdapter = {
+export const gasketTargets = (importer: string): D1TargetAdapter => ({
   async read(db, destination, kind, id) {
     const row = await kindOf(kind).read(db, id)
     return row ? { destination, targetKind: kind, targetId: id, value: row.value as Json, revision: row.revision } : undefined
@@ -136,7 +140,8 @@ export const gasketTargets: D1TargetAdapter = {
     return row ? kindOf(kind).matches(value!, id, row.revision) : kindOf(kind).absent(id)
   },
   write(row: TargetRow) {
-    return kindOf(row.targetKind).write(row.value as Record<string, any>, row.targetId, row.revision)
+    const value = row.value as Record<string, any>
+    return [...kindOf(row.targetKind).write(value, row.targetId, row.revision), ...(row.targetKind === 'asset' ? writeAssetCustom(value, row.targetId, importer) : [])]
   },
   remove(_destination, kind, id) {
     return kindOf(kind).remove(id)
@@ -149,4 +154,4 @@ export const gasketTargets: D1TargetAdapter = {
   matchesCount(count) {
     return sql(`(${Object.values(KINDS).map(kind => kind.count).join(' + ')}) = ?`, count)
   },
-}
+})

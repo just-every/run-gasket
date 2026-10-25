@@ -1,3 +1,4 @@
+import { customStatements, customValues } from './custom-fields'
 import { canonicalPart, UNMERGED } from './part-identity'
 import { catalogView } from './catalogs'
 // Clause 3 (and the parts half of clause 8): parts, stock movements and
@@ -23,8 +24,9 @@ export async function createPart(env: Bindings, actor: Actor, input: Input) {
   const number = input.text('number', { max: 60 }), name = input.text('name', { max: 160 }), unit = input.text('unit', { max: 20 })
   const minimum = toMilli(input.text('minimum', { optional: true, max: 20 }) || '0', 'minimum', { allowZero: true })
   const location = input.text('location', { optional: true, max: 120 }) || null
-  const id = newId()
-  await commit(env, [stmt(env, 'INSERT INTO gk_parts (id, number, name, unit, minimum_milli, location, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', id, number, name, unit, minimum, location, now())],
+  const id = newId(), category = input.text('category', { optional: true, max: 80 }) || null
+  const custom = await customStatements(env, actor, input, 'part', id, category, true)
+  await commit(env, [stmt(env, 'INSERT INTO gk_parts (id, number, name, unit, minimum_milli, location, created_at, category) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', id, number, name, unit, minimum, location, now(), category), ...custom],
     { actor: actor.id, action: 'part.create', subject: id, detail: { number, name, unit, minimum: fromMilli(minimum) } })
   return { id }
 }
@@ -177,5 +179,5 @@ export async function partDetail(env: Bindings, _actor: Actor, id: string) {
     row.remaining_value_cents = (row.value_cents ?? 0) - row.dispositions.reduce((sum: number, event: any) => sum + event.value_cents, 0)
     row.remaining = fromMilli(row.remaining_milli)
   }
-  return { ...found, catalog, photos, merges, quarantines: quarantines.map(row => ({ ...row, quantity: fromMilli(row.quantity_milli) })), quarantinedQuantity: fromMilli(quarantines.reduce((sum,row) => sum+row.remaining_milli,0)), quarantinedValueCents: quarantines.reduce((sum,row) => sum+row.remaining_value_cents,0), ...stockValue(found.on_hand, found.stock_value), onHand: fromMilli(found.on_hand), reserved: fromMilli(reserved), available: fromMilli(found.on_hand - reserved), reservations: held, substitutes, minimum: fromMilli(found.minimum_milli), seen: moves[0]?.seq ?? 0, moves: moves.map(move => ({ ...move, quantity: fromMilli(move.quantity_milli), counted: move.counted_milli === null ? null : fromMilli(move.counted_milli) })) }
+  return { ...found, customFields: await customValues(env, 'part', found.id, found.category), catalog, photos, merges, quarantines: quarantines.map(row => ({ ...row, quantity: fromMilli(row.quantity_milli) })), quarantinedQuantity: fromMilli(quarantines.reduce((sum,row) => sum+row.remaining_milli,0)), quarantinedValueCents: quarantines.reduce((sum,row) => sum+row.remaining_value_cents,0), ...stockValue(found.on_hand, found.stock_value), onHand: fromMilli(found.on_hand), reserved: fromMilli(reserved), available: fromMilli(found.on_hand - reserved), reservations: held, substitutes, minimum: fromMilli(found.minimum_milli), seen: moves[0]?.seq ?? 0, moves: moves.map(move => ({ ...move, quantity: fromMilli(move.quantity_milli), counted: move.counted_milli === null ? null : fromMilli(move.counted_milli) })) }
 }

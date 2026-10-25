@@ -1,3 +1,4 @@
+import { customFields, customValues } from './custom-fields'
 import { recoveryHealth } from './recovery'
 import { strategyView } from './pm-strategies'
 import { responseSettings } from './request-response'
@@ -62,6 +63,8 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  customFields: env => customFields(env, undefined, undefined, true),
+  locationFields: async (env,_actor,id) => { insist(await one(env,"SELECT 1 FROM gk_request_targets WHERE id=? AND kind='location'",id),'location_not_found',404);return customValues(env,'location',id) },
   recovery: (env,actor) => recoveryHealth(env,actor),
   pmStrategies:(env,actor)=>strategyView(env,actor),
   requestResponse:(env,actor)=>responseSettings(env,actor),
@@ -99,7 +102,7 @@ export const views: Record<string, View> = {
   me: async (_env, actor) => ({ id: actor.id, email: actor.email, name: actor.name, role: actor.role, today: actor.today, zone: actor.zone }),
   site: env => site(env),
   members: async (env, actor) => { requireCapability(actor, 'site.manage'); return await members(env) },
-  assets: (env, actor) => assetList(env, actor),
+  assets: (env, actor, _id, url) => assetList(env, actor, url),
   asset: (env, actor, id) => assetDetail(env, actor, id),
   history: (env, actor, id) => assetHistory(env, actor, id),
   parts: (env, actor) => partList(env, actor),
