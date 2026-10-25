@@ -1620,7 +1620,7 @@
       "executable": false
     },
     "src/gasket/retention.ts": {
-      "sha256": "2d4b67242e2a743ab180f4b7dc1dd883ebcc560a652f5106c78d4c5810367626",
+      "sha256": "799102a7b60c0310d858543075a994d8e39bb265c1897d73b210788a5f7f9ba1",
       "executable": false
     },
     "src/gasket/review.ts": {
@@ -3952,7 +3952,7 @@
       "executable": false
     },
     "tests/gasket/search.mjs": {
-      "sha256": "4b705d6659a1ef80220578c77020264570ad94877644f2c2bcd6d84a03ac3302",
+      "sha256": "79f4ab57ec3a681301480119cd8ede052bace453eb64d302c73fe0df4b0710ad",
       "executable": false
     },
     "tests/gasket/spend-browser.mjs": {

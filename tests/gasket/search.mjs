@@ -192,6 +192,15 @@ export async function retentionJourney() {
   const audit = (await h.api('audit?action=workorder.evidence', owner)).rows.filter(row => row.subject === work)
   assert.ok(audit.length)
   assert.ok(audit.every(row => row.detail === '{}'), 'original filename is removed from retained attachment audit')
+  const racingWork = (await h.api('workorder.create', owner, { asset: ids[0], title: 'Concurrent hold and erasure', due: (await h.api('me', owner)).today, assignee: ownId })).id
+  const racingEvidence = (await h.api('workorder.evidence', owner, { workOrder: racingWork, file: file('race.png', png, 'image/png') })).evidence
+  const raced = await Promise.all([
+    h.raw('/api/gasket/retention.hold', { cookie: owner, body: { kind: 'attachment', id: racingEvidence, revision: 0, held: true, reason: 'Preserve concurrent original' } }),
+    h.raw('/api/gasket/attachment.erase', { cookie: owner, body: { evidence: racingEvidence, version: 2, confirm: true } }),
+  ])
+  await Promise.all(raced.map(response => response.text()))
+  assert.deepEqual(raced.map(response => response.status).sort(), [200,409], 'a hold and erasure cannot both claim the same original')
+  assert.equal((await h.raw(`/app/evidence/${racingEvidence}`, { cookie: owner })).status, raced[0].status === 200 ? 200 : 404)
   // Signed and required originals remain obligations even without a legal hold.
   const signedPhoto = (await h.api('workorder.evidence', owner, { workOrder: work, version: (await h.api(`work/${work}`, owner)).version, file: file('signed.png', png, 'image/png') })).evidence
   await h.api('workorder.sign', owner, { workOrder: work, version: (await h.api(`work/${work}`, owner)).version, role: 'technician' })

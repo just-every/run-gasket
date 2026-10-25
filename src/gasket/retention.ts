@@ -19,6 +19,7 @@ export async function holdRecord(env: Bindings, actor: Actor, input: Input) {
   const revision = input.integer('revision', { min: 0 })
   insist(revision === (old?.revision ?? 0), 'stale', 409)
   await commit(env, [
+    guard(env, 'stale', kind === 'attachment' ? 'EXISTS(SELECT 1 FROM gk_evidence WHERE id=?) OR EXISTS(SELECT 1 FROM gk_request_files WHERE id=?)' : `EXISTS(SELECT 1 FROM ${table} WHERE id=?${kind === 'request' && held ? ' AND erased_at IS NULL' : ''})`, ... (kind === 'attachment' ? [id,id] : [id])),
     guard(env, 'stale', `(SELECT COALESCE((SELECT revision FROM ${holds} WHERE kind=? AND record_id=?),0))=?`, kind, id, revision),
     stmt(env, `INSERT INTO ${holds}(kind,record_id,held,reason,revision,changed_by,changed_at) VALUES(?,?,?,?,1,?,?)
       ON CONFLICT(kind,record_id) DO UPDATE SET held=excluded.held,reason=excluded.reason,revision=${holds}.revision+1,changed_by=excluded.changed_by,changed_at=excluded.changed_at`, kind, id, Number(held), reason, actor.id, now()),
