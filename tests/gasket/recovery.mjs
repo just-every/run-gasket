@@ -13,6 +13,12 @@ export async function recoveryJourney() {
   try {
     const owner = await h.owner()
     await h.api('site.configure', owner, { name: 'Recovery estate', timezone: 'UTC' })
+    assert.deepEqual(await h.api('recovery', owner), { backup: null, restore: null, drill: null, backupAgeMinutes: null })
+    assert.equal((await h.raw('/api/gasket/recovery')).status, 401)
+    await h.api('access.give', owner, { name: 'Recovery lead', email: 'synthetic-gasket-recovery@example.test', role: 'lead' })
+    const lead = await h.signIn('synthetic-gasket-recovery@example.test')
+    await h.api('recovery', lead, undefined, 403)
+    await h.api('recovery.drill', lead, { receipt: 'synthetic-gasket-1', confirm: true }, 403)
     const asset = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-recovery', name: 'Recovery pump', location: 'Plant' })).id
     const checklist = (await h.api('checklist.create', owner, { name: 'Recovery inspection', items: ['Listen for noise'] })).id
     const today = (await h.api('me', owner)).today
@@ -48,6 +54,19 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/api/gasket/me', { cookie: owner })).status, 401, 'source sessions are excluded')
       const signed = await restored.signIn(h.vars.OWNER_EMAIL)
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
+      const recovery = await restored.api('recovery', signed)
+      assert.equal(recovery.restore.kind, 'restore')
+      assert.equal(recovery.restore.recovery_point, records[0].exportedAt)
+      assert.equal(recovery.restore.content_hash, records.at(-1).contentHash)
+      assert.equal(recovery.restore.archive_hash, records.at(-1).archiveHash)
+      assert.equal(recovery.drill, null, 'an import does not claim a verified drill')
+      await restored.api('recovery.drill', signed, { receipt: recovery.restore.id }, 400)
+      await restored.api('recovery.drill', signed, { receipt: recovery.restore.id, confirm: true })
+      const drill = (await restored.api('recovery', signed)).drill
+      assert.equal(drill.drill_by, (await restored.api('me', signed)).id)
+      assert.ok(drill.drill_at)
+      await restored.api('recovery.drill', signed, { receipt: recovery.restore.id, confirm: true })
+      assert.equal((await restored.api('audit?action=recovery.drill', signed)).rows.length, 1, 'drill confirmation is idempotent')
       const schedules = await restored.api('schedules', signed)
       assert.ok(schedules.length); assert.ok(schedules.every(row => !row.active))
       assert.ok((await restored.api('automation' + '/jobs', signed)).rules.every(row => row.paused))
@@ -70,6 +89,10 @@ export async function recoveryJourney() {
             for (const [name,path] of [['automation','/app/automation'],['schedules','/app/schedules']]) {
               await page.goto(restored.origin + path)
               await page.getByRole('heading', { name: name === 'automation' ? 'Automation' : 'Schedules', exact: true, level: 1 }).waitFor()
+              if (name === 'automation') {
+                await page.getByRole('heading', { name: 'Backup and recovery', exact: true }).waitFor()
+                assert.match(await page.locator('main').innerText(), /Last owner-confirmed restore drill/)
+              }
               await page.evaluate(async () => { await document.fonts.ready })
               assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${name} fits ${width}`)
               await page.screenshot({ path: `${process.env.GASKET_RECOVERY_SCREENSHOTS}/${name}-${width}.png`, fullPage: true })
@@ -90,6 +113,13 @@ export async function recoveryJourney() {
     const source = await harness({ vars: h.vars, installation: h.installation })
     try {
       const signed = await source.signIn(h.vars.OWNER_EMAIL)
+      const backup = await source.api('recovery', signed)
+      assert.equal(backup.backup.kind, 'backup')
+      assert.equal(backup.backup.recovery_point, records[0].exportedAt)
+      assert.equal(backup.backup.content_hash, records.at(-1).contentHash)
+      assert.equal(backup.restore, null)
+      assert.equal(backup.drill, null)
+      assert.ok(Number.isFinite(backup.backupAgeMinutes))
       assert.deepEqual(await source.api('schedules', signed), sourceSchedule, 'export leaves source schedules active')
       assert.deepEqual((await source.api('automation' + '/jobs', signed)).rules, sourceRules)
       const current = await source.api(`requests/${request}`, signed)
@@ -100,6 +130,12 @@ export async function recoveryJourney() {
       assert.deepEqual(erased.files, [], 'erasure removes file records')
       assert.equal((await source.raw(`/app/request-files/${photo}`, { cookie: signed })).status, 404, 'erasure removes photo bytes')
       await source.stop()
+      await assert.rejects(h.installation.rer('export', '--output', archive))
+      const reopened = await harness({ vars: h.vars, installation: h.installation })
+      try {
+        const checkOwner = await reopened.signIn(h.vars.OWNER_EMAIL)
+        assert.deepEqual((await reopened.api('recovery', checkOwner)).backup, backup.backup, 'refused export does not advance backup freshness')
+      } finally { await reopened.close() }
       const later = join(h.installation.root, 'exports', 'after-erasure.rer')
       await h.installation.rer('export', '--output', later)
       const afterBytes = await readFile(later)

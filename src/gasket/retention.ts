@@ -31,8 +31,17 @@ export async function retentionPreview(env: Bindings, actor: Actor, url: URL) {
   insist(request, 'request_not_found', 404)
   const held = !await one(env, `SELECT 1 WHERE ${REQUEST_NOT_HELD}`, id, id)
   const files = (await one<{ count: number; bytes: number }>(env, 'SELECT COUNT(*) AS count,COALESCE(SUM(size),0) AS bytes FROM gk_request_files WHERE request_id=?', id))!
-  return { id, version: request.version, held, erased: Boolean(request.erased_at), files, linkedWork: request.work_order_id,
+  const dependencies = await requestErasureCounts(env, id)
+  const result = await one(env, 'SELECT result_json FROM gk_request_erasure_results WHERE request_id=?', id)
+  return { dependencies, result: result ? JSON.parse(result.result_json) : null, id, version: request.version, held, erased: Boolean(request.erased_at), files, linkedWork: request.work_order_id,
     holds: await all(env, "SELECT kind,record_id,held,reason,revision FROM gk_retention_holds WHERE (kind='request' AND record_id=?) OR (kind='work' AND record_id=?)", id, request.work_order_id),
     policy: 'Retain indefinitely. No automatic erasure. Explicit owner confirmation is required by the request erasure door.',
     obligations: ['Maintenance work and its audit remain; copied request fault details are anonymized.', 'Prior downloads remain outside local erasure.', 'Supply a later archive as the erasure journal when restoring. An archive older than a request erasure is refused.'] }
+}
+
+export async function requestErasureCounts(env: Bindings, id: string) {
+  const tables = { attachments: 'gk_request_files', events: 'gk_request_events', clocks: 'gk_request_clocks', clockEvents: 'gk_request_clock_events', escalations: 'gk_request_escalations' }
+  const counts: Record<string, number> = {}
+  for (const [kind, table] of Object.entries(tables)) counts[kind] = (await one(env, `SELECT COUNT(*) AS n FROM ${table} WHERE request_id=?`, id)).n
+  return counts
 }

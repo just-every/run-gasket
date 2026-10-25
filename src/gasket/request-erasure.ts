@@ -1,5 +1,5 @@
 import { redactionStatements, invalidateTransfersStatements } from '@runeditrun/rer/modules/portability/journal'
-import { REQUEST_NOT_HELD } from './retention'
+import { REQUEST_NOT_HELD, requestErasureCounts } from './retention'
 // Explicit owner erasure keeps the request number while removing private intake.
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
@@ -11,12 +11,18 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
   insist(input.flag('confirm'), 'erasure_confirmation_required')
   const id = input.text('request'), r = await one(env, 'SELECT * FROM gk_requests WHERE id=?', id)
   insist(r, 'request_not_found', 404)
-  if (r.erased_at) return { id }
+  if (r.erased_at) {
+    const saved = await one(env, 'SELECT result_json FROM gk_request_erasure_results WHERE request_id=?', id)
+    return { id, result: saved ? JSON.parse(saved.result_json) : null }
+  }
   const version = input.integer('version', { min: 1 })
   insist(version === r.version, 'stale', 409)
+  const removed = await requestErasureCounts(env, id)
+  const result = { removed, anonymized: { requests: 1, linkedWork: r.work_order_id && r.status === 'converted' ? 1 : 0 }, retained: { maintenanceWork: r.work_order_id ? 1 : 0, audit: true }, priorDownloads: 'Outside local erasure' }
   await commit(env, [
     guard(env, 'retention_hold', REQUEST_NOT_HELD, id, id),
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=? AND erased_at IS NULL)', id, version),
+    stmt(env, 'INSERT INTO gk_request_erasure_results(request_id,result_json) VALUES(?,?)', id, JSON.stringify(result)),
     // Fence older archives and invalidate export snapshots in the erasure batch.
     ...await redactionStatements(env.DB),
     ...await invalidateTransfersStatements(env.DB),
@@ -34,5 +40,5 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
     ] : []),
     stmt(env, "UPDATE gk_requests SET description='',contact='',requester_id=NULL,answers_json='{}',form_json='[]',status='declined',erased_at=?,version=version+1 WHERE id=?", now(), id),
   ], { actor: actor.id, action: 'request.erase', subject: id, detail: { erased: true } })
-  return { id }
+  return { id, result }
 }
