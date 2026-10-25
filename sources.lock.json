@@ -3844,7 +3844,7 @@
       "executable": false
     },
     "tests/gasket/automation.mjs": {
-      "sha256": "510adb70af190143be36630c0a6a3c7550e6dbdc8999b625222e97d5b6778a52",
+      "sha256": "680ab4bfe875d57069c3be2b39bea666cfc7ce55935f0bc13753bcae3d3a375a",
       "executable": false
     },
     "tests/gasket/clock.mjs": {

@@ -137,7 +137,7 @@ export async function connectorJourney() {
       const expected=createHmac('sha256',config.secret).update(`${headers['gasket-timestamp']}.${headers['gasket-id']}.${body}`).digest('hex')
       assert.equal(headers['gasket-signature'],`v1=${expected}`,'receiver independently verifies exact signed bytes')
       const mode=modes.get(name)
-      received.push({name,body:JSON.parse(body),headers})
+      received.push({name,body:JSON.parse(body),headers,rawBody:body})
       captured={body,headers}
       if(mode==='rate')return new Response('Synthetic rate limit',{status:429,headers:{'retry-after':'120'}})
       if(mode==='reject')return new Response('Synthetic invalid receiver configuration',{status:422})
@@ -237,7 +237,7 @@ export async function connectorJourney() {
     const interruptedReceipt = (await state()).deliveries.find(row => row.type === 'receipt.created')
     assert.equal(interruptedReceipt.state, 'retry')
     assert.equal(interruptedReceipt.error, 'network_failure')
-    modes.set('receipt','rate')
+    await control('receipt',true)
     const receiptEvent=received.find(row=>row.name==='receipt')
     assert.equal(receiptEvent.body.sourceId,receipt.receipt)
     assert.deepEqual(receiptEvent.body.data,{orderId:order,revisionId,externalId:'synthetic-gasket-4'})
@@ -249,7 +249,7 @@ export async function connectorJourney() {
     modes.set('work','rate')
     await h.api('workorders.bulk',cookie.lead,{workOrder:[work],version:['1'],action:'reschedule',due:today})
     await run(now()+4000)
-    current=await state();let pending=current.deliveries.find(row=>row.state==='retry')
+    current=await state();let pending=current.deliveries.find(row=>row.state==='retry' && row.type==='work.changed')
     assert.equal(pending.error,'rate_limited');assert.equal(pending.attempts,1)
     const count=received.length
     await run(now()+60_000);assert.equal(received.length,count,'no retry before receiver Retry-After')
@@ -298,6 +298,7 @@ export async function connectorJourney() {
     assert.deepEqual([effects.stock.length,effects.bills.length],[1,1], 'restore and resumed receipt delivery never duplicate stock or bills')
     assert.equal((await h.api('receipt.receive',cookie.lead,receiptInput)).replayed,true,'the restored source receipt also rejects a duplicate business operation')
     assert.deepEqual(await h.api(`parts/${part}`,cookie.lead),domainBefore.part)
+    captured={body:retried.rawBody,headers:retried.headers}
     const oldKey=await receiveWebhook(new Request('https://receiver.example.test/work',{method:'POST',headers:captured.headers,body:captured.body}),{secret:workSub.secret,keyVersion:1,acceptOnce:()=>{throw Error('must not apply')},now:receiverClock})
     assert.equal(oldKey.status,401)
     const expired=await receiveWebhook(new Request('https://receiver.example.test/work',{method:'POST',headers:captured.headers,body:captured.body}),{...keys.get('work'),acceptOnce:()=>{throw Error('must not apply')},now:Number(captured.headers['gasket-timestamp'])*1000+301_000})
