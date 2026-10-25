@@ -13,14 +13,16 @@ In MaintainX, open **Reporting → Export Data** and export as **CSV (Excel)** w
 
 ## 2. Dry run
 
-In Gasket, open **More → Move in from MaintainX**, choose the files and how dates are written in the exports (month first, MaintainX's default, or day first), and press **Dry run**.
+In Gasket, open **Move in from MaintainX**, choose the files and how dates are written in the exports (month first, MaintainX's default, or day first), and press **Dry run**.
 
 The dry run writes nothing. It shows:
 
 - how many assets, meters, readings, parts and completed work orders would be created;
-- every rejected row and why, for example a row with no location, a duplicate MaintainX ID, a criticality that is not one of your levels under **More → Codes and failures**, a counter reading lower than an earlier one, or a work order that is not Done;
+- every rejected row and why, for example a row with no location, a duplicate MaintainX ID, a criticality that is not one of your levels under **Codes and failures**, a counter reading lower than an earlier one, or a work order that is not Done;
 - what needs your attention, such as an asset that was Offline in MaintainX, or a work order whose categories match no failure mode code (it moves in unclassified);
 - what is not carried across.
+
+Define asset custom fields under **Custom fields** first. On the dry run, expand **Map asset columns** to choose which export column fills each field, then press **Review mapping**. A unique exact field-name match is selected automatically. Required values, field types and category scope are validated before a row can be applied. Renaming a field keeps its id and imported values. Editing imported custom values blocks undo, even if the value is later changed back.
 
 Fix rows in MaintainX and export again, or carry on without them. A dry run of files you already applied shows those rows as already moved in, unchanged.
 
@@ -34,7 +36,7 @@ The **Move-in journal** lists every move-in. **Undo this move-in** removes every
 
 ## What is not carried
 
-Asset hierarchy (each parent is kept as a note), teams, vendors, depreciation, attachments, custom fields, procedures, PM schedules, open work orders, procedure answers and time entries. Completed work orders arrive as history only: they never raise work or move a schedule, and their recurrence is kept as text. MaintainX parts have no unit, so every part arrives in "each"; change units before your first count if needed. The custodian is MaintainX's first assigned team; change it to the person responsible.
+Asset hierarchy (each parent is kept as a note), teams, vendors, depreciation, attachments, part and work custom fields, procedures, PM schedules, open work orders, procedure answers and time entries. Completed work orders arrive as history only: they never raise work or move a schedule, and their recurrence is kept as text. MaintainX parts have no unit, so every part arrives in "each"; change units before your first count if needed. The custodian is MaintainX's first assigned team; change it to the person responsible.
 
 After moving in, count your shelves, write your checklists and schedules in Gasket, and keep MaintainX read-only until a lead has run one full preventive cycle in Gasket.
 

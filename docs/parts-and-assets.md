@@ -44,3 +44,9 @@ On an asset's page, a lead keeps its **Bill of materials**: the parts a repair n
 To reconcile the register with the floor, record a sighting on the asset's page: found at its recorded location, found somewhere else, or not found. The asset list shows the last sighting of each.
 
 Next: [People, access and agents](people-and-agents.md).
+
+## Custom register fields
+
+Owners and maintenance leads define fields under **Custom fields** in Settings. Choose the record type, scope and typed validation. Asset and part register forms accept the applicable values; their detail pages and signed-in scan labels show the values, an edit disclosure and actor-stamped history. Location records open from the location register on the field Settings page. Part category changes validate newly required values in the same operation.
+
+The asset register filters by a field value and downloads the selected register as CSV. Part and location CSV downloads also include custom values and archived fields. Renaming keeps values; archiving a definition keeps both values and history. Moving a record out of a field's category also keeps its old values archived. Native technician-app coverage requires FIELD-001, and additional sites require ADMIN-002.

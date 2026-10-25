@@ -60,7 +60,7 @@ export async function customFieldsJourney() {
     assert.equal(archived.retired,1);assert.equal(archived.value,480);assert.equal(archived.history.length,1)
     assert.ok((await (await h.raw('/app/parts.csv',{cookie:owner})).text()).includes('Voltage (archived)'))
     const imported='Name,ID,Location,Types,Refrigerant type\r\nRoof cooler,synthetic-gasket-1,Roof,HVAC,R-32\r\n'
-    const input={assets:file('assets.csv',imported),dateOrder:'MDY',customMapping:{'Refrigerant type':refrigerant}}
+    const input={assets:file('assets.csv',imported),dateFormat:'MDY',customMapping:{'Refrigerant type':refrigerant}}
     const preview=await h.api('import.preview',owner,input)
     const applied=await h.api('import.apply',owner,{...input,fingerprint:preview.fingerprint})
     assert.equal(applied.state,'completed')

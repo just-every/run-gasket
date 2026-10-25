@@ -424,3 +424,95 @@ User and maintenance-record settings are retained for their future erasure doors
 those classes are not currently eligible for deletion. `retention.hold` also
 accepts attachment and user kinds. Attachment holds protect their original files;
 user holds protect their linked request intake and uploaded work originals.
+
+## Register custom fields
+
+Owners and maintenance leads define fields at `/app/settings/fields` or with
+`POST /api/gasket/customfield.save`. Supply `name`, `entityType` (`asset`,
+`location` or `part`), `type` (`text`, `number`, `single`, `multiple`, `date`,
+`boolean` or `link`), and `scope` (`organization`, `site` or `category`). Category
+scope names one asset or part `category`. Number fields require `unit` and accept
+`minimum` and `maximum`. Choice `options` are comma-separated or one per line.
+`required: true` refuses missing values when creating or editing an applicable
+record. Existing records remain readable while a newly required field is filled.
+
+Asset and part creation accept `customValues`, an object keyed by field id. The
+`customvalue.set` action accepts `entityType`, `entityId` and `customValues`.
+Values are JSON scalars or arrays; number strings and comma-separated multiple
+choices are also accepted. The existing register-management permission controls
+writes. Ordinary authorized record reads include `customFields` with values,
+value revisions and actor-stamped history. Signed-out intake never receives them.
+Location fields are at `/api/gasket/locations/{id}/fields`; their id is the
+published location target, also used by `/app/locations/{id}` and its scan label.
+
+A field rename supplies its `id`, current `revision` and unchanged definition to
+`customfield.save`. Definition types and applicability are immutable; define a
+new field to change their meaning. `customfield.retire` takes `id` and `revision`
+and archives values. `part.category` takes `part`, its `revision`, `category`
+and any newly required `customValues`. Previously scoped values remain archived.
+
+`GET /api/gasket/search?kind=asset&field={id}&value=R-32` filters scalar values
+or exact array members; `kind=part` uses the same door. Saved views retain these
+filters and recheck record access. The asset register also accepts `field` and
+`value`. `/app/assets.csv`, `/app/parts.csv` and `/app/locations.csv` include
+custom values, units and archived definitions; CSV downloads require the
+existing history-export permission and neutralize spreadsheet formulas.
+
+The current organization and current site share this installation's boundary.
+Multiple sites, native apps and custom dashboards inherit field coverage under
+ADMIN-002, FIELD-001 and REPORT-007. Full migration doors inherit it under
+MIG-001, MIG-002 and MIG-007; the existing MaintainX asset mapper supports it now.
+
+## Site automation rules
+
+Owners and maintenance leads use `/app/settings/rules`; JSON clients use
+`GET /api/gasket/rules` and the `rules.save`, `rules.preview` and `rules.control`
+actions. A rule has a `name`, `trigger`, numeric `priority`, `conditions` and
+`actions`, plus a recorded `reason`. Editing supplies `rule` and its current
+`revision`. Each published revision starts paused. Enabling or pausing takes
+`rule`, `revision`, `paused` and `reason` and creates another immutable revision.
+The author retains responsibility; an owner editing a lead's rule does not
+silently replace that author's authority.
+
+Triggers are `request.submitted`, `work.created`, `work.status_changed`,
+`asset.status_changed`, `meter.recorded`, `part.below_minimum`,
+`checklist.failed` and `work.overdue`. They use committed source mutations;
+stock mutations below minimum each produce an event, and the scheduler evaluates
+retained overdue work once per local due date and day. A failed checklist result
+keeps its existing correction obligations. Imports never rerun old maintenance.
+
+Conditions are objects with `field`, `op` and `value`. Fields are `asset`,
+`location`, `category`, `priority`, `team`, `status`, `time` or `custom:{id}`.
+Operators are `eq`, `ne`, `contains`, `gte`, `lte`; time uses `between` with
+`value` and `until` as site-local 24-hour times, inclusive start and exclusive
+end. Crossing midnight is supported. All conditions must match. Archived custom
+fields do not match new events. Source snapshots retain routing and condition
+facts, excluding request contacts, answers, files and free-text descriptions.
+
+Actions are `assign` (`team`, `person`), `priority` (`value`), `status` (`value`),
+`due` (`days`), `procedure` (`value` is a checklist id), `notify` (`people` or
+`team`, and `text`), `follow_up` (`title`, `days`) and `request_approval`.
+Work status is limited to open or in progress; request status to new or needs
+details. Attaching a procedure refuses existing results or an existing procedure.
+Requesting approval submits complete work already held by the author and never
+approves it. Every effect rechecks the author's current active rights and grant.
+Assignments and notices refuse newly exposing a record. No action approves work,
+approves spend, closes findings, deletes data or sends to an external channel.
+
+Rules run by ascending priority and then id; the first action for a conflicting
+field wins, with later conflicts visible. Repeated rule visits to the same
+record and bounded chain depth stop with a visible error. Every committed action
+records its rule revision, event, input and output in audit and execution history.
+A failed action stops later actions and preserves earlier committed effects.
+Catch-up refuses an event with completed effects to avoid repeating them.
+
+`rules.preview` takes `rule`, optional `revision`, and optional epoch-millisecond
+`from` and `to` bounds (default: the last seven days, at most 200 recent records).
+It reads retained source snapshots or explicitly labelled current fields of
+older recent requests, checks proposed effects and conflicts, and writes no
+work, notices, purchases, audit or execution rows. Paused-rule previews are
+allowed. `rules.control` with `catchUp: true` and a retained `event` retries an
+untouched paused or failed source under the revision supplied; repeated catch-up
+keeps the source identity. Health shows pauses, events, executions and errors.
+External delivery remains unavailable. The conservative author, access and
+in-app-only policy awaits ct approval under PLAN-009.

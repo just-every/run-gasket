@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "f663e060dfdfefbe320dc8ed26efe3bf31a46fe98ce94a95165b6531f0070edb",
+      "sha256": "86218c0cd9d695a4d67e125cbe20a229e2cb708bc31d81f442bdfe76ddd5c0b0",
       "executable": false
     },
     "base-copies.json": {
@@ -236,11 +236,11 @@
       "executable": false
     },
     "docs/move-in.md": {
-      "sha256": "6108c65f4992d8706fd210a9b80c6938e7a4ee180a08db033b123aaf5f04ad80",
+      "sha256": "455c0fc144932b63b518cbc41d1531b8af81cf5a9bd62094911d38ade96db94e",
       "executable": false
     },
     "docs/parts-and-assets.md": {
-      "sha256": "7cd15e9486a403fea09656468bf09750ad98f29b811943bf3c4b0775dd52136d",
+      "sha256": "a5d35fbb081f43b848128562631272b92823eaf7e61bcf4c768b6c0da28d91a4",
       "executable": false
     },
     "docs/people-and-agents.md": {
@@ -752,7 +752,7 @@
       "executable": false
     },
     "public/gasket.css": {
-      "sha256": "448657beb78419e72ff2a704df798604127c9fa69a0922e7173ecee027bc7eed",
+      "sha256": "1a03e1fd3345b795912009b774a4ae1ebe08f667aa4e5246c4962befb29bbe12",
       "executable": false
     },
     "public/label-scan.js": {
@@ -3908,7 +3908,7 @@
       "executable": false
     },
     "tests/gasket/custom-fields.mjs": {
-      "sha256": "5e53cb8d989a673727559172adea489f4642e4a70c408feeae1a4d771c843c23",
+      "sha256": "fa2541b1e0b84072f6726abfeb88d8f7dacb47df5c2078ef23918d8017b55dd6",
       "executable": false
     },
     "tests/gasket/fixtures.mjs": {

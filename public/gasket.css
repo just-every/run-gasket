@@ -291,7 +291,7 @@ td:first-child .gk-cell > a:hover { text-decoration: underline; }
 .gk-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .gk-field label, fieldset legend { font-size: 14px; line-height: 20px; font-weight: 600; color: #2b3754; }
 .gk-hint { color: var(--rer-muted); font-size: 13px; line-height: 18px; margin: 0; }
-input[type="text"], input[type="email"], input[type="number"], input[type="date"], input[type="datetime-local"], input:not([type]), select, textarea {
+input[type="text"], input[type="email"], input[type="url"], input[type="time"], input[type="number"], input[type="date"], input[type="datetime-local"], input:not([type]), select, textarea {
   font: inherit; font-size: 15px; color: var(--rer-text); background: var(--rer-surface); border: 1px solid var(--gk-field-line); border-radius: 10px; padding: 9px 13px; min-height: 44px; width: 100%; transition: border-color .12s; }
 input:hover, select:hover, textarea:hover { border-color: #9fb0cf; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--gk-accent); outline: 3px solid color-mix(in srgb, var(--rer-focus) 30%, transparent); outline-offset: 0; }
