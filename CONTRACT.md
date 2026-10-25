@@ -366,8 +366,8 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 47 | 34 | 41 | 122 |
-| All | 61 | 34 | 41 | 136 |
+| Target and push further | 48 | 33 | 41 | 122 |
+| All | 62 | 33 | 41 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |

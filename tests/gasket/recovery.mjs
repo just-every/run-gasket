@@ -63,7 +63,7 @@ export async function recoveryJourney() {
       assert.equal(recovery.restore.archive_hash, records.at(-1).archiveHash)
       assert.equal(recovery.drill, null, 'an import does not claim a verified drill')
       await restored.api('recovery.drill', signed, { receipt: recovery.restore.id }, 400)
-      await restored.api('recovery.drill', signed, { receipt: recovery.restore.id, confirm: true })
+      await restored.submit('recovery.drill', signed, { receipt: recovery.restore.id, confirm: 'yes' }, '/app/automation')
       const drill = (await restored.api('recovery', signed)).drill
       assert.equal(drill.drill_by, (await restored.api('me', signed)).id)
       assert.ok(drill.drill_at)
