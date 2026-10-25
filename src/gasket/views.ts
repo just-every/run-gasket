@@ -1,3 +1,5 @@
+import { strategyView } from './pm-strategies'
+import { responseSettings } from './request-response'
 import { requestReport } from './request-report'
 import { retentionPreview } from './retention'
 import { searchEstate, savedSearches } from './search'
@@ -59,6 +61,8 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  pmStrategies:(env,actor)=>strategyView(env,actor),
+  requestResponse:(env,actor)=>responseSettings(env,actor),
   requestReport:(env,actor,_id,url)=>requestReport(env,actor,url),
   retentionPreview: (env, actor, _id, url) => retentionPreview(env, actor, url),
   search: (env, actor, _id, url) => searchEstate(env, actor, url),

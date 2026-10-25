@@ -1,3 +1,5 @@
+import { copyStrategy, adaptStrategy, approveStrategy, previewStrategy, rolloutStrategy } from './pm-strategies'
+import { responsePolicy, changeRequestClock } from './request-response'
 import { holdRecord } from './retention'
 import { saveSearch, deleteSearch } from './search'
 import { eraseRequest } from './request-erasure'
@@ -77,7 +79,8 @@ export const actions: Record<string, Handler> = {
   'retention.hold': (env, actor, input) => holdRecord(env, actor, input),
   'search.save': (env, actor, input) => saveSearch(env, actor, input),
   'search.delete': (env, actor, input) => deleteSearch(env, actor, input),
-  'request.erase':eraseRequest, 'request.triage':triageRequest, 'request.reply':replyToRequest, 'request.convert':convertRequest, 'label.work':createLabelWork, 'request.portal':savePortal, 'request.target':saveTarget, 'request.field':addRequestField,
+  'pm.copy':copyStrategy, 'pm.adapt':adaptStrategy, 'pm.approve':approveStrategy, 'pm.preview':previewStrategy, 'pm.rollout':rolloutStrategy,
+  'request.responsePolicy':responsePolicy, 'request.clock':changeRequestClock, 'request.erase':eraseRequest, 'request.triage':triageRequest, 'request.reply':replyToRequest, 'request.convert':convertRequest, 'label.work':createLabelWork, 'request.portal':savePortal, 'request.target':saveTarget, 'request.field':addRequestField,
   'webhook.subscribe': subscribeWebhook, 'webhook.control': controlWebhook, 'webhook.rotate': rotateWebhook, 'webhook.resume': resumeWebhook, 'webhook.retry': retryWebhook,
   'catalog.preview':catalogPreview, 'catalog.undo':undoCatalog,
   'catalog.apply':(env,actor,input)=>importCatalog(env,actor,Input.of({supplier:input.text('supplier'),fingerprint:input.text('fingerprint'),file:{filename:input.text('filename'),base64:input.text('base64',{max:2_000_000}),type:input.text('mediaType',{optional:true})}})),

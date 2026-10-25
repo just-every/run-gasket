@@ -5,7 +5,7 @@ import { costingPage } from './ui/costing'
 import { costingCsv } from './costing'
 import { labelsPage, scanPage } from './ui/labels'
 import { submitRequest, requestFile } from './requests'
-import { requestPortalPage, requestReceiptPage, requestSettingsPage, requestsPage, requestPage } from './ui/requests'
+import { responseSettingsPage, requestPortalPage, requestReceiptPage, requestSettingsPage, requestsPage, requestPage } from './ui/requests'
 import { catalogPreviewPage } from './ui/catalog-preview'
 import { partMergePage } from './ui/part-merge'
 import { partPhoto } from './part-photos'
@@ -174,6 +174,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  requestResponse: (env,actor,url)=>responseSettingsPage(env,actor,url),
   workPdf: (env, actor, _url, id) => workPdf(env, actor, id),
   workPdfZip: (env, actor, url) => workPdfZip(env, actor, url),
   costing: (env,actor,url) => costingPage(env,actor,url),

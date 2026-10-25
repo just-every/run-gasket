@@ -1,3 +1,4 @@
+import { requestClock } from './request-response'
 import { requestWorkAccess } from './request-sources'
 // Opt-in operator intake. Anonymous traffic has no register/list/detail door.
 import type { Bindings } from '../auth.server'
@@ -84,6 +85,7 @@ export async function requestDetail(env:Bindings,actor:Actor,id:string) {
   return {...safe,answers:JSON.parse(row.answers_json),form:JSON.parse(row.form_json),
     files:await all(env,'SELECT id,field_key,filename,media_type,size,sha256 FROM gk_request_files WHERE request_id=? ORDER BY id',id),
     timeline:await all(env,'SELECT e.kind,e.text,e.at,m.name AS actor FROM gk_request_events e LEFT JOIN gk_members m ON m.id=e.actor WHERE request_id=? ORDER BY seq',id),
+    clock:can(actor,'work.assign')?await requestClock(env,row):null,
     linked:can(actor,'work.assign')?await all(env,'SELECT id,number,status,work_order_id FROM gk_requests WHERE duplicate_of=? OR id=?',row.duplicate_of || row.id,row.duplicate_of || row.id):[]}
 }
 async function photo(input:Input,name:string,optional:boolean) {
@@ -132,6 +134,7 @@ export async function submitRequest(env:Bindings,actor:Actor|null,portalId:strin
     guard(env,'label_retired',`EXISTS(SELECT 1 FROM gk_request_targets t LEFT JOIN gk_assets a ON a.id=t.asset_id WHERE t.id=? AND t.retired_at IS NULL AND a.retired_at IS NULL)`,target.id),
     stmt(env,`INSERT INTO gk_requests(id,number,portal_id,target_id,asset_id,location,description,urgency,contact,requester_id,answers_json,form_json,submission_key,fingerprint,created_at)
       VALUES(?,(SELECT COALESCE(MAX(number),0)+1 FROM gk_requests),?,?,?,?,?,?,?,?,?,?,?,?,?)`,id,portalId,target.id,target.asset_id,target.kind==='asset'?null:target.name,description,urgency,contact,actor?.id??null,JSON.stringify(answers),JSON.stringify(fields),keyHash,fingerprint,now()),
+    stmt(env,`INSERT INTO gk_request_clocks(request_id,policy_json) SELECT ?,policy_json FROM gk_request_response_policies WHERE urgency=? ORDER BY revision DESC LIMIT 1`,id,urgency),
     ...files.map(f=>stmt(env,'INSERT INTO gk_request_files(id,request_id,field_key,filename,media_type,size,sha256,bytes) VALUES(?,?,?,?,?,?,?,?)',f.id,id,f.field,f.filename,f.mediaType,f.bytes.length,f.sha256,f.bytes)),
     stmt(env,"INSERT INTO gk_request_events(request_id,kind,text,actor,at) VALUES(?,'submitted',?,?,?)",id,description,actor?.id??null,now()),
   ]

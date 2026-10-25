@@ -136,7 +136,7 @@ async function requestScreens(f,requestId) {
   finally {await context.close();await browser.close()}
 }
 if(process.argv[1]===fileURLToPath(import.meta.url)) {
-  const journeys={portal:requestPortalJourney,drafts:requestDraftJourney,labels:labelsJourney,triage:requestTriageJourney,report:requestReportJourney}
+  const journeys={portal:requestPortalJourney,drafts:requestDraftJourney,labels:labelsJourney,triage:requestTriageJourney,report:requestReportJourney,response:requestResponseJourney,strategy:strategyRolloutJourney}
   const task=process.env.REQUEST_JOURNEY || 'all'
   assert.ok(task==='all' || Object.hasOwn(journeys,task),`Unknown request journey: ${task}`)
   for(const journey of task==='all'?Object.values(journeys):[journeys[task]])await journey()
@@ -478,5 +478,188 @@ export async function requestReportJourney() {
     for(const door of ['/api/gasket/request-report','/app/request-report','/app/request-report.csv'])assert.equal((await h.raw(door,{cookie:cookie.lead})).status,403)
     assert.ok(lead)
     console.log('REQ-007 requestReportJourney: lifecycle denominators, source timestamps, scoped filters and CSV, reasons, definitions, responsive pages and access revocation passed')
+  } finally {await context?.close();await browser?.close();await h.close()}
+}
+
+export async function requestResponseJourney() {
+  const f=await requestFixture({clockInstant:Date.parse('2026-10-23T20:30:00Z')}),{cookie,portal,target,payload,post}=f
+  let h=f.h,browser,context
+  const advance=async at=>{await h.stop();h=await harness({installation:f.h.installation,vars:f.h.vars,clockInstant:Date.parse(at)})}
+  const detail=id=>h.api(`requests/${id}`,cookie.lead)
+  try {
+    const owner=(await h.api('me',cookie.owner)).id,lead=(await h.api('me',cookie.lead)).id
+    await h.api('closure.add',cookie.lead,{kind:'holiday',label:'Synthetic site holiday',startsOn:'2026-10-26'})
+    const policy={urgency:'normal',acknowledgmentMinutes:60,resolutionMinutes:240,owner,escalation:lead,afterHours:'business',weekdays:['1','2','3','4','5'],opens:540,closes:1020}
+    for(const who of [cookie.tech,cookie.agent])await h.api('request.responsePolicy',who,policy,403)
+    await h.api('request.responsePolicy',cookie.lead,{...policy,escalation:(await h.api('me',cookie.tech)).id},400)
+    await h.api('request.responsePolicy',cookie.lead,policy)
+    await h.api('request.responsePolicy',cookie.lead,{...policy,urgency:'emergency',afterHours:'elapsed',acknowledgmentMinutes:15,resolutionMinutes:60})
+    const ids=[]
+    for(const [name,urgency] of [['routine','normal'],['paused','normal'],['urgent','emergency'],['no-policy','high']]) {
+      await post({...payload,urgency,submissionKey:randomUUID(),description:`synthetic-gasket-${name}`})
+      ids.push((await h.api('requests',cookie.lead)).find(r=>r.description===`synthetic-gasket-${name}`).id)
+    }
+    const [routine,paused,urgent,unconfigured]=ids
+    assert.equal((await detail(unconfigured)).clock,null)
+    assert.equal((await detail(routine)).clock.policy.holidays[0].starts_on,'2026-10-26')
+    await h.api('request.clock',cookie.tech,{request:paused,revision:1,kind:'pause',reason:'Access unavailable'},403)
+    await h.api('request.clock',cookie.lead,{request:paused,revision:1,kind:'pause',reason:''},400)
+    await h.api('request.clock',cookie.lead,{request:paused,revision:1,kind:'pause',reason:'Access unavailable'})
+    await h.api('request.clock',cookie.lead,{request:paused,revision:1,kind:'resume',reason:'Old tab'},409)
+    // A new policy never silently resets existing clocks or holiday snapshots.
+    await h.api('request.responsePolicy',cookie.lead,{...policy,acknowledgmentMinutes:600})
+    assert.equal((await detail(routine)).clock.acknowledgment.targetMinutes,60)
+    await advance('2026-10-26T16:00:00Z')
+    await h.scheduled('*/15 * * * *')
+    let r=await detail(routine),u=await detail(urgent),p=await detail(paused)
+    assert.ok(Math.abs(r.clock.acknowledgment.elapsedMinutes-30)<1,'only Friday business time counts across the holiday and weekend')
+    assert.equal(r.clock.notices.length,0);assert.equal(p.clock.paused,true);assert.ok(p.clock.acknowledgment.elapsedMinutes<1)
+    assert.equal(u.clock.notices.length,2);assert.ok(Math.abs(u.clock.acknowledgment.elapsedMinutes-(Date.parse('2026-10-26T16:00:00Z')-u.created_at)/60000)<1,'urgent after-hours clock reconciles to source timestamps (4050 minutes from Friday 20:30 UTC to Monday 16:00 UTC)')
+    for(const notice of u.clock.notices){assert.equal(notice.recipient_id,lead);assert.equal(notice.owner_id,owner);assert.ok(notice.automation_job_id);assert.equal(notice.automation_rule_revision,1)}
+    assert.match(await (await h.raw('/app/requests',{cookie:cookie.lead})).text(),/Your request escalations/)
+    await h.api('request.triage',cookie.lead,{request:urgent,version:u.version,decision:'assess',reason:'Lead accepted ownership'})
+    await advance('2026-10-27T13:30:00Z')
+    await h.scheduled('*/15 * * * *')
+    r=await detail(routine);p=await detail(paused);u=await detail(urgent)
+    assert.ok(Math.abs(r.clock.acknowledgment.elapsedMinutes-60)<1);assert.equal(r.clock.acknowledgment.overdue,true)
+    assert.equal(r.clock.notices.length,1);assert.equal(r.clock.notices[0].kind,'acknowledgment')
+    assert.equal(u.clock.acknowledgment.overdue,false);assert.equal(u.clock.resolution.overdue,true)
+    assert.equal(p.clock.notices.length,0);assert.equal((await h.api('requests',cookie.lead)).length,4,'paused reports remain in backlog')
+    await h.api('request.clock',cookie.lead,{request:paused,revision:2,kind:'resume',reason:'Access restored'})
+    await advance('2026-10-27T14:31:00Z')
+    // The existing owner-controlled chase grant governs this job too.
+    await h.api('automation.control',cookie.owner,{rule:'chase',revision:1,paused:true,reason:'Hold all reminders'})
+    await h.scheduled('*/15 * * * *')
+    assert.equal((await detail(paused)).clock.notices.length,0)
+    await h.api('automation.control',cookie.owner,{rule:'chase',revision:2,paused:false,reason:'Resume request escalation'})
+    await h.api('automation.catchup',cookie.owner,{rule:'chase',revision:3})
+    p=await detail(paused)
+    assert.ok(Math.abs(p.clock.acknowledgment.elapsedMinutes-61)<1,'pause excludes only the paused interval')
+    assert.equal(p.clock.notices.length,1);assert.equal(p.clock.notices[0].automation_rule_revision,3)
+    const before=(await detail(urgent)).clock.notices
+    await h.scheduled('*/15 * * * *');await h.scheduled('*/15 * * * *')
+    assert.deepEqual((await detail(urgent)).clock.notices,before,'replays never duplicate notices or change their ownership')
+    await h.api('request.triage',cookie.lead,{request:paused,version:p.version,decision:'decline',reason:'Access check confirmed no fault'})
+    p=await detail(paused);assert.ok(p.clock.resolvedAt);assert.equal(p.clock.resolution.overdue,false)
+    assert.equal((await h.api(`requests/${routine}`,cookie.tech)).clock,null,'requester never gains internal response policy or escalation details')
+    for(const who of [cookie.tech,cookie.agent])for(const door of ['/api/gasket/request-response','/app/request-response'])assert.equal((await h.raw(door,{cookie:who})).status,403)
+    assert.ok(!(await h.api('automation'+'/jobs',cookie.owner)).jobs.every(j=>!j.input.requestResponse))
+    await h.api('access.give',cookie.owner,{name:'Reviewer',email:'reviewer@example.test',role:'supervisor'})
+    const reviewer=await h.signIn('reviewer@example.test')
+    assert.ok((await h.api('automation'+'/jobs',reviewer)).jobs.every(j=>!j.input.requestResponse&&!(j.output?.notices??[]).some(n=>n.request_id)),'request input evidence and notice sources remain restricted to triagers')
+    ;({browser,context}=await browserContext(h,cookie.lead));const page=await context.newPage()
+    await page.goto(h.origin+'/app/request-response')
+    await page.getByLabel('Acknowledgment target minutes',{exact:true}).fill('90')
+    await Promise.all([page.waitForURL(/notice=/),page.getByRole('button',{name:'Approve response policy',exact:true}).click()])
+    assert.equal((await h.api('request-response',cookie.lead)).policies[0].acknowledgmentMinutes,90)
+    if(process.env.REQUEST_SCREENSHOTS) {
+      await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true})
+      await capture(page,h,'/app/request-response','response-policy')
+      await capture(page,h,'/app/requests','response-queue')
+      await capture(page,h,`/app/requests/${urgent}`,'response-acknowledged')
+      await capture(page,h,`/app/requests/${paused}`,'response-resumed')
+      await capture(page,h,'/app/automation','response-automation')
+    }
+    await h.api('request.clock',cookie.lead,{request:routine,revision:1,kind:'pause',reason:'Private access detail'})
+    if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,`/app/requests/${routine}`,'response-paused')
+    await h.api('request.erase',cookie.owner,{request:routine,version:(await detail(routine)).version,confirm:true})
+    assert.equal((await detail(routine)).clock,null)
+    assert.equal(JSON.parse((await h.api('audit?action=request.clock',cookie.owner)).rows.find(e=>e.subject===routine).detail).reason,undefined)
+    const id=(await h.api('me',cookie.lead)).id
+    await h.api('access.role',cookie.owner,{member:id,role:'maintainer'})
+    for(const door of ['/api/gasket/request-response','/app/request-response','/app/requests'])assert.equal((await h.raw(door,{cookie:cookie.lead})).status,403)
+    console.log('REQ-005 requestResponseJourney: priority clocks, holiday, after-hours, retained policy, accountable escalation, reasoned pause and resume, acknowledgment, resolution, grant controls, replay, erasure and responsive public doors passed')
+  } finally {await context?.close();await browser?.close();await h.close();await f.h.close()}
+}
+
+export async function strategyRolloutJourney() {
+  const f=await requestFixture({clockInstant:Date.parse('2026-10-23T16:00:00Z')}),{h,cookie}=f
+  let browser,context
+  try {
+    const original=(await h.api('checklist.create',cookie.lead,{name:'Existing compressor procedure',items:['Existing guard inspection']})).id
+    const assets=[],schedules=[]
+    for(let index=0;index<2;index++) {
+      assets.push((await h.api('asset.create',cookie.lead,{tag:`CMP-${index}`,name:`Synthetic compressor ${index}`,location:'Assembly',category:'Air compressor'})).id)
+      schedules.push((await h.api('schedule.create',cookie.lead,{asset:assets[index],checklist:original,title:`Compressor ${index} preventive check`,everyDays:30,firstDue:'2026-10-23'})).id)
+    }
+    const issued=(await h.api('workorders.generate',cookie.lead,{})).created
+    assert.equal(issued.length,2)
+    const issuedBefore=await Promise.all(issued.map(w=>h.api(`work/${w.id}`,cookie.lead)))
+    const library=(await h.api('pm-strategies',cookie.lead)).library
+    const template=library.find(t=>t.id==='air-compressor')
+    const payload={template:template.id,name:'Compressor strategy',category:'Air compressor'}
+    await h.api('pm.copy',cookie.agent,payload,403)
+    const strategy=(await h.api('pm.copy',cookie.lead,payload)).id
+    const current=async()=> (await h.api('pm-strategies',cookie.lead)).strategies.find(s=>s.id===strategy)
+    let revision=await current()
+    assert.equal(revision.library_key,template.id);assert.equal(revision.library_version,template.version)
+    await h.api('pm.approve',cookie.owner,{strategy,revision:revision.revision_id,reason:'Unadapted'},409)
+    await h.api('pm.preview',cookie.lead,{strategy,schedules},409)
+    const steps=[...JSON.parse(revision.items_json).map(s=>s.text),'Record the site-specific drain inspection']
+    await h.api('pm.adapt',cookie.lead,{strategy,number:revision.number,items:steps,everyDays:14,reference:'Synthetic equipment manual revision 1 and site isolation procedure',note:'Adapt to equipment and site'})
+    revision=await current()
+    await h.api('pm.approve',cookie.lead,{strategy,revision:revision.revision_id,reason:'Self approval'},403)
+    await h.api('pm.approve',cookie.owner,{strategy,revision:revision.revision_id,reason:'Reviewed isolation and manufacturer instructions'})
+    const preview=await h.api('pm.preview',cookie.lead,{strategy,schedules})
+    assert.equal((await h.api('pm-strategies',cookie.lead)).rollouts.length,0,'preview does not create rollout records')
+    assert.ok(preview.rows.every(r=>r.issued.length===1&&r.current.everyDays===30&&r.proposed.everyDays===14))
+    await h.api('pm.rollout',cookie.lead,{strategy,schedules,hash:preview.hash,occurrencePlan:'preserve_issued_and_due'},403)
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:preview.hash,occurrencePlan:'cancel'},400)
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:preview.hash,occurrencePlan:'preserve_issued_and_due'})
+    let rows=await h.api('schedules',cookie.lead)
+    assert.ok(schedules.every(id=>rows.find(s=>s.id===id).every_days===14))
+    assert.deepEqual(await Promise.all(issued.map(w=>h.api(`work/${w.id}`,cookie.lead))),issuedBefore,'rollout leaves every issued-work field unchanged')
+    // A local interval and procedure override are retained when the next
+    // program changes another field; conflicting edits demand a local decision.
+    let local=rows.find(s=>s.id===schedules[1])
+    await h.api('schedule.edit',cookie.lead,{schedule:local.id,revision:local.revision,everyDays:10})
+    const adapted=JSON.parse((await current()).items_json).map(s=>s.text)
+    await h.api('pm.adapt',cookie.lead,{strategy,number:(await current()).number,items:[...adapted,'Inspect additional OEM guard'],everyDays:14,reference:'Synthetic manual revision 2',note:'Add a guard inspection; retain local interval'})
+    await h.api('pm.approve',cookie.owner,{strategy,revision:(await current()).revision_id,reason:'Independent safety review of added guard'})
+    const preserve=await h.api('pm.preview',cookie.lead,{strategy,schedules})
+    assert.deepEqual(preserve.rows[1].conflicts,[]);assert.equal(preserve.rows[1].merged.everyDays,10)
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:preserve.hash,occurrencePlan:'preserve_issued_and_due'})
+    local=(await h.api('schedules',cookie.lead)).find(s=>s.id===schedules[1])
+    assert.equal(local.every_days,10)
+    await h.api('pm.adapt',cookie.lead,{strategy,number:(await current()).number,items:JSON.parse((await current()).items_json).map(s=>s.text),everyDays:7,reference:'Synthetic manual revision 3',note:'Revise preventive interval'})
+    await h.api('pm.approve',cookie.owner,{strategy,revision:(await current()).revision_id,reason:'Independent interval review'})
+    const conflict=await h.api('pm.preview',cookie.lead,{strategy,schedules})
+    assert.deepEqual(conflict.rows[1].conflicts,['everyDays'])
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:conflict.hash,occurrencePlan:'preserve_issued_and_due',decisions:{}},409)
+    ;({browser,context}=await browserContext(h,cookie.owner));const page=await context.newPage()
+    const query=new URLSearchParams({strategy});for(const id of schedules)query.append('schedules',id)
+    if(process.env.REQUEST_SCREENSHOTS) {
+      await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true})
+      await capture(page,h,`/app/schedules?${query}`,'strategy-conflict')
+    }
+    const decisions={[schedules[1]]:{choice:'keep_local',reason:'Local duty cycle requires the retained 10-day interval; explicitly reviewed'}}
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:conflict.hash,occurrencePlan:'preserve_issued_and_due',decisions})
+    rows=await h.api('schedules',cookie.lead)
+    assert.equal(rows.find(s=>s.id===schedules[0]).every_days,7);assert.equal(rows.find(s=>s.id===schedules[1]).every_days,10)
+    assert.deepEqual(await Promise.all(issued.map(w=>h.api(`work/${w.id}`,cookie.lead))),issuedBefore)
+    const history=await h.api('pm-strategies',cookie.owner)
+    assert.equal(JSON.parse(history.rollouts.at(-1).decisions_json)[schedules[1]].reason,decisions[schedules[1]].reason)
+    const tech=(await h.api('me',cookie.tech)).id,oldIssued=issued.find(w=>w.schedule===schedules[0]).id
+    await h.api('workorder.assign',cookie.lead,{workOrder:oldIssued,assignee:tech})
+    await h.api('workorder.results',cookie.tech,{workOrder:oldIssued,item:['0'],outcome:['pass'],note:['Original issued procedure completed']})
+    await h.api('workorder.submit',cookie.tech,{workOrder:oldIssued,version:(await h.api(`work/${oldIssued}`,cookie.tech)).version})
+    await h.api('workorder.review',cookie.owner,{workOrder:oldIssued,version:(await h.api(`work/${oldIssued}`,cookie.owner)).version,decision:'approve'})
+    const future=(await h.api('workorders.generate',cookie.lead,{})).created.find(w=>w.schedule===schedules[0])
+    assert.ok(future,'the next occurrence is issued through the ordinary generation door')
+    const nextWork=await h.api(`work/${future.id}`,cookie.lead)
+    assert.equal(nextWork.due_date,'2026-10-30')
+    assert.deepEqual(nextWork.items.map(i=>i.text),JSON.parse((await current()).items_json).map(i=>i.text),'future work uses the approved rollout procedure')
+    assert.notEqual(nextWork.checklist_revision_id,issuedBefore[0].checklist_revision_id)
+    const stale=await h.api('pm.preview',cookie.lead,{strategy,schedules})
+    local=rows.find(s=>s.id===schedules[1])
+    await h.api('schedule.edit',cookie.lead,{schedule:local.id,revision:local.revision,everyDays:9})
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:stale.hash,occurrencePlan:'preserve_issued_and_due',decisions},409)
+    // Existing OEM bounds apply even when the selected conflict decision would
+    // otherwise preserve a local interval.
+    await h.api('interval.limit',cookie.lead,{schedule:schedules[0],source:'oem',revision:0,minDays:14,maxDays:60,reference:'Synthetic minimum maintenance interval'})
+    const bounded=await h.api('pm.preview',cookie.lead,{strategy,schedules})
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:bounded.hash,occurrencePlan:'preserve_issued_and_due',decisions},409)
+    if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,'/app/schedules','strategy-retained')
+    console.log('PM-007 strategyRolloutJourney: copied library provenance, adaptation, independent approval, source-bound current-site rollout, local override merge and conflict, declared bounds, stale refusal and unchanged issued work passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }

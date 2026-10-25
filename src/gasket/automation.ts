@@ -11,6 +11,8 @@ import { meterState } from './meters'
 import { leadDays } from './site'
 import { executeRule, SCHEDULER } from './scheduler'
 
+const visibleOutput = (actor:Actor,output:any) => !can(actor,'work.assign') && output?.notices ? {...output,notices:output.notices.filter((n:any)=>!n.request_id)} : output
+
 function ruleName(input: Input): AutomationRule {
   const rule = input.text('rule'); insist(Object.hasOwn(AUTOMATION_RULES, rule), 'invalid_automation_rule'); return rule as AutomationRule
 }
@@ -62,13 +64,14 @@ export async function automationHealth(env: Bindings, actor: Actor) {
       const latest = await one(env, "SELECT started_at FROM gk_automation_jobs WHERE rule_id=? AND state='completed' ORDER BY started_at DESC LIMIT 1", rule.id)
       const since = latest?.started_at ?? (rule.changed_at || null), minutes = since === null ? null : Math.max(0, Math.floor((instant - since) / 60_000))
       return { ...rule, name: AUTOMATION_RULES[rule.id as AutomationRule], lastRun: latest?.started_at ?? null, uncoveredMinutes: minutes, missed: minutes !== null && minutes > SCHEDULER.missedAfterMinutes }
-    })), jobs: jobs.map(row => ({ ...row, output: row.output === null ? null : JSON.parse(row.output) })), coverage,
-    delivery: { replenishment: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='failed'")).n }, vendor: { reminders: await all(env, 'SELECT state,COUNT(*) AS n FROM gk_vendor_reminders GROUP BY state ORDER BY state'), pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='vendor' AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='vendor' AND state='failed'")).n }, inApp: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='failed'")).n, stored: (await one(env, 'SELECT COUNT(*) AS n FROM gk_notices')).n }, external: { state: 'unavailable', detail: 'Email and push delivery workers are not configured. In-app notices are saved synchronously.' } },
+    })), jobs: jobs.map(row => ({ ...row, output: row.output === null ? null : visibleOutput(actor,JSON.parse(row.output)) })), coverage,
+    delivery: { replenishment: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='failed'")).n }, vendor: { reminders: await all(env, 'SELECT state,COUNT(*) AS n FROM gk_vendor_reminders GROUP BY state ORDER BY state'), pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='vendor' AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='vendor' AND state='failed'")).n }, inApp: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='failed'")).n, stored: (await one(env,can(actor,'work.assign')?'SELECT (SELECT COUNT(*) FROM gk_notices)+(SELECT COUNT(*) FROM gk_request_escalations) AS n':'SELECT COUNT(*) AS n FROM gk_notices')).n }, external: { state: 'unavailable', detail: 'Email and push delivery workers are not configured. In-app notices are saved synchronously.' } },
   }
 }
 export async function ledgerView(env: Bindings, actor: Actor, url?: URL) {
   requireCapability(actor, 'board.read')
   const ledger = await automationLedger(env), job = url?.searchParams.get('job')
+  if (!can(actor,'work.assign')) ledger.jobs=ledger.jobs.map(row=>{const {requestResponse:_,...input}=row.input;return {...row,input,output:visibleOutput(actor,row.output)}})
   if (!can(actor, 'work.review')) ledger.jobs = ledger.jobs.map(row => {
     if (row.rule_id !== 'replenishment' || !row.input.replenishment) return row
     const facts = row.input.replenishment

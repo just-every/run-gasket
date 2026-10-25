@@ -1,3 +1,4 @@
+import { runRequestEscalations } from './request-response'
 import { runConnectors } from './connector-jobs'
 // PM-001: the installation's own scheduler. A Cron Trigger runs it every 15
 // minutes, deployed and under `rer dev`, with no one pressing a button. Each run
@@ -33,9 +34,9 @@ export async function executeRule(env: Bindings, rule: AutomationRule, day: stri
     if (rule === 'vendor') return await runVendorFollowUp(env, day)
     if (rule === 'pm') return { ...await issueDue(env, { id: SCHEDULER.id, today: day }, input.schedules!, 'workorder.schedule', { automatic: true }), runs: [], notices: [] }
     if (rule === 'routes') return { created: [], runs: await issueDueRoutes(env, { id: SCHEDULER.id, today: day }), notices: [] }
-    if (rule === 'chase') await chase(env, day)
+    if (rule === 'chase') { await chase(env, day); await runRequestEscalations(env) }
     else await remindExpiring(env, day)
-    return { created: [], runs: [], notices: await all(env, 'SELECT id,kind,recipient_id,work_order_id,asset_id FROM gk_notices WHERE automation_job_id=?', automationAuthority()!.job) }
+    return { created: [], runs: [], notices: [...await all(env, 'SELECT id,kind,recipient_id,work_order_id,asset_id FROM gk_notices WHERE automation_job_id=?', automationAuthority()!.job), ...await all(env,"SELECT 'request:'||request_id||':'||kind AS id,kind,recipient_id,request_id FROM gk_request_escalations WHERE automation_job_id=?",automationAuthority()!.job)] }
   }, { revision, instant })
 }
 

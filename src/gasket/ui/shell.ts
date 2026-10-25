@@ -29,6 +29,7 @@ export const NAV: Destination[] = [
   { href: '/app/reliability', label: 'Reliability', detail: 'MTBF, MTTR and MTTA with their definitions, failures by failure mode and repeat failures.', icon: ICON.board, show: actor => can(actor, 'board.read') },
 ]
 export const SETTINGS: Destination[] = [
+  { href: '/app/request-response', label: 'Request response policy', detail: 'Priority targets, business hours and named escalation.', icon: ICON.clock, show: actor => can(actor,'work.assign') },
   { href: '/app/labels', label: 'Print labels', detail: 'Reprint QR and barcode identification.', icon: ICON.assets, show: actor => can(actor,'register.manage') },
   { href: '/app/requests', label: 'Requests', detail: 'Triage operator faults.', icon: ICON.work, show: actor => can(actor,'work.assign') },
   { href: '/app/request-portals', label: 'Request portals', detail: 'Configure bounded operator intake.', icon: ICON.site, show: actor => can(actor,'site.manage') },

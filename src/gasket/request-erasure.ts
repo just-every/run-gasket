@@ -23,7 +23,10 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
     stmt(env, "INSERT INTO gk_guard(code,ok) VALUES('request_erasure',1)"),
     stmt(env, 'DELETE FROM gk_request_files WHERE request_id=?', id),
     stmt(env, 'DELETE FROM gk_request_events WHERE request_id=?', id),
-    stmt(env, "UPDATE gk_audit SET detail='{}' WHERE subject=? AND action IN ('request.submit','request.triage','request.reply','request.convert')", id),
+    stmt(env, 'DELETE FROM gk_request_clock_events WHERE request_id=?', id),
+    stmt(env, 'DELETE FROM gk_request_escalations WHERE request_id=?', id),
+    stmt(env, 'DELETE FROM gk_request_clocks WHERE request_id=?', id),
+    stmt(env, "UPDATE gk_audit SET detail='{}' WHERE subject=? AND action IN ('request.submit','request.triage','request.reply','request.convert','request.clock','request.escalation')", id),
     // Conversion copies the source description and title, so erase those copies.
     ...(r.work_order_id ? [
       stmt(env, "UPDATE gk_work_orders SET title='Erased operator fault',description=NULL WHERE id=? AND EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND status='converted')", r.work_order_id, id),
