@@ -1,3 +1,4 @@
+import { customStatements } from './custom-fields'
 import { requestClock } from './request-response'
 import { requestWorkAccess } from './request-sources'
 // Opt-in operator intake. Anonymous traffic has no register/list/detail door.
@@ -45,7 +46,8 @@ export async function saveTarget(env:Bindings,actor:Actor,input:Input) {
   if(asset) insist(await one(env,'SELECT 1 FROM gk_assets WHERE id=? AND retired_at IS NULL',asset),'asset_not_found',404)
   insist(input.flag('publishConsent'),'label_consent_required')
   const id=newId()
-  await commit(env,[stmt(env,'INSERT INTO gk_request_targets(id,portal_id,kind,asset_id,name,created_by,created_at) VALUES(?,?,?,?,?,?,?)',id,portal.id,kind,asset,name,actor.id,now())],
+  const custom = kind === 'location' ? await customStatements(env,actor,input,'location',id,null,true) : []
+  await commit(env,[...custom,stmt(env,'INSERT INTO gk_request_targets(id,portal_id,kind,asset_id,name,created_by,created_at) VALUES(?,?,?,?,?,?,?)',id,portal.id,kind,asset,name,actor.id,now())],
     {actor:actor.id,action:'request.target',subject:id,detail:{portal:portal.id,kind,asset,name,publishConsent:true}})
   return {id}
 }
@@ -72,13 +74,13 @@ export async function requestQueue(env:Bindings,actor:Actor,url:URL) {
   triager(actor)
   const impact=url.searchParams.get('impact') || ''
   const status=url.searchParams.get('status') || '', urgency=url.searchParams.get('urgency') || '', criticality=url.searchParams.get('criticality') || '', target=url.searchParams.get('target') || ''
-  return await all(env,`SELECT r.id,r.number,r.status,r.urgency,r.description,r.created_at,r.version,r.asset_id,r.location,r.impact,a.criticality,t.name AS target,p.name AS portal,
+  return await all(env,`SELECT r.id,r.number,r.status,r.urgency,r.description,r.created_at,r.version,r.asset_id,r.location,r.impact,r.team_id,r.assignee_id,r.due_date,a.criticality,t.name AS target,p.name AS portal,
     r.duplicate_of,r.work_order_id FROM gk_requests r JOIN gk_request_targets t ON t.id=r.target_id JOIN gk_request_portals p ON p.id=r.portal_id LEFT JOIN gk_assets a ON a.id=r.asset_id
     WHERE (?='' OR r.impact=?) AND (?='' OR r.status=?) AND (?='' OR r.urgency=?) AND (?='' OR a.criticality=?) AND (?='' OR r.target_id=?)
     ORDER BY CASE r.impact WHEN 'stopped' THEN 0 WHEN 'reduced' THEN 1 ELSE 2 END,CASE r.urgency WHEN 'emergency' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,r.created_at,r.number`,impact,impact,status,status,urgency,urgency,criticality,criticality,target,target)
 }
 export async function requestDetail(env:Bindings,actor:Actor,id:string) {
-  const row=await one(env,`SELECT r.*,t.name AS target,a.criticality FROM gk_requests r JOIN gk_request_targets t ON t.id=r.target_id LEFT JOIN gk_assets a ON a.id=r.asset_id WHERE r.id=?`,id)
+  const row=await one(env,`SELECT r.*,t.name AS target,a.criticality,(SELECT name FROM gk_teams WHERE id=r.team_id) AS routed_team,(SELECT name FROM gk_members WHERE id=r.assignee_id) AS routed_person FROM gk_requests r JOIN gk_request_targets t ON t.id=r.target_id LEFT JOIN gk_assets a ON a.id=r.asset_id WHERE r.id=?`,id)
   insist(row,'request_not_found',404)
   insist(can(actor,'work.assign') || row.requester_id===actor.id,'forbidden',403)
   const {submission_key:_,fingerprint:__,...safe}=row

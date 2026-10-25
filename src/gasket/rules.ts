@@ -56,9 +56,11 @@ export async function controlRule(env:Bindings,actor:Actor,input:Input) {
   const run=newId(),event=input.text('event'),source=await one(env,'SELECT * FROM gk_rule_events WHERE id=?',event)
   insist(source,'rule_event_not_found',404)
   if(r.revision!==revision || r.paused) {
-   await env.DB.batch([stmt(env,"INSERT INTO gk_rule_runs(id,event_id,rule_id,revision,source,input,started_at,finished_at,outcome,error) VALUES(?,?,?,?,'catch-up',?,?,?,'failed',?)",run,event,id,revision,source.input,now(),now(),r.revision!==revision?'stale':'rule_paused')])
+   const attempt=newId()
+   await env.DB.batch([stmt(env,"INSERT INTO gk_rule_events(id,source_id,trigger,entity_type,entity_id,source,occurred_at,input,completed_at,error) VALUES(?,?,?,?,?,'catch-up',?,?,?,?)",attempt,`failed:${attempt}`,source.trigger,source.entity_type,source.entity_id,now(),source.input,now(),r.revision!==revision?'stale':'rule_paused'),stmt(env,"INSERT INTO gk_rule_runs(id,event_id,rule_id,revision,source,input,started_at,finished_at,outcome,error) VALUES(?,?,?,?,'catch-up',?,?,?,'failed',?)",run,attempt,id,revision,source.input,now(),now(),r.revision!==revision?'stale':'rule_paused')])
    throw new GasketError(r.revision!==revision?'stale':'rule_paused',409)
   }
+  insist(!await one(env,"SELECT 1 FROM gk_rule_runs WHERE event_id=? AND rule_id=? AND outcome='completed'",event,id),'rule_event_already_completed',409)
   return runRules(env,{trigger:source.trigger,entityType:source.entity_type,entityId:source.entity_id,sourceId:`catch-up:${id}:${revision}:${source.id}`,source:'catch-up',at:source.occurred_at},{only:id,expectedRevision:revision!})
  }
  insist(r.revision===revision,'stale',409)
@@ -140,16 +142,15 @@ export async function runRules(env:Bindings,event:RuleEvent,options:{only?:strin
     if(rule.paused)continue
     insist(!options.expectedRevision||options.expectedRevision===rule.revision,'stale',409)
     insist(!item.ancestors.has(signature),'rule_loop_detected',409)
-    const actor=await ownerActor(env,rule.owner_id),children:RuleEvent[]=[]
+    const actor=await ownerActor(env,rule.owner_id)
     for(const [position,a] of (chosen?.actions??[]).entries()) {
      const action=newId(),provenance={rule:rule.id,revision:rule.revision,event:id,run,action,source:e.source??'event'}
      const current=await ruleFacts(env,e),prepared=await prepareAction(env,actor,e,current,a,provenance)
      await commit(env,[guard(env,'rule_changed','EXISTS(SELECT 1 FROM gk_rules WHERE id=? AND revision=? AND paused=0)',rule.id,rule.revision),guard(env,'rule_owner_authority_revoked',ownerSql,rule.owner_id),
       stmt(env,'INSERT INTO gk_rule_actions(id,run_id,position,rule_id,revision,input,output,at) VALUES(?,?,?,?,?,?,?,?)',action,run,position,rule.id,rule.revision,JSON.stringify({event:e,facts:current,action:a}),JSON.stringify(prepared.output),now()),...prepared.statements],
       {actor:actor.id,action:'rules.action',subject:current.work?.id??e.entityId,detail:{...provenance,action:a,result:prepared.output,input:current}})
-     children.push(...prepared.events)
+     for(const [i,child] of prepared.events.entries())queue.push({event:{...child,sourceId:`${action}:${i}`,source:e.source??'event',at:e.at??now()},parent:id,depth:item.depth+1,ancestors:new Set([...item.ancestors,signature])})
     }
-    for(const [i,child] of children.entries())queue.push({event:{...child,sourceId:`${run}:${i}`,source:e.source??'event',at:e.at??now()},parent:id,depth:item.depth+1,ancestors:new Set([...item.ancestors,signature])})
    } catch(cause) {error=cause instanceof GasketError?cause.code:cause instanceof Error?cause.message:'rule_failed'}
    finally {
     await env.DB.batch([stmt(env,'UPDATE gk_rule_runs SET outcome=?,error=?,finished_at=? WHERE id=?',error?'failed':rule.paused?'paused':'completed',error,now(),run)])

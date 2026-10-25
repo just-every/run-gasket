@@ -259,7 +259,7 @@ export async function recordReadings(env: Bindings, actor: Actor, input: Input) 
   insist(takenOn <= localNow(actor.zone), 'reading_in_future')
   const meters = input.list('meter', { keepEmpty: true }), values = input.list('value', { keepEmpty: true })
   insist(meters.length === values.length && meters.length > 0, 'invalid_value')
-  const statements: D1PreparedStatement[] = [], recorded: { meter: string; value: string }[] = [], read: string[] = []
+  const statements: D1PreparedStatement[] = [], recorded: { meter: string; reading: string; value: string }[] = [], read: string[] = []
   for (const [index, meterId] of meters.entries()) {
     const raw = values[index]
     if (!raw) continue
@@ -267,7 +267,7 @@ export async function recordReadings(env: Bindings, actor: Actor, input: Input) 
     insist(meter, 'meter_not_found', 404)
     const kept = await readingStatements(env, actor, meter, raw, { takenOn, workOrder: order.id, provenance: 'manual', source: null, quality: 'good' })
     statements.push(...kept.statements)
-    recorded.push({ meter: meter.name, value: kept.value })
+    recorded.push({ meter: meter.name, reading: kept.id, value: kept.value })
     read.push(meter.id)
   }
   insist(recorded.length, 'invalid_value')

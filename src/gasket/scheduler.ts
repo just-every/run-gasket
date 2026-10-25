@@ -1,3 +1,4 @@
+import { overdueRuleEvents } from './rule-events'
 import { runRequestEscalations } from './request-response'
 import { runConnectors } from './connector-jobs'
 // PM-001: the installation's own scheduler. A Cron Trigger runs it every 15
@@ -55,6 +56,7 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
       await executeRule(env, 'replenishment', day, 'cron', { instant: at })
       await executeRule(env, 'vendor', day, 'cron', { instant: at })
       await executeRule(env, 'connectors', day, 'cron', { instant: at })
+      await overdueRuleEvents(env,at)
       const created = pm.output?.created.length ?? 0
       const runs = routes.output && 'runs' in routes.output ? routes.output.runs : []
       await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET created=?,finished_at=?,state='completed' WHERE id=?", created + runs.reduce((sum: number, run: any) => sum + run.workOrders.length, 0), now(), id)])

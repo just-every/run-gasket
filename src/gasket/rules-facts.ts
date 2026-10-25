@@ -12,15 +12,18 @@ export async function ruleFacts(env:Bindings,event:RuleEvent):Promise<Row> {
  if(event.entityType==='reading')record=await one(env,'SELECT r.*,m.asset_id FROM gk_readings r JOIN gk_meters m ON m.id=r.meter_id WHERE r.id=?',event.entityId)
  if(event.entityType==='result')record=await one(env,'SELECT * FROM gk_results WHERE work_order_id=? AND outcome=\'fail\' ORDER BY recorded_at DESC LIMIT 1',event.entityId)
  insist(record,'rule_source_not_found',404)
- if(!work && record.work_order_id)work=await one(env,'SELECT * FROM gk_work_orders WHERE id=?',record.work_order_id)
+ if(!work && event.entityType!=='request' && record.work_order_id)work=await one(env,'SELECT * FROM gk_work_orders WHERE id=?',record.work_order_id)
  const assetId=asset?.id??record.asset_id??work?.asset_id
  if(!asset && assetId)asset=await one(env,`SELECT a.*,${ASSET_STATUS} AS status FROM gk_assets a WHERE a.id=?`,assetId)
  const custom:Row={}
- for(const [type,id] of [['asset',asset?.id],['location',record.location??work?.location??asset?.location],['part',part?.id]]) {
+ const locationName=record.location??work?.location??asset?.location
+ const locationId=event.entityType==='request' && record.location ? record.target_id : locationName ? (await one(env,"SELECT id FROM gk_request_targets WHERE kind='location' AND name=? AND retired_at IS NULL ORDER BY id LIMIT 1",locationName))?.id : null
+ for(const [type,id] of [['asset',asset?.id],['location',locationId],['part',part?.id]]) {
   if(!id)continue
   for(const row of await all(env,'SELECT field_id,value FROM gk_custom_values WHERE entity_type=? AND entity_id=?',type,id))custom[row.field_id]=JSON.parse(row.value)
  }
  if(work)for(const row of await all(env,'SELECT field_id,value FROM gk_work_field_values WHERE work_order_id=?',work.id))custom[row.field_id]=row.value
+ if(event.entityType==='request')record=Object.fromEntries(['id','number','asset_id','location','urgency','status','version','work_order_id','team_id','assignee_id','due_date','target_id'].map(k=>[k,record![k]??null]))
  const zone=(await one(env,'SELECT timezone FROM gk_site WHERE singleton=1'))?.timezone??'UTC'
  return {record,work,assetRecord:asset,partRecord:part,asset:asset?.id??null,location:record.location??work?.location??asset?.location??null,
   category:asset?.category??part?.category??null,priority:record.urgency??work?.priority??null,team:record.team_id??work?.team_id??null,

@@ -47,12 +47,14 @@ export async function commit(env: Bindings, statements: D1PreparedStatement[], a
   const events = Array.isArray(audit) ? audit : [audit]
   const authority = automationAuthority()
   try {
-    await env.DB.batch([
+    const results = await env.DB.batch([
       ...(authority ? [guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_automation_rules WHERE id=? AND revision=? AND paused=0)', authority.rule, authority.revision)] : []),
       ...statements,
       stmt(env, 'DELETE FROM gk_guard'),
       ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), automation: authority } : event.detail ?? {}))),
     ])
+    const relevant = events.some(event => /^(request\.submit|workorder\.(create|generate|schedule|trigger|submit|approve|return|cancel|reopen|merged|merge|readings|results)|asset\.(state|retire)|downtime\.(start|end)|meter\.feed|part\.(create|receive|count|issue|return|disposition))$/.test(event.action))
+    if (relevant) { const { dispatchRuleEvents } = await import('./rule-events'); await dispatchRuleEvents(env, events, results.slice(results.length-events.length).map(result => result.meta.last_row_id)) }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const code = message.match(/gasket_guard_(\w+)/)?.[1]

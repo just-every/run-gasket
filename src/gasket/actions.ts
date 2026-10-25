@@ -1,3 +1,4 @@
+import { saveRule, controlRule, previewRule } from './rules'
 import { saveCustomField, retireCustomField, setCustomValues } from './custom-fields'
 import { eraseAttachment } from './attachment-erasure'
 import { confirmRecoveryDrill } from './recovery'
@@ -79,6 +80,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'rules.save': saveRule, 'rules.control': controlRule, 'rules.preview': previewRule,
   'customfield.save': saveCustomField, 'customfield.retire': retireCustomField, 'customvalue.set': setCustomValues,
   'attachment.erase': (env, actor, input) => eraseAttachment(env, actor, input),
   'recovery.drill': (env, actor, input) => confirmRecoveryDrill(env, actor, input),

@@ -13,6 +13,7 @@ export async function saveCustomField(env: Bindings, actor: Actor, input: Input)
   const id = input.text('id', { optional: true }) || newId(), existing = await one<CustomField>(env, 'SELECT * FROM gk_custom_fields WHERE id=?', id)
   const name = input.text('name', { max: 100 }), entityType = input.text('entityType'), type = input.text('type'), scope = input.text('scope')
   insist(['asset', 'part', 'location'].includes(entityType) && CUSTOM_TYPES.includes(type as any) && ['organization', 'site', 'category'].includes(scope), 'invalid_custom_definition')
+  insist(entityType !== 'location' || scope !== 'category', 'location_category_not_supported')
   const category = scope === 'category' ? input.text('category', { max: 80 }) : null
   const options = ['single', 'multiple'].includes(type) ? input.text('options', { max: 2000 }).split(/\r?\n|,/).map(s => s.trim()).filter(Boolean) : null
   insist(!options || (options.length > 0 && options.length <= 100 && new Set(options).size === options.length), 'invalid_custom_options')
@@ -60,6 +61,7 @@ export async function customStatements(env: Bindings, actor: Actor, input: Input
     const json = JSON.stringify(value), revision = (previous?.revision ?? 0) + 1
     writes.push(guard(env, 'custom_field_changed', 'EXISTS(SELECT 1 FROM gk_custom_fields WHERE id=? AND revision=? AND retired=0)', f.id, f.revision))
     if (previous) writes.push(guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_custom_values WHERE entity_type=? AND entity_id=? AND field_id=? AND revision=?)', entityType, entityId, f.id, previous.revision))
+    else writes.push(guard(env, 'stale', 'NOT EXISTS(SELECT 1 FROM gk_custom_values WHERE entity_type=? AND entity_id=? AND field_id=?)', entityType, entityId, f.id))
     writes.push(stmt(env, 'INSERT INTO gk_custom_values(entity_type,entity_id,field_id,value,revision,changed_by,changed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(entity_type,entity_id,field_id) DO UPDATE SET value=excluded.value,revision=excluded.revision,changed_by=excluded.changed_by,changed_at=excluded.changed_at', entityType, entityId, f.id, json, revision, actor.id, now()), stmt(env, 'INSERT INTO gk_custom_history(entity_type,entity_id,field_id,value,revision,changed_by,changed_at) VALUES(?,?,?,?,?,?,?)', entityType, entityId, f.id, json, revision, actor.id, now()))
   }
   return writes

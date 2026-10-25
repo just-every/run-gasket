@@ -1,3 +1,4 @@
+import { rulesPage } from './ui/rules'
 import { customFieldsPage, locationPage } from './ui/custom-fields'
 import { customRegisterCsv } from './custom-export'
 import { requestReportPage } from './ui/request-report'
@@ -176,6 +177,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  rules: (env,actor,url)=>rulesPage(env,actor,url),
   customFields: (env,actor,url)=>customFieldsPage(env,actor,url),
   locationFields: (env,actor,url,id)=>locationPage(env,actor,id,url),
   ...Object.fromEntries(['asset','part','location'].map(type => [type+'sCsv', async (env:Bindings,actor:Actor,url:URL) => new Response(await customRegisterCsv(env,actor,type,url), {headers:{'content-type':'text/csv; charset=utf-8','content-disposition':`attachment; filename="${type}s.csv"`,'cache-control':'private, no-store'}})])),

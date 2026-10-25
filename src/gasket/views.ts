@@ -1,3 +1,4 @@
+import { rulesView } from './rules'
 import { customFields, customValues } from './custom-fields'
 import { recoveryHealth } from './recovery'
 import { strategyView } from './pm-strategies'
@@ -63,6 +64,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  rules: (env,actor,urlId,url)=>rulesView(env,actor,url),
   customFields: env => customFields(env, undefined, undefined, true),
   locationFields: async (env,_actor,id) => { insist(await one(env,"SELECT 1 FROM gk_request_targets WHERE id=? AND kind='location'",id),'location_not_found',404);return customValues(env,'location',id) },
   recovery: (env,actor) => recoveryHealth(env,actor),

@@ -24,7 +24,7 @@ export function definitionOf(input: Input): Definition {
   const type=input.text(`actionType${i}`,{optional:true}); if(!type)return []
   const value=input.text(`actionValue${i}`,{optional:true,max:500})
   return [{type,value,team:input.text(`actionTeam${i}`,{optional:true}),person:input.text(`actionPerson${i}`,{optional:true}),
-   people:input.list(`actionPeople${i}`),text:value,title:value,days:['due','follow_up'].includes(type)?Number(value):undefined}]
+   people:input.list(`actionPeople${i}`),text:value,title:value,days:type==='due'?Number(value):type==='follow_up'?Number(input.text(`actionDays${i}`,{optional:true})||'0'):undefined}]
  })
  const d={name:input.text('name',{max:100}),trigger:input.text('trigger') as RuleTrigger,priority:input.integer('priority',{min:0,max:10000})!,conditions,actions}
  insist(Object.hasOwn(RULE_TRIGGERS,d.trigger),'invalid_rule_trigger')
