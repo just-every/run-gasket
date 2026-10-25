@@ -59,6 +59,7 @@ export async function customFieldsJourney() {
     const archived=(await h.api(`parts/${part}`,tech)).customFields.find(f=>f.id===voltage)
     assert.equal(archived.retired,1);assert.equal(archived.value,480);assert.equal(archived.history.length,1)
     assert.ok((await (await h.raw('/app/parts.csv',{cookie:owner})).text()).includes('Voltage (archived)'))
+    if(process.env.CUSTOM_SCREENSHOTS)await retainedBrowser({h,owner,asset,part})
     const imported='Name,ID,Location,Types,Refrigerant type\r\nRoof cooler,synthetic-gasket-1,Roof,HVAC,R-32\r\n'
     const input={assets:file('assets.csv',imported),dateFormat:'MDY',customMapping:{'Refrigerant type':refrigerant}}
     const preview=await h.api('import.preview',owner,input)
@@ -110,3 +111,19 @@ async function customBrowser({h,owner,asset,part,target,location,refrigerant}) {
   } finally {await browser.close()}
 }
 if(process.argv[1]&&import.meta.url===new URL(`file://${process.argv[1]}`).href)await customFieldsJourney()
+
+async function retainedBrowser({h,owner,asset,part}) {
+  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  try {
+    const context=await browser.newContext({ignoreHTTPSErrors:true})
+    await context.addCookies(owner.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+    const page=await context.newPage()
+    for(const [name,path] of [['retired-field','/app/settings/fields'],['renamed-value',`/app/assets/${asset}`],['archived-value',`/app/parts/${part}`]])for(const width of [1440,390]) {
+      await page.setViewportSize({width,height:1000});assert.equal((await page.goto(h.origin+path)).status(),200)
+      if(name!=='retired-field') {await page.getByText('Value history',{exact:true}).click();await page.locator('#custom-fields').scrollIntoViewIfNeeded()}
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
+      await page.screenshot({path:`${process.env.CUSTOM_SCREENSHOTS}/${name}-${width}.png`})
+    }
+    await context.close()
+  } finally {await browser.close()}
+}

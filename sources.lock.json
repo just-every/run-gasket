@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "3ed35400870d8bf8ca3bf959eca86f1e62686b937f4709efdae98cb96bb0cbc2",
+      "sha256": "41b381bf783ddd39b63ca36382663e8126b6cda2a1f55e22289985175722f15f",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c572bb78dca3325c5091b3aedc5c9503074b0971345d0403f88aa2b74feeb244",
+      "sha256": "1314fcd17d5940ecaefc5c8f9dd13483bd1f5ea76ab15cebfc4f5e4bc4ae4e3e",
       "executable": false
     },
     "DEMO.md": {
@@ -1812,7 +1812,7 @@
       "executable": false
     },
     "src/gasket/ui/custom-fields.ts": {
-      "sha256": "7ee7a3980f2cf5af8a73578c6ba0ec7f9e4d116fc7b9ecd49bbd311da79ab1d7",
+      "sha256": "95b8d706dd5395c403210e858632acbea1ec657b26943b668e7f26edb1166d2f",
       "executable": false
     },
     "src/gasket/ui/documents.ts": {
@@ -1868,7 +1868,7 @@
       "executable": false
     },
     "src/gasket/ui/parts.ts": {
-      "sha256": "ae06ff7f4a16d25a3f347e78289654a324f6685fadda3545f6001eab8c70c500",
+      "sha256": "526988509f2c2fad8100e184c4fb4807b48192c4974057bc4ac498e529f050e8",
       "executable": false
     },
     "src/gasket/ui/performance.ts": {
@@ -3908,7 +3908,7 @@
       "executable": false
     },
     "tests/gasket/custom-fields.mjs": {
-      "sha256": "fa2541b1e0b84072f6726abfeb88d8f7dacb47df5c2078ef23918d8017b55dd6",
+      "sha256": "a18c574fb8a54c7d0b27776d1e47ea03bdaf8426687410c393ccba393420a6c5",
       "executable": false
     },
     "tests/gasket/fixtures.mjs": {
@@ -4020,7 +4020,7 @@
       "executable": false
     },
     "tests/gasket/rules.mjs": {
-      "sha256": "9616f9215fde858af2e7f2f46bd1499b89c35e42a282deb0b6539ee2d3cda04f",
+      "sha256": "2ccd8f725ca25d054dea437e982daa6c16a259e0a0d793ef25a6b8f0455ea470",
       "executable": false
     },
     "tests/gasket/search.mjs": {

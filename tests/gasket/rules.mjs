@@ -21,11 +21,11 @@ export async function rulesJourney() {
   const targets=[]
   for(const id of [asset,other])targets.push((await h.api('request.target',cookie.owner,{portal,kind:'asset',asset:id,name:'Conveyor fault',publishConsent:true})).id)
   async function request(target,description) {
-   const r=await h.raw(`/request/${portal}`,{cookie:cookie.tech,body:{submissionKey:randomUUID(),target,description,urgency:'normal',contact:'synthetic-gasket-96'}})
+   const r=await h.raw(`/request/${portal}`,{cookie:cookie.tech,body:{submissionKey:randomUUID(),target,description,urgency:'normal',contact:'Shift lead, extension 220'}})
    assert.equal(r.status,303,await r.text())
    return (await h.api('requests',cookie.owner)).find(r=>r.description===description).id
   }
-  const historic=await request(targets[0],'synthetic-gasket-97')
+  const historic=await request(targets[0],'Conveyor drive rattles on deceleration')
   const definition={name:'Route conveyor electrical faults',trigger:'request.submitted',priority:10,reason:'Route Line 2 electrical faults',conditions:[{field:'location',op:'eq',value:'Line 2'},{field:'category',op:'eq',value:'Conveyor'},{field:`custom:${custom}`,op:'eq',value:'Electrical'}],actions:[{type:'assign',team,person:ids.tech},{type:'priority',value:'high'},{type:'notify',people:[ids.lead],text:'Electrical request received'}]}
   for(const who of ['tech','supervisor'])await h.api('rules.save',cookie[who],definition,403)
   await h.api('rules.save',undefined,definition,401)
@@ -53,12 +53,12 @@ export async function rulesJourney() {
   await h.api('rules.save',cookie.lead,{...definition,actions:[{type:'status',value:'closed'}]},400)
   await h.api('rules.control',cookie.lead,{rule,revision:1,paused:true,reason:'Stale editor'},409)
   saved=await h.api('rules.control',cookie.owner,{rule,revision:saved.revision,paused:true,reason:'Planned pause'})
-  const paused=await request(targets[0],'synthetic-gasket-101')
+  const paused=await request(targets[0],'Motor overload after short restart')
   assert.equal((await h.api(`requests/${paused}`,cookie.lead)).urgency,'normal')
   let view=await state(),event=view.events.find(e=>e.entity_id===paused)
   assert.ok(view.runs.some(r=>r.event_id===event.id && r.outcome==='paused'))
   const snapshot=JSON.stringify(view.events.find(e=>e.entity_id===paused).input)
-  assert.ok(!snapshot.includes('synthetic-gasket-96'),'contact is excluded from retained input')
+  assert.ok(!snapshot.includes('Shift lead, extension 220'),'contact is excluded from retained input')
   const previewPaused=await h.api('rules.preview',cookie.lead,{rule,revision:saved.revision})
   assert.ok(previewPaused.rows.find(r=>r.entityId===paused)?.matched)
   saved=await h.api('rules.control',cookie.owner,{rule,revision:saved.revision,paused:false,reason:'Resume reviewed rule'})
@@ -75,16 +75,16 @@ export async function rulesJourney() {
   }
   // Two matching rules contend over priority. Stable stated ordering is visible in execution evidence.
   const scoped=[{field:'asset',op:'eq',value:asset}]
-  const first=await created('synthetic-gasket-102','work.created',scoped,[{type:'priority',value:'high'}],1)
-  const second=await created('synthetic-gasket-103','work.created',scoped,[{type:'priority',value:'low'}],2)
+  const first=await created('Prioritize Line 2 work','work.created',scoped,[{type:'priority',value:'high'}],1)
+  const second=await created('Routine Line 2 priority','work.created',scoped,[{type:'priority',value:'low'}],2)
   const work=(await h.api('workorder.create',cookie.lead,{asset,title:'synthetic-gasket-104',due:new Date(now()).toISOString().slice(0,10)})).id
   assert.equal((await h.api(`work/${work}`,cookie.lead)).priority,'high')
   const conflict=(await state()).runs.find(r=>r.rule_id===second.id && r.input.work?.id===work)
   assert.ok(conflict.conflicts.some(c=>c.field==='priority' && c.winner===first.id))
   // A creation starts an alternating status chain, whose second visit to a rule must stop visibly.
-  await created('synthetic-gasket-105','work.created',scoped,[{type:'status',value:'in_progress'}])
-  await created('synthetic-gasket-106','work.status_changed',[...scoped,{field:'status',op:'eq',value:'in_progress'}],[{type:'status',value:'open'}])
-  await created('synthetic-gasket-107','work.status_changed',[...scoped,{field:'status',op:'eq',value:'open'}],[{type:'status',value:'in_progress'}])
+  await created('Start Line 2 work','work.created',scoped,[{type:'status',value:'in_progress'}])
+  await created('Return pending work to open','work.status_changed',[...scoped,{field:'status',op:'eq',value:'in_progress'}],[{type:'status',value:'open'}])
+  await created('Resume open Line 2 work','work.status_changed',[...scoped,{field:'status',op:'eq',value:'open'}],[{type:'status',value:'in_progress'}])
   await h.api('workorder.create',cookie.lead,{asset,title:'synthetic-gasket-108',due:new Date(now()).toISOString().slice(0,10)})
   view=await state();assert.ok(view.runs.some(r=>r.error==='rule_loop_detected'))
   assert.ok((await(await h.raw('/app/settings/rules',{cookie:cookie.owner})).text()).includes('rule loop detected'))
