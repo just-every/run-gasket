@@ -9,8 +9,10 @@ import { fileRecords } from '@runeditrun/rer/modules/portability/files'
 export function recoveryPortability(portability) {
   async function run(context, verb) {
     const result = await portability[verb](context)
+    // Legacy recovery keeps the pinned adapter's explicit unverified-metadata audit.
+    if (context.legacyRecovery) return result
     let manifest
-    for await (const record of fileRecords(context.legacyRecovery?.output ?? context.path)) {
+    for await (const record of fileRecords(context.path)) {
       if (record.kind === 'manifest') manifest = record
     }
     const { getPlatformProxy } = createRequire(join(context.root, 'package.json'))('wrangler')

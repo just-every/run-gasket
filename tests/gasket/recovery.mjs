@@ -122,6 +122,7 @@ export async function recoveryJourney() {
       assert.equal(backup.restore, null)
       assert.equal(backup.drill, null)
       assert.ok(Number.isFinite(backup.backupAgeMinutes))
+      if (process.env.GASKET_RECOVERY_SCREENSHOTS) await backupBrowser(source, signed)
       assert.deepEqual(await source.api('schedules', signed), sourceSchedule, 'export leaves source schedules active')
       assert.deepEqual((await source.api('automation' + '/jobs', signed)).rules, sourceRules)
       const current = await source.api(`requests/${request}`, signed)
@@ -173,3 +174,25 @@ export async function recoveryJourney() {
   } finally { await h.close(); await target.remove(); await corruptTarget.remove() }
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) await recoveryJourney()
+
+
+export async function backupBrowser(h, cookie) {
+  const { chromium } = await import('@playwright/test')
+  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain','--password-store=basic'] })
+  try {
+    for (const width of [1440,390]) {
+      const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
+      await context.addCookies(cookie.split('; ').map(pair => { const at=pair.indexOf('='); return { name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin } }))
+      const page = await context.newPage()
+      await page.goto(h.origin + '/app/automation')
+      await page.getByRole('heading', { name: 'Backup and recovery', exact: true }).waitFor()
+      const recovery = await h.api('recovery', cookie)
+      assert.ok(recovery.backup)
+      assert.ok(!(await page.locator('main').innerText()).includes('No completed backup recorded'))
+      await page.evaluate(async () => { await document.fonts.ready })
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `backup reporting fits ${width}`)
+      await page.screenshot({ path: `${process.env.GASKET_RECOVERY_SCREENSHOTS}/backup-${width}.png`, fullPage: true })
+      await context.close()
+    }
+  } finally { await browser.close() }
+}

@@ -41,7 +41,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
     { type: 'ESModule', path: join(root, 'dist/server/pinned-clock.mjs'), contents: `const Real = Date, offset = ${offset ?? 0}, instant = ${instant ?? "undefined"}\nclass PinnedDate extends Real { constructor(...args) { super(...(args.length ? args : [instant ?? Real.now() + offset])) } static now() { return instant ?? Real.now() + offset } }\nglobalThis.Date = PinnedDate\n` })
   const mf = new Miniflare({
     ...convertV4MiniflareOptions({
-      host: '127.0.0.1', port, https: true, modulesRoot: join(root, 'dist/server'),
+      host: '127.0.0.1', port, https: true, unsafeTriggerHandlers: true, modulesRoot: join(root, 'dist/server'),
       modules,
       compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
       assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
@@ -74,7 +74,13 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
 
   /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
   async function scheduled(cron, at = instant ?? Date.now() + (offset ?? 0)) {
-    return await (await mf.getWorker()).scheduled({ cron, scheduledTime: new Date(at) })
+    // Dispatch a real scheduled event without the synchronous proxy bridge,
+    // which can deadlock when the receiver is a Node network-edge callback.
+    const query = new URLSearchParams({ cron, time: String(at), format: 'json' })
+    const response = await mf.dispatchFetch(`${origin}/cdn-cgi/local/scheduled?${query}`)
+    const result = await response.json()
+    if (!response.ok || result.outcome !== 'ok') throw new Error(`Scheduled event failed: ${result.outcome}`)
+    return result
   }
 
   /** One request to the Worker. Form bodies are encoded here, so every body reaches it as bytes. */

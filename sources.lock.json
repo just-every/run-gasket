@@ -1064,7 +1064,7 @@
       "executable": false
     },
     "scripts/installer/recovery.mjs": {
-      "sha256": "13d59f7525187594159e21bbfb415c1f6335c6bd53e0f1849f2f6a3152dcdd26",
+      "sha256": "b88db37ccf368e8acb865eea58ef6ee44bd16c680ec736399daf54ae3eb15b2b",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -3824,7 +3824,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "68dc0421a4a4eac117a8c54ef73be9b0b44a8a37978c07d54c9164597ebc7dcc",
+      "sha256": "3f73ca4f45be72f112607ed74346a7ebcb2dc3b7c3c9556fd5816c07b5f54076",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
@@ -3924,7 +3924,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "254cc6840a217b5d731e47b5ca3b87648a3c73e2191fdfcc45261a12319d8be5",
+      "sha256": "264662e43241863b60bacc7266a948b92ad2f599952d247dfada5366e8aa4f57",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {
