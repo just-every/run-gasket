@@ -31,6 +31,12 @@ export const REQUEST_NOT_HELD = `NOT EXISTS(SELECT 1 FROM gk_retention_holds h W
  AND NOT EXISTS(SELECT 1 FROM gk_retention_scope_holds h WHERE h.held=1 AND
  ((h.kind='user' AND h.record_id=(SELECT requester_id FROM gk_requests WHERE id=?))
  OR (h.kind='attachment' AND h.record_id IN (SELECT id FROM gk_request_files WHERE request_id=?))))`
+// Request originals form part of their linked work's retained evidence.
+export const REQUEST_EVIDENCE_RETAINED = `EXISTS(SELECT 1 FROM gk_requests r JOIN gk_work_orders w ON w.id=r.work_order_id WHERE r.id=? AND
+ (w.submitted_version IS NOT NULL OR w.requires_evidence=1 OR
+ EXISTS(SELECT 1 FROM gk_signatures s WHERE s.work_order_id=w.id) OR
+ EXISTS(SELECT 1 FROM gk_evidence e WHERE e.work_order_id=w.id AND e.certificate=1) OR
+ EXISTS(SELECT 1 FROM gk_calibration_certificates c WHERE c.work_order_id=w.id)))`
 export async function retentionPreview(env: Bindings, actor: Actor, url: URL) {
   ownerOnly(actor)
   if (url.searchParams.get('kind') === 'attachment') return attachmentErasurePreview(env, actor, url.searchParams.get('id') ?? '')
@@ -42,10 +48,11 @@ export async function retentionPreview(env: Bindings, actor: Actor, url: URL) {
   const settings = await retentionSettings(env, actor)
   const contactDays = settings.policies.find(row => row.kind === 'request_contacts')!.minimum_days
   const attachmentDays = files.count ? settings.policies.find(row => row.kind === 'attachments')!.minimum_days : 0
-  const eligible = !held && !request.erased_at && request.created_at <= now()-Math.max(contactDays, attachmentDays)*86400000
+  const evidenceRetained = Boolean(await one(env, `SELECT 1 WHERE ${REQUEST_EVIDENCE_RETAINED}`, id))
+  const eligible = !evidenceRetained && !held && !request.erased_at && request.created_at <= now()-Math.max(contactDays, attachmentDays)*86400000
   const dependencies = await requestErasureCounts(env, id)
   const result = await one(env, 'SELECT result_json FROM gk_request_erasure_results WHERE request_id=?', id)
-  return { eligible, dependencies, result: result ? JSON.parse(result.result_json) : null, id, version: request.version, held, erased: Boolean(request.erased_at), files, linkedWork: request.work_order_id,
+  return { eligible, evidenceRetained, dependencies, result: result ? JSON.parse(result.result_json) : null, id, version: request.version, held, erased: Boolean(request.erased_at), files, linkedWork: request.work_order_id,
     scopeHolds: await all(env, `SELECT kind,record_id,held,reason,revision FROM gk_retention_scope_holds WHERE (kind='user' AND record_id=(SELECT requester_id FROM gk_requests WHERE id=?)) OR (kind='attachment' AND record_id IN (SELECT id FROM gk_request_files WHERE request_id=?))`, id, id),
     holds: await all(env, "SELECT kind,record_id,held,reason,revision FROM gk_retention_holds WHERE (kind='request' AND record_id=?) OR (kind='work' AND record_id=?)", id, request.work_order_id),
     policy: 'Retain indefinitely. No automatic erasure. Explicit owner confirmation is required by the request erasure door.',

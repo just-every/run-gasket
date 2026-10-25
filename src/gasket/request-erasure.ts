@@ -1,5 +1,5 @@
 import { redactionStatements, invalidateTransfersStatements } from '@runeditrun/rer/modules/portability/journal'
-import { REQUEST_NOT_HELD, REQUEST_ERASURE_TABLES, requestErasureCounts } from './retention'
+import { REQUEST_NOT_HELD, REQUEST_EVIDENCE_RETAINED, REQUEST_ERASURE_TABLES, requestErasureCounts } from './retention'
 // Explicit owner erasure keeps the request number while removing private intake.
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
@@ -21,6 +21,7 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
   const result = { removed, anonymized: { requests: 1, linkedWork: r.work_order_id && r.status === 'converted' ? 1 : 0 }, retained: { maintenanceWork: r.work_order_id ? 1 : 0, audit: true }, priorDownloads: 'Outside local erasure' }
   await commit(env, [
     guard(env, 'retention_hold', REQUEST_NOT_HELD, id, id, id, id),
+    guard(env, 'request_evidence_retained', `NOT (${REQUEST_EVIDENCE_RETAINED})`, id),
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=? AND erased_at IS NULL)', id, version),
     guard(env, 'retention_hold', `(SELECT created_at FROM gk_requests WHERE id=?)<=?-COALESCE((SELECT minimum_days FROM gk_retention_policies WHERE kind='request_contacts'),0)*86400000`, id, now()),
     guard(env, 'retention_hold', `NOT EXISTS(SELECT 1 FROM gk_request_files WHERE request_id=?) OR (SELECT created_at FROM gk_requests WHERE id=?)<=?-COALESCE((SELECT minimum_days FROM gk_retention_policies WHERE kind='attachments'),0)*86400000`, id, id, now()),

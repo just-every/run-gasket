@@ -10,7 +10,8 @@ const ELIGIBLE = `EXISTS(SELECT 1 FROM gk_evidence e JOIN gk_work_orders w ON w.
  WHERE e.id=? AND w.version=? AND w.status IN ('open','in_progress','returned')
  AND w.submitted_version IS NULL AND w.requires_evidence=0 AND e.item IS NULL AND e.certificate=0
  AND NOT EXISTS(SELECT 1 FROM gk_signatures s WHERE s.work_order_id=w.id)
- AND NOT EXISTS(SELECT 1 FROM gk_calibration_certificates c WHERE c.evidence_id=e.id)
+ AND NOT EXISTS(SELECT 1 FROM gk_calibration_certificates c WHERE c.work_order_id=w.id)
+ AND NOT EXISTS(SELECT 1 FROM gk_evidence certificate WHERE certificate.work_order_id=w.id AND certificate.certificate=1)
  AND e.uploaded_at<=?-COALESCE((SELECT minimum_days FROM gk_retention_policies WHERE kind='attachments'),0)*86400000
  AND NOT EXISTS(SELECT 1 FROM gk_retention_scope_holds h WHERE h.held=1 AND ((h.kind='attachment' AND h.record_id=e.id) OR (h.kind='user' AND h.record_id=e.uploaded_by)))
  AND NOT EXISTS(SELECT 1 FROM gk_retention_holds h WHERE h.kind='work' AND h.record_id=w.id AND h.held=1))`

@@ -231,6 +231,24 @@ export async function retentionJourney() {
   const calibrationWork=(await h.api('workorders.generate',owner,{})).created.find(r=>r.schedule===calibration).id
   const certificate=(await h.api('workorder.evidence',owner,{workOrder:calibrationWork,file:file('synthetic-gasket-certificate.pdf','%PDF-1.4 synthetic-gasket-1','application/pdf'),certificate:true})).evidence
   await assertRetained(certificate,calibrationWork)
+  const companion=(await h.api('workorder.evidence',owner,{workOrder:calibrationWork,file:file('synthetic-gasket-companion.png',png,'image/png')})).evidence
+  await assertRetained(companion,calibrationWork)
+  const sourceReceipt=await h.raw(`/request/${portal}`,{cookie:tech,body:{target,submissionKey:randomUUID(),description:'Synthetic signed source',urgency:'normal',contact:'Synthetic requester',photo:file('synthetic-gasket-source.png',png,'image/png')}})
+  assert.equal(sourceReceipt.status,303,await sourceReceipt.text())
+  const source=(await h.api('requests',owner)).find(r=>r.description==='Synthetic signed source').id
+  await h.api('request.triage',owner,{request:source,version:(await h.api(`requests/${source}`,owner)).version,decision:'approve',reason:'Confirmed source'})
+  const sourceWork=(await h.api('request.convert',owner,{request:source,version:(await h.api(`requests/${source}`,owner)).version})).id
+  await h.api('workorder.assign',owner,{workOrder:sourceWork,assignee:ownId})
+  await h.api('workorder.sign',owner,{workOrder:sourceWork,version:(await h.api(`work/${sourceWork}`,owner)).version,role:'technician'})
+  const sourceBefore=await h.api(`requests/${source}`,owner),sourceWorkBefore=await h.api(`work/${sourceWork}`,owner)
+  const sourcePreview=await h.api(`retention-preview?request=${source}`,owner)
+  assert.equal(sourcePreview.eligible,false);assert.equal(sourcePreview.evidenceRetained,true)
+  await h.api('request.erase',owner,{request:source,version:sourceBefore.version,confirm:true},409)
+  assert.deepEqual(await h.api(`retention-preview?request=${source}`,owner),sourcePreview)
+  assert.deepEqual(await h.api(`requests/${source}`,owner),sourceBefore)
+  assert.deepEqual(await h.api(`work/${sourceWork}`,owner),sourceWorkBefore)
+  assert.deepEqual(Buffer.from(await (await h.raw(`/app/request-files/${sourceBefore.files[0].id}`,{cookie:owner})).arrayBuffer()),png)
+
   if(process.env.RETENTION_SCREENSHOTS) {
     const {chromium}=await import('@playwright/test'),{mkdir}=await import('node:fs/promises')
     await mkdir(process.env.RETENTION_SCREENSHOTS,{recursive:true})
