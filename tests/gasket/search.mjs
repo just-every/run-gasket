@@ -142,6 +142,32 @@ export async function retentionJourney() {
   assert.deepEqual((await h.api('request.erase', owner, { request, version: requestBefore.version, confirm: true })).result, erased.result, 'retry retains the original per-type result')
   assert.equal((await h.api(`retention-preview?request=${request}`, owner)).files.count, 0)
   assert.equal((await h.raw(`/app/request-files/${requestBefore.files[0].id}`, { cookie: owner })).status, 404)
+  const ownId = (await h.api('me', owner)).id
+  const work = (await h.api('workorder.create', owner, { asset: ids[0], title: 'Optional evidence erasure', due: (await h.api('me', owner)).today, assignee: ownId })).id
+  const attached = await h.api('workorder.evidence', owner, { workOrder: work, version: 1, file: file('synthetic-gasket-1.png', png, 'image/png') })
+  const evidence = attached.evidence
+  const attachmentPreview = () => h.api(`retention-preview?kind=attachment&id=${evidence}`, owner)
+  await h.api(`retention-preview?kind=attachment&id=${evidence}`, tech, undefined, 403)
+  await h.api('attachment.erase', tech, { evidence, version: 2, confirm: true }, 403)
+  const evidenceHold = await h.api('retention.hold', owner, { kind: 'work', id: work, revision: 0, held: true, reason: 'Preserve original evidence' })
+  assert.equal((await attachmentPreview()).eligible, false)
+  await h.api('attachment.erase', owner, { evidence, version: 2, confirm: true }, 409)
+  assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${evidence}`, { cookie: owner })).arrayBuffer()), png)
+  await h.api('retention.hold', owner, { kind: 'work', id: work, revision: evidenceHold.revision, held: false, reason: 'Original evidence released' })
+  const attachment = await attachmentPreview()
+  assert.equal(attachment.eligible, true)
+  assert.deepEqual(attachment.dependencies, { attachments: 1, bytes: png.length, annotations: 0 })
+  await h.api('attachment.erase', owner, { evidence, version: attachment.version }, 400)
+  await h.api('attachment.erase', owner, { evidence, version: 1, confirm: true }, 409)
+  const result = await h.api('attachment.erase', owner, { evidence, version: attachment.version, confirm: true })
+  assert.deepEqual(result.result.removed, attachment.dependencies)
+  assert.equal((await h.raw(`/app/evidence/${evidence}`, { cookie: owner })).status, 404)
+  assert.equal((await h.api(`work/${work}`, owner)).title, 'Optional evidence erasure')
+  assert.deepEqual((await attachmentPreview()).result, result.result)
+  assert.deepEqual(await h.api('attachment.erase', owner, { evidence, confirm: true }), result)
+  const audit = (await h.api('audit?action=workorder.evidence', owner)).rows.filter(row => row.subject === work)
+  assert.ok(audit.length)
+  assert.ok(audit.every(row => row.detail === '{}'), 'original filename is removed from retained attachment audit')
     console.log('Retention journey: request and linked work holds, preserved bytes, denied access, release and confirmed erasure passed')
   } finally { await h.close() }
 }

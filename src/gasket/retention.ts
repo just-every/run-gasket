@@ -1,3 +1,4 @@
+import { attachmentErasurePreview } from './attachment-erasure'
 // Conservative retention default: retain indefinitely, with no automatic erasure.
 // Holds protect request intake and any copied fault on linked maintenance work.
 import type { Bindings } from '../auth.server'
@@ -26,6 +27,7 @@ export const REQUEST_NOT_HELD = `NOT EXISTS(SELECT 1 FROM gk_retention_holds h W
   ((h.kind='request' AND h.record_id=?) OR (h.kind='work' AND h.record_id=(SELECT work_order_id FROM gk_requests WHERE id=?))))`
 export async function retentionPreview(env: Bindings, actor: Actor, url: URL) {
   ownerOnly(actor)
+  if (url.searchParams.get('kind') === 'attachment') return attachmentErasurePreview(env, actor, url.searchParams.get('id') ?? '')
   const id = url.searchParams.get('request') ?? ''
   const request = await one(env, 'SELECT id,version,erased_at,work_order_id FROM gk_requests WHERE id=?', id)
   insist(request, 'request_not_found', 404)

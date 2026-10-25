@@ -636,7 +636,7 @@
       "executable": false
     },
     "migrations/core/0086_recovery_receipts.sql": {
-      "sha256": "a5372eb683a5dec413e5b5346a081c16a55a79dbd1adf09db82c1ff4e7b82a04",
+      "sha256": "be75b2bb503095ce3b836f99e810aded67d1e731a629585b166001659326521c",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1220,7 +1220,7 @@
       "executable": false
     },
     "src/gasket/actions.ts": {
-      "sha256": "ef5cd49ad71d1e5eb15e17f4eff7ade0fdfcb09124c352052355eb9edc8b7ce5",
+      "sha256": "87c23257913fda5885e34137494e86b2f4abbe97daa9a918fdb32a9c73638d9a",
       "executable": false
     },
     "src/gasket/actor.ts": {
@@ -1237,6 +1237,10 @@
     },
     "src/gasket/assets.ts": {
       "sha256": "74b954d27ef06217b8c9a3e2a0a1f9e97da89927c1270b555d4a8569b804ec6f",
+      "executable": false
+    },
+    "src/gasket/attachment-erasure.ts": {
+      "sha256": "65351a4f1f6b8004271c6c4512f3d0e7266feedc2997ef77217a88c8bf79e098",
       "executable": false
     },
     "src/gasket/audit.ts": {
@@ -1612,7 +1616,7 @@
       "executable": false
     },
     "src/gasket/retention.ts": {
-      "sha256": "e25b79c0a013115b8cea4380fbebe084746bc08e705b7229bec269d94c9b0f84",
+      "sha256": "ba8fdc7c5d111cbd10eb9a0fea43c2a0216925949b0d9201932f227ba68ba0bc",
       "executable": false
     },
     "src/gasket/review.ts": {
@@ -3944,7 +3948,7 @@
       "executable": false
     },
     "tests/gasket/search.mjs": {
-      "sha256": "b45daa4a163de76e9aadcf51d8262da35761eb855f28e1d823c597cedf63e59a",
+      "sha256": "3eb34c05728a1bab41862db079d301269e456d4bc4a7ab242269dc52295e8020",
       "executable": false
     },
     "tests/gasket/spend-browser.mjs": {

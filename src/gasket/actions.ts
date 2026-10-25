@@ -1,3 +1,4 @@
+import { eraseAttachment } from './attachment-erasure'
 import { confirmRecoveryDrill } from './recovery'
 import { copyStrategy, adaptStrategy, approveStrategy, previewStrategy, rolloutStrategy } from './pm-strategies'
 import { responsePolicy, changeRequestClock } from './request-response'
@@ -77,6 +78,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'attachment.erase': (env, actor, input) => eraseAttachment(env, actor, input),
   'recovery.drill': (env, actor, input) => confirmRecoveryDrill(env, actor, input),
   'retention.hold': (env, actor, input) => holdRecord(env, actor, input),
   'search.save': (env, actor, input) => saveSearch(env, actor, input),
