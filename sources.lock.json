@@ -4016,7 +4016,7 @@
       "executable": false
     },
     "tests/gasket/rules-browser.mjs": {
-      "sha256": "4a18da0f187359333d37b785a02bdf8f99831dbafeb808ec3964231b79d1dce0",
+      "sha256": "e38d5ecfd39468ee67bada89f971b22504eb2000b9c6ed067e14e51c003fb062",
       "executable": false
     },
     "tests/gasket/rules.mjs": {

@@ -40,7 +40,11 @@ export async function rulesBrowser({h,cookie,ids,asset,team,custom,matched,defin
     await capture('rule-preview',`/app/settings/rules?rule=${rule}&preview=yes`)
     await capture('request-routing',`/app/requests/${matched}`)
     await capture('request-queue','/app/requests')
+    await context.clearCookies()
+    await context.addCookies(cookie.lead.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
     await capture('notices','/app/notices')
+    await context.clearCookies()
+    await context.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
     await capture('rule-errors','/app/settings/rules')
     await context.close()
   } finally {await browser.close()}
