@@ -3940,7 +3940,7 @@
       "executable": false
     },
     "tests/runtime.mjs": {
-      "sha256": "31ce65bdb1609600c292f3b7dea65d91b3d6323baa4b66373ee81aa8deb0e48e",
+      "sha256": "396774c9fc6867d4dccbcb04c4b8be10a8b0d67ddd12274cbb04fbbd80995054",
       "executable": false
     },
     "tests/site/site.test.mjs": {
