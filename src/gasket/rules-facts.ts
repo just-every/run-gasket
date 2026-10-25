@@ -23,7 +23,17 @@ export async function ruleFacts(env:Bindings,event:RuleEvent):Promise<Row> {
   for(const row of await all(env,'SELECT v.field_id,v.value FROM gk_custom_values v JOIN gk_custom_fields f ON f.id=v.field_id WHERE v.entity_type=? AND v.entity_id=? AND f.retired=0',type,id))custom[row.field_id]=JSON.parse(row.value)
  }
  if(work)for(const row of await all(env,'SELECT field_id,value FROM gk_work_field_values WHERE work_order_id=?',work.id))custom[row.field_id]=row.value
- if(event.entityType==='request')record=Object.fromEntries(['id','number','asset_id','location','urgency','status','version','work_order_id','team_id','assignee_id','due_date','target_id','requester_id'].map(k=>[k,record![k]??null]))
+ if(event.entityType==='request')record=Object.fromEntries(['id','number','asset_id','location','urgency','status','version','work_order_id','team_id','assignee_id','due_date','target_id'].map(k=>[k,record![k]??null]))
+ const pick=(row:Row|null,keys:string[])=>row?Object.fromEntries(keys.map(k=>[k,row[k]??null])):null
+ const workKeys=['id','number','asset_id','location','status','version','priority','assignee_id','team_id','trade','shift','checklist_revision_id','due_date']
+ work=pick(work,workKeys)
+ if(event.entityType==='work')record=work!
+ if(event.entityType==='asset')record=pick(record,['id','status','retired_at','category','location'])!
+ if(event.entityType==='part')record=pick(record,['id','category','minimum_milli','revision'])!
+ if(event.entityType==='reading')record=pick(record,['id','asset_id','meter_id','work_order_id','value','taken_on'])!
+ if(event.entityType==='result')record=pick(record,['work_order_id','item','outcome','recorded_at'])!
+ asset=pick(asset,['id','status','retired_at','category','location'])
+ part=pick(part,['id','category','minimum_milli','revision'])
  const zone=(await one(env,'SELECT timezone FROM gk_site WHERE singleton=1'))?.timezone??'UTC'
  return {record,work,assetRecord:asset,partRecord:part,asset:asset?.id??null,location:record.location??work?.location??asset?.location??null,
   category:asset?.category??part?.category??null,priority:record.urgency??work?.priority??null,team:record.team_id??work?.team_id??null,

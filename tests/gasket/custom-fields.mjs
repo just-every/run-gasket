@@ -54,7 +54,7 @@ export async function customFieldsJourney() {
     const archived=(await h.api(`parts/${part}`,tech)).customFields.find(f=>f.id===voltage)
     assert.equal(archived.retired,1);assert.equal(archived.value,480);assert.equal(archived.history.length,1)
     assert.ok((await (await h.raw('/app/parts.csv',{cookie:owner})).text()).includes('Voltage (archived)'))
-    const imported='Name,ID,Location,Types,QR/Barcode,Refrigerant type\r\nRoof cooler,synthetic-gasket-1,Roof,HVAC,COOL-ROOF,R-32\r\n'
+    const imported='Name,ID,Location,Types,Refrigerant type\r\nRoof cooler,synthetic-gasket-1,Roof,HVAC,R-32\r\n'
     const input={assets:file('assets.csv',imported),dateOrder:'MDY',customMapping:{'Refrigerant type':refrigerant}}
     const preview=await h.api('import.preview',owner,input)
     const applied=await h.api('import.apply',owner,{...input,fingerprint:preview.fingerprint})
@@ -92,7 +92,7 @@ async function customBrowser({h,owner,asset,part,target,location,refrigerant}) {
     await page.locator(`[name="cf.${refrigerant}"]`).selectOption('R-410A')
     await page.getByRole('button',{name:'Update values'}).click()
     await page.goto(h.origin+'/app/move-in')
-    await page.locator('input[name=assets]').setInputFiles({name:'maintainx-assets.csv',mimeType:'text/csv',buffer:Buffer.from('Name,ID,Location,Types,QR/Barcode,Refrigerant type\r\nWorkshop cooler,synthetic-gasket-8,Workshop,HVAC,COOL-8,R-32\r\n')})
+    await page.locator('input[name=assets]').setInputFiles({name:'maintainx-assets.csv',mimeType:'text/csv',buffer:Buffer.from('Name,ID,Location,Types,Refrigerant type\r\nWorkshop cooler,synthetic-gasket-8,Workshop,HVAC,R-32\r\n')})
     await page.getByRole('button',{name:'Dry run',exact:true}).click()
     for(const width of [1440,390]) {
       await page.setViewportSize({width,height:1000})

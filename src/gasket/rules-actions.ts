@@ -10,8 +10,8 @@ export async function prepareAction(env:Bindings,actor:Actor,event:RuleEvent,fac
  const work=facts.work,request=event.entityType==='request'?facts.record:null,target=work??request
  const statements:D1PreparedStatement[]=[],output:Row={type:a.type},events:RuleEvent[]=[]
  const readable=(person:string)=> {
-  const sql=work ? `EXISTS(SELECT 1 FROM gk_members m WHERE m.id=? AND (m.role IN ('owner','lead','supervisor') OR m.id=? OR EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id=? AND c.member_id=m.id AND c.removed_at IS NULL)))` : request ? `EXISTS(SELECT 1 FROM gk_members m WHERE m.id=? AND (m.role IN ('owner','lead') OR m.id=?))` : '1'
-  const params=work ? [person,work.assignee_id,work.id] : request ? [person,request.requester_id] : []
+  const sql=work ? `EXISTS(SELECT 1 FROM gk_members m WHERE m.id=? AND (m.role IN ('owner','lead','supervisor') OR m.id=? OR EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id=? AND c.member_id=m.id AND c.removed_at IS NULL)))` : request ? `EXISTS(SELECT 1 FROM gk_members m WHERE m.id=? AND (m.role IN ('owner','lead') OR EXISTS(SELECT 1 FROM gk_requests r WHERE r.id=? AND r.requester_id=m.id)))` : '1'
+  const params=work ? [person,work.assignee_id,work.id] : request ? [person,request.id] : []
   return {sql,params}
  }
  const requireRead=async(person:string)=>{const check=readable(person);insist(await one(env,`SELECT 1 WHERE ${check.sql}`,...check.params),'rule_action_would_widen_access',403);statements.push(guard(env,'rule_access_changed',check.sql,...check.params))}
