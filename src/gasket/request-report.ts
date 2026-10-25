@@ -6,7 +6,7 @@ import { cell } from './audit'
 import { addDays, isDate, today } from './dates'
 import { triager } from './requests'
 
-export const REQUEST_POLICY = 'Submission cohort uses inclusive site-local dates. Acknowledgment is the first assess, ask-details, approval, decline or duplicate decision on that request. Resolution is independent approval closing linked corrective work; decline is a separate outcome. Means divide elapsed milliseconds by measured requests, never by all requests. All-request denominators retain untriaged, unanswered, declined and unresolved reports. Repeat faults are explicit duplicate links, not inferred similarity. Requester groups are signed-in intake or public unverified intake, never inferred from contact details. Abandonment is an explicit reasoned lead decision retaining the report; unanswered needs-details reports remain visible and are never inferred abandoned. Erased request timelines and requester identity are unavailable, never reconstructed; erased rows have their own requester group and are not inferred rejections. Current installation site only.'
+export const REQUEST_POLICY = 'Submission cohort uses inclusive site-local dates. Acknowledgment is the first assess, ask-details, approval, decline, abandonment or duplicate decision on that request. Resolution is independent approval closing linked corrective work; decline is a separate outcome. Means divide elapsed milliseconds by measured requests, never by all requests. All-request denominators retain untriaged, unanswered, declined and unresolved reports. Repeat faults are explicit duplicate links, not inferred similarity. Requester groups are signed-in intake or public unverified intake, never inferred from contact details. Abandonment is an explicit reasoned lead decision retaining the report; unanswered needs-details reports remain visible and are never inferred abandoned. Erased request timelines and requester identity are unavailable, never reconstructed; erased rows have their own requester group and are not inferred rejections. Current installation site only.'
 const decisions = new Set(['assess','ask_details','approve','decline','abandon','duplicate'])
 export async function requestReport(env: Bindings, actor: Actor, url: URL) {
   triager(actor)
@@ -23,7 +23,7 @@ export async function requestReport(env: Bindings, actor: Actor, url: URL) {
   const events=await all(env,'SELECT request_id,seq,kind,text,at FROM gk_request_events ORDER BY seq')
   const rows=sources.filter(r=>{const day=today(actor.zone,r.created_at),group=r.erased_at?'erased':r.requester_id?'signed-in':'public';return day>=from&&day<=to&&(!filters.site||filters.site===site)&&(!filters.asset||r.asset_id===filters.asset)&&(!filters.group||group===filters.group)&&(!filters.status||r.status===filters.status)}).map(r=>{
     const timeline=events.filter(e=>e.request_id===r.id),ack=timeline.find(e=>decisions.has(e.kind))
-    const converted=timeline.find(e=>e.kind==='work_created'),approval=timeline.find(e=>e.kind==='approve'),decline=timeline.find(e=>e.kind==='decline')
+    const converted=timeline.find(e=>e.kind==='work_created'),approval=timeline.find(e=>e.kind==='approve')??events.find(e=>e.request_id===r.duplicate_of&&e.kind==='approve'),decline=timeline.find(e=>e.kind==='decline')
     const abandonment=timeline.find(e=>e.kind==='abandon')
     const resolvedAt=r.work_status==='closed'?r.closed_at:null
     return {id:r.id,number:r.number,site,asset:r.asset_id,assetTag:r.asset_tag,target:r.target,group:r.erased_at?'erased':r.requester_id?'signed-in':'public',status:r.status,createdAt:r.created_at,
@@ -34,8 +34,9 @@ export async function requestReport(env: Bindings, actor: Actor, url: URL) {
     }
   })
   const summarize=(selected:typeof rows)=>{
+    const reasons=(key:'conversionReason'|'rejectionReason'|'abandonmentReason')=>[...new Set(selected.map(r=>r[key]).filter(Boolean))].map(reason=>({reason,count:selected.filter(r=>r[key]===reason).length}))
     const duration=(key:'acknowledgmentMs'|'resolutionMs')=>{const known=selected.filter(r=>r[key]!==null),totalMs=known.reduce((sum,r)=>sum+r[key]!,0);return {totalMs,measured:known.length,all:selected.length,missing:selected.length-known.length,meanMs:known.length?totalMs/known.length:null}}
-    return {total:selected.length,untriaged:selected.filter(r=>!r.acknowledgedAt).length,abandoned:selected.filter(r=>r.status==='abandoned').length,awaitingDetails:selected.filter(r=>r.status==='needs_details').length,
+    return {reasons:{conversion:reasons('conversionReason'),rejection:reasons('rejectionReason'),abandonment:reasons('abandonmentReason')},total:selected.length,untriaged:selected.filter(r=>!r.acknowledgedAt).length,abandoned:selected.filter(r=>r.status==='abandoned').length,awaitingDetails:selected.filter(r=>r.status==='needs_details').length,
       unresolved:selected.filter(r=>r.resolvedAt===null).length,duplicates:selected.filter(r=>r.duplicateOf).length,converted:selected.filter(r=>r.convertedAt!==null).length,declined:selected.filter(r=>r.status==='declined'&&!r.erased).length,
       acknowledgment:duration('acknowledgmentMs'),resolution:duration('resolutionMs')}
   }

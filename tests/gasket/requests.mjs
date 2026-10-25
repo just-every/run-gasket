@@ -415,7 +415,18 @@ export async function requestReportJourney() {
       assert.equal((await h.api(row.sourceDoor.replace('/api/gasket/',''),cookie.lead)).id,row.id)
       assert.ok(!JSON.stringify(row).includes(payload.contact))
     }
-    const {readCsv}=await import('../../src/gasket/movein/csv.ts')
+    // Independent CSV decoding keeps the download assertion outside product code.
+    const readCsv=bytes=>{
+      const text=new TextDecoder().decode(bytes),rows=[];let row=[],value='',quoted=false
+      for(let i=0;i<text.length;i++) {
+        const c=text[i]
+        if(c==='"') {if(quoted&&text[i+1]==='"'){value+='"';i++}else quoted=!quoted}
+        else if(c===','&&!quoted){row.push(value);value=''}
+        else if(c==='\n'&&!quoted){row.push(value.replace(/\r$/,''));rows.push(row);row=[];value=''}
+        else value+=c
+      }
+      assert.equal(quoted,false);return {rows}
+    }
     for(const filter of ['',`&site=${encodeURIComponent(r.site)}&asset=${asset}&group=signed-in`,'&group=public','&status=needs_details','&site=Other']) {
       const selected=await h.api(`request-report${query}${filter}`,cookie.lead)
       const csv=await h.raw(`/app/request-report.csv${query}${filter}`,{cookie:cookie.lead})
@@ -449,7 +460,18 @@ export async function requestReportJourney() {
       await capture(page,h,`/app/request-report${query}`,'request-report')
       await capture(page,h,`/app/request-report${query}&asset=${asset}&group=signed-in`,'request-report-filtered')
       await capture(page,h,`/app/requests`,'request-report-entry')
+      await capture(page,h,`/app/requests/${untriaged}`,'request-report-triage')
+      await capture(page,h,`/app/requests/${abandoned}`,'request-report-abandoned')
+      await capture(page,h,`/app/metrics?metric=requests.volume`,'request-report-definition')
     }
+    await h.api('request.erase',cookie.owner,{request:untriaged,version:(await detail(untriaged)).version,confirm:true})
+    const erased=await report()
+    assert.equal(erased.summary.total,7);assert.equal(erased.coverage.erased,1)
+    assert.equal(erased.summary.declined,1,'erasure is not a new rejection')
+    assert.equal(erased.rows.find(row=>row.id===untriaged).group,'erased')
+    assert.deepEqual(erased.rows.find(row=>row.id===untriaged).timeline,[])
+    assert.equal(erased.byRequesterGroup.find(g=>g.value==='erased').summary.total,1)
+    assert.notEqual(erased.inputFingerprint,r.inputFingerprint)
     // Every read rechecks current membership; an existing session loses report access.
     const lead=(await h.api('me',cookie.lead)).id
     await h.api('access.role',cookie.owner,{member:lead,role:'maintainer'})

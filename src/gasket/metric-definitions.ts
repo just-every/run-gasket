@@ -41,8 +41,16 @@ function definitions(sourceDoor: string, clause: string, eventTime: string, excl
 
 /** Frozen array and frozen scalar-only records; this is the immutable version-1 catalog. */
 export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
-  ...['volume','acknowledgment','resolution','repeat','conversion','rejection'].map(id=>Object.freeze({id:`requests.${id}`,name:`Request ${id}`,version:1,clause:'REQ-007',requiredCapability:'work.assign' as const,
-    formula:REQUEST_POLICY,eventTime:'Submission cohort in inclusive site-local dates; elapsed milliseconds use retained event timestamps.',exclusions:'No retained request is dropped from the all-request denominator. No inferred abandonment or verified public identity.',freshness:'Recomputed on read with source audit revision, latest change, retained omissions and input fingerprint.',sourceDoor:'/api/gasket/request-report'})),
+  ...[
+    ['volume','Count every retained request in the selected submission cohort once.'],
+    ['acknowledgment','Sum first decision time minus submission time; mean divides by requests with a decision. Disclose measured, missing and all-request counts.'],
+    ['resolution','Sum linked closed corrective work time minus submission time for each request; mean divides by requests linked to closed work. One work may resolve several separately counted reports. Disclose measured, missing and all-request counts.'],
+    ['repeat','Count request rows with an explicit duplicate link; retain the original and each duplicate as separate volume.'],
+    ['conversion','Count reports with a retained work-created event, including linked duplicates; group recorded approval reasons separately. This is report conversion, not unique work order volume.'],
+    ['rejection','Count declined requests excluding erased rows and group retained decline reasons.'],
+    ['abandonment','Count explicit abandoned request decisions and group retained reasons; never infer abandonment from age or unanswered questions.'],
+  ].map(([id,formula])=>Object.freeze({id:`requests.${id}`,name:`Request ${id}`,version:1,clause:'REQ-007',requiredCapability:'work.assign' as const,
+    formula:formula+' '+REQUEST_POLICY,eventTime:'Submission cohort in inclusive site-local dates; elapsed milliseconds use retained event timestamps.',exclusions:'No retained request is dropped from the all-request denominator. No inferred abandonment or verified public identity.',freshness:'Recomputed on read with source audit revision, latest change, retained omissions and input fingerprint.',sourceDoor:'/api/gasket/request-report'})),
   ...COSTING_METRICS,
   ...LABOR_METRICS,
   ...INTERVENTION_METRICS,

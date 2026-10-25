@@ -118,7 +118,7 @@ The scheduler's existing fixed-calendar and approval-reading meter cadence remai
 
 - **REQ-006 — Email and Google Forms intake.** A site inbound email address accepts fault descriptions, attachments and replies with sender validation; Google Forms responses map authorized asset/location fields into requests through a documented connector. Message/response IDs deduplicate repeated deliveries; rejected rows are visible. **Acceptance evidence:** Send an operator email and replay a Google Forms response at the network edge, reply to the acknowledgment and submit an unmappable asset. Inspect one request per source ID, linked reply and actionable rejection.
 
-- **REQ-007 — Request reporting and operator adoption.** Leads see request volumes, acknowledgment/resolution time, repeat faults, conversion and rejection reasons by site, asset and requester group. Reports link to the exact records and show untriaged/abandoned requests rather than excluding them from response metrics. **Acceptance evidence:** Submit, duplicate, decline, convert and leave requests untriaged, then filter/download the request dashboard and compare counts and time denominators with source timestamps.
+- **REQ-007 — Request reporting and operator adoption.** Leads see request volumes, acknowledgment and resolution time, repeat faults, conversion and rejection reasons by site, asset and requester group. Reports link to the exact records and show untriaged and abandoned requests rather than excluding them from response metrics. Current lead and owner triage permission protects the page, JSON and CSV doors. The current installation is the site dimension; ADMIN-002 inherits authorized multi-site report scoping before more sites ship. Requester groups describe signed-in intake, public unverified intake and erased identity; ADMIN-004 inherits future requester groups under its scoped identities. Acknowledgment is the first recorded lead decision on each report; resolution is independent closure of linked corrective work. Declines stay separate from repair resolution. Durations disclose elapsed totals, measured counts, missing counts and all-request counts. Repeat faults are explicit duplicate links; conversion counts reports linked by retained work-created events, with the canonical approval reason. Abandonment is an explicit reasoned triage decision that retains the report, never an inference from waiting time. Erased sources remain counted with unavailable identity and timeline evidence disclosed. REPORT-009 definitions, retained omissions, source links and freshness apply to all these measures. **Acceptance evidence:** Submit, duplicate, decline, convert and leave requests untriaged, then filter and download the request dashboard and compare counts and time denominators with source timestamps.
 
 ### Work planning and coordination
 
@@ -366,8 +366,8 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 46 | 33 | 43 | 122 |
-| All | 60 | 33 | 43 | 136 |
+| Target and push further | 47 | 33 | 42 | 122 |
+| All | 61 | 33 | 42 | 136 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -415,7 +415,7 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | `REQ-004` | Requester status and two-way updates | target | missing |  | No requester status page, conversation or lifecycle notifications. |
 | `REQ-005` | Response targets and escalation | target | missing |  | No request targets, business calendars or escalation engine. |
 | `REQ-006` | Email and Google Forms intake | target | missing |  | No maintenance inbound email or Google Forms connector. |
-| `REQ-007` | Request reporting and operator adoption | target | missing |  | No request reporting or lifecycle metrics. |
+| `REQ-007` | Request reporting and operator adoption | target | done | `tests/gasket/requests.mjs` — requestReportJourney: submit, duplicate, decline, convert, independently close corrective work, explicitly abandon and leave unanswered and untriaged reports; reconcile volume and elapsed-time totals, measured and all-request denominators to source details and closure timestamps; filter by current site, asset, intake group, status and site-local dates; reconcile CSV rows and timestamps; exact source links, recorded reasons, immutable definitions, stable fingerprint, empty-cohort unknowns, erased-source omissions and immediate role revocation at JSON, page and download doors. capture: report, filtered report, queue entry, triage, abandoned detail and definition at 1440 and 390. `src/gasket/request-report.ts`; `src/gasket/ui/request-report.ts`. |  |
 | `PLAN-001` | Priority, lifecycle and reusable work templates | target | done | `src/gasket/work.ts`; `src/gasket/templates.ts`; `src/gasket/ui/templates.ts`; `migrations/core/0042_work_templates.sql`; `migrations/core/0043_location_work.sql`; `src/gasket/work-fields.ts`; `migrations/core/0044_work_fields.sql`; `src/gasket/review.ts`; `tests/gasket/flows.mjs`; `migrations/core/0045_location_schedules.sql`; `src/gasket/schedules.ts` |  |
 | `PLAN-002` | Teams, trades and accountable assignments | target | done | `src/gasket/crew.ts`; `src/gasket/work.ts`; `src/gasket/control.ts`; `src/gasket/ui/crew.ts`; `migrations/core/0031_crew.sql`; `tests/gasket/flows.mjs` |  |
 | `PLAN-003` | Calendar and workload scheduling | target | missing |  | No work calendar, capacity model, leave or drag scheduling. |

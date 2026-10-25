@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "0333ff361c7d22f3617c8cde9280f9b00b4f231555e7dbfcc09366c48c13929d",
+      "sha256": "8e6427d560ef405f3cc9293e722ad5ead888d295d3ed9a453de3116ae00c4481",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "3149d3ae32235c11555ac6126ced4f5f09b974880dc3678dc4477d873187912c",
+      "sha256": "35a0adbd3390bec7982edd9d931307c22799aacceefe2c628d9f502f58a521b1",
       "executable": false
     },
     "base-copies.json": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ed9f335ebef6024970a4eecb039a50038746da2ddf16b92c5fe3b4d7868ac72a",
+      "sha256": "928fcb85f62fc2f87fee703362a58bc6a8f36f849333374e1ad533f22d275511",
       "executable": false
     },
     "DEMO.md": {
@@ -1416,7 +1416,7 @@
       "executable": false
     },
     "src/gasket/metric-definitions.ts": {
-      "sha256": "bccc46c5ac825e56254d9b660bcea0a274335196348e946087684310f69ef4b9",
+      "sha256": "59149adb4feba10ccb4a3bec1bd87f0283b9c8134bff1b3390c553d64a13e389",
       "executable": false
     },
     "src/gasket/metrics.ts": {
@@ -1560,7 +1560,7 @@
       "executable": false
     },
     "src/gasket/request-report.ts": {
-      "sha256": "fd260a9fea5668096f4fb06d9675a49e6d20de1e246c3d578037e2fdf69fda29",
+      "sha256": "02781063f0edec7826cc98fafb2aab6311ddac5e54c0210da37fe1bcacc6c8b5",
       "executable": false
     },
     "src/gasket/request-sources.ts": {
@@ -3904,7 +3904,7 @@
       "executable": false
     },
     "tests/gasket/requests.mjs": {
-      "sha256": "b0fffaa40f99c0597e002187b1e3261afb27398ab553cb79b904768057b312c6",
+      "sha256": "605bb73dd871c9bdcb90bfbe9dfa0f8b4fe4979050118aa353276e571cee06e3",
       "executable": false
     },
     "tests/gasket/search.mjs": {
