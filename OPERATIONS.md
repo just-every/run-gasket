@@ -74,3 +74,14 @@ health.
 `packaging.json` declares Gasket's Worker build, DB migrations, native sign-in and mail providers. Run `pnpm run build`, then `pnpm delivery:spec` to update the committed deployment specification. `pnpm check:deployment-spec` refuses stale source policy or build output. Package with `node scripts/delivery/base/cli.mjs package --config packaging.json --output rer-package`; the output contains the descriptor, setup manifest, dispatch-only Managed workflow and delivery artifact. Generated packages stay outside source control.
 
 Managed hosting supplies the RER mail relay URL, sender and private credential. Assisted hosting collects the selected provider's sender and private key; Cloudflare also requires its account ID. Configure a verified sender before sending production sign-in mail. Local development continues to suppress mail.
+
+
+After a successful local archive command, open Settings, then Automation to
+inspect the completed backup time, backup age and recovered snapshot time.
+Keep the archive itself safe: a receipt does not prove the file is still present.
+After a restore, compare original attachment digests and accepted records with
+the source archive, then use Confirm restore drill. The server checks product
+record counts and records the owner's explicit attestation. A failed or merely
+staged import does not become a successful restore receipt or drill. Resume
+individual PM schedules and automation rules only after this reconciliation;
+rotate connector signing keys before deliberately reconnecting receivers.

@@ -6,6 +6,7 @@ export const API_DOORS: [string, string][] = [
   ['^pm-strategies$', 'pmStrategies'],
   ['^request-response$', 'requestResponse'],
   ['^request-report$', 'requestReport'],
+  ['^retention-settings$', 'retentionSettings'],
   ['^retention-preview$', 'retentionPreview'],
   ['^search$', 'search'], ['^search-views$', 'searchViews'],
   ['^costing$', 'costing'],

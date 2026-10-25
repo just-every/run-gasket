@@ -123,6 +123,12 @@ export async function retentionJourney() {
   assert.ok(retention.dependencies.events > 0)
   assert.equal(retention.result, null)
   assert.equal(retention.held, true); assert.equal(retention.files.count, 1)
+  await h.api('retention-settings', tech, undefined, 403)
+  await h.api('retention.policy', tech, { kind: 'attachments', minimumDays: 1, revision: 0, reason: 'No authority' }, 403)
+  const contactPolicy = await h.api('retention.policy', owner, { kind: 'request_contacts', minimumDays: 1, revision: 0, reason: 'Preserve recent request contacts' })
+  await h.api('retention.policy', owner, { kind: 'request_contacts', minimumDays: 0, revision: 0, reason: 'Stale policy' }, 409)
+  await h.api('retention.policy', owner, { kind: 'attachments', minimumDays: -1, revision: 0, reason: 'Invalid retention' }, 400)
+  assert.equal((await h.api('retention-settings', owner)).automaticErasure, false)
   const requestBefore = await h.api(`requests/${request}`, owner)
   const photoBefore = await h.raw(`/app/request-files/${requestBefore.files[0].id}`, { cookie: owner })
   const photoBytes = Buffer.from(await photoBefore.arrayBuffer())
@@ -133,6 +139,14 @@ export async function retentionJourney() {
   await h.api('retention.hold', owner, { kind: 'request', id: request, revision: hold.revision, held: false, reason: 'Review complete' })
   await h.api('retention.hold', owner, { kind: 'request', id: request, revision: hold.revision, held: true, reason: 'Stale edit' }, 409)
   assert.equal((await h.api('request.erase', owner, { request, version: requestBefore.version }, 400)).error, 'erasure_confirmation_required', 'erasure needs explicit confirmation')
+  await h.api('request.erase', owner, { request, version: requestBefore.version, confirm: true }, 409)
+  await h.api('retention.policy', owner, { kind: 'request_contacts', minimumDays: 0, revision: contactPolicy.revision, reason: 'Explicit release of minimum retention' })
+  for (const [kind, id] of [['attachment', requestBefore.files[0].id], ['user', (await h.api('me', tech)).id]]) {
+    const protectedRecord = await h.api('retention.hold', owner, { kind, id, revision: 0, held: true, reason: 'Preserve original requester evidence' })
+    assert.equal((await h.api(`retention-preview?request=${request}`, owner)).held, true)
+    await h.api('request.erase', owner, { request, version: requestBefore.version, confirm: true }, 409)
+    await h.api('retention.hold', owner, { kind, id, revision: protectedRecord.revision, held: false, reason: 'Owner released evidence hold' })
+  }
   const preview = await h.api(`retention-preview?request=${request}`, owner)
   const erased = await h.api('request.erase', owner, { request, version: requestBefore.version, confirm: true })
   assert.deepEqual(erased.result.removed, preview.dependencies)
@@ -154,6 +168,16 @@ export async function retentionJourney() {
   await h.api('attachment.erase', owner, { evidence, version: 2, confirm: true }, 409)
   assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${evidence}`, { cookie: owner })).arrayBuffer()), png)
   await h.api('retention.hold', owner, { kind: 'work', id: work, revision: evidenceHold.revision, held: false, reason: 'Original evidence released' })
+  const attachmentPolicy = await h.api('retention.policy', owner, { kind: 'attachments', minimumDays: 1, revision: 0, reason: 'Retain new original files' })
+  assert.equal((await attachmentPreview()).eligible, false)
+  await h.api('attachment.erase', owner, { evidence, version: 2, confirm: true }, 409)
+  await h.api('retention.policy', owner, { kind: 'attachments', minimumDays: 0, revision: attachmentPolicy.revision, reason: 'Owner released minimum age' })
+  for (const [kind, id] of [['attachment', evidence], ['user', ownId]]) {
+    const held = await h.api('retention.hold', owner, { kind, id, revision: 0, held: true, reason: 'Preserve work original' })
+    assert.equal((await attachmentPreview()).eligible, false)
+    await h.api('attachment.erase', owner, { evidence, version: 2, confirm: true }, 409)
+    await h.api('retention.hold', owner, { kind, id, revision: held.revision, held: false, reason: 'Owner released work original' })
+  }
   const attachment = await attachmentPreview()
   assert.equal(attachment.eligible, true)
   assert.deepEqual(attachment.dependencies, { attachments: 1, bytes: png.length, annotations: 0 })
@@ -168,6 +192,17 @@ export async function retentionJourney() {
   const audit = (await h.api('audit?action=workorder.evidence', owner)).rows.filter(row => row.subject === work)
   assert.ok(audit.length)
   assert.ok(audit.every(row => row.detail === '{}'), 'original filename is removed from retained attachment audit')
+  // Signed and required originals remain obligations even without a legal hold.
+  const signedPhoto = (await h.api('workorder.evidence', owner, { workOrder: work, version: (await h.api(`work/${work}`, owner)).version, file: file('signed.png', png, 'image/png') })).evidence
+  await h.api('workorder.sign', owner, { workOrder: work, version: (await h.api(`work/${work}`, owner)).version, role: 'technician' })
+  assert.equal((await h.api(`retention-preview?kind=attachment&id=${signedPhoto}`, owner)).eligible, false)
+  await h.api('attachment.erase', owner, { evidence: signedPhoto, version: (await h.api(`work/${work}`, owner)).version, confirm: true }, 409)
+  const template = (await h.api('template.save', owner, { name: 'Required original', title: 'Required evidence', requiresEvidence: true })).id
+  const requiredWork = (await h.api('workorder.create', owner, { asset: ids[0], template, due: (await h.api('me', owner)).today, assignee: ownId })).id
+  const requiredPhoto = (await h.api('workorder.evidence', owner, { workOrder: requiredWork, file: file('required.png', png, 'image/png') })).evidence
+  assert.equal((await h.api(`retention-preview?kind=attachment&id=${requiredPhoto}`, owner)).eligible, false)
+  await h.api('attachment.erase', owner, { evidence: requiredPhoto, version: (await h.api(`work/${requiredWork}`, owner)).version, confirm: true }, 409)
+  assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${requiredPhoto}`, { cookie: owner })).arrayBuffer()), png)
     console.log('Retention journey: request and linked work holds, preserved bytes, denied access, release and confirmed erasure passed')
   } finally { await h.close() }
 }

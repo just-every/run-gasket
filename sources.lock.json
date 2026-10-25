@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "c7eee4dcfb69932730e73195672a61ee20e47ddc9fca8015c8457660e41f01e5",
+      "sha256": "f663e060dfdfefbe320dc8ed26efe3bf31a46fe98ce94a95165b6531f0070edb",
       "executable": false
     },
     "base-copies.json": {
@@ -276,7 +276,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "c15ca14a66b0d956bc5817cb5fe54664f1d8260973e8098c37ea8e67b6e4e652",
+      "sha256": "062ea3fcfa1af55be7ecdb1f844fd84c86432d326f7a0b080e62345e3fd631cc",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -639,6 +639,10 @@
       "sha256": "be75b2bb503095ce3b836f99e810aded67d1e731a629585b166001659326521c",
       "executable": false
     },
+    "migrations/core/0087_retention_settings.sql": {
+      "sha256": "34d0ccb833720886143b1590b81f1dd1a098ae5331f730039147f4119c93512b",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "5d20f1bd0c24def0cd6c1165d1a58d0472ad0f02f2b60047014bda962eaf4274",
       "executable": false
@@ -648,7 +652,7 @@
       "executable": false
     },
     "OPERATIONS.md": {
-      "sha256": "c9f350d2cad4947bddf37745ce0eff4a7db3d791762229843ee513cea7cc8098",
+      "sha256": "3d0c60731cd7fb2ad882ca2be626c826fa0291519bb54de8985dc2253dd50f82",
       "executable": false
     },
     "package.json": {
@@ -1060,7 +1064,7 @@
       "executable": false
     },
     "scripts/installer/recovery.mjs": {
-      "sha256": "8b5ef82999f6389ae461b7dc2112574147c43217d99ece57d10ca2681b2d9bfb",
+      "sha256": "13d59f7525187594159e21bbfb415c1f6335c6bd53e0f1849f2f6a3152dcdd26",
       "executable": false
     },
     "scripts/installer/seed.mjs": {
@@ -1220,7 +1224,7 @@
       "executable": false
     },
     "src/gasket/actions.ts": {
-      "sha256": "87c23257913fda5885e34137494e86b2f4abbe97daa9a918fdb32a9c73638d9a",
+      "sha256": "7885e055b9640856fbf972781bd8ec36fcf60ff7a8410db6d269a6a29f7c7617",
       "executable": false
     },
     "src/gasket/actor.ts": {
@@ -1240,7 +1244,7 @@
       "executable": false
     },
     "src/gasket/attachment-erasure.ts": {
-      "sha256": "65351a4f1f6b8004271c6c4512f3d0e7266feedc2997ef77217a88c8bf79e098",
+      "sha256": "825ab2ce6458e606f1ad695f76d39c0515b7896844f986a276d7ee263f8eed86",
       "executable": false
     },
     "src/gasket/audit.ts": {
@@ -1368,7 +1372,7 @@
       "executable": false
     },
     "src/gasket/doors.ts": {
-      "sha256": "895b96cf8024bef349f5693bbc2a18af1d95164ed1e19aff345e20fda0024adb",
+      "sha256": "064ad0f3a7f2762089e55b1c348e1197341be949eb804e1d0c2520c320aa1707",
       "executable": false
     },
     "src/gasket/exceptions.ts": {
@@ -1584,7 +1588,7 @@
       "executable": false
     },
     "src/gasket/request-erasure.ts": {
-      "sha256": "e0424dfeeb6db19d83e20b5050ff2aabe1d8ec2fc6798d291588548183a7cc02",
+      "sha256": "5a366884f8ee0861bd01c9bdd22a830903217000974b9b9c52d8da5d94bd7f71",
       "executable": false
     },
     "src/gasket/request-photos.ts": {
@@ -1616,7 +1620,7 @@
       "executable": false
     },
     "src/gasket/retention.ts": {
-      "sha256": "ba8fdc7c5d111cbd10eb9a0fea43c2a0216925949b0d9201932f227ba68ba0bc",
+      "sha256": "2d4b67242e2a743ab180f4b7dc1dd883ebcc560a652f5106c78d4c5810367626",
       "executable": false
     },
     "src/gasket/review.ts": {
@@ -1912,7 +1916,7 @@
       "executable": false
     },
     "src/gasket/views.ts": {
-      "sha256": "bfca04b783196cfb2459b5c85aa96e2c2108fa9f5e29948b75a2f391d1bfb440",
+      "sha256": "75540764632e8daa744b3394724f7e76b465d28210f0cb7e9dc17ca11903141e",
       "executable": false
     },
     "src/gasket/webhook-signing.ts": {
@@ -3920,7 +3924,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "44460f304ec614733aced0e5c9db5c83e742ac034a6d0951f7092cf575bc8b45",
+      "sha256": "ea4df169faf6fab3494b2611d3a05a0533f94a97f57a41cdad94b76061d0a81f",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {
@@ -3948,7 +3952,7 @@
       "executable": false
     },
     "tests/gasket/search.mjs": {
-      "sha256": "3eb34c05728a1bab41862db079d301269e456d4bc4a7ab242269dc52295e8020",
+      "sha256": "4b705d6659a1ef80220578c77020264570ad94877644f2c2bcd6d84a03ac3302",
       "executable": false
     },
     "tests/gasket/spend-browser.mjs": {

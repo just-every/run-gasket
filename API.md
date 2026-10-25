@@ -384,3 +384,43 @@ The response includes source rows and links, reasons, first-decision and closed-
 `GET /api/gasket/pm-strategies` lists the versioned starting library, latest strategy revisions and retained rollout records for internal board readers. `POST /api/gasket/pm.copy` requires register permission and `template`, `name`, `category`; it creates a draft retaining the library id and version. `pm.adapt` appends a revision using `strategy`, current `number`, typed `items`, `everyDays`, a safety and manufacturer `reference` and change `note`. `pm.approve` requires an independent owner or supervisor, exact `revision` and a reason; an unadapted library copy cannot be approved.
 
 `pm.preview` takes a `strategy` and `schedules` list and writes nothing. Current-site, category-matched calendar schedules are supported. The returned hash covers source versions, existing procedures, issued work, declared interval limits, program changes and local conflicts. `pm.rollout` requires an independent owner or supervisor, that exact hash, the same selection and explicit `occurrencePlan: "preserve_issued_and_due"`. Each conflicting schedule needs a `decisions` entry keyed by its id with `choice` (`keep_local` or `use_program`) and a nonempty `reason`. Nonconflicting local overrides survive automatically. Changes to sources require another preview. The transaction preserves issued work and due dates and creates future procedure revisions; it cannot cancel issued work or perform catch-up. The Schedules page provides copy, adaptation, approval, diff and conflict-decision forms using the same actions. Additional sites, non-calendar rollouts, cancellation and catch-up remain gaps in PM-007. Both clauses retain the conservative authorization defaults in their contract Gap pending ct approval.
+
+
+### Recovery receipts and optional evidence erasure
+
+Successful local `rer export` and `rer import` commands record archive digests,
+the source recovery point and completed-operation time. The owner reads these
+through `GET /api/gasket/recovery` and the existing Automation page. A failed
+command never advances the last completed receipt. A restored installation
+requires deliberate resumption of schedules and connector-key rotation.
+`POST /api/gasket/recovery.drill` takes `receipt` and explicit `confirm`; it
+reconciles product record counts to the restore manifest and records the owner's
+attestation that original attachment digests were checked. Import alone never
+claims a successful drill.
+
+Request retention previews now enumerate removed attachment, event, clock and
+escalation counts. Confirmed request erasure returns and persists its per-type
+result; retries return that same result. The result remains in later archives.
+
+`GET /api/gasket/retention-preview?kind=attachment&id=ID` previews optional work
+evidence. `POST /api/gasket/attachment.erase` takes `evidence`, the preview's
+work `version` and explicit `confirm`. Only the owner may use either door.
+The conservative default preserves work holds, any submitted or signed work,
+required evidence and calibration certificates. Eligible originals and their
+annotations are removed atomically, attachment audit payloads are anonymized,
+the maintenance record remains, and older archives are fenced by the same
+later-journal requirement as request erasure. Per-type results survive retries
+and restore. Prior downloads remain outside local erasure. There is no automatic
+erasure; user retention and broader maintenance-record erasure remain unfinished.
+
+
+`GET /api/gasket/retention-settings` reads owner-only per-type minimum ages.
+`POST /api/gasket/retention.policy` takes `kind` (attachments, request_contacts,
+users or maintenance_records), `minimumDays`, current `revision` and `reason`.
+Every type retains indefinitely by default; a minimum age only delays eligibility
+for explicit erasure. It never starts an automatic deletion job. Request-contact
+and attachment minima are enforced atomically by their existing erasure doors.
+User and maintenance-record settings are retained for their future erasure doors;
+those classes are not currently eligible for deletion. `retention.hold` also
+accepts attachment and user kinds. Attachment holds protect their original files;
+user holds protect their linked request intake and uploaded work originals.

@@ -2,7 +2,7 @@ import { recoveryHealth } from './recovery'
 import { strategyView } from './pm-strategies'
 import { responseSettings } from './request-response'
 import { requestReport } from './request-report'
-import { retentionPreview } from './retention'
+import { retentionPreview, retentionSettings } from './retention'
 import { searchEstate, savedSearches } from './search'
 import { costingReport } from './costing'
 import { portalSettings, requestQueue, requestDetail } from './requests'
@@ -66,6 +66,7 @@ export const views: Record<string, View> = {
   pmStrategies:(env,actor)=>strategyView(env,actor),
   requestResponse:(env,actor)=>responseSettings(env,actor),
   requestReport:(env,actor,_id,url)=>requestReport(env,actor,url),
+  retentionSettings: (env, actor) => retentionSettings(env, actor),
   retentionPreview: (env, actor, _id, url) => retentionPreview(env, actor, url),
   search: (env, actor, _id, url) => searchEstate(env, actor, url),
   searchViews: (env, actor) => savedSearches(env, actor),

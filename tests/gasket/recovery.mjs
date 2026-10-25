@@ -25,12 +25,34 @@ export async function recoveryJourney() {
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
     await h.api('webhook.control', owner, { subscription: subscription.id, revision: 1, paused: false, reason: 'Receiver confirmed' })
-    const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today })
+    const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today, assignee: (await h.api('me', owner)).id })
+    const workPhoto = (await h.api('workorder.evidence', owner, { workOrder: accepted.id, version: 1, file: file('synthetic-gasket-private-photo.png', png, 'image/png') })).evidence
     const portal = (await h.api('request.portal', owner, { name: 'Recovery intake', fields: [] })).id
     const intakeTarget = (await h.api('request.target', owner, { portal, kind: 'asset', asset, name: 'Recovery pump', publishConsent: true })).id
     assert.equal((await h.raw(`/request/${portal}`, { cookie: owner, body: { target: intakeTarget, submissionKey: randomUUID(), description: 'synthetic-gasket-private-fault', urgency: 'normal', contact: 'synthetic-gasket-private-contact', photo: file('request.png', png, 'image/png') } })).status, 303)
     const request = (await h.api('search?kind=request&q=synthetic-gasket-private-fault', owner)).rows[0].id
     const photo = (await h.api(`requests/${request}`, owner)).files[0].id
+    // Interrupt a real source PM evaluation through the owner's pause door.
+    // One accepted occurrence precedes the interrupted batch and must survive.
+    await h.api('automation.catchup', owner, { rule: 'pm', revision: 1 })
+    const acceptedPm = (await h.api('work', owner)).find(row => row.title === 'Recovery PM')
+    assert.ok(acceptedPm)
+    for (let index = 0; index < 48; index++) await h.api('schedule.create', owner, { asset, checklist, title: `Interrupted PM ${index}`, everyDays: 30, firstDue: today })
+    const attempt = h.raw('/api/gasket/automation.catchup', { cookie: owner, body: { rule: 'pm', revision: 1 } })
+    let running
+    for (let probe = 0; probe < 100; probe++) {
+      running = (await h.api('automation/jobs', owner)).jobs.find(row => row.rule_id === 'pm' && row.state === 'running')
+      if (running) break
+    }
+    assert.ok(running, 'observe the actual source PM job before interrupting it')
+    await h.api('automation.control', owner, { rule: 'pm', revision: 1, paused: true, reason: 'Interrupt source PM evaluation for recovery drill' })
+    const interrupted = await attempt
+    assert.equal(interrupted.status, 409, 'pause fences the in-flight source PM commit')
+    assert.equal((await interrupted.json()).error, 'automation_changed')
+    const failed = await h.api(`automation/jobs?job=${running.id}`, owner)
+    assert.equal(failed.state, 'failed')
+    assert.equal(failed.error, 'automation_changed')
+    assert.equal((await h.api('work', owner)).filter(row => row.title.startsWith('Interrupted PM')).length, 0)
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
     await h.stop()
@@ -54,6 +76,10 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/api/gasket/me', { cookie: owner })).status, 401, 'source sessions are excluded')
       const signed = await restored.signIn(h.vars.OWNER_EMAIL)
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
+      assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
+      const recoveredJob = await restored.api(`automation/jobs?job=${running.id}`, signed)
+      assert.equal(recoveredJob.state, 'failed')
+      assert.equal(recoveredJob.error, 'automation_changed')
       const recovery = await restored.api('recovery', signed)
       assert.equal(recovery.restore.kind, 'restore')
       assert.equal(recovery.restore.recovery_point, records[0].exportedAt)
@@ -108,6 +134,16 @@ export async function recoveryJourney() {
         const stillOwner = await unchanged.signIn(h.vars.OWNER_EMAIL)
         assert.deepEqual(await unchanged.api('work?state=open', stillOwner), before, 'nonempty refusal writes no work')
         assert.deepEqual(await unchanged.api('schedules', stillOwner), schedules, 'nonempty refusal changes no PMs')
+        for (const schedule of schedules) await unchanged.api('automation.schedule', stillOwner, { schedule: schedule.id, revision: schedule.revision, active: true, reason: 'Reconcile and resume the recovered PM source' })
+        const pmRule = (await unchanged.api('automation/jobs', stillOwner)).rules.find(row => row.id === 'pm')
+        await unchanged.api('automation.control', stillOwner, { rule: 'pm', revision: pmRule.revision, paused: false, reason: 'Owner intentionally resumed recovered PMs' })
+        await unchanged.api('automation.catchup', stillOwner, { rule: 'pm', revision: pmRule.revision + 1 })
+        const resumed = await unchanged.api('work', stillOwner)
+        assert.ok(resumed.some(row => row.id === acceptedPm.id), 'accepted source occurrence is preserved')
+        assert.equal(resumed.filter(row => row.title.startsWith('Interrupted PM')).length, 48)
+        await unchanged.api('automation.catchup', stillOwner, { rule: 'pm', revision: pmRule.revision + 1 })
+        await unchanged.scheduled('*/15 * * * *')
+        assert.deepEqual(await unchanged.api('work', stillOwner), resumed, 'resuming and replaying the interrupted source produces each occurrence once')
       } finally { await unchanged.close() }
     } finally { await restored.close() }
     const source = await harness({ vars: h.vars, installation: h.installation })
@@ -129,6 +165,10 @@ export async function recoveryJourney() {
       assert.equal(erased.contact, '', 'erasure removes contact text')
       assert.deepEqual(erased.files, [], 'erasure removes file records')
       assert.equal((await source.raw(`/app/request-files/${photo}`, { cookie: signed })).status, 404, 'erasure removes photo bytes')
+      const attachment = await source.api(`retention-preview?kind=attachment&id=${workPhoto}`, signed)
+      assert.equal(attachment.eligible, true)
+      await source.api('attachment.erase', signed, { evidence: workPhoto, version: attachment.version, confirm: true })
+      assert.equal((await source.raw(`/app/evidence/${workPhoto}`, { cookie: signed })).status, 404)
       await source.stop()
       await assert.rejects(h.installation.rer('export', '--output', archive))
       const reopened = await harness({ vars: h.vars, installation: h.installation })
@@ -140,6 +180,7 @@ export async function recoveryJourney() {
       await h.installation.rer('export', '--output', later)
       const afterBytes = await readFile(later)
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-fault')), 'anonymous archive contains no erased fault')
+      assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-photo.png')), 'work attachment filename is absent from the later archive')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-contact')), 'anonymous archive contains no erased contact')
       const fenced = await installation()
       try {
@@ -153,6 +194,8 @@ export async function recoveryJourney() {
           const cleanOwner = await clean.signIn(h.vars.OWNER_EMAIL)
           assert.equal((await clean.raw('/setup', { cookie: cleanOwner, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
           const retained = await clean.api(`requests/${request}`, cleanOwner)
+          assert.equal((await clean.raw(`/app/evidence/${workPhoto}`, { cookie: cleanOwner })).status, 404, 'erased work attachment never reappears after restore')
+          assert.equal((await clean.api(`retention-preview?kind=attachment&id=${workPhoto}`, cleanOwner)).erased, true)
           assert.equal(retained.description, '', 'erased fault never reappears after restore')
           assert.equal(retained.contact, '', 'erased contact never reappears after restore')
           assert.deepEqual(retained.files, [], 'erased photo never reappears after restore')

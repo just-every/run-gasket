@@ -10,7 +10,7 @@ export function recoveryPortability(portability) {
   async function run(context, verb) {
     const result = await portability[verb](context)
     let manifest
-    for await (const record of fileRecords(context.path)) {
+    for await (const record of fileRecords(context.legacyRecovery?.output ?? context.path)) {
       if (record.kind === 'manifest') manifest = record
     }
     const { getPlatformProxy } = createRequire(join(context.root, 'package.json'))('wrangler')

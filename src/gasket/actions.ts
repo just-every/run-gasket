@@ -2,7 +2,7 @@ import { eraseAttachment } from './attachment-erasure'
 import { confirmRecoveryDrill } from './recovery'
 import { copyStrategy, adaptStrategy, approveStrategy, previewStrategy, rolloutStrategy } from './pm-strategies'
 import { responsePolicy, changeRequestClock } from './request-response'
-import { holdRecord } from './retention'
+import { holdRecord, setRetentionPolicy } from './retention'
 import { saveSearch, deleteSearch } from './search'
 import { eraseRequest } from './request-erasure'
 import { recordCostComparison, setWorkCostCenter } from './costing'
@@ -80,6 +80,7 @@ type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => 
 export const actions: Record<string, Handler> = {
   'attachment.erase': (env, actor, input) => eraseAttachment(env, actor, input),
   'recovery.drill': (env, actor, input) => confirmRecoveryDrill(env, actor, input),
+  'retention.policy': (env, actor, input) => setRetentionPolicy(env, actor, input),
   'retention.hold': (env, actor, input) => holdRecord(env, actor, input),
   'search.save': (env, actor, input) => saveSearch(env, actor, input),
   'search.delete': (env, actor, input) => deleteSearch(env, actor, input),
