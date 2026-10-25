@@ -232,11 +232,11 @@ export async function connectorJourney() {
     await h.api('receipt.receive',cookie.lead,{...receiptInput,lines:[{line:0,part,quantity:'5',quarantine:'0',bin:'A1'}]},409)
     // Lose the reply after the source receipt receiver commits. The unfinished
     // receipt delivery must survive backup and deliberate reconnection below.
-    modes.set('receipt','disconnect')
+    modes.set('receipt','timeout')
     await run(now()+3000)
     const interruptedReceipt = (await state()).deliveries.find(row => row.type === 'receipt.created')
     assert.equal(interruptedReceipt.state, 'retry')
-    assert.equal(interruptedReceipt.error, 'network_failure')
+    assert.equal(interruptedReceipt.error, 'receiver_timeout')
     await control('receipt',true)
     const receiptEvent=received.find(row=>row.name==='receipt')
     assert.equal(receiptEvent.body.sourceId,receipt.receipt)
