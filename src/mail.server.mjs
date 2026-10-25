@@ -12,8 +12,10 @@ export function localDevelopment(env) {
 
 // Demos and local runtimes use Base's development sender, which validates each
 // message and silently suppresses it. Installations keep their real provider.
+// Base refuses relayUrl for any provider but rer, and an Assisted installation
+// carries an empty MAIL_RELAY_URL, so only rer receives it, and only when set.
 export function operatorMail(env) {
  if (env.RER_DEMO === '1' || localDevelopment(env)) return createMailSender({ provider: 'development', mode: 'development' })
  if (!env.MAIL_PROVIDER || env.MAIL_PROVIDER === 'development') return undefined
- return createMailSender({ provider: env.MAIL_PROVIDER, mode: 'production', apiKey: env.MAIL_API_KEY, relayUrl: env.MAIL_RELAY_URL, ...(env.MAIL_PROVIDER === 'cloudflare' ? { accountId: env.MAIL_ACCOUNT_ID } : {}) })
+ return createMailSender({ provider: env.MAIL_PROVIDER, mode: 'production', apiKey: env.MAIL_API_KEY, ...(env.MAIL_PROVIDER === 'rer' && env.MAIL_RELAY_URL?.trim() ? { relayUrl: env.MAIL_RELAY_URL } : {}), ...(env.MAIL_PROVIDER === 'cloudflare' ? { accountId: env.MAIL_ACCOUNT_ID } : {}) })
 }

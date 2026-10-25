@@ -10,7 +10,8 @@ import { emittedWorker } from './emitted-worker.mjs'
 import { harness } from './gasket/harness.mjs'
 
 const secret = () => randomBytes(32).toString('base64url'), owner = 'owner@example.test'
-const vars = { OWNER_EMAIL: owner, SESSION_SECRET: secret(), SETUP_TOKEN: secret() }
+// As deployed: wrangler.jsonc ships MAIL_RELAY_URL empty, which an Assisted provider must ignore.
+const vars = { OWNER_EMAIL: owner, SESSION_SECRET: secret(), SETUP_TOKEN: secret(), MAIL_RELAY_URL: '' }
 const worker = await emittedWorker(vars), origin = worker.origin
 const post = (path, body, cookie) => worker.request(path, { method: 'POST', redirect: 'manual', headers: { origin, 'content-type': 'application/json', ...(cookie ? { cookie } : {}) }, body: JSON.stringify(body) })
 try {

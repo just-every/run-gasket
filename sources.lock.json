@@ -1908,7 +1908,7 @@
       "executable": false
     },
     "src/mail.server.mjs": {
-      "sha256": "f24497ca42b0e030fd7e03296bacf8009f2dee694abcde757e321aa128c7e263",
+      "sha256": "9f6ec8956ee23c7348afc781f493adcb1e338a4f01167085aaf2e0901719bce1",
       "executable": false
     },
     "src/modules/ai/client.mjs": {
@@ -3768,7 +3768,7 @@
       "executable": false
     },
     "tests/email-link.mjs": {
-      "sha256": "4f41f25ebad1bd42d88e16bb48c20e2d622dac371a1515eb8bc77bf0e45e0374",
+      "sha256": "d7a7484dfe6d10ae6cfdfeae33458281f8a992c5cc29b831100f59121678a911",
       "executable": false
     },
     "tests/emitted-worker.mjs": {
