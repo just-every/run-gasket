@@ -17,6 +17,11 @@ export async function customFieldsJourney() {
     const asset=(await h.api('asset.create',owner,{...base,customValues:{[refrigerant]:'R-32'}})).id
     const other=(await h.api('asset.create',owner,{tag:'CV-12',name:'Line 2 conveyor',category:'Conveyor',location:'Line 2'})).id
     const part=(await h.api('part.create',owner,{number:'MOTOR-480',name:'Conveyor drive motor',unit:'each',customValues:{[voltage]:480}})).id
+    const categoryField=(await define({name:'Motor enclosure',entityType:'part',scope:'category',category:'Motor',required:true})).id
+    let partState=await h.api(`parts/${part}`,owner)
+    await h.api('part.category',owner,{part,revision:partState.revision,category:'Motor'},400)
+    await h.api('part.category',owner,{part,revision:partState.revision,category:'Motor',customValues:{[categoryField]:'IP66'}})
+    assert.equal((await h.api(`parts/${part}`,tech)).customFields.find(f=>f.id===categoryField).value,'IP66')
     const update={entityType:'asset',entityId:asset,customValues:{[refrigerant]:'R-410A'}}
     await h.api('customvalue.set',tech,update,403)
     await h.submit('customvalue.set',owner,{entityType:'asset',entityId:asset,[`cf.${refrigerant}`]:'R-410A'},`/app/assets/${asset}`)

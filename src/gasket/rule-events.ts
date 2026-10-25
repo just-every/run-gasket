@@ -9,6 +9,7 @@ export async function dispatchRuleEvents(env: Bindings, events: Audit[], sequenc
     const detail = event.detail && typeof event.detail === 'object' ? event.detail as Record<string,any> : {}
     const found: RuleEvent[] = []
     const add=(trigger:RuleEvent['trigger'],entityType:RuleEvent['entityType'],entityId:string)=>found.push({trigger,entityType,entityId})
+    if(detail.statusChanged)add('work.status_changed','work',detail.workOrder??event.subject)
     if(event.action==='request.submit')add('request.submitted','request',event.subject)
     if(['workorder.create','workorder.generate','workorder.schedule','workorder.trigger'].includes(event.action))add('work.created','work',event.subject)
     if(['workorder.submit','workorder.approve','workorder.return','workorder.cancel','workorder.reopen','workorder.merged','workorder.merge'].includes(event.action))add('work.status_changed','work',event.subject)

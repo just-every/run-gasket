@@ -202,7 +202,7 @@ export async function recordResults(env: Bindings, actor: Actor, input: Input) {
   insist(recorded.length, 'invalid_outcome')
   // PM-004: results the checklist's failure rule covers raise their correction in the same batch.
   const correction = await correctionStatements(env, actor, order, recorded)
-  await commit(env, [...touch(env, order), ...statements, ...correction.statements], [{ actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded } }, ...correction.audits])
+  await commit(env, [...touch(env, order), ...statements, ...correction.statements], [{ actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded, statusChanged: order.status !== 'in_progress' } }, ...correction.audits])
   return { id: order.id }
 }
 
@@ -231,7 +231,7 @@ export async function addEvidence(env: Bindings, actor: Actor, input: Input, doo
   const size = imageSize(file.bytes, mediaType)
   const id = newId(), sha256 = await sha256Hex(file.bytes)
   await commit(env, [...touch(env, order), stmt(env, 'INSERT INTO gk_evidence (id, work_order_id, item, filename, media_type, size, sha256, bytes, uploaded_by, uploaded_at, certificate, phase, taken_on, door, width, height) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, item, file.filename, mediaType, file.bytes.length, sha256, file.bytes, actor.id, now(), certificate ? 1 : 0, phase, takenOn, door, size?.width ?? null, size?.height ?? null)],
-    { actor: actor.id, action: 'workorder.evidence', subject: order.id, detail: { evidence: id, filename: file.filename, size: file.bytes.length, sha256, door, ...(item !== null ? { item } : {}), ...(certificate ? { certificate } : {}), ...(phase ? { phase } : {}), ...(takenOn ? { takenOn } : {}) } })
+    { actor: actor.id, action: 'workorder.evidence', subject: order.id, detail: { statusChanged: order.status !== 'in_progress', evidence: id, filename: file.filename, size: file.bytes.length, sha256, door, ...(item !== null ? { item } : {}), ...(certificate ? { certificate } : {}), ...(phase ? { phase } : {}), ...(takenOn ? { takenOn } : {}) } })
   return { id: order.id, evidence: id }
 }
 
@@ -246,7 +246,7 @@ export async function recordTime(env: Bindings, actor: Actor, input: Input) {
   await commit(env, [...touch(env, order), stmt(env,
     'INSERT INTO gk_time_entries (id, work_order_id, worked_on, minutes, note, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
     id, order.id, workedOn, minutes, note, actor.id, now())],
-    { actor: actor.id, action: 'workorder.time', subject: order.id, detail: { timeEntry: id, workedOn, minutes, note } })
+    { actor: actor.id, action: 'workorder.time', subject: order.id, detail: { statusChanged: order.status !== 'in_progress', timeEntry: id, workedOn, minutes, note } })
   return { id: order.id, timeEntry: id }
 }
 
@@ -271,21 +271,21 @@ export async function recordReadings(env: Bindings, actor: Actor, input: Input) 
     read.push(meter.id)
   }
   insist(recorded.length, 'invalid_value')
-  await commit(env, [...touch(env, order), ...statements], { actor: actor.id, action: 'workorder.readings', subject: order.id, detail: { takenOn, recorded } })
+  await commit(env, [...touch(env, order), ...statements], { actor: actor.id, action: 'workorder.readings', subject: order.id, detail: { statusChanged: order.status !== 'in_progress', takenOn, recorded } })
   return { id: order.id, meters: read }
 }
 
 export async function issue(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
   const move = await issuePart(env, actor, input, order)
-  await commit(env, [...touch(env, order), ...move.statements], { actor: actor.id, action: 'part.issue', subject: order.id, detail: { part: move.part.id, quantity: fromMilli(move.quantity) } })
+  await commit(env, [...touch(env, order), ...move.statements], { actor: actor.id, action: 'part.issue', subject: order.id, detail: { statusChanged: order.status !== 'in_progress', part: move.part.id, quantity: fromMilli(move.quantity) } })
   return { id: order.id }
 }
 
 export async function giveBack(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
   const move = await returnPart(env, actor, input, order)
-  await commit(env, [...touch(env, order), ...move.statements], { actor: actor.id, action: 'part.return', subject: order.id, detail: { part: move.part.id, quantity: fromMilli(move.quantity), condition: move.condition, reason: move.reason } })
+  await commit(env, [...touch(env, order), ...move.statements], { actor: actor.id, action: 'part.return', subject: order.id, detail: { statusChanged: order.status !== 'in_progress', part: move.part.id, quantity: fromMilli(move.quantity), condition: move.condition, reason: move.reason } })
   return { id: order.id }
 }
 
@@ -306,7 +306,7 @@ export async function downtimeStart(env: Bindings, actor: Actor, input: Input) {
   insist(!await one(env, `SELECT 1 WHERE ${overlap.replace('NOT EXISTS', 'EXISTS')}`, order.asset_id, startedOn), 'downtime_overlaps', 409)
   const id = newId()
   await commit(env, [...touch(env, order), guard(env, 'downtime_overlaps', overlap, order.asset_id, startedOn), stmt(env, 'INSERT INTO gk_downtime (id, asset_id, work_order_id, started_on, reason, planned, degraded, failure_mode, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.asset_id, order.id, startedOn, reason, kind.planned ? 1 : 0, degraded ? 1 : 0, kind.failureMode, actor.id, now())],
-    { actor: actor.id, action: 'downtime.start', subject: order.asset_id, detail: { workOrder: order.id, startedOn, reason, planned: kind.planned, degraded, failureMode: kind.key } })
+    { actor: actor.id, action: 'downtime.start', subject: order.asset_id, detail: { statusChanged: order.status !== 'in_progress', workOrder: order.id, startedOn, reason, planned: kind.planned, degraded, failureMode: kind.key } })
   return { id: order.id, downtime: id }
 }
 
@@ -320,7 +320,7 @@ export async function downtimeEnd(env: Bindings, actor: Actor, input: Input) {
   insist(endedOn <= localNow(actor.zone), 'downtime_in_future')
   const minutes = minutesBetween(open.started_on, endedOn)
   await commit(env, [...touch(env, order), stmt(env, 'UPDATE gk_downtime SET ended_on = ?, minutes = ? WHERE id = ? AND ended_on IS NULL', endedOn, minutes, open.id)],
-    { actor: actor.id, action: 'downtime.end', subject: order.asset_id, detail: { workOrder: order.id, endedOn, minutes } })
+    { actor: actor.id, action: 'downtime.end', subject: order.asset_id, detail: { statusChanged: order.status !== 'in_progress', workOrder: order.id, endedOn, minutes } })
   return { id: order.id, minutes }
 }
 
@@ -352,7 +352,7 @@ export async function recordFinding(env: Bindings, actor: Actor, input: Input) {
       followUpId, order.asset_id, order.location, order.id, `Follow-up: ${text.slice(0, 120)}`, text, due, actor.id, now()))
   }
   statements.push(stmt(env, 'INSERT INTO gk_findings (id, work_order_id, asset_id, item, severity, text, follow_up_id, failure_mode, cause, remedy, risk, recorded_by, recorded_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, order.id, order.asset_id, item, severity, text, followUpId, codes.failure_mode, codes.cause, codes.remedy, codes.risk, actor.id, now()))
-  await commit(env, statements, [{ actor: actor.id, action: 'finding.record', subject: order.id, detail: { finding: id, item, severity, followUp: followUpId, ...codes } },
+  await commit(env, statements, [{ actor: actor.id, action: 'finding.record', subject: order.id, detail: { statusChanged: order.status !== 'in_progress', finding: id, item, severity, followUp: followUpId, ...codes } },
     ...(followUpId ? [{ actor: actor.id, action: 'workorder.create', subject: followUpId, detail: { followUpOf: order.id } }] : [])])
   return { id: order.id, finding: id, followUp: followUpId }
 }

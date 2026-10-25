@@ -1,5 +1,5 @@
 import { saveRule, controlRule, previewRule } from './rules'
-import { saveCustomField, retireCustomField, setCustomValues } from './custom-fields'
+import { saveCustomField, retireCustomField, setCustomValues, setPartCategory } from './custom-fields'
 import { eraseAttachment } from './attachment-erasure'
 import { confirmRecoveryDrill } from './recovery'
 import { copyStrategy, adaptStrategy, approveStrategy, previewStrategy, rolloutStrategy } from './pm-strategies'
@@ -81,7 +81,7 @@ type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => 
 
 export const actions: Record<string, Handler> = {
   'rules.save': saveRule, 'rules.control': controlRule, 'rules.preview': previewRule,
-  'customfield.save': saveCustomField, 'customfield.retire': retireCustomField, 'customvalue.set': setCustomValues,
+  'part.category': setPartCategory, 'customfield.save': saveCustomField, 'customfield.retire': retireCustomField, 'customvalue.set': setCustomValues,
   'attachment.erase': (env, actor, input) => eraseAttachment(env, actor, input),
   'recovery.drill': (env, actor, input) => confirmRecoveryDrill(env, actor, input),
   'retention.policy': (env, actor, input) => setRetentionPolicy(env, actor, input),

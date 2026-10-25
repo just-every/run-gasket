@@ -37,12 +37,12 @@ export async function retireCustomField(env: Bindings, actor: Actor, input: Inpu
   return { id }
 }
 export async function customValues(env: Bindings, entityType: string, entityId: string, category: string | null = null) {
-  const fields = await customFields(env, entityType, category, true)
+  const fields = await customFields(env, entityType, undefined, true)
   const values = await all(env, 'SELECT * FROM gk_custom_values WHERE entity_type=? AND entity_id=?', entityType, entityId)
   const history = await all(env, 'SELECT h.*,m.name AS actor FROM gk_custom_history h LEFT JOIN gk_members m ON m.id=h.changed_by WHERE entity_type=? AND entity_id=? ORDER BY seq DESC', entityType, entityId)
-  return fields.filter(f => !f.retired || values.some(v => v.field_id === f.id)).map(f => {
+  return fields.filter(f => (!f.retired && (f.scope !== 'category' || f.category?.toLowerCase() === category?.toLowerCase())) || values.some(v => v.field_id === f.id)).map(f => {
     const row = values.find(v => v.field_id === f.id)
-    return { ...f, value: row ? JSON.parse(row.value) : null, valueRevision: row?.revision ?? 0, history: history.filter(h => h.field_id === f.id).map(h => ({ ...h, value: JSON.parse(h.value) })) }
+    return { ...f, archived: Boolean(f.retired || (f.scope === 'category' && f.category?.toLowerCase() !== category?.toLowerCase())), value: row ? JSON.parse(row.value) : null, valueRevision: row?.revision ?? 0, history: history.filter(h => h.field_id === f.id).map(h => ({ ...h, value: JSON.parse(h.value) })) }
   })
 }
 export async function customStatements(env: Bindings, actor: Actor, input: Input, entityType: string, entityId: string, category: string | null, creating = false) {
@@ -76,4 +76,14 @@ export async function setCustomValues(env: Bindings, actor: Actor, input: Input)
   insist(!record.retired_at, 'record_retired', 409)
   await commit(env, await customStatements(env, actor, input, entityType, entityId, record.category ?? null), { actor: actor.id, action: 'customvalue.set', subject: entityId, detail: { entityType } })
   return { id: entityId }
+}
+
+export async function setPartCategory(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'register.manage')
+  const id=input.text('part'),record=await one(env,'SELECT category,revision FROM gk_parts WHERE id=?',id)
+  insist(record,'part_not_found',404)
+  const category=input.text('category',{optional:true,max:80})||null
+  const writes=await customStatements(env,actor,input,'part',id,category)
+  await commit(env,[guard(env,'stale','EXISTS(SELECT 1 FROM gk_parts WHERE id=? AND revision=?)',id,input.integer('revision',{min:1})),...writes,stmt(env,'UPDATE gk_parts SET category=?,revision=revision+1 WHERE id=?',category,id)],{actor:actor.id,action:'part.category',subject:id,detail:{before:record.category,after:category}})
+  return {id}
 }

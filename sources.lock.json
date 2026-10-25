@@ -1232,7 +1232,7 @@
       "executable": false
     },
     "src/gasket/actions.ts": {
-      "sha256": "f36831e638c3cd14edd98b0955778a7a0fe9176236a3d31660a3fa021e85fe0c",
+      "sha256": "68172e92e78a8d8f4aaaf50e57a509558a6d689b02ebdec78cfbc4f6069a2e69",
       "executable": false
     },
     "src/gasket/actor.ts": {
@@ -1244,7 +1244,7 @@
       "executable": false
     },
     "src/gasket/annotations.ts": {
-      "sha256": "23f41ab2430649d8704dd7a659d6dc6d1e55d6f1134870f5ebefea711890b38a",
+      "sha256": "a6754f7db23ba5b32a159a8996c827bd464d276d3c16b5dd400175eb1b4625b9",
       "executable": false
     },
     "src/gasket/assets.ts": {
@@ -1336,7 +1336,7 @@
       "executable": false
     },
     "src/gasket/core.ts": {
-      "sha256": "dae6250b9d45eb017320099cc8857bde6bec70ee37cd8e26154a830c3500aa27",
+      "sha256": "fbe99c59866642cbc31946964b55265589d509765663f0daf6fade12c1f89186",
       "executable": false
     },
     "src/gasket/corrections.ts": {
@@ -1364,7 +1364,7 @@
       "executable": false
     },
     "src/gasket/custom-fields.ts": {
-      "sha256": "3ec9563b39efc72829b02ccdf02de516a93a76cc5a49f82da7050f01641d7115",
+      "sha256": "997c6571c2c2c3b50500d0bd603d34d6506fb7f8d8ec0518a834e657e141c24f",
       "executable": false
     },
     "src/gasket/custom-validation.ts": {
@@ -1660,7 +1660,7 @@
       "executable": false
     },
     "src/gasket/rule-events.ts": {
-      "sha256": "58dc6101cbb60644c8fc97aa282626e3843dac763d5ac084e994d81939121eaf",
+      "sha256": "076228749e343f300d6895535982a0fb6b00d97d05b042be01c341c9fa36dbb7",
       "executable": false
     },
     "src/gasket/rules-actions.ts": {
@@ -1812,7 +1812,7 @@
       "executable": false
     },
     "src/gasket/ui/custom-fields.ts": {
-      "sha256": "8da526a253f238e2e04ac05f438e574fec22451b12eaaf5789c278d41fe16b3a",
+      "sha256": "7ee7a3980f2cf5af8a73578c6ba0ec7f9e4d116fc7b9ecd49bbd311da79ab1d7",
       "executable": false
     },
     "src/gasket/ui/documents.ts": {
@@ -1996,7 +1996,7 @@
       "executable": false
     },
     "src/gasket/work.ts": {
-      "sha256": "456a14eda337cd87a7c4031abdb331f2e7d63e552066b7960163ea7775ef56e4",
+      "sha256": "4a7da382ec9b376f690ae904c7c60dbf1bbc0f97dc9bddebc062578b1f09d3de",
       "executable": false
     },
     "src/gasket/zip.ts": {
@@ -3908,7 +3908,7 @@
       "executable": false
     },
     "tests/gasket/custom-fields.mjs": {
-      "sha256": "e5634f409c8edb1efbbb5ba9a5f8a3f14db1f10951ac9af72d3abebb120f55bb",
+      "sha256": "5e53cb8d989a673727559172adea489f4642e4a70c408feeae1a4d771c843c23",
       "executable": false
     },
     "tests/gasket/fixtures.mjs": {
@@ -3916,7 +3916,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "6d3de38089e7321fe50b401e71ca3c41757a104945eda1ef0ef775cc436bab7f",
+      "sha256": "89924d58431180b13c2f2b4b82bbd4b92ad21f8d47259f89c11a853197600ecd",
       "executable": false
     },
     "tests/gasket/harness.mjs": {
@@ -4011,8 +4011,12 @@
       "sha256": "454e90b08b8ee721a0cb06e53431f24d95624f5feb5841e0920f21fdee2a6014",
       "executable": false
     },
+    "tests/gasket/rule-sources.mjs": {
+      "sha256": "e5a0748406003129c77025ac81752390b5150f5bf15db7a53c6d2da2303fa3ea",
+      "executable": false
+    },
     "tests/gasket/rules-browser.mjs": {
-      "sha256": "0c18f696374f0a73dc91f427fd1956facbbaf9c8c238e450ff7d94feae701a46",
+      "sha256": "4a18da0f187359333d37b785a02bdf8f99831dbafeb808ec3964231b79d1dce0",
       "executable": false
     },
     "tests/gasket/rules.mjs": {

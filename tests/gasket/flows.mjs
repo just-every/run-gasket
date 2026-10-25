@@ -1,3 +1,4 @@
+import { ruleSourcesJourney } from './rule-sources.mjs'
 import { rulesJourney } from './rules.mjs'
 import { customFieldsJourney } from './custom-fields.mjs'
 import { searchJourney, retentionJourney } from './search.mjs'
@@ -36,7 +37,7 @@ import { now, zone } from './clock.mjs'
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
 const independent = new Map([
-  [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
+  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
   [outcomeJourney, 'reports'], [intervalJourney, 'reports'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
@@ -77,6 +78,7 @@ const unzip = buffer => {
 try {
   await check('Custom fields through the register and import doors', customFieldsJourney)
   await check('Site rules through authoring and execution doors', rulesJourney)
+  await check('Maintenance rule sources and bounded actions', ruleSourcesJourney)
   await check('GAS-01 site and access', async () => {
     // Signed out: every GET door refuses, no data served.
     for (const [pattern] of API_DOORS) {

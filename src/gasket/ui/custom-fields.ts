@@ -1,7 +1,7 @@
 import type { Bindings } from '../../auth.server'
 import { can, type Actor } from '../actor'
 import { customFields, customValues, CUSTOM_TYPES } from '../custom-fields'
-import { all, insist } from '../core'
+import { all, one, insist } from '../core'
 import { showInstant } from '../dates'
 import { area, card, checkbox, field, form, h, hidden, select, table, tag } from './html'
 import { page } from './shell'
@@ -18,10 +18,11 @@ export async function customInputs(env: Bindings, entityType: string, category?:
 }
 export async function customCard(env: Bindings, actor: Actor, entityType: string, entityId: string, category: string | null, back: string) {
   const values = await customValues(env, entityType, entityId, category)
-  if (!values.length) return ''
-  const active = values.filter(v => !v.retired)
-  return card('Custom fields', h`${table(['Field', 'Value'], values.map(f => [h`${f.name}${f.retired ? h` ${tag('Archived')}` : ''}`, `${displayCustom(f.value)}${f.value !== null && f.unit ? ` ${f.unit}` : ''}`]), 'Custom fields', { wrap: [0, 1] })}${can(actor, 'register.manage') && active.length ? h`<details class="gk-details"><summary>Edit custom fields</summary>${form('customvalue.set', back, h`${hidden('entityType', entityType)}${hidden('entityId', entityId)}${await customInputs(env, entityType, category, values)}`, 'Update values', { secondary: true })}</details>` : ''}
-    <details class="gk-details"><summary>Value history</summary>${table(['Field', 'Value', 'Who', 'When'], values.flatMap(f => f.history.map(row => [f.name, displayCustom(row.value), row.actor ?? row.changed_by, showInstant(row.changed_at, actor.zone)])), 'Custom field history', { wrap: [0, 1] })}</details>`, { id: 'custom-fields' })
+  if (!values.length && entityType !== 'part') return ''
+  const part = entityType === 'part' ? await one(env,'SELECT category,revision FROM gk_parts WHERE id=?',entityId) : null
+  const active = values.filter(v => !v.archived)
+  return card('Custom fields', h`${table(['Field', 'Value'], values.map(f => [h`${f.name}${f.archived ? h` ${tag('Archived')}` : ''}`, f.type === 'link' && f.value ? h`<a href="${f.value}">${f.value}</a>` : `${displayCustom(f.value)}${f.value !== null && f.unit ? ` ${f.unit}` : ''}`]), 'Custom fields', { wrap: [0, 1] })}${can(actor, 'register.manage') && active.length ? h`<details class="gk-details"><summary>Edit custom fields</summary>${form('customvalue.set', back, h`${hidden('entityType', entityType)}${hidden('entityId', entityId)}${await customInputs(env, entityType, category, values)}`, 'Update values', { secondary: true })}</details>` : ''}
+    ${part && can(actor,'register.manage') ? h`<details class="gk-details"><summary>Change part category</summary>${form('part.category',back,h`${hidden('part',entityId)}${hidden('revision',part.revision)}${field('Category','category',{value:part.category??'',required:false})}${await customInputs(env,'part',undefined,values)}`,'Update category',{secondary:true})}</details>` : ''}<details class="gk-details"><summary>Value history</summary>${table(['Field', 'Value', 'Who', 'When'], values.flatMap(f => f.history.map(row => [f.name, displayCustom(row.value), row.actor ?? row.changed_by, showInstant(row.changed_at, actor.zone)])), 'Custom field history', { wrap: [0, 1] })}</details>`, { id: 'custom-fields' })
 }
 export async function customFieldsPage(env: Bindings, actor: Actor, url: URL) {
   const fields = await customFields(env, undefined, undefined, true), manage = can(actor, 'register.manage')

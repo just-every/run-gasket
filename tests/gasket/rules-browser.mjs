@@ -40,6 +40,7 @@ export async function rulesBrowser({h,cookie,ids,asset,team,custom,matched,defin
     await capture('rule-preview',`/app/settings/rules?rule=${rule}&preview=yes`)
     await capture('request-routing',`/app/requests/${matched}`)
     await capture('request-queue','/app/requests')
+    await capture('notices','/app/notices')
     await capture('rule-errors','/app/settings/rules')
     await context.close()
   } finally {await browser.close()}

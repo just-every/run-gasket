@@ -46,7 +46,7 @@ export async function annotate(env: Bindings, actor: Actor, input: Input) {
   insist(shape === 'arrow' ? x1 !== x2 || y1 !== y2 : x1 < x2 && y1 < y2, 'invalid_shape')
   const note = input.text('note', { max: 300 }), id = newId()
   await commit(env, [...touch(env, order), stmt(env, 'INSERT INTO gk_annotations (id, evidence_id, work_order_id, shape, x1, y1, x2, y2, note, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, photo.id, order.id, shape, x1, y1, x2, y2, note, actor.id, now())],
-    { actor: actor.id, action: 'workorder.annotate', subject: order.id, detail: { evidence: photo.id, annotation: id, shape, x1: x1 / 100, y1: y1 / 100, x2: x2 / 100, y2: y2 / 100, note } })
+    { actor: actor.id, action: 'workorder.annotate', subject: order.id, detail: { statusChanged: order.status !== 'in_progress', evidence: photo.id, annotation: id, shape, x1: x1 / 100, y1: y1 / 100, x2: x2 / 100, y2: y2 / 100, note } })
   return { id: order.id, annotation: id }
 }
 
