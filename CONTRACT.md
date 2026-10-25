@@ -370,7 +370,7 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 49 | 32 | 43 | 124 |
+| Target and push further | 49 | 33 | 42 | 124 |
 | All | 63 | 33 | 42 | 138 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |

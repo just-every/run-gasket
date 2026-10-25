@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1314fcd17d5940ecaefc5c8f9dd13483bd1f5ea76ab15cebfc4f5e4bc4ae4e3e",
+      "sha256": "d389c4c931e0650516fde674baf9102ccd85b336735c6e8be32b952058917e94",
       "executable": false
     },
     "DEMO.md": {
@@ -1748,7 +1748,7 @@
       "executable": false
     },
     "src/gasket/ui/assets.ts": {
-      "sha256": "fa3bcd5b3e549c2e92878c711dacad85911eb1e168c873489b7e1926c9e158fe",
+      "sha256": "0323abbba16ad337ea1bb93f4c5baa9d311f1eb1ae2a7ac8565eb1e87db220e6",
       "executable": false
     },
     "src/gasket/ui/automation.ts": {
