@@ -10,6 +10,7 @@ import type { Input } from './input'
 import { triager } from './requests'
 
 type Policy = { revision:number; urgency:string; acknowledgmentMinutes:number; resolutionMinutes:number; owner:string; escalation:string; afterHours:string; weekdays:number[]; opens:number; closes:number; zone:string; holidays:{starts_on:string;ends_on:string}[] }
+const activeTriager = `SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=? AND m.status='active' AND o.status='active' AND (o.role='owner' OR m.role='lead')`
 const decisions = ['assess','ask_details','approve','decline','abandon','duplicate']
 export async function responsePolicy(env:Bindings,actor:Actor,input:Input) {
   triager(actor)
@@ -17,7 +18,7 @@ export async function responsePolicy(env:Bindings,actor:Actor,input:Input) {
   insist(['normal','high','emergency'].includes(urgency),'invalid_urgency')
   insist(['business','elapsed'].includes(afterHours),'invalid_after_hours')
   const owner=input.text('owner'),escalation=input.text('escalation')
-  for(const id of [owner,escalation])insist(await one(env,"SELECT 1 FROM gk_members WHERE id=? AND status='active' AND role IN ('owner','lead')",id),'request_lead_required')
+  for(const id of [owner,escalation])insist(await one(env,activeTriager,id),'request_lead_required')
   const weekdays=[...new Set(input.list('weekdays').map(Number))]
   insist(weekdays.length>0 && weekdays.every(n=>Number.isInteger(n)&&n>=1&&n<=7),'invalid_weekdays')
   const opens=input.integer('opens',{min:0,max:1439})!,closes=input.integer('closes',{min:1,max:1440})!
@@ -82,8 +83,9 @@ export async function runRequestEscalations(env:Bindings) {
     const clock=await requestClock(env,r)
     if(!clock)continue
     for(const kind of ['acknowledgment','resolution'] as const)if(clock[kind].overdue&&!clock.notices.some(n=>n.kind===kind)) {
+      if(!await one(env,activeTriager,clock.policy.escalation)||!await one(env,activeTriager,clock.policy.owner))continue
       const authority=automationAuthority()!
-      await commit(env,[stmt(env,`INSERT INTO gk_request_escalations(request_id,kind,recipient_id,owner_id,created_at,automation_job_id,automation_rule_revision) SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=? AND erased_at IS NULL) AND EXISTS(SELECT 1 FROM gk_request_clocks WHERE request_id=? AND revision=?) AND (?='acknowledgment' OR NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE id=(SELECT work_order_id FROM gk_requests WHERE id=?) AND closed_at IS NOT NULL)) ON CONFLICT DO NOTHING`,r.id,kind,clock.policy.escalation,clock.policy.owner,now(),authority.job,authority.revision,r.id,r.version,r.id,clock.revision,kind,r.id)],{actor:'scheduler',action:'request.escalation',subject:r.id,detail:{kind,owner:clock.policy.owner,recipient:clock.policy.escalation}})
+      await commit(env,[stmt(env,`INSERT INTO gk_request_escalations(request_id,kind,recipient_id,owner_id,created_at,automation_job_id,automation_rule_revision) SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM gk_requests WHERE id=? AND version=? AND erased_at IS NULL) AND EXISTS(SELECT 1 FROM gk_request_clocks WHERE request_id=? AND revision=?) AND EXISTS(${activeTriager}) AND EXISTS(${activeTriager}) AND (?='acknowledgment' OR NOT EXISTS(SELECT 1 FROM gk_work_orders WHERE id=(SELECT work_order_id FROM gk_requests WHERE id=?) AND closed_at IS NOT NULL)) ON CONFLICT DO NOTHING`,r.id,kind,clock.policy.escalation,clock.policy.owner,now(),authority.job,authority.revision,r.id,r.version,r.id,clock.revision,clock.policy.escalation,clock.policy.owner,kind,r.id)],{actor:'scheduler',action:'request.escalation',subject:r.id,detail:{kind,owner:clock.policy.owner,recipient:clock.policy.escalation}})
     }
   }
 }

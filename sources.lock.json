@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "4f4b101b4189a9318f93a2761c1635d332e676fcf293598825356ca70bd7c4ea",
+      "sha256": "df775a9674caab9da958ac9305618bb71e53021ba3f2f072a85d1c190b255832",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "5ac497545e84f4c3ef2693ae22b67b344451335aafe742b7daafba9366316cd7",
+      "sha256": "2541e02f4e3574c3474adbeee934c7f5f81e63b516e189ff27e8a926238cae50",
       "executable": false
     },
     "DEMO.md": {
@@ -1508,7 +1508,7 @@
       "executable": false
     },
     "src/gasket/pm-strategies.ts": {
-      "sha256": "0d6979d8f78aeeaf6ca175d890dc1cd86bdb24b668a4e59e38516c30668105b8",
+      "sha256": "5006a14a220af04159d110798a1b0763ad80390cff6d1d14d953c71b294bd760",
       "executable": false
     },
     "src/gasket/portability.d.ts": {
@@ -1600,7 +1600,7 @@
       "executable": false
     },
     "src/gasket/request-response.ts": {
-      "sha256": "514d5e5f044a590ed31bd4c78aad29d170c4457d4ede4df45d664bb662366c9a",
+      "sha256": "d6ca1a25f3ff99478f9aceb9dc7803de2c2c79c8b7313ac6fe179a8b00798fef",
       "executable": false
     },
     "src/gasket/request-sources.ts": {
@@ -1824,7 +1824,7 @@
       "executable": false
     },
     "src/gasket/ui/pm-strategies.ts": {
-      "sha256": "157f28b564e877f9a68fdd374f2ae15b8f86a32583c746aefdeede89ec21ea72",
+      "sha256": "a43284fc7b9f40a655007e0e4f3d2d97713a1720b0ee8ebaf9780bf05a5c2d67",
       "executable": false
     },
     "src/gasket/ui/proposals.ts": {
@@ -3948,11 +3948,11 @@
       "executable": false
     },
     "tests/gasket/requests.mjs": {
-      "sha256": "d126acc78dad10eb94c0a1a01575b831fe178da0f4402f2c5cae7bb3fd682058",
+      "sha256": "454e90b08b8ee721a0cb06e53431f24d95624f5feb5841e0920f21fdee2a6014",
       "executable": false
     },
     "tests/gasket/search.mjs": {
-      "sha256": "79f4ab57ec3a681301480119cd8ede052bace453eb64d302c73fe0df4b0710ad",
+      "sha256": "344248b7b9b2e72a03142cd461de3d1536aac61fb12a2816d00fc5c256653649",
       "executable": false
     },
     "tests/gasket/spend-browser.mjs": {

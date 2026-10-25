@@ -93,7 +93,7 @@ export async function searchJourney(h, cookie, count = 12) {
 }
 
 export async function retentionJourney() {
-  const h = await harness()
+  const h = await harness({clockInstant:Date.parse('2026-10-25T16:00:00Z')})
   try {
     const owner = await h.owner()
     await h.api('site.configure', owner, { name: 'Held estate', timezone: 'America/New_York' })
@@ -167,6 +167,7 @@ export async function retentionJourney() {
   assert.equal((await attachmentPreview()).eligible, false)
   await h.api('attachment.erase', owner, { evidence, version: 2, confirm: true }, 409)
   assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${evidence}`, { cookie: owner })).arrayBuffer()), png)
+  await assertRetained(evidence,work)
   await h.api('retention.hold', owner, { kind: 'work', id: work, revision: evidenceHold.revision, held: false, reason: 'Original evidence released' })
   const attachmentPolicy = await h.api('retention.policy', owner, { kind: 'attachments', minimumDays: 1, revision: 0, reason: 'Retain new original files' })
   assert.equal((await attachmentPreview()).eligible, false)
@@ -201,17 +202,53 @@ export async function retentionJourney() {
   await Promise.all(raced.map(response => response.text()))
   assert.deepEqual(raced.map(response => response.status).sort(), [200,409], 'a hold and erasure cannot both claim the same original')
   assert.equal((await h.raw(`/app/evidence/${racingEvidence}`, { cookie: owner })).status, raced[0].status === 200 ? 200 : 404)
+  async function assertRetained(id, workId) {
+    const before = await h.api(`retention-preview?kind=attachment&id=${id}`, owner)
+    const bytes = Buffer.from(await (await h.raw(`/app/evidence/${id}`, {cookie:owner})).arrayBuffer())
+    const record = await h.api(`work/${workId}`, owner)
+    assert.equal(before.eligible,false)
+    await h.api('attachment.erase',owner,{evidence:id,version:record.version,confirm:true},409)
+    assert.deepEqual(await h.api(`retention-preview?kind=attachment&id=${id}`,owner),before,'refusal preserves dependency counts and per-type result')
+    assert.deepEqual(await h.api(`work/${workId}`,owner),record,'refusal preserves the maintenance record')
+    assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${id}`,{cookie:owner})).arrayBuffer()),bytes,'retained original bytes are unchanged')
+  }
+  if(raced[0].status===200)await assertRetained(racingEvidence,racingWork)
   // Signed and required originals remain obligations even without a legal hold.
   const signedPhoto = (await h.api('workorder.evidence', owner, { workOrder: work, version: (await h.api(`work/${work}`, owner)).version, file: file('signed.png', png, 'image/png') })).evidence
   await h.api('workorder.sign', owner, { workOrder: work, version: (await h.api(`work/${work}`, owner)).version, role: 'technician' })
   assert.equal((await h.api(`retention-preview?kind=attachment&id=${signedPhoto}`, owner)).eligible, false)
   await h.api('attachment.erase', owner, { evidence: signedPhoto, version: (await h.api(`work/${work}`, owner)).version, confirm: true }, 409)
+  await assertRetained(signedPhoto,work)
   const template = (await h.api('template.save', owner, { name: 'Required original', title: 'Required evidence', requiresEvidence: true })).id
   const requiredWork = (await h.api('workorder.create', owner, { asset: ids[0], template, due: (await h.api('me', owner)).today, assignee: ownId })).id
   const requiredPhoto = (await h.api('workorder.evidence', owner, { workOrder: requiredWork, file: file('required.png', png, 'image/png') })).evidence
   assert.equal((await h.api(`retention-preview?kind=attachment&id=${requiredPhoto}`, owner)).eligible, false)
   await h.api('attachment.erase', owner, { evidence: requiredPhoto, version: (await h.api(`work/${requiredWork}`, owner)).version, confirm: true }, 409)
   assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${requiredPhoto}`, { cookie: owner })).arrayBuffer()), png)
+  const procedure=(await h.api('checklist.create',owner,{name:'Synthetic calibration',items:['Pressure | number kPa 0..10']})).id
+  const today=(await h.api('me',owner)).today
+  const calibration=(await h.api('calibration.create',owner,{asset:ids[0],checklist:procedure,title:'Synthetic certificate retention',everyDays:30,firstDue:today,graceDays:0,assignee:ownId})).id
+  const calibrationWork=(await h.api('workorders.generate',owner,{})).created.find(r=>r.schedule===calibration).id
+  const certificate=(await h.api('workorder.evidence',owner,{workOrder:calibrationWork,file:file('synthetic-gasket-certificate.pdf','%PDF-1.4 synthetic-gasket-1','application/pdf'),certificate:true})).evidence
+  await assertRetained(certificate,calibrationWork)
+  if(process.env.RETENTION_SCREENSHOTS) {
+    const {chromium}=await import('@playwright/test'),{mkdir}=await import('node:fs/promises')
+    await mkdir(process.env.RETENTION_SCREENSHOTS,{recursive:true})
+    const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+    try {
+      const context=await browser.newContext({ignoreHTTPSErrors:true})
+      await context.addCookies(owner.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+      const page=await context.newPage()
+      for(const [record,label] of [[work,'signed'],[calibrationWork,'certificate']])for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:1100})
+        assert.equal((await page.goto(h.origin+`/app/work/${record}`)).status(),200)
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+        assert.deepEqual(await page.locator('button,a,[role=button]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()&&!n.querySelector('img[alt]')&&!n.getAttribute('data-tooltip')).map(n=>n.outerHTML)),[],'icon-only controls have tooltips')
+        await page.screenshot({path:`${process.env.RETENTION_SCREENSHOTS}/retention-${label}-${width}.png`,fullPage:true})
+      }
+      await context.close()
+    } finally {await browser.close()}
+  }
     console.log('Retention journey: request and linked work holds, preserved bytes, denied access, release and confirmed erasure passed')
   } finally { await h.close() }
 }

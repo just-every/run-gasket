@@ -565,9 +565,28 @@ export async function requestResponseJourney() {
     await h.api('request.erase',cookie.owner,{request:routine,version:(await detail(routine)).version,confirm:true})
     assert.equal((await detail(routine)).clock,null)
     assert.equal(JSON.parse((await h.api('audit?action=request.clock',cookie.owner)).rows.find(e=>e.subject===routine).detail).reason,undefined)
-    const id=(await h.api('me',cookie.lead)).id
-    await h.api('access.role',cookie.owner,{member:id,role:'maintainer'})
+    // A retained policy grants no right to a recipient whose access changes.
+    await h.api('request.responsePolicy',cookie.owner,{...policy,urgency:'high',afterHours:'elapsed',acknowledgmentMinutes:1,resolutionMinutes:1})
+    await h.api('access.role',cookie.owner,{member:lead,role:'maintainer'})
     for(const door of ['/api/gasket/request-response','/app/request-response','/app/requests'])assert.equal((await h.raw(door,{cookie:cookie.lead})).status,403)
+    await h.scheduled('*/15 * * * *')
+    assert.equal((await h.api(`requests/${unconfigured}`,cookie.owner)).clock,null)
+    // Create under the retained policy through the current worker after its restart.
+    const deniedPayload={...payload,urgency:'high',submissionKey:randomUUID(),description:'synthetic-gasket-denied-recipient'}
+    assert.equal((await h.raw(`/request/${portal}`,{cookie:cookie.tech,body:deniedPayload})).status,303)
+    const denied=(await h.api('requests',cookie.owner)).find(r=>r.description===deniedPayload.description).id
+    await advance('2026-10-27T14:35:00Z')
+    await h.scheduled('*/15 * * * *')
+    assert.equal((await h.api(`requests/${denied}`,cookie.owner)).clock.notices.length,0,'demoted recipient receives no escalation')
+    await h.api('request.responsePolicy',cookie.owner,{...policy,escalation:lead},400)
+    await h.api('access.role',cookie.owner,{member:lead,role:'lead'})
+    await h.api('access.end',cookie.owner,{member:lead})
+    await h.scheduled('*/15 * * * *')
+    assert.equal((await h.api(`requests/${denied}`,cookie.owner)).clock.notices.length,0,'inactive recipient receives no escalation')
+    await h.api('request.responsePolicy',cookie.owner,{...policy,escalation:lead},400)
+    for(const mail of h.mails)assert.ok(!JSON.stringify(mail).includes(deniedPayload.description),'no request field leaks into outbound mail')
+    assert.equal((await h.raw('/api/gasket/request-response',{cookie:cookie.lead})).status,401)
+    for(const door of ['/app/request-response','/app/requests'])assert.equal((await h.raw(door,{cookie:cookie.lead})).status,303)
     console.log('REQ-005 requestResponseJourney: priority clocks, holiday, after-hours, retained policy, accountable escalation, reasoned pause and resume, acknowledgment, resolution, grant controls, replay, erasure and responsive public doors passed')
   } finally {await context?.close();await browser?.close();await h.close();await f.h.close()}
 }
@@ -598,15 +617,23 @@ export async function strategyRolloutJourney() {
     const steps=[...JSON.parse(revision.items_json).map(s=>s.text),'Record the site-specific drain inspection']
     await h.api('pm.adapt',cookie.lead,{strategy,number:revision.number,items:steps,everyDays:14,reference:'Synthetic equipment manual revision 1 and site isolation procedure',note:'Adapt to equipment and site'})
     revision=await current()
-    await h.api('pm.approve',cookie.lead,{strategy,revision:revision.revision_id,reason:'Self approval'},403)
+    const author=(await h.api('me',cookie.lead)).id
+    await h.api('access.role',cookie.owner,{member:author,role:'supervisor'})
+    await h.api('pm.approve',cookie.lead,{strategy,revision:revision.revision_id,reason:'Self approval'},409)
+    await h.api('access.role',cookie.owner,{member:author,role:'lead'})
     await h.api('pm.approve',cookie.owner,{strategy,revision:revision.revision_id,reason:'Reviewed isolation and manufacturer instructions'})
-    const preview=await h.api('pm.preview',cookie.lead,{strategy,schedules})
+    const dueBefore=(await h.api('schedules',cookie.lead)).filter(s=>schedules.includes(s.id)).map(s=>[s.id,s.next_due_date])
+    let preview=await h.api('pm.preview',cookie.lead,{strategy,schedules})
     assert.equal((await h.api('pm-strategies',cookie.lead)).rollouts.length,0,'preview does not create rollout records')
     assert.ok(preview.rows.every(r=>r.issued.length===1&&r.current.everyDays===30&&r.proposed.everyDays===14))
-    await h.api('pm.rollout',cookie.lead,{strategy,schedules,hash:preview.hash,occurrencePlan:'preserve_issued_and_due'},403)
+    await h.api('access.role',cookie.owner,{member:author,role:'supervisor'})
+    await h.api('pm.rollout',cookie.lead,{strategy,schedules,hash:preview.hash,occurrencePlan:'preserve_issued_and_due'},409)
+    await h.api('access.role',cookie.owner,{member:author,role:'lead'})
+    preview=await h.api('pm.preview',cookie.lead,{strategy,schedules})
     await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:preview.hash,occurrencePlan:'cancel'},400)
     await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:preview.hash,occurrencePlan:'preserve_issued_and_due'})
     let rows=await h.api('schedules',cookie.lead)
+    assert.deepEqual(rows.filter(s=>schedules.includes(s.id)).map(s=>[s.id,s.next_due_date]),dueBefore,'rollout preserves due occurrences')
     assert.ok(schedules.every(id=>rows.find(s=>s.id===id).every_days===14))
     assert.deepEqual(await Promise.all(issued.map(w=>h.api(`work/${w.id}`,cookie.lead))),issuedBefore,'rollout leaves every issued-work field unchanged')
     // A local interval and procedure override are retained when the next
@@ -638,6 +665,15 @@ export async function strategyRolloutJourney() {
     assert.equal(rows.find(s=>s.id===schedules[0]).every_days,7);assert.equal(rows.find(s=>s.id===schedules[1]).every_days,10)
     assert.deepEqual(await Promise.all(issued.map(w=>h.api(`work/${w.id}`,cookie.lead))),issuedBefore)
     const history=await h.api('pm-strategies',cookie.owner)
+    const retained=JSON.parse(history.rollouts.at(-1).preview_json)
+    assert.match(retained.approvalDigest,/^[a-f0-9]{64}$/)
+    const {approvalDigest,...approvedPreview}=retained
+    assert.equal(approvalDigest,createHash('sha256').update(JSON.stringify({preview:approvedPreview,decisions:JSON.parse(history.rollouts.at(-1).decisions_json),occurrencePlan:history.rollouts.at(-1).occurrence_plan})).digest('hex'),'digest binds the exact preview, both conflict sides, decisions and plans')
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules,hash:conflict.hash,occurrencePlan:'preserve_issued_and_due',decisions:{[schedules[1]]:{choice:'use_program',reason:'Changed after approval'}}},409)
+    assert.equal(history.rollouts.at(-1).applied_by,(await h.api('me',cookie.owner)).id)
+    assert.equal(retained.rows[1].current.everyDays,10);assert.equal(retained.rows[1].proposed.everyDays,7)
+    const approvalAudit=(await h.api('audit?action=pm.rollout',cookie.owner)).rows.find(r=>r.subject===strategy)
+    assert.equal(JSON.parse(approvalAudit.detail).digest,retained.approvalDigest)
     assert.equal(JSON.parse(history.rollouts.at(-1).decisions_json)[schedules[1]].reason,decisions[schedules[1]].reason)
     const tech=(await h.api('me',cookie.tech)).id,oldIssued=issued.find(w=>w.schedule===schedules[0]).id
     await h.api('workorder.assign',cookie.lead,{workOrder:oldIssued,assignee:tech})
@@ -650,6 +686,20 @@ export async function strategyRolloutJourney() {
     assert.equal(nextWork.due_date,'2026-10-30')
     assert.deepEqual(nextWork.items.map(i=>i.text),JSON.parse((await current()).items_json).map(i=>i.text),'future work uses the approved rollout procedure')
     assert.notEqual(nextWork.checklist_revision_id,issuedBefore[0].checklist_revision_id)
+    // Procedure rollout also covers non-calendar meters without rewriting their
+    // independently configured trigger or due occurrence.
+    const meter=(await h.api('meter.create',cookie.lead,{asset:assets[0],name:'Synthetic hours',unit:'h',kind:'counter'})).id
+    const metered=(await h.api('schedule.create',cookie.lead,{asset:assets[0],checklist:original,title:'Synthetic meter service',meter,everyUnits:'500',firstDueMeter:'500'})).id
+    const meterBefore=(await h.api('schedules',cookie.lead)).find(s=>s.id===metered)
+    const meterPreview=await h.api('pm.preview',cookie.lead,{strategy,schedules:[metered]})
+    assert.equal(meterPreview.rows[0].proposed.everyDays,null)
+    assert.equal(meterPreview.rows[0].trigger.nextDueMeter,'500')
+    await h.api('pm.rollout',cookie.owner,{strategy,schedules:[metered],hash:meterPreview.hash,occurrencePlan:'preserve_issued_and_due'})
+    const meterAfter=(await h.api('schedules',cookie.lead)).find(s=>s.id===metered)
+    for(const key of ['meter_id','every_units','next_due_meter','next_due_date','trigger_when','trigger_value','reset_value','sustain_minutes','combine'])assert.equal(meterAfter[key],meterBefore[key],`non-calendar rollout preserves ${key}`)
+    assert.notEqual(meterAfter.checklist,meterBefore.checklist)
+    const installed=await h.api('pm.preview',cookie.lead,{strategy,schedules:[metered]})
+    assert.deepEqual(installed.rows[0].current.items,JSON.parse((await current()).items_json),'meter schedule uses the approved strategy procedure')
     const stale=await h.api('pm.preview',cookie.lead,{strategy,schedules})
     local=rows.find(s=>s.id===schedules[1])
     await h.api('schedule.edit',cookie.lead,{schedule:local.id,revision:local.revision,everyDays:9})
