@@ -6,6 +6,7 @@ import { workPdfJourney } from './work-pdf.mjs'
 import { costingJourney } from './work-costing.mjs'
 import { laborJourney } from './labor-costs.mjs'
 import { outcomeJourney } from './outcomes.mjs'
+import { agentRunJourney } from './agent-runs.mjs'
 import { intervalJourney } from './intervals.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
 import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
@@ -39,7 +40,7 @@ import { now, zone } from './clock.mjs'
 const independent = new Map([
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [outcomeJourney, 'reports'], [intervalJourney, 'reports'], [agentFollowUpJourney, 'reports'],
+  [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'reports'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
@@ -2257,6 +2258,8 @@ try {
   await check('BUY-006 vendor delivery follow-up', vendorFollowUpJourney)
 
   await check('AGENT-004 measured reliability outcomes', outcomeJourney)
+
+  await check('AGENT-009 granted, budgeted and revocable model runs', agentRunJourney)
 
   await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
 

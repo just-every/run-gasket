@@ -1,0 +1,74 @@
+{
+  "clause": "AGENT-009",
+  "recordedOn": "2026-10-26",
+  "how": "python3 briefs/_od08-env.py AI_API_KEY=OPENAI_API_KEY -- node tests/gasket/agent-run-live.mjs; the injector held the key, which no output, file or surface contains (checked by value, not printed)",
+  "fixtures": "fictitious site, people and assets; one agent identity; one corrective-work proposal kind",
+  "prices": "owner-entered 0.20 and 1.25 USD per million tokens (an assumption for the cheapest current model, not reconciled against the provider bill)",
+  "caps": "USD 0.01 per grant, 500 output tokens, one provider call per run, 15 s deadline, no retry",
+  "provider": "api.openai.com",
+  "model": "gpt-5.4-nano",
+  "runs": [
+    {
+      "label": "live run",
+      "run": "e07735e6-0075-4bce-b2ea-ebba1beb206a",
+      "status": "completed",
+      "providerOutcome": "answered",
+      "tokens": [
+        459,
+        372
+      ],
+      "costUsd": "0.000557",
+      "costBasis": "reported",
+      "proposals": 2,
+      "discarded": false
+    },
+    {
+      "label": "revoked mid-run",
+      "run": "b690f66c-4c26-498c-a27c-d94a13a83e4f",
+      "status": "revoked",
+      "providerOutcome": "answered",
+      "tokens": [
+        502,
+        345
+      ],
+      "costUsd": "0.000532",
+      "costBasis": "reported",
+      "proposals": 0,
+      "discarded": true
+    },
+    {
+      "label": "provider refusal",
+      "run": "0dc88777-c194-4160-8183-cd21d6ddf818",
+      "status": "failed",
+      "providerOutcome": "upstream_error",
+      "tokens": [
+        null,
+        null
+      ],
+      "costUsd": "0.000000",
+      "costBasis": "none",
+      "proposals": 0,
+      "discarded": true
+    },
+    {
+      "label": "answer after the deadline",
+      "run": "edf226f3-759a-43a3-a7b9-3bc061b5211d",
+      "status": "uncertain",
+      "providerOutcome": "upstream_uncertain",
+      "tokens": [
+        null,
+        null
+      ],
+      "costUsd": "0.001052",
+      "costBasis": "reserved",
+      "proposals": 0,
+      "discarded": true
+    }
+  ],
+  "reserveUsd": "0.001015",
+  "rejectedPendingOnRevoke": 1,
+  "providerCalls": 4,
+  "totalCostUsd": "0.002141",
+  "exportRows": 5,
+  "noKeyInSurfaces": 5
+}

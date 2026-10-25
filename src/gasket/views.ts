@@ -11,6 +11,8 @@ import { portalSettings, requestQueue, requestDetail } from './requests'
 import { connectors } from './webhooks'
 import { stockInsights } from './stock-insights'
 import { outcomeList, readOutcome } from './outcomes'
+import { agentRunsView, readRun } from './agent-run-views'
+import { previewRun } from './agent-runs'
 import { lookupPart } from './catalogs'
 import { followUpView } from './agent-follow-up'
 import { replenishmentView, previewReplenishment } from './replenishment'
@@ -79,6 +81,7 @@ export const views: Record<string, View> = {
   requestPortals: (env,actor) => portalSettings(env,actor), requests:(env,actor,_id,url)=>requestQueue(env,actor,url), request:(env,actor,id)=>requestDetail(env,actor,id),
   connectors: (env,actor,_id,url) => connectors(env,actor,url),
   stockInsights: (env,actor,id) => stockInsights(env,actor,id),
+  agentRuns: (env,actor) => agentRunsView(env,actor), agentRun: (env,actor,id) => readRun(env,actor,id), agentPreview: (env,actor,id) => previewRun(env,actor,id),
   outcomes: (env,actor) => outcomeList(env,actor),
   outcome:(env,actor,id)=>readOutcome(env,actor,id),
   partLookup:(env,actor,_id,url)=>lookupPart(env,actor,url),

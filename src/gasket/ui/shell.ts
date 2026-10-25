@@ -36,6 +36,7 @@ export const SETTINGS: Destination[] = [
   { href: '/app/requests', label: 'Requests', detail: 'Triage operator faults.', icon: ICON.work, show: actor => can(actor,'work.assign') },
   { href: '/app/request-portals', label: 'Request portals', detail: 'Configure bounded operator intake.', icon: ICON.site, show: actor => can(actor,'site.manage') },
   { href: '/app/metrics', label: 'Measure definitions', detail: 'KPI formulas, source freshness and unresolved data quality.', icon: ICON.board, show: actor => can(actor, 'board.read') },
+  { href: '/app/agent-runs', label: 'Agent runs', detail: 'Grant a model run with a dollar budget and data scope, preview it, revoke it and export its cost history.', icon: ICON.board, show: actor => can(actor, 'agent.run') },
   { href: '/app/spend-policy', label: 'Spend policy', detail: 'Period envelopes, independent routing, delegations and overrides.', icon: ICON.parts, show: actor => can(actor, 'site.manage') },
   { href: '/app/automation', label: 'Automation', detail: 'Execution health, rule previews, pause and catch-up controls.', icon: ICON.clock, show: actor => can(actor, 'board.read') },
   { href: '/app/purchasing', label: 'Purchasing', detail: 'Suppliers, catalogs, cost centers and maintenance requisitions awaiting approval.', icon: ICON.parts, show: () => true },

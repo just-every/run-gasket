@@ -69,6 +69,10 @@ resource ownership, migrations, receipt and health checks are defined there.
 Local validation does not prove hosted acceptance, provider delivery or remote
 health.
 
+## Model runs
+
+Agent runs (More, Agent runs) stay off until the installation has `AI_ENABLED` set to `true` and an `AI_API_KEY`. `AI_BASE_URL` names any OpenAI-compatible chat endpoint (default OpenAI's `/v1`; HTTPS only) and `AI_DEADLINE_MS` the wait before a run is recorded as uncertain (default 45000). `deploy.json` declares them for a self-owned deployment: the key is an optional secret, never a variable, and no door, export, audit entry or error returns it. A managed hosting deployment does not declare these settings yet, so runs are unavailable there. Each run is one provider call that may be billed: the grant's dollar budget is a ceiling on reserves and reported usage priced at the owner's per-million-token rates, not a reconciliation against the provider's own bill, so compare the export's cost column with the provider's usage page.
+
 ## Hosted installation package
 
 `packaging.json` declares Gasket's Worker build, DB migrations, native sign-in and mail providers. Run `pnpm run build`, then `pnpm delivery:spec` to update the committed deployment specification. `pnpm check:deployment-spec` refuses stale source policy or build output. Package with `node scripts/delivery/base/cli.mjs package --config packaging.json --output rer-package`; the output contains the descriptor, setup manifest, dispatch-only Managed workflow and delivery artifact. Generated packages stay outside source control.

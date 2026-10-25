@@ -17,7 +17,9 @@
   "vars": {
     "AUTH_LOCAL": "false",
     "MAIL_PROVIDER": "resend",
-    "MAIL_FROM": "auth@example.invalid"
+    "MAIL_FROM": "auth@example.invalid",
+    "AI_ENABLED": "false",
+    "AI_BASE_URL": "https://api.openai.com/v1"
   },
   "secrets": [
     {
@@ -43,6 +45,11 @@
     {
       "binding": "INSTALLATION_KEY_PREVIOUS",
       "environment": "INSTALLATION_KEY_PREVIOUS",
+      "optional": true
+    },
+    {
+      "binding": "AI_API_KEY",
+      "environment": "AI_API_KEY",
       "optional": true
     }
   ],

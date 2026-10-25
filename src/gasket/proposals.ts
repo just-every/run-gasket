@@ -67,21 +67,28 @@ function payloadOf(kind: Kind, input: Input): Record<string, string> {
   return payload
 }
 
-export async function prepare(env: Bindings, actor: Actor, input: Input) {
-  requireCapability(actor, 'proposal.prepare')
-  const kind = input.text('kind', { max: 20 }) as Kind
-  insist(KINDS.includes(kind), 'invalid_kind')
-  const reasoning = input.text('reasoning', { max: 4000 })
-  const payload = payloadOf(kind, Input.of(input.json('payload') as Record<string, unknown>))
+/** A validated proposal as one insert and its audit entry, so a caller can commit it inside its own guarded batch. */
+export async function draftProposal(env: Bindings, actor: Actor, kind: Kind, reasoning: string, raw: Record<string, unknown>) {
+  const payload = payloadOf(kind, Input.of(raw))
   // Validate now so the approver sees a proposal that would run today.
   if (kind === 'schedule') await scheduleFields(env, Input.of(payload))
   if (kind === 'corrective') { insist(isDate(payload.due), 'invalid_due'); insist(await one(env, 'SELECT 1 FROM gk_assets WHERE id = ? AND retired_at IS NULL', payload.asset), 'asset_not_found', 404) }
   if (kind === 'count') toMilli(payload.counted, 'counted', { allowZero: true })
   const basis = await basisOf(env, kind, payload, actor)
   const json = JSON.stringify(payload), hash = await sha256Hex(json), id = newId()
-  await commit(env, [stmt(env, `INSERT INTO ${proposalTable(kind)} (id, kind, payload_json, payload_hash, basis_json, reasoning, prepared_by, prepared_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, kind, json, hash, JSON.stringify(basis), reasoning, actor.id, now())],
-    { actor: actor.id, action: 'proposal.prepare', subject: id, detail: { kind, hash } })
-  return { id, kind, hash }
+  return { id, kind, hash,
+    statement: stmt(env, `INSERT INTO ${proposalTable(kind)} (id, kind, payload_json, payload_hash, basis_json, reasoning, prepared_by, prepared_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, id, kind, json, hash, JSON.stringify(basis), reasoning, actor.id, now()),
+    audit: { actor: actor.id, action: 'proposal.prepare', subject: id, detail: { kind, hash } } }
+}
+
+export async function prepare(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor, 'proposal.prepare')
+  const kind = input.text('kind', { max: 20 }) as Kind
+  insist(KINDS.includes(kind), 'invalid_kind')
+  const reasoning = input.text('reasoning', { max: 4000 })
+  const draft = await draftProposal(env, actor, kind, reasoning, input.json('payload') as Record<string, unknown>)
+  await commit(env, [draft.statement], draft.audit)
+  return { id: draft.id, kind, hash: draft.hash }
 }
 
 export async function decide(env: Bindings, actor: Actor, input: Input) {

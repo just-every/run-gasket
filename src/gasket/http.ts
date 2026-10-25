@@ -1,4 +1,6 @@
 import { rulesPage } from './ui/rules'
+import { agentRunsPage } from './ui/agent-runs'
+import { agentRunsCsv } from './agent-run-views'
 import { customFieldsPage, locationPage } from './ui/custom-fields'
 import { customRegisterCsv } from './custom-export'
 import { requestReportPage } from './ui/request-report'
@@ -177,6 +179,8 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  agentRuns: guarded(actor => can(actor, 'agent.run'), (env, actor, url) => agentRunsPage(env, actor, url)),
+  agentRunsCsv: async (env, actor) => new Response(await agentRunsCsv(env, actor), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="agent-runs.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   rules: (env,actor,url)=>rulesPage(env,actor,url),
   customFields: (env,actor,url)=>customFieldsPage(env,actor,url),
   locationFields: (env,actor,url,id)=>locationPage(env,actor,id,url),
