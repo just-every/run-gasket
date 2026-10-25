@@ -121,8 +121,12 @@ export async function chase(env: Bindings, today: string) {
 }
 
 /** My notices, newest first; a mention (PLAN-006) links to its comment and stays unread until I have read that comment. */
-export const notices = async (env: Bindings, actor: Actor) => (await all(env, `SELECT n.id, n.kind, n.text, n.work_order_id, n.asset_id, n.comment_id, n.part_id, n.purchase_order_id, n.outcome_id, ${NOTICE_UNREAD} AS unread, n.created_at FROM gk_notices n WHERE n.recipient_id = ? ORDER BY n.created_at DESC, n.id LIMIT 100`, actor.id))
+export const notices = async (env: Bindings, actor: Actor) => {
+  const ordinary = (await all(env, `SELECT n.id, n.kind, n.text, n.work_order_id, n.asset_id, n.comment_id, n.part_id, n.purchase_order_id, n.outcome_id, ${NOTICE_UNREAD} AS unread, n.created_at FROM gk_notices n WHERE n.recipient_id = ? ORDER BY n.created_at DESC, n.id LIMIT 100`, actor.id))
   .map(row => ({ ...row, unread: Boolean(row.unread), link: row.outcome_id ? `/api/gasket/outcomes/${row.outcome_id}` : row.purchase_order_id ? `/app/purchase-orders/${row.purchase_order_id}` : noticeLink(row) }))
+  const rules = await all(env, `SELECT n.id,'reminder' AS kind,n.text,n.request_id,n.part_id,n.created_at FROM gk_rule_notices n LEFT JOIN gk_requests r ON r.id=n.request_id WHERE n.recipient_id=? AND (n.request_id IS NULL OR ?=1 OR r.requester_id=?)`, actor.id, Number(can(actor,'work.assign')),actor.id)
+  return [...ordinary,...rules.map(row=>({...row,unread:false,link:row.request_id?`/app/requests/${row.request_id}`:`/app/parts/${row.part_id}`}))].sort((a,b)=>b.created_at-a.created_at).slice(0,100)
+}
 
 /** One work order's chase: overdue start and age, responses, blockers and every notice sent about it. */
 export async function chaseOf(env: Bindings, order: Row, today: string) {

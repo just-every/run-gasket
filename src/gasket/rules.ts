@@ -92,17 +92,24 @@ export async function previewRule(env:Bindings,actor:Actor,input:Input) {
  const from=input.integer('from',{min:0,max:9_000_000_000_000,optional:true})??now()-7*86400000,to=input.integer('to',{min:0,max:9_000_000_000_000,optional:true})??now()
  insist(from<=to,'invalid_rule_period')
  const recorded=await all(env,'SELECT * FROM gk_rule_events WHERE occurred_at>=? AND occurred_at<=? AND trigger=? ORDER BY occurred_at DESC,id LIMIT 200',from,to,rule.definition.trigger)
- const rows:Row[]=recorded.map(e=>({event:e.id,entityId:e.entity_id,at:e.occurred_at,basis:'retained_event_snapshot',facts:JSON.parse(e.input),trigger:e.trigger}))
+ const rows:Row[]=recorded.map(e=>({event:e.id,entityId:e.entity_id,at:e.occurred_at,entityType:e.entity_type,basis:'retained_event_snapshot',facts:JSON.parse(e.input),trigger:e.trigger}))
  // Existing requests are inspectable before the engine was installed. Report that their fields are current.
  if(rule.definition.trigger==='request.submitted')for(const r of await all(env,'SELECT id,created_at FROM gk_requests WHERE erased_at IS NULL AND created_at>=? AND created_at<=? ORDER BY created_at DESC,id LIMIT 200',from,to)) {
   if(rows.some(e=>e.entityId===r.id))continue
-  rows.push({event:null,entityId:r.id,at:r.created_at,basis:'current_fields_of_recent_request',trigger:rule.definition.trigger,facts:await ruleFacts(env,{trigger:rule.definition.trigger,entityType:'request',entityId:r.id,at:r.created_at})})
+  rows.push({event:null,entityId:r.id,at:r.created_at,entityType:'request',basis:'current_fields_of_recent_request',trigger:rule.definition.trigger,facts:await ruleFacts(env,{trigger:rule.definition.trigger,entityType:'request',entityId:r.id,at:r.created_at})})
  }
  const scope=rules.map(r=>r.id===id?{...r,paused:0}:r)
- return {id,revision:rule.revision,preview:true,writes:0,from,to,limit:200,rows:rows.slice(0,200).map(r=>{
-  const proposed=candidates(scope,{trigger:r.trigger,entityType:'request',entityId:r.entityId},r.facts).find(p=>p.rule.id===id)
-  return {...r,matched:Boolean(proposed),actions:proposed?.actions??[],conflicts:proposed?.conflicts??[]}
- })}
+ return {id,revision:rule.revision,preview:true,writes:0,from,to,limit:200,rows:await Promise.all(rows.slice(0,200).map(async r=>{
+  const proposed=candidates(scope,{trigger:r.trigger,entityType:r.entityType,entityId:r.entityId},r.facts).find(p=>p.rule.id===id)
+  const checks=[]
+  if(proposed)for(const action of proposed.actions) {
+   try {
+    const owner=await ownerActor(env,rule.owner_id),prepared=await prepareAction(env,owner,{trigger:r.trigger,entityType:r.entityType,entityId:r.entityId,at:r.at},r.facts,action,{rule:rule.id,revision:rule.revision,event:r.event,action:'preview'})
+    checks.push({action,outcome:'would_apply',output:prepared.output})
+   }catch(error){checks.push({action,outcome:'refused',error:error instanceof GasketError?error.code:'rule_preview_failed'})}
+  }
+  return {...r,matched:Boolean(proposed),actions:proposed?.actions??[],conflicts:proposed?.conflicts??[],checks}
+ }))}
 }
 export async function rulesView(env:Bindings,actor:Actor,_url?:URL) {
  rulesManager(actor)

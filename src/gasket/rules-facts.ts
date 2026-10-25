@@ -20,10 +20,10 @@ export async function ruleFacts(env:Bindings,event:RuleEvent):Promise<Row> {
  const locationId=event.entityType==='request' && record.location ? record.target_id : locationName ? (await one(env,"SELECT id FROM gk_request_targets WHERE kind='location' AND name=? AND retired_at IS NULL ORDER BY id LIMIT 1",locationName))?.id : null
  for(const [type,id] of [['asset',asset?.id],['location',locationId],['part',part?.id]]) {
   if(!id)continue
-  for(const row of await all(env,'SELECT field_id,value FROM gk_custom_values WHERE entity_type=? AND entity_id=?',type,id))custom[row.field_id]=JSON.parse(row.value)
+  for(const row of await all(env,'SELECT v.field_id,v.value FROM gk_custom_values v JOIN gk_custom_fields f ON f.id=v.field_id WHERE v.entity_type=? AND v.entity_id=? AND f.retired=0',type,id))custom[row.field_id]=JSON.parse(row.value)
  }
  if(work)for(const row of await all(env,'SELECT field_id,value FROM gk_work_field_values WHERE work_order_id=?',work.id))custom[row.field_id]=row.value
- if(event.entityType==='request')record=Object.fromEntries(['id','number','asset_id','location','urgency','status','version','work_order_id','team_id','assignee_id','due_date','target_id'].map(k=>[k,record![k]??null]))
+ if(event.entityType==='request')record=Object.fromEntries(['id','number','asset_id','location','urgency','status','version','work_order_id','team_id','assignee_id','due_date','target_id','requester_id'].map(k=>[k,record![k]??null]))
  const zone=(await one(env,'SELECT timezone FROM gk_site WHERE singleton=1'))?.timezone??'UTC'
  return {record,work,assetRecord:asset,partRecord:part,asset:asset?.id??null,location:record.location??work?.location??asset?.location??null,
   category:asset?.category??part?.category??null,priority:record.urgency??work?.priority??null,team:record.team_id??work?.team_id??null,

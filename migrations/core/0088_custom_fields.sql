@@ -17,3 +17,5 @@ CREATE TABLE gk_custom_history (
  changed_by TEXT NOT NULL, changed_at INTEGER NOT NULL
 );
 CREATE INDEX gk_custom_history_record ON gk_custom_history(entity_type,entity_id,seq);
+CREATE TRIGGER gk_custom_history_no_update BEFORE UPDATE ON gk_custom_history BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;
+CREATE TRIGGER gk_custom_history_no_delete BEFORE DELETE ON gk_custom_history BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;

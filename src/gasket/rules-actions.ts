@@ -9,6 +9,13 @@ import type { RuleAction, RuleEvent } from './rules-definition'
 export async function prepareAction(env:Bindings,actor:Actor,event:RuleEvent,facts:Row,a:RuleAction,provenance:Row) {
  const work=facts.work,request=event.entityType==='request'?facts.record:null,target=work??request
  const statements:D1PreparedStatement[]=[],output:Row={type:a.type},events:RuleEvent[]=[]
+ const readable=(person:string)=> {
+  const sql=work ? `EXISTS(SELECT 1 FROM gk_members m WHERE m.id=? AND (m.role IN ('owner','lead','supervisor') OR m.id=? OR EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id=? AND c.member_id=m.id AND c.removed_at IS NULL)))` : request ? `EXISTS(SELECT 1 FROM gk_members m WHERE m.id=? AND (m.role IN ('owner','lead') OR m.id=?))` : '1'
+  const params=work ? [person,work.assignee_id,work.id] : request ? [person,request.requester_id] : []
+  return {sql,params}
+ }
+ const requireRead=async(person:string)=>{const check=readable(person);insist(await one(env,`SELECT 1 WHERE ${check.sql}`,...check.params),'rule_action_would_widen_access',403);statements.push(guard(env,'rule_access_changed',check.sql,...check.params))}
+
  const editable=()=>{
   insist(target,'rule_action_needs_work_or_request',409)
   insist(work ? ['open','in_progress','returned'].includes(work.status) : ['new','needs_details','approved'].includes(request.status),'rule_target_not_open',409)
@@ -24,6 +31,7 @@ export async function prepareAction(env:Bindings,actor:Actor,event:RuleEvent,fac
   }
   if(person) {
    await assigneeFits(env,person,team)
+   if(work)await requireRead(person)
    statements.push(guard(env,'rule_assignee_changed',"EXISTS(SELECT 1 FROM gk_members WHERE id=? AND status='active' AND role IN ('owner','lead','maintainer'))",person))
    if(team)statements.push(guard(env,'rule_team_changed','EXISTS(SELECT 1 FROM gk_team_members WHERE team_id=? AND member_id=?)',team,person))
   }
@@ -71,6 +79,7 @@ export async function prepareAction(env:Bindings,actor:Actor,event:RuleEvent,fac
   insist(ids.size>0 && ids.size<=50,'invalid_rule_recipients')
   const text=`${a.text} · Rule ${provenance.rule}, revision ${provenance.revision}`
   for(const id of ids) {
+   await requireRead(id)
    insist(await one(env,"SELECT 1 FROM gk_members WHERE id=? AND status='active' AND role<>'agent'",id),'rule_recipient_unavailable',409)
    statements.push(guard(env,'rule_recipient_changed',"EXISTS(SELECT 1 FROM gk_members WHERE id=? AND status='active' AND role<>'agent')",id))
    if(a.team && !(a.people??[]).includes(id))statements.push(guard(env,'rule_team_changed','EXISTS(SELECT 1 FROM gk_team_members WHERE team_id=? AND member_id=?)',a.team,id))

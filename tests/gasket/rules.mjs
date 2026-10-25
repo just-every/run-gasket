@@ -1,3 +1,4 @@
+import { rulesBrowser } from './rules-browser.mjs'
 // Rule authoring and execution through the built Worker's public HTTP doors.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
@@ -6,17 +7,17 @@ import { now } from './clock.mjs'
 export async function rulesJourney() {
  const h=await harness(),cookie={owner:await h.owner()},ids={}
  try {
-  await h.api('site.configure',cookie.owner,{name:'synthetic-gasket-90',timezone:'UTC'})
+  await h.api('site.configure',cookie.owner,{name:'Great Lakes Assembly',timezone:'UTC'})
   for(const [who,role] of [['lead','lead'],['tech','maintainer'],['supervisor','supervisor']]) {
-   ids[who]=(await h.api('access.give',cookie.owner,{name:`synthetic-gasket-${who}`,email:`${who}@example.test`,role})).id
+   ids[who]=(await h.api('access.give',cookie.owner,{name:who==='lead'?'Lena Park':who==='tech'?'Maya Chen':'Sam Ito',email:`${who}@example.test`,role})).id
    cookie[who]=await h.signIn(`${who}@example.test`)
   }
   const asset=(await h.api('asset.create',cookie.lead,{tag:'synthetic-gasket-91',name:'Line 2 conveyor',location:'Line 2',category:'Conveyor'})).id
   const other=(await h.api('asset.create',cookie.lead,{tag:'synthetic-gasket-92',name:'Line 3 pump',location:'Line 3',category:'Pump'})).id
-  const team=(await h.api('team.create',cookie.lead,{name:'synthetic-gasket-93',trade:'Electrical',member:[ids.tech]})).id
-  const custom=(await h.api('customfield.save',cookie.lead,{name:'synthetic-gasket-94',entityType:'asset',type:'single',scope:'site',options:'Electrical,Mechanical'})).id
+  const team=(await h.api('team.create',cookie.lead,{name:'Electrical response',trade:'Electrical',member:[ids.tech]})).id
+  const custom=(await h.api('customfield.save',cookie.lead,{name:'Maintenance trade',entityType:'asset',type:'single',scope:'site',options:'Electrical,Mechanical'})).id
   await h.api('customvalue.set',cookie.lead,{entityType:'asset',entityId:asset,customValues:{[custom]:'Electrical'}})
-  const portal=(await h.api('request.portal',cookie.owner,{name:'synthetic-gasket-95',fields:[]})).id
+  const portal=(await h.api('request.portal',cookie.owner,{name:'Line faults',fields:[]})).id
   const targets=[]
   for(const id of [asset,other])targets.push((await h.api('request.target',cookie.owner,{portal,kind:'asset',asset:id,name:'Conveyor fault',publishConsent:true})).id)
   async function request(target,description) {
@@ -25,7 +26,7 @@ export async function rulesJourney() {
    return (await h.api('requests',cookie.owner)).find(r=>r.description===description).id
   }
   const historic=await request(targets[0],'synthetic-gasket-97')
-  const definition={name:'synthetic-gasket-98',trigger:'request.submitted',priority:10,reason:'Route Line 2 electrical faults',conditions:[{field:'location',op:'eq',value:'Line 2'},{field:'category',op:'eq',value:'Conveyor'},{field:`custom:${custom}`,op:'eq',value:'Electrical'}],actions:[{type:'assign',team,person:ids.tech},{type:'priority',value:'high'},{type:'notify',people:[ids.lead],text:'Electrical request received'}]}
+  const definition={name:'Route conveyor electrical faults',trigger:'request.submitted',priority:10,reason:'Route Line 2 electrical faults',conditions:[{field:'location',op:'eq',value:'Line 2'},{field:'category',op:'eq',value:'Conveyor'},{field:`custom:${custom}`,op:'eq',value:'Electrical'}],actions:[{type:'assign',team,person:ids.tech},{type:'priority',value:'high'},{type:'notify',people:[ids.lead],text:'Electrical request received'}]}
   for(const who of ['tech','supervisor'])await h.api('rules.save',cookie[who],definition,403)
   await h.api('rules.save',undefined,definition,401)
   let saved=await h.api('rules.save',cookie.lead,definition)
@@ -37,7 +38,7 @@ export async function rulesJourney() {
   assert.ok(preview.rows.find(r=>r.entityId===historic)?.matched)
   assert.deepEqual({request:await h.api(`requests/${historic}`,cookie.lead),audit:await h.api('audit',cookie.owner),work:await h.api('work',cookie.lead),notices:await h.api('notices',cookie.lead),rules:await state(),purchases:await h.api('purchase-orders',cookie.owner)},before,'historical preview leaves every live record and ledger unchanged')
   saved=await h.api('rules.control',cookie.lead,{rule,revision:saved.revision,paused:false,reason:'Preview reviewed'})
-  const matched=await request(targets[0],'synthetic-gasket-99'),unmatched=await request(targets[1],'synthetic-gasket-100')
+  const matched=await request(targets[0],'Conveyor motor trips at startup'),unmatched=await request(targets[1],'Pump seal dripping at Line 3')
   const detail=await h.api(`requests/${matched}`,cookie.lead)
   assert.equal(detail.team_id,team);assert.equal(detail.assignee_id,ids.tech);assert.equal(detail.urgency,'high')
   const unchanged=await h.api(`requests/${unmatched}`,cookie.lead)
@@ -89,6 +90,7 @@ export async function rulesJourney() {
   assert.ok((await(await h.raw('/app/settings/rules',{cookie:cookie.owner})).text()).includes('rule loop detected'))
   assert.equal((await h.raw('/app/settings/rules',{cookie:cookie.tech})).status,403)
   assert.equal((await h.raw('/app/settings/rules')).status,303)
+  if(process.env.RULES_SCREENSHOTS)await rulesBrowser({h,cookie,ids,asset,team,custom,matched,definition})
   // Revoking the author prevents new effects, including when an owner previously enabled that author's rule.
   await h.api('access.end',cookie.owner,{member:ids.lead})
   await request(targets[0],'synthetic-gasket-109')

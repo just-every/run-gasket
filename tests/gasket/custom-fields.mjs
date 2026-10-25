@@ -76,7 +76,7 @@ async function customBrowser({h,owner,asset,part,target,location,refrigerant}) {
     const context=await browser.newContext({ignoreHTTPSErrors:true})
     await context.addCookies(owner.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
     const page=await context.newPage()
-    for(const [name,path] of [['fields','/app/settings/fields'],['asset',`/app/assets/${asset}`],['parts','/app/parts'],['part',`/app/parts/${part}`],['scan',`/scan/${target}`],['location',`/app/locations/${location}`],['filter',`/app/assets?field=${refrigerant}&value=R-410A`]])for(const width of [1440,390]) {
+    for(const [name,path] of [['fields','/app/settings/fields'],['asset-register','/app/assets'],['request-portals','/app/request-portals'],['move-in','/app/move-in'],['asset',`/app/assets/${asset}`],['parts','/app/parts'],['part',`/app/parts/${part}`],['scan',`/scan/${target}`],['location',`/app/locations/${location}`],['filter',`/app/assets?field=${refrigerant}&value=R-410A`]])for(const width of [1440,390]) {
       await page.setViewportSize({width,height:1000});assert.equal((await page.goto(h.origin+path)).status(),200)
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
       assert.deepEqual(await page.locator('button,a,[role=button]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()&&!n.querySelector('img[alt]')&&!n.getAttribute('data-tooltip')).map(n=>n.outerHTML)),[],`${name} icon-only controls have tooltips`)
@@ -91,6 +91,16 @@ async function customBrowser({h,owner,asset,part,target,location,refrigerant}) {
     await page.locator('summary').filter({hasText:'Edit custom fields'}).click()
     await page.locator(`[name="cf.${refrigerant}"]`).selectOption('R-410A')
     await page.getByRole('button',{name:'Update values'}).click()
+    await page.goto(h.origin+'/app/move-in')
+    await page.locator('input[name=assets]').setInputFiles({name:'maintainx-assets.csv',mimeType:'text/csv',buffer:Buffer.from('Name,ID,Location,Types,QR/Barcode,Refrigerant type\r\nWorkshop cooler,synthetic-gasket-8,Workshop,HVAC,COOL-8,R-32\r\n')})
+    await page.getByRole('button',{name:'Dry run',exact:true}).click()
+    for(const width of [1440,390]) {
+      await page.setViewportSize({width,height:1000})
+      await page.getByText('Map asset columns',{exact:true}).click()
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`import mapping fits ${width}`)
+      await page.screenshot({path:`${process.env.CUSTOM_SCREENSHOTS}/import-mapping-${width}.png`,fullPage:true})
+      await page.getByText('Map asset columns',{exact:true}).click()
+    }
     await context.close()
   } finally {await browser.close()}
 }
