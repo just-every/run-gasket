@@ -45,7 +45,7 @@ export async function reportSchedules(env:Bindings,actor:Actor){
   let schedules=await all(env,'SELECT * FROM gk_report_schedules WHERE ?=1 OR editor_id=? ORDER BY created_at,id',actor.role==='owner'?1:0,actor.id)
   if(actor.role!=='owner'){const live=[];for(const row of schedules)if((await member(env,row.owner_id,row.zone))?.role==='owner')live.push(row);schedules=live}
   insist(actor.role==='owner'||schedules.length>0,'forbidden',403)
-  return {schedules,deliveries:await all(env,'SELECT d.*,m.name AS recipient FROM gk_report_deliveries d JOIN gk_report_schedules s ON s.id=d.schedule_id LEFT JOIN gk_members m ON m.id=d.recipient_id WHERE ?=1 OR s.editor_id=? ORDER BY d.claimed_at DESC,d.id',actor.role==='owner'?1:0,actor.id),
+  return {schedules,deliveries:(await all(env,'SELECT d.*,m.name AS recipient FROM gk_report_deliveries d JOIN gk_report_schedules s ON s.id=d.schedule_id LEFT JOIN gk_members m ON m.id=d.recipient_id WHERE ?=1 OR s.editor_id=? ORDER BY d.claimed_at DESC,d.id',actor.role==='owner'?1:0,actor.id)).filter(d=>schedules.some(s=>s.id===d.schedule_id)),
     recipients:await all(env,"SELECT m.id,m.name FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id WHERE m.status='active' AND o.status='active' AND m.role IN ('owner','lead','supervisor') ORDER BY m.name")}
 }
 export async function previewReportPack(env:Bindings,actor:Actor,id:string){

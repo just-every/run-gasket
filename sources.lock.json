@@ -679,6 +679,10 @@
       "sha256": "3d13d048d7e133e32b58e5a6a87ae78337f46eee2b460cf2c072279c340df02a",
       "executable": false
     },
+    "migrations/core/0097_report_authors.sql": {
+      "sha256": "061f89094cdcdce303d6952d7bcdc0c6aad89b28ee6c2664f63674e309fc5971",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "5d20f1bd0c24def0cd6c1165d1a58d0472ad0f02f2b60047014bda962eaf4274",
       "executable": false
@@ -1467,6 +1471,10 @@
       "sha256": "494ef435e344593f6b00fb9964301c9dca15766781e78b126acbe314abd70f98",
       "executable": false
     },
+    "src/gasket/history-report.ts": {
+      "sha256": "31338d3eb811e744392aaa1b5dce2ea63dff11e716362cccec03a73428825beb",
+      "executable": false
+    },
     "src/gasket/history.ts": {
       "sha256": "57284b408d0486855cd3b56dc19b5609d660cca60dbc9abe4e16b0bd188c8161",
       "executable": false
@@ -1688,7 +1696,7 @@
       "executable": false
     },
     "src/gasket/report-schedules.ts": {
-      "sha256": "2ee7565be4c320fbe594999101edcd61b1809c5423a6487574589c9ef0192f94",
+      "sha256": "0636834842d128179f0a6382bcbed6db7b0c399835f95ba991943fc66545b357",
       "executable": false
     },
     "src/gasket/request-erasure.ts": {
@@ -2008,7 +2016,7 @@
       "executable": false
     },
     "src/gasket/ui/report-schedules.ts": {
-      "sha256": "a77ec3bca6dfa629cbf65aa598722201fe89c143a91a156122f922b7ad882c7b",
+      "sha256": "5f29c22ec7dc9b36e7643ebcd991f18ae26c6353de6a84bbf041a671e7bd6ca5",
       "executable": false
     },
     "src/gasket/ui/request-report.ts": {
@@ -4132,7 +4140,7 @@
       "executable": false
     },
     "tests/gasket/report-schedules.mjs": {
-      "sha256": "12f1a095207dd2db9769445439e03c7a3c6e1a03b96372566bf1295846647096",
+      "sha256": "56745e0d0cf1d8176bd00f997da4d06416e9acb4d4a2c758686612aeee895d6b",
       "executable": false
     },
     "tests/gasket/request-draft-privacy.mjs": {

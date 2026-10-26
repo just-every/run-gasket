@@ -142,7 +142,7 @@ export async function reportSchedulesJourney(){
       assert.deepEqual(pack.data,expected,`${kind} complete dataset matches its public read door`)
       assert.ok(pack.metadata.definitions.length>0)
       assert.equal(csv2.includes('synthetic-gasket-private-rate-1'),false)
-      assert.equal(csv2.includes('documents'),false)
+      if(kind==='history')assert.deepEqual(Object.keys(pack.data.asset).sort(),['id','name','tag'])
       if(kind==='history'){
         assert.equal(pack.data.asset.tag,'PACK-1')
         assert.ok(pack.data.events.some(e=>e.what==='Work order created'))
@@ -208,6 +208,7 @@ export async function reportSchedulesJourney(){
           await page.setViewportSize({width,height:1100});await page.goto(h.origin+path)
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
           assert.equal(await page.getByRole('heading',{name:'Scheduled reports',exact:true}).count(),1)
+          if(name==='report-history'||name==='report-valuation')assert.equal(await page.getByLabel('Report',{exact:true}).inputValue(),name.slice(7))
           await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
         }
         await context.clearCookies()
@@ -216,6 +217,15 @@ export async function reportSchedulesJourney(){
           await page.setViewportSize({width,height:1100});await page.goto(`${h.origin}/app/settings/reports?edit=${delegatedId}`)
           assert.equal(await page.getByRole('button',{name:'Save for owner review'}).count(),1)
           assert.equal(await page.getByLabel('Delegated author').count(),0)
+          if(width===1440){
+            await page.getByLabel('Pack name',{exact:true}).fill('Browser authored draft')
+            await page.getByRole('checkbox',{name:'I submit this draft for owner review.',exact:false}).check()
+            await page.getByRole('button',{name:'Save for owner review'}).click()
+            await page.waitForURL(url=>!url.searchParams.has('edit'))
+            const savedRow=(await h.api('report-schedules',cookie.owner)).schedules.find(s=>s.id===delegatedId)
+            assert.equal(savedRow.name,'Browser authored draft');assert.equal(savedRow.paused,1)
+            await page.goto(`${h.origin}/app/settings/reports?edit=${delegatedId}`)
+          }
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
           await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/report-delegate-${width}.png`,fullPage:true})
         }
