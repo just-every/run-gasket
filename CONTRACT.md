@@ -382,8 +382,8 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 53 | 31 | 40 | 124 |
-| All | 67 | 31 | 40 | 138 |
+| Target and push further | 53 | 30 | 41 | 124 |
+| All | 67 | 30 | 41 | 138 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -402,7 +402,7 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | `GAS-13` | Let an agent prepare and a person approve | published | done | `src/gasket/proposals.ts`; `src/gasket/actor.ts`; `tests/gasket/flows.mjs` |  |
 | `HTTP-001` | Health, Lobby and real 404s | published | done | `tests/runtime.mjs`; `src/base/lobby.ts`; `src/gasket/http.ts` |  |
 | `ADMIN-001` | US operating defaults | target | partial | `src/gasket/site.ts`; `src/gasket/dates.ts`; `src/gasket/ui/settings.ts`; `src/gasket/bad-actors.ts`; `src/gasket/lifecycle.ts`; `tests/gasket/flows.mjs` | US English, US time-zone choices, site-local dates, recorded meter units and USD work/lifecycle costs exist; organization postal address, explicit customary/SI conversions, multiple US sites and the complete daylight-saving/export journey remain missing. |
-| `ADMIN-002` | Multiple sites and shared governance | target | partial | `src/gasket/site.ts`; `src/gasket/actor.ts` | Only one site is represented; no site-scoped records, membership or transfers. |
+| `ADMIN-002` | Multiple sites and shared governance | target | missing | `src/gasket/site.ts`; `src/gasket/actor.ts` | Only one site is represented; no site-scoped records, membership or transfers. |
 | `ADMIN-003` | Role rights and separation of duties | target | partial | `src/gasket/actor.ts`; `src/gasket/site.ts`; `tests/gasket/flows.mjs` | Fixed owner/lead/maintainer/supervisor/agent roles exist; a technician create-work right (default, self-assigned or left unassigned, owner-revocable for the site; FIELD-009) exists; site, stores, purchasing, analyst roles, custom grants, per-site revocation across sites of the create-work right and the Operator template do not. |
 | `ADMIN-004` | Requester and contractor access | target | missing |  | No requester or contractor identity, scoped portal or expiring external work grant. |
 | `ADMIN-005` | Enterprise identity lifecycle | target | missing |  | No SSO, SCIM, MFA policy or group/site mapping. |

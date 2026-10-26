@@ -1,3 +1,4 @@
+import { safetyState } from '../safety'
 import { safetyCard } from './safety'
 import { stockSources } from '../stock-sources'
 import { all as sourceRows, newId } from '../core'
@@ -155,6 +156,7 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
 
 export async function workOrderPage(env: Bindings, actor: Actor, id: string, url: URL) {
   const w = await workOrderDetail(env, actor, id)
+  w.missing.push(...(await safetyState(env,actor,w)).missing)
   const back = `/app/work/${w.id}`
   // PLAN-006: opening the page reads its thread; the card still marks what was unread.
   await readThread(env, actor, 'work', w.id)

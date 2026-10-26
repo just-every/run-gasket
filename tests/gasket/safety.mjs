@@ -127,11 +127,13 @@ async function browserProof(h,owner,who,checklist,work,mode='closed') {
    await context.addCookies(cookie.split('; ').map(pair=>{const i=pair.indexOf('=');return{name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
    const page=await context.newPage()
    for(const width of [1440,390]) {
+    if(name==='open')await h.api('workorder.results',who,{workOrder:work,value:['0'],note:['Rechecked isolation reading']})
     await page.setViewportSize({width,height:1000})
     assert.equal((await page.goto(h.origin+path)).status(),200)
     await page.getByRole('heading',{name:name==='template'?'Site-approved safety prerequisites':name==='library'?'Compliance templates':'Isolation and permit evidence'}).waitFor()
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
     if(name==='open'){
+     assert.equal(await page.getByRole('button',{name:'Submit for review',exact:true}).isDisabled(),true)
      await page.screenshot({path:`${process.env.SAFETY_SCREENSHOTS}/sign-off-form-${width}.png`,fullPage:true})
      await page.getByLabel('I attest the site-approved isolation prerequisites were performed',{exact:true}).check()
      await page.getByLabel('Permit reference',{exact:true}).fill('synthetic-gasket-3')
@@ -139,6 +141,7 @@ async function browserProof(h,owner,who,checklist,work,mode='closed') {
      await page.getByLabel('Permit original',{exact:true}).setInputFiles({name:'browser-permit.txt',mimeType:'text/plain',buffer:Buffer.from('Site-approved isolation permit')})
      await page.getByRole('button',{name:'Record qualified sign-off',exact:true}).click()
      await page.getByText('Required evidence recorded.',{exact:true}).waitFor()
+     assert.equal(await page.getByRole('button',{name:'Submit for review',exact:true}).isEnabled(),true)
     }
     if(name==='work'||name==='open')await page.getByText(provenance,{exact:true}).first().waitFor()
     for(const control of await page.locator('button:visible').all())assert.ok((await control.textContent()).trim()||await control.getAttribute('data-tooltip'),'icon control has a tooltip')
