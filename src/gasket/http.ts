@@ -1,3 +1,4 @@
+import { planningPage } from './ui/planning'
 import { rulesPage } from './ui/rules'
 import { agentRunsPage } from './ui/agent-runs'
 import { agentRunsCsv } from './agent-run-views'
@@ -237,6 +238,7 @@ const pages: Record<string, Page> = {
   auditCsv: async (env, actor, url) => new Response(await auditCsv(env, actor, url), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="audit.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   codes: (env, actor, url) => codesPage(env, actor, url),
   notices: (env, actor, url) => noticesPage(env, actor, url),
+  planning:(env,actor,url)=>planningPage(env,actor,url), resources:(env,actor,url)=>planningPage(env,actor,url,true),
   teams: (env, actor, url) => teamsPage(env, actor, url),
   performance: guarded(actor => can(actor, 'board.read'), (env, actor, url) => performancePage(env, actor, url)),
   reliability: guarded(actor => can(actor, 'board.read'), (env, actor, url) => reliabilityPage(env, actor, url)),

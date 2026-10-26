@@ -521,3 +521,40 @@ in-app-only policy awaits ct approval under PLAN-009.
 ## Model runs (AGENT-009)
 
 Only an owner uses these, and only when the installation has `AI_ENABLED` true with an `AI_API_KEY` (and optionally `AI_BASE_URL`, default OpenAI's `/v1`) set as its own settings; the key is never returned by any door. `agentrun.grant` takes `agent` (an active agent-role person), `provider` (the host shown by `agent-runs`), `model`, `assets` (one to three asset ids), `actions` (`corrective`), `budget` (USD), `inputPrice` and `outputPrice` (USD per million tokens), `maxProposals` (1 to 5), `maxOutputTokens` (100 to 4000) and optionally `costs: true` with `termsAck` (at least twenty characters naming the terms that bind the provider). `GET agent-grants/ID/preview` returns the exact request, and `agentrun.start` takes the grant and that `previewHash`; it refuses a changed preview, a revoked grant, a provider other than the granted host and a run whose reserve would pass the budget, then makes one provider call and returns the run. `agentrun.revoke` takes `grant` and `reason`, ends the grant for good, marks its running runs revoked, rejects the proposals those runs left pending and discards any answer that arrives later, still recording its cost. A run only prepares pending corrective proposals as the grant's agent; a lead or the owner approves them with `proposal.decide`.
+
+
+### Work calendar and resources
+
+`GET /api/gasket/planning?from=2026-10-20&view=week` reads current open work,
+bookings, conflicts, explicit availability and utilization by person, team and
+site. `view=day` selects one day; the default is seven days. The existing
+work assignment right gates this read and both `/app/planning` and
+`/app/settings/resources`. The calendar preserves original due dates,
+PM cadence and work estimates. Assignee changes release the old slot and tool
+bookings as part of the existing handoff; rescheduling does not reassign work.
+
+Planning mutations use the ordinary authenticated action and form doors:
+
+- `planning.qualification`: owner-only `member`, `name`, inclusive `expires`
+  date and `reference`. A renewal retains the former value in the audit.
+- `planning.tool`: owner-only `name`, `identifier`, inclusive `calibrationDue`,
+  optional existing `id`, and current planning `revision`. Names are immutable.
+- `planning.window`: work assignment right; `member`, `kind` (`available` or
+  `absent`), site-local `starts` and `ends`, `reason` and `revision`. Windows
+  cover one day and may not overlap another window of the same kind for that
+  person. `planning.window.remove` requires its `id`, a `reason` and `revision`.
+- `planning.requirements`: `workOrder`, comma-separated `qualifications`
+  (empty clears the requirements), and `revision`.
+- `planning.slot`: `workOrder`, `starts`, `ends`, repeated `tool` register ids
+  and `revision`. `preview=true` returns conflicts without writing; confirmation
+  repeats the checks and atomically claims the resources. `remove=true` releases
+  the slot. Assign the work first through the existing work-order door.
+
+No override is available for an expired qualification, an unavailable person,
+a missing reserved BOM part or an overlapping person or tool booking. The
+credential reference is entered by the owner, not verified by Gasket. Productive
+minutes are approved wrench entries clipped to the selected period; travel,
+wait, administrative, pending and legacy unclassified entries are excluded.
+Capacity uses explicit site-clock availability minus absence intersections;
+without recorded availability there is no utilization denominator. Team
+capacity shares its members with other teams, so team capacities are not additive.
