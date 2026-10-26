@@ -23,6 +23,7 @@ export async function recoveryJourney() {
     const checklist = (await h.api('checklist.create', owner, { name: 'Recovery inspection', items: ['Listen for noise'] })).id
     const today = (await h.api('me', owner)).today
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
+    const credential = await h.api('service.create', owner, { name: 'Synthetic recovery service', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
     await h.api('webhook.control', owner, { subscription: subscription.id, revision: 1, paused: false, reason: 'Receiver confirmed' })
     const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today, assignee: (await h.api('me', owner)).id })
@@ -39,6 +40,7 @@ export async function recoveryJourney() {
     await h.installation.rer('export', '--output', archive)
     const bytes = await readFile(archive)
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')
+    assert.ok(!bytes.includes(Buffer.from(credential.token)), 'service bearer secrets are absent from exports')
     const records = bytes.toString().trim().split('\n').map(line => JSON.parse(line))
     const subscriptions = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_connector_subscriptions')
     assert.equal(subscriptions.length, 1)
@@ -53,9 +55,11 @@ export async function recoveryJourney() {
     const restored = await harness({ vars: h.vars, installation: target })
     try {
       assert.equal((await restored.raw('/api/gasket/me', { cookie: owner })).status, 401, 'source sessions are excluded')
+      assert.equal((await restored.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })).status, 401, 'restore never reactivates a source service credential')
       const signed = await restored.signIn(h.vars.OWNER_EMAIL)
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
+      assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
       const recovery = await restored.api('recovery', signed)
       assert.equal(recovery.restore.kind, 'restore')
       assert.equal(recovery.restore.recovery_point, records[0].exportedAt)

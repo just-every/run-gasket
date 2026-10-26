@@ -588,6 +588,18 @@
       "name": "0093_safety_evidence.sql",
       "sha256": "0d2b8176246ac4727317078b7c8fdce25f6d64de3325f94809599de8cc6974d7",
       "sql": "-- Immutable site-approved prerequisites and attributed sign-offs.\nCREATE TABLE gk_safety_requirements (\n id TEXT PRIMARY KEY, checklist_id TEXT NOT NULL REFERENCES gk_checklists(id),\n revision INTEGER NOT NULL, hazard TEXT NOT NULL, isolation TEXT NOT NULL,\n qualification TEXT NOT NULL, published_by TEXT NOT NULL REFERENCES gk_members(id),\n published_at INTEGER NOT NULL, UNIQUE(checklist_id, revision)\n);\nCREATE TABLE gk_safety_attestations (\n id TEXT PRIMARY KEY, work_order_id TEXT NOT NULL REFERENCES gk_work_orders(id),\n requirement_id TEXT NOT NULL REFERENCES gk_safety_requirements(id),\n procedure_revision TEXT NOT NULL REFERENCES gk_checklist_revisions(id),\n work_version INTEGER NOT NULL, signer TEXT NOT NULL REFERENCES gk_members(id),\n qualification_json TEXT NOT NULL, permit TEXT NOT NULL, expires_on TEXT NOT NULL,\n filename TEXT NOT NULL, bytes BLOB NOT NULL, sha256 TEXT NOT NULL, recorded_at INTEGER NOT NULL\n);\nCREATE INDEX gk_safety_work ON gk_safety_attestations(work_order_id);\nCREATE TRIGGER gk_safety_requirements_immutable BEFORE UPDATE ON gk_safety_requirements BEGIN SELECT RAISE(ABORT, 'gasket_immutable'); END;\nCREATE TRIGGER gk_safety_attestations_immutable BEFORE UPDATE ON gk_safety_attestations BEGIN SELECT RAISE(ABORT, 'gasket_immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0094_api_writes.sql",
+      "sha256": "b5aad54327185cb91b38f39d37eee90156af818623ffa96a333fb17a5db2c6b3",
+      "sql": "-- Retry receipts keep only hashes and bounded action results, never input bodies.\nCREATE TABLE gk_api_writes (\n  actor_id TEXT NOT NULL,\n  key_hash TEXT NOT NULL,\n  action TEXT NOT NULL,\n  fingerprint TEXT NOT NULL,\n  role TEXT NOT NULL,\n  state TEXT NOT NULL CHECK (state IN ('pending', 'completed', 'failed')),\n  result_json TEXT,\n  created_at INTEGER NOT NULL,\n  PRIMARY KEY (actor_id, key_hash)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0095_api_credentials.sql",
+      "sha256": "3d020217ad400586956e33a7aedb757c485c82d1c49a00bc62162aa7cff18534",
+      "sql": "CREATE TABLE gk_api_credentials (\n  id TEXT PRIMARY KEY,\n  member_id TEXT NOT NULL REFERENCES gk_members(id),\n  name TEXT NOT NULL,\n  token_hash TEXT NOT NULL UNIQUE,\n  scopes_json TEXT NOT NULL,\n  expires_at INTEGER NOT NULL,\n  created_at INTEGER NOT NULL,\n  revoked_at INTEGER\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

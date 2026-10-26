@@ -19,15 +19,15 @@ export async function harness({ vars, installation, clockOffset = offset, clockI
   const stop = async () => { if (!stopped) { stopped = true; await worker.close() } }
   const close = async () => { await stop(); if (owned) await installation.remove() }
 
-  const raw = (path, { cookie, body, form, method } = {}) => worker.request(path, {
+  const raw = (path, { cookie, body, form, method, headers = {} } = {}) => worker.request(path, {
     method: method ?? (body !== undefined || form ? 'POST' : 'GET'), redirect: 'manual',
-    headers: { 'CF-Connecting-IP': '127.0.0.1', ...(cookie ? { cookie } : {}), ...(body !== undefined || form ? { origin } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
+    headers: { ...headers, 'CF-Connecting-IP': '127.0.0.1', ...(cookie ? { cookie } : {}), ...(body !== undefined || form ? { origin } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
     body: body !== undefined ? JSON.stringify(body) : form,
   })
 
   /** The JSON door: GET reads a view, a body POSTs an action. Asserts the status and returns the JSON. */
   async function api(path, cookie, body, status = 200) {
-    const response = await raw(`/api/gasket/${path}`, { cookie, body })
+    const response = await raw(`/api/gasket/${path.replace(/^\//, '')}`, { cookie, body })
     const text = await response.text()
     assert.equal(response.status, status, `${path}: ${response.status} ${text.slice(0, 400)}`)
     return text ? JSON.parse(text) : null

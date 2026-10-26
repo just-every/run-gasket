@@ -1,3 +1,4 @@
+import { serviceCredentials } from './service-auth'
 import { complianceTemplates, readSafety } from './safety'
 import { planningView } from './planning'
 import { rulesView } from './rules'
@@ -68,6 +69,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  serviceCredentials: (env, actor) => serviceCredentials(env, actor),
   complianceTemplates: env=>complianceTemplates(env),
   safety: (env,actor,id)=>readSafety(env,actor,id),
   planning:(env,actor,_id,url)=>planningView(env,actor,url),

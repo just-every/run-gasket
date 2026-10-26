@@ -7,14 +7,17 @@ export default {
   requiredConfiguration: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'AUTH_ORIGIN', 'MAIL_PROVIDER', 'MAIL_FROM'],
   exportRow(table, row) {
     // An encrypted connector signing key is still a secret, even without its wrapping key.
+    if (table === 'gk_api_credentials') return { ...row, token_hash: `inactive-${row.id}` }
     return table === 'gk_connector_subscriptions' ? { ...row, secret_cipher: '' } : row
   },
   importSafety: {
+    gk_api_credentials: { revoked_at: [0] },
     gk_automation_rules: { paused: [1], reason: ['Restored inactive; review before resuming.'] },
     gk_schedules: { active: [0] },
     gk_connector_subscriptions: { paused: [1], secret_cipher: [''] },
   },
   importRow(table, row) {
+    if (table === 'gk_api_credentials') return { ...row, revoked_at: 0, token_hash: `inactive-${row.id}` }
     if (table === 'gk_automation_rules') return { ...row, paused: 1, reason: 'Restored inactive; review before resuming.' }
     if (table === 'gk_schedules') return { ...row, active: 0 }
     if (table === 'gk_connector_subscriptions') return { ...row, paused: 1, secret_cipher: '' }

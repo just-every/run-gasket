@@ -1,3 +1,4 @@
+import { createServiceCredential, revokeServiceCredential } from './service-auth'
 import { publishSafety, attestSafety } from './safety'
 import { saveQualification, savePlanningTool, savePlanningWindow, removePlanningWindow, saveRequirements, planSlot } from './planning'
 import { saveRule, controlRule, previewRule } from './rules'
@@ -84,6 +85,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'service.create': createServiceCredential, 'service.revoke': revokeServiceCredential,
   'safety.publish': (env,actor,input) => publishSafety(env,actor,input),
   'safety.attest': (env,actor,input) => attestSafety(env,actor,input),
   'planning.qualification':saveQualification, 'planning.tool':savePlanningTool, 'planning.window':savePlanningWindow, 'planning.window.remove':removePlanningWindow, 'planning.requirements':saveRequirements, 'planning.slot':planSlot,

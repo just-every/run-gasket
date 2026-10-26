@@ -1,3 +1,6 @@
+import { withServiceAuthority } from './service-context'
+import { authorizeService } from './service-auth'
+import { apiEstate, keyedWrite } from './api-contract'
 import { compliancePack } from './compliance-pack'
 import { planningPage } from './ui/planning'
 import { rulesPage } from './ui/rules'
@@ -95,6 +98,7 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
   let actor: Actor | null = null
   try {
     actor = await currentActor(env, request)
+    if (actor?.service && !api) throw new GasketError('service_scope_forbidden', 403)
     if(scan) {
       if(request.method==='POST') throw new GasketError('not_found',404)
       const code=scan[1] || url.searchParams.get('code') || ''
@@ -111,7 +115,7 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
       return key ? await requestReceiptPage(env,url,id,key) : await requestPortalPage(env,actor,url,id)
     }
     if (!actor) return api ? json({ error: 'authentication_required' }, 401) : new Response(null, { status: 303, headers: { location: `/signin?returnTo=${encodeURIComponent(url.pathname)}`, 'cache-control': 'no-store' } })
-    if (api) return await apiResponse(env, actor, request, url)
+    if (api) return await withServiceAuthority(actor.service?.id, () => apiResponse(env, actor!, request, url))
     return await pageResponse(env, actor, request, url)
   } catch (error) {
     const { code, status, detail } = failure(error)
@@ -130,12 +134,23 @@ async function requestIntakeInput(request:Request) {
 }
 
 async function apiResponse(env: Bindings, actor: Actor, request: Request, url: URL) {
-  const path = url.pathname.slice('/api/gasket/'.length)
+  const suffix = url.pathname.slice('/api/gasket/'.length)
+  const versioned = suffix.startsWith('v1/')
+  const path = versioned ? suffix.slice(3) : suffix
+  authorizeService(actor, request, path)
+  if (/^v[0-9]+(?:\/|$)/.test(path)) throw new GasketError('unsupported_api_version', 404)
   if (request.method === 'POST') {
     const action = actions[path]
     if (!action) throw new GasketError('not_found', 404)
+    if (request.headers.has('idempotency-key')) {
+      const kept = await keyedWrite(env, actor, request, path, input => action(env, actor, input, request))
+      const response = json(kept.result)
+      response.headers.set('idempotency-replayed', String(kept.replayed))
+      return response
+    }
     return json(await action(env, actor, await Input.from(request), request))
   }
+  if (versioned && ['assets', 'work', 'parts'].includes(path)) return json(await apiEstate(env, actor, path, url))
   const { view, id } = route(path)
   return json(await view(env, actor, id, url))
 }

@@ -1,3 +1,4 @@
+import { apiJourney } from './api.mjs'
 import { safetyJourney } from './safety.mjs'
 import { qualificationPlanningJourney, calendarPlanningJourney } from './planning.mjs'
 import { ruleSourcesJourney } from './rule-sources.mjs'
@@ -40,6 +41,7 @@ import { now, zone } from './clock.mjs'
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
 const independent = new Map([
+  [apiJourney, 'reports'],
   [safetyJourney,'reports'],
   [qualificationPlanningJourney,'reports'], [calendarPlanningJourney,'reports'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
@@ -81,6 +83,7 @@ const unzip = buffer => {
 }
 
 try {
+  await check('Versioned API paging and durable write retries', apiJourney)
   await check('Isolation evidence and portable compliance pack',safetyJourney)
   await check('Qualification expiry and resource booking constraints',qualificationPlanningJourney)
   await check('Calendar capacity, absence and PM due preservation',calendarPlanningJourney)

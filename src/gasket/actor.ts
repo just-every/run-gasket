@@ -1,3 +1,4 @@
+import { serviceActor } from './service-auth'
 // The signed-in person as Gasket sees them: a Base operator-auth session joined
 // to a Gasket member and that member's one role. Every handler asks for a
 // capability here; the owner holds every role.
@@ -32,6 +33,7 @@ const GRANTS: Record<Role, Capability[]> = {
 export interface Actor {
   id: string
   sessionId: string
+  service?: { id: string; scopes: string[] }
   email: string
   name: string
   role: Role
@@ -50,6 +52,7 @@ export async function siteZone(env: Bindings): Promise<string> {
 }
 
 export async function currentActor(env: Bindings, request: Request): Promise<Actor | null> {
+  if (request.headers.has('authorization')) return serviceActor(env, request)
   const session = await operatorAuth(env).getSession(request)
   if (!session) return null
   const email = session.operator.email.toLowerCase()
