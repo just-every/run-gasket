@@ -77,3 +77,11 @@ export async function safetyGuards(env: Bindings,actor: Actor,order: Row) {
   const r=state.requirement,a=state.attestations.at(-1)!,q=JSON.parse((await one(env,'SELECT qualification_json FROM gk_safety_attestations WHERE id=?',a.id)).qualification_json)
   return [guard(env,'safety_changed','(SELECT id FROM gk_safety_requirements WHERE checklist_id=? ORDER BY revision DESC LIMIT 1)=?',r.checklist_id,r.id),guard(env,'procedure_changed','(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?',r.checklist_id,state.procedure.latest),guard(env,'qualification_changed',"EXISTS(SELECT 1 FROM gk_qualifications q JOIN gk_members m ON m.id=q.member_id WHERE m.id=? AND m.status='active' AND q.name=? AND q.expires_on=? AND q.reference=?)",a.signer,q.name,q.expires_on,q.reference)]
 }
+
+/** Required inspection library: existing procedure revisions and their published intervals. */
+export async function complianceTemplates(env: Bindings) {
+  return all(env,`SELECT c.id,c.name,r.id AS procedure_revision,r.number,s.id AS prerequisite,s.qualification,s.revision AS prerequisite_revision,
+    (SELECT json_group_array(json_object('id',p.id,'everyDays',p.every_days,'calibration',p.calibration,'active',p.active)) FROM gk_schedules p WHERE p.checklist_id=c.id) AS intervals
+    FROM gk_checklists c JOIN gk_checklist_revisions r ON r.checklist_id=c.id AND r.number=(SELECT MAX(number) FROM gk_checklist_revisions WHERE checklist_id=c.id)
+    JOIN gk_safety_requirements s ON s.checklist_id=c.id AND s.revision=(SELECT MAX(revision) FROM gk_safety_requirements WHERE checklist_id=c.id) ORDER BY c.name`)
+}

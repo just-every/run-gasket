@@ -1,6 +1,6 @@
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
-import { all, commit, now, one, sha256Hex } from './core'
+import { all, commit, guard, now, one, sha256Hex } from './core'
 import { safetyState, QUALIFICATION_PROVENANCE } from './safety'
 import { workOrderDetail } from './work'
 import { zip } from './zip'
@@ -8,6 +8,7 @@ import { zip } from './zip'
 /** Owner custody: pack existing work evidence without exposing personnel or private source documents to planning. */
 export async function compliancePack(env: Bindings,actor: Actor,id:string) {
   requireCapability(actor,'site.manage')
+  const planningRevision=(await one(env,'SELECT revision FROM gk_planning_state WHERE singleton=1')).revision
   const work=await workOrderDetail(env,actor,id),safety=await safetyState(env,actor,work)
   const instructions=work.checklist_revision_id?await one(env,'SELECT id,checklist_id,number,items_json,note,published_by,published_at FROM gk_checklist_revisions WHERE id=?',work.checklist_revision_id):null
   const files:{path:string;bytes:Uint8Array}[]=[],manifest:{path:string;sha256:string;size:number}[]=[]
@@ -28,6 +29,6 @@ export async function compliancePack(env: Bindings,actor: Actor,id:string) {
   const missing=[...work.missing,...safety.missing,...(!work.reviews.some((r:any)=>r.decision==='approved')?['Independent approval missing']:[]),...(!work.evidence.some((e:any)=>e.certificate)?['Certificate missing']:[])]
   const summary={work:{id:work.id,number:work.number,title:work.title,status:work.status,procedureRevision:work.checklist_revision_id},generatedAt:now(),provenance:QUALIFICATION_PROVENANCE,missing,files:manifest}
   files.push({path:'MANIFEST.json',bytes:encode(summary)},{path:'MANIFEST.csv',bytes:new TextEncoder().encode('File,SHA-256,Bytes\r\n'+manifest.map(f=>`${f.path},${f.sha256},${f.size}`).join('\r\n')+'\r\n')})
-  await commit(env,[],{actor:actor.id,action:'compliance.export',subject:id,detail:{files:manifest,missing}})
+  await commit(env,[guard(env,'export_changed','EXISTS(SELECT 1 FROM gk_work_orders WHERE id=? AND version=?)',id,work.version),guard(env,'export_changed','(SELECT revision FROM gk_planning_state WHERE singleton=1)=?',planningRevision),...(safety.requirement?[guard(env,'export_changed','(SELECT id FROM gk_safety_requirements WHERE checklist_id=? ORDER BY revision DESC LIMIT 1)=?',safety.requirement.checklist_id,safety.requirement.id),guard(env,'export_changed','(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?',safety.requirement.checklist_id,safety.procedure.latest)]:[])],{actor:actor.id,action:'compliance.export',subject:id,detail:{files:manifest,missing}})
   return new Response(zip(files),{headers:{'content-type':'application/zip','content-disposition':`attachment; filename="work-${work.number}-compliance.zip"`,'cache-control':'private, no-store','x-content-type-options':'nosniff'}})
 }

@@ -105,7 +105,8 @@ export async function linkDocument(env: Bindings, actor: Actor, input: Input) {
   const number = input.integer('revision', { optional: true, min: 1, max: 100_000 }) ?? document.current_revision
   const revision = await one(env, 'SELECT id, revision FROM gk_document_revisions WHERE document_id = ? AND revision = ?', document.id, number)
   insist(revision, 'revision_not_found', 404)
-  await commit(env, [guard(env, 'work_order_not_open', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND status IN ${OPEN})`, order.id),
+  await commit(env, [guard(env, 'work_order_not_open', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND status IN ${OPEN} AND version = ?)`, order.id, order.version),
+    stmt(env, 'UPDATE gk_work_orders SET version=version+1 WHERE id=?', order.id),
     stmt(env, 'INSERT INTO gk_work_documents (work_order_id, document_id, revision_id, linked_by, linked_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(work_order_id, document_id) DO UPDATE SET revision_id = excluded.revision_id, linked_by = excluded.linked_by, linked_at = excluded.linked_at', order.id, document.id, revision.id, actor.id, now())],
   { actor: actor.id, action: 'document.link', subject: order.id, detail: { document: document.id, revision: revision.revision } })
   return { id: order.id, document: document.id, revision: revision.revision }
