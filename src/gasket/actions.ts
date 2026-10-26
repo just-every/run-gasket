@@ -1,3 +1,4 @@
+import { saveReportSchedule } from './report-schedules'
 import { createServiceCredential, revokeServiceCredential } from './service-auth'
 import { publishSafety, attestSafety } from './safety'
 import { saveQualification, savePlanningTool, savePlanningWindow, removePlanningWindow, saveRequirements, planSlot } from './planning'
@@ -85,6 +86,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'report.schedule': saveReportSchedule,
   'service.create': createServiceCredential, 'service.revoke': revokeServiceCredential,
   'safety.publish': (env,actor,input) => publishSafety(env,actor,input),
   'safety.attest': (env,actor,input) => attestSafety(env,actor,input),

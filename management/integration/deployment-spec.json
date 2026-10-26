@@ -600,6 +600,12 @@
       "name": "0095_api_credentials.sql",
       "sha256": "3d020217ad400586956e33a7aedb757c485c82d1c49a00bc62162aa7cff18534",
       "sql": "CREATE TABLE gk_api_credentials (\n  id TEXT PRIMARY KEY,\n  member_id TEXT NOT NULL REFERENCES gk_members(id),\n  name TEXT NOT NULL,\n  token_hash TEXT NOT NULL UNIQUE,\n  scopes_json TEXT NOT NULL,\n  expires_at INTEGER NOT NULL,\n  created_at INTEGER NOT NULL,\n  revoked_at INTEGER\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0096_report_schedules.sql",
+      "sha256": "3d13d048d7e133e32b58e5a6a87ae78337f46eee2b460cf2c072279c340df02a",
+      "sql": "CREATE TABLE gk_report_schedules (\n id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES gk_members(id), name TEXT NOT NULL,\n report TEXT NOT NULL, filters_json TEXT NOT NULL, recipients_json TEXT NOT NULL,\n weekday INTEGER NOT NULL CHECK(weekday BETWEEN 0 AND 6), clock TEXT NOT NULL,\n zone TEXT NOT NULL, next_day TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,\n paused INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL\n);\nCREATE TABLE gk_report_deliveries (\n id TEXT PRIMARY KEY, schedule_id TEXT NOT NULL REFERENCES gk_report_schedules(id),\n revision INTEGER NOT NULL, occasion TEXT NOT NULL, recipient_id TEXT NOT NULL REFERENCES gk_members(id),\n state TEXT NOT NULL, error TEXT, claimed_at INTEGER NOT NULL, finished_at INTEGER,\n provider TEXT, provider_message_id TEXT, fingerprint TEXT, scope_json TEXT,\n UNIQUE(schedule_id,occasion,recipient_id)\n);\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

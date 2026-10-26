@@ -29,6 +29,7 @@ export const NAV: Destination[] = [
   { href: '/app/reliability', label: 'Reliability', detail: 'MTBF, MTTR and MTTA with their definitions, failures by failure mode and repeat failures.', icon: ICON.board, show: actor => can(actor, 'board.read') },
 ]
 export const SETTINGS: Destination[] = [
+  { href:'/app/settings/reports', label:'Scheduled reports', detail:'Weekly report packs and delivery results.', icon:ICON.clock, show:actor=>can(actor,'site.manage') },
   { href:'/app/planning', label:'Work calendar', detail:'Capacity, planned slots and conflicts.', icon:ICON.clock, show:actor=>can(actor,'work.assign') },
   { href:'/app/settings/resources', label:'Resource settings', detail:'Availability, qualifications and calibrated tools.', icon:ICON.people, show:actor=>can(actor,'work.assign') },
   { href: '/app/settings/rules', label: 'Automation rules', detail: 'Versioned site rules, previews and execution results.', icon: ICON.clock, show: actor => can(actor,'register.manage') },

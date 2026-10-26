@@ -1,3 +1,6 @@
+import { reportSchedulesPage } from './ui/report-schedules'
+import { previewReportPack } from './report-schedules'
+import { packCsv, packPdf } from './report-packs'
 import { withServiceAuthority } from './service-context'
 import { authorizeService } from './service-auth'
 import { apiEstate, keyedWrite } from './api-contract'
@@ -196,6 +199,9 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  reportSchedules: (env,actor,url)=>reportSchedulesPage(env,actor,url),
+  reportPackPdf: async(env,actor,_url,id)=>new Response(await packPdf(await previewReportPack(env,actor,id)) as BodyInit,{headers:{'content-type':['application','pdf'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=report.pdf'}}),
+  reportPackCsv: async(env,actor,_url,id)=>new Response(packCsv(await previewReportPack(env,actor,id)),{headers:{'content-type':['text','csv'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=dataset.csv'}}),
   compliancePack: (env,actor,_url,id)=>compliancePack(env,actor,id),
   agentRuns: guarded(actor => can(actor, 'agent.run'), (env, actor, url) => agentRunsPage(env, actor, url)),
   agentRunsCsv: async (env, actor) => new Response(await agentRunsCsv(env, actor), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="agent-runs.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
