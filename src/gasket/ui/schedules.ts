@@ -1,3 +1,4 @@
+import { safetyTemplateCard } from './safety'
 import { strategiesCard } from './pm-strategies'
 // Schedules and the checklists they use.
 import type { Bindings } from '../../auth.server'
@@ -75,5 +76,5 @@ export async function checklistPage(env: Bindings, actor: Actor, id: string, url
     ${can(actor, 'register.manage') ? form('rule.set', `/app/checklists/${checklist.id}`, h`${hidden('checklist', checklist.id)}<fieldset><legend>Raise a correction on</legend><label class="gk-check"><input type="checkbox" name="outcome" value="fail"${!rule || rule.outcomes.includes('fail') ? raw(' checked') : ''}> Fail</label><label class="gk-check"><input type="checkbox" name="outcome" value="attention"${rule?.outcomes.includes('attention') ? raw(' checked') : ''}> Needs attention</label></fieldset>
       ${select('Severity', 'severity', [{ value: 'low', label: 'Low' }, { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }], rule?.severity ?? 'medium')}${field('Due within (days)', 'dueDays', { type: 'number', value: String(rule?.due_days ?? 3), attrs: 'min="0" max="365"' })}`, 'Approve rule', { secondary: true }) : ''}`, { id: 'rule' })
   const revisions = checklist.revisions.map(revision => card(`Revision ${revision.number}`, h`<ol class="gk-plain-list">${revision.items.map(item => h`<li>${item.text}<span class="gk-sub">${stepSummary(item, revision.items)}${item.key ? ` · key ${item.key}` : ''}</span></li>`)}</ol><p class="gk-sub">${revision.note ?? ''} · ${revision.publishedBy ?? ''} · ${showInstant(revision.publishedAt, actor.zone)}</p>`, { extra: revision === latest ? tag('Current') : '' }))
-  return page(env, checklist.name, actor, h`${backLink('/app/schedules', 'Schedules')}<h1>${checklist.name}</h1><p class="gk-lede">Work orders keep the revision they were created with.</p><div class="gk-columns"><div class="gk-col-main">${revisions}</div><div class="gk-col-side">${ruleCard}${revise}</div></div>`, { url })
+  return page(env, checklist.name, actor, h`${backLink('/app/schedules', 'Schedules')}<h1>${checklist.name}</h1><p class="gk-lede">Work orders keep the revision they were created with.</p><div class="gk-columns"><div class="gk-col-main">${revisions}</div><div class="gk-col-side">${safetyTemplateCard(actor,checklist.id)}${ruleCard}${revise}</div></div>`, { url })
 }

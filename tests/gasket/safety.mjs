@@ -1,0 +1,105 @@
+import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import { mkdir } from 'node:fs/promises'
+import { chromium } from '@playwright/test'
+import { file, harness } from './harness.mjs'
+import { png } from './fixtures.mjs'
+
+const provenance='Owner-entered reference — not verified by Gasket with the issuing body.'
+const unzip=buffer=>{const b=Buffer.from(buffer),out={};for(let at=0;b.readUInt32LE(at)===0x04034b50;){const size=b.readUInt32LE(at+18),n=b.readUInt16LE(at+26),start=at+30+n+b.readUInt16LE(at+28);out[b.subarray(at+30,at+30+n).toString()]=b.subarray(start,start+size);at=start+size}return out}
+
+export async function safetyJourney() {
+ const h=await harness({clockInstant:Date.parse('2026-10-26T16:00:00Z')})
+ try {
+  const owner=await h.owner();await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
+  const tech=(await h.api('access.give',owner,{name:'Synthetic technician',email:'safety-tech@example.test',role:'maintainer'})).id
+  const who=await h.signIn('safety-tech@example.test')
+  const supervisor=(await h.api('access.give',owner,{name:'Independent reviewer',email:'safety-review@example.test',role:'supervisor'})).id
+  const review=await h.signIn('safety-review@example.test')
+  const agentId=(await h.api('access.give',owner,{name:'Synthetic agent',email:'safety-agent@example.test',role:'agent'})).id
+  const agent=await h.signIn('safety-agent@example.test')
+  const asset=(await h.api('asset.create',owner,{name:'Isolated drive',tag:'SAFE-1',location:'Workshop'})).id
+  const checklist=(await h.api('checklist.create',owner,{name:'Required isolation inspection',items:['Inspect guard']})).id
+  const prerequisite={checklist,hazard:'Stored electrical energy',isolation:'Apply the site-approved lockout procedure and verify isolation',qualification:'Isolation training',siteApproved:true}
+  await h.api('safety.publish',who,prerequisite,403)
+  await h.api('safety.publish',owner,{...prerequisite,siteApproved:false},400)
+  await h.api('safety.publish',owner,prerequisite)
+  const schedule=(await h.api('schedule.create',owner,{asset,checklist,title:'Required isolation inspection',everyDays:30,firstDue:'2026-10-26',assignee:tech})).id
+  const work=(await h.api('workorders.generate',owner,{})).created.find(w=>w.schedule===schedule).id
+  const current=()=>h.api(`work/${work}`,who)
+  const state=()=>h.api(`work/${work}/safety`,who)
+  assert.equal((await h.raw(`/api/gasket/work/${work}/safety`)).status,401)
+  await h.api(`work/${work}/safety`,agent,undefined,403)
+  await h.api('planning',who,undefined,403)
+  await h.api('workorder.results',who,{workOrder:work,outcome:['pass'],note:['Guard inspected']})
+  let w=await current()
+  assert.equal((await h.api('workorder.submit',who,{workOrder:work,version:w.version},409)).error,'safety_evidence_required')
+  const sign=async(extra={},status=200)=>h.api('safety.attest',who,{workOrder:work,version:(await current()).version,isolated:true,permit:'synthetic-gasket-1',expires:'2026-11-01',file:file('permit.txt','Site-approved isolation permit'),...extra},status)
+  assert.equal((await sign({},409)).error,'qualification_missing_or_expired')
+  const q={member:tech,name:'Isolation training',expires:'2026-10-25',reference:'synthetic-gasket-2'}
+  await h.api('planning.qualification',owner,q)
+  await sign({},409)
+  await h.api('planning.qualification',owner,{...q,expires:'2027-01-01'})
+  assert.equal((await sign({expires:'2026-10-25'},409)).error,'permit_expired')
+  await sign({isolated:false},400)
+  await sign()
+  assert.deepEqual((await state()).missing,[])
+  assert.equal((await state()).attestations.at(-1).qualification.provenance,provenance)
+  await h.api('checklist.revise',owner,{checklist,items:['Inspect guard','Confirm isolation point'],note:'New isolation point'})
+  assert.ok((await state()).missing.includes('Changed evidence requires reapproval'))
+  w=await current();await h.api('workorder.submit',who,{workOrder:work,version:w.version},409)
+  // Old instructions are retained; a human explicitly reapproves the changed procedure.
+  await sign()
+  await h.api('workorder.evidence',who,{workOrder:work,certificate:true,file:file('certificate.png',png,'image/png')})
+  assert.ok((await state()).missing.length,'new evidence invalidates earlier sign-off')
+  await sign()
+  const snapshot=await state()
+  assert.equal(snapshot.attestations.at(-1).signer,tech)
+  w=await current();await h.api('workorder.submit',who,{workOrder:work,version:w.version})
+  await h.api('workorder.review',who,{workOrder:work,version:(await current()).version,decision:'approve'},403)
+  await h.api('safety.publish',owner,{...prerequisite,isolation:'Revised site-approved isolation points'})
+  assert.equal((await h.api('workorder.review',review,{workOrder:work,version:(await current()).version,decision:'approve'},409)).error,'safety_evidence_required')
+  await h.api('workorder.review',review,{workOrder:work,version:(await current()).version,decision:'return',reason:'Reapprove changed isolation'})
+  await sign()
+  w=await current();await h.api('workorder.submit',who,{workOrder:work,version:w.version})
+  await h.api('workorder.review',review,{workOrder:work,version:(await current()).version,decision:'approve'})
+  assert.equal((await current()).status,'closed')
+  assert.equal((await h.api(`work/${work}/safety`,review)).attestations.at(-1).qualification,undefined,'review does not grant personnel browsing')
+  const download=async(cookie,status)=>{const r=await h.raw(`/app/work/${work}/compliance.zip`,{cookie});assert.equal(r.status,status);return r}
+  await download(undefined,303);await download(agent,403);await download(who,403)
+  const response=await download(owner,200),entries=unzip(await response.arrayBuffer()),manifest=JSON.parse(entries['MANIFEST.json'])
+  for(const f of manifest.files)assert.equal(createHash('sha256').update(entries[f.path]).digest('hex'),f.sha256)
+  assert.equal(JSON.parse(entries['instructions.json']).number,1)
+  assert.equal(JSON.parse(entries['results.json']).items[0].result.outcome,'pass')
+  assert.ok(JSON.parse(entries['review.json']).reviews.some(r=>r.decision==='approved'&&r.reviewer==='Independent reviewer'))
+  assert.equal(JSON.parse(entries['qualifications.json']).provenance,provenance)
+  assert.ok(Object.keys(entries).some(p=>p.startsWith('permits/')))
+  assert.ok(Object.keys(entries).some(p=>p.endsWith('certificate.png')))
+  assert.ok(entries['MANIFEST.csv'])
+  const audit=JSON.stringify(await h.api('audit',owner));assert.ok(audit.includes('safety.attest'));assert.ok(audit.includes('compliance.export'))
+  if(process.env.SAFETY_SCREENSHOTS)await browserProof(h,owner,who,checklist,work)
+ } finally {await h.close()}
+}
+
+async function browserProof(h,owner,who,checklist,work) {
+ await mkdir(process.env.SAFETY_SCREENSHOTS,{recursive:true})
+ const browser=await chromium.launch({headless:true,executablePath:process.env.SAFETY_CHROMIUM||undefined,args:['--no-sandbox']})
+ try {
+  for(const [name,cookie,path] of [['template',owner,`/app/checklists/${checklist}`],['work',who,`/app/work/${work}`]]) {
+   const context=await browser.newContext({ignoreHTTPSErrors:true})
+   await context.addCookies(cookie.split('; ').map(pair=>{const i=pair.indexOf('=');return{name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
+   const page=await context.newPage()
+   for(const width of [1440,390]) {
+    await page.setViewportSize({width,height:1000})
+    assert.equal((await page.goto(h.origin+path)).status(),200)
+    await page.getByRole('heading',{name:name==='template'?'Site-approved safety prerequisites':'Isolation and permit evidence'}).waitFor()
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
+    if(name==='work')await page.getByText(provenance,{exact:true}).first().waitFor()
+    for(const control of await page.locator('button:visible').all())assert.ok((await control.textContent()).trim()||await control.getAttribute('data-tooltip'),'icon control has a tooltip')
+    await page.screenshot({path:`${process.env.SAFETY_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
+   }
+   await context.close()
+  }
+ } finally {await browser.close()}
+}
+if(process.argv[1]&&import.meta.url===new URL(`file://${process.argv[1]}`).href){await safetyJourney();console.log('Safety evidence journey passed')}

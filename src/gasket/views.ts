@@ -1,3 +1,4 @@
+import { readSafety } from './safety'
 import { planningView } from './planning'
 import { rulesView } from './rules'
 import { customFields, customValues } from './custom-fields'
@@ -67,6 +68,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  safety: (env,actor,id)=>readSafety(env,actor,id),
   planning:(env,actor,_id,url)=>planningView(env,actor,url),
   rules: (env,actor,urlId,url)=>rulesView(env,actor,url),
   customFields: env => customFields(env, undefined, undefined, true),

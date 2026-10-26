@@ -1,3 +1,4 @@
+import { safetyGuards } from './safety'
 // Clause 9: submit for review, then a supervisor approves the exact version
 // they read, or returns it with a reason. Approval closes the work order and
 // moves its schedule on. Nobody approves work they did.
@@ -22,6 +23,7 @@ export async function submit(env: Bindings, actor: Actor, input: Input) {
   const detail = await workOrderDetail(env, actor, order.id)
   insist(!detail.missing.length, 'not_ready_for_review', 409, { missing: detail.missing })
   await commit(env, [
+    ...await safetyGuards(env, actor, order),
     guard(env, 'stale', `EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status IN ${OPEN})`, order.id, version),
     guard(env, 'downtime_open', 'NOT EXISTS(SELECT 1 FROM gk_downtime WHERE work_order_id = ? AND ended_on IS NULL)', order.id),
     stmt(env, "UPDATE gk_work_orders SET status = 'submitted', version = version + 1, submitted_at = ?, submitted_version = ? WHERE id = ?", now(), version, order.id),
@@ -41,6 +43,7 @@ export async function review(env: Bindings, actor: Actor, input: Input) {
   const reason = input.text('reason', { optional: decision === 'approve', max: 1000 }) || null
   const id = newId()
   const statements = [
+    ...(decision === 'approve' ? await safetyGuards(env, actor, order) : []),
     guard(env, 'stale', "EXISTS(SELECT 1 FROM gk_work_orders WHERE id = ? AND version = ? AND status = 'submitted')", order.id, version),
     stmt(env, 'INSERT INTO gk_reviews (id, work_order_id, version, decision, reason, reviewer, at) VALUES (?, ?, ?, ?, ?, ?, ?)', id, order.id, version, decision === 'approve' ? 'approved' : 'returned', reason, actor.id, now()),
     decision === 'approve'

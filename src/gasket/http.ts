@@ -1,3 +1,4 @@
+import { compliancePack } from './compliance-pack'
 import { planningPage } from './ui/planning'
 import { rulesPage } from './ui/rules'
 import { agentRunsPage } from './ui/agent-runs'
@@ -180,6 +181,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  compliancePack: (env,actor,_url,id)=>compliancePack(env,actor,id),
   agentRuns: guarded(actor => can(actor, 'agent.run'), (env, actor, url) => agentRunsPage(env, actor, url)),
   agentRunsCsv: async (env, actor) => new Response(await agentRunsCsv(env, actor), { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': 'attachment; filename="agent-runs.csv"', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   rules: (env,actor,url)=>rulesPage(env,actor,url),
