@@ -26,7 +26,7 @@ export async function reportPack(env: Bindings, actor: Actor, kind: ReportKind, 
   url.searchParams.set('from',addDays(end,-7));url.searchParams.set('to',addDays(end,-1))
   const data = await REPORTS[kind](env,actor,url)
   const audit = await one(env,'SELECT COALESCE(MAX(seq),0) AS revision,MAX(at) AS latestAt FROM gk_audit')
-  const definitions = currentMetricDefinitions().filter(d=>d.sourceDoor===url.pathname)
+  const definitions = currentMetricDefinitions().filter(d=>kind==='history'?d.id==='history.events':d.sourceDoor===url.pathname)
   const metadata = { report:kind, period:{from:url.searchParams.get('from'),to:url.searchParams.get('to')}, generatedAt:now(), zone:actor.zone,
     scope:{site:(await one(env,'SELECT name FROM gk_site WHERE singleton=1')).name,filters,role:actor.role,recipient:actor.id,policy:'Current report access only. No original files or individual labor rates.'},
     sourceRevision:audit.revision,latestChangeAt:audit.latestAt,freshness:'Recomputed from retained records at dispatch; external source completeness is not implied.',definitions,

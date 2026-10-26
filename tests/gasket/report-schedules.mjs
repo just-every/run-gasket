@@ -141,6 +141,7 @@ export async function reportSchedulesJourney(){
       const expected=await h.api(`${kind}?from=2027-03-07&to=2027-03-13${kind==='history'?`&asset=${asset}`:''}`,cookie.owner)
       assert.deepEqual(pack.data,expected,`${kind} complete dataset matches its public read door`)
       assert.ok(pack.metadata.definitions.length>0)
+      for(const definition of pack.metadata.definitions)assert.equal((await h.raw(definition.sourceDoor,{cookie:cookie.owner})).status,200,'each definition opens a public source directory without report filters')
       assert.equal(csv2.includes('synthetic-gasket-private-rate-1'),false)
       if(kind==='history')assert.deepEqual(Object.keys(pack.data.asset).sort(),['id','name','tag'])
       if(kind==='history'){

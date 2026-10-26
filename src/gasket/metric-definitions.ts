@@ -143,8 +143,8 @@ export const METRIC_DEFINITIONS: readonly MetricDefinition[] = Object.freeze([
     ['stores.moved-in', 'Moved-in opening stock', 'Sum imported opening-movement quantities per part through selected report end; list nonzero totals separately.', 'Opening stock belongs in balances, never demand; this total is cumulative through end, not only in-period imports.'],
   ]),
 
-  ...definitions('/api/gasket/history', 'REPORT-006', 'Selected site-local days, both included. Use recorded event instants; moved-in completed work uses its retained completion instant.', 'One selected asset. Current identity only; original documents, unrelated asset details and individual labor rates are excluded.', [
-    ['history.events', 'Retained asset history events', 'List every retained event in ascending instant order within the period, with kind, work order reference, description and attribution. A missing person remains null.'],
+  ...definitions('/api/gasket/assets', 'REPORT-006', 'Selected site-local days, both included. Use recorded event instants; moved-in completed work uses its retained completion instant.', 'One selected asset. Current identity only; original documents, unrelated asset details and individual labor rates are excluded.', [
+    ['history.events', 'Retained asset history events', 'Select an asset from the source directory; its filtered history report lists every retained event in ascending instant order within the period, with kind, work order reference, description and attribution. A missing person remains null.'],
   ]),
 
   ...definitions('/api/gasket/valuation', 'PART-007', 'Selected site-local dates, both included; defaults to first day of selected to month through to (today by default). Movement at is the accounting time.', 'Null kept values are not invented; pre-valuation and moved-in opening stock remain unpriced. Vendor-price changes revalue no existing movement.', [
