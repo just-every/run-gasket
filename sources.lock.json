@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "8bad5f1f594c87b2c8a85ed03b44d1c8a0c4a7c3e7f0899c188103675fde42a7",
+      "sha256": "3694cdfae6b571b5250aa556dfd838aec4f468b342cb63b826026443516c7609",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "908cfc19c32ac12ba9782e13967f39d9d3161f44c9d7079d28485443d312ebc6",
+      "sha256": "fc3a3c8931a79145746ad3d94f09bc2522b7f1497a09a5bcb9010db1422afac4",
       "executable": false
     },
     "base-copies.json": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "2ee96710a5156079066779bc83f4ddf4d3cc331c6253e84c41808ba6a5cb7d7f",
+      "sha256": "250d6785a38e104ec7be9df97f31ff26278684b855cfbeaeb25003880f01b4a3",
       "executable": false
     },
     "DEMO.md": {
@@ -276,7 +276,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "a28ac213106a928cc17c9157e7662c49e56198641ed8d92cad9157d8871d1b17",
+      "sha256": "bf6f3f9d26c093f6c668212440b17dce1c172fa68e9878aedba6bfbbd6e9173c",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -657,6 +657,10 @@
     },
     "migrations/core/0091_planning.sql": {
       "sha256": "e27e38e6ea191504b02ebcac20f155c48aabc9aceaeb4a58cf61ef9ce64f7010",
+      "executable": false
+    },
+    "migrations/core/0092_controlled_stock.sql": {
+      "sha256": "69ad3e895ce78c31df31d3ff98ff767694574b7f5c2d388ed0713a738b964bb5",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1556,7 +1560,7 @@
       "executable": false
     },
     "src/gasket/parts.ts": {
-      "sha256": "c20e32fcf24d6c8871d87a1fd867de91b05e9b4be61b74d81af3eaced1b987d0",
+      "sha256": "cd4da2a87ad17de743f85526124f87180867c0294bc798ebd3cf8a0b09d37212",
       "executable": false
     },
     "src/gasket/performance.ts": {
@@ -1620,7 +1624,7 @@
       "executable": false
     },
     "src/gasket/receiving.ts": {
-      "sha256": "8f87bf57318b3b2ede8da61876716afe4cb05bd6a472fc7635047758cbf4005f",
+      "sha256": "43c7aec887b6ebcde91b5c57b8b214c67ce5a85c50d8b931d983b89f4aeaabb5",
       "executable": false
     },
     "src/gasket/recovery.ts": {
@@ -1751,8 +1755,12 @@
       "sha256": "45a9ac933baf399efe9a581c2c3ec2d95562d289cb5f1ef85c4c0f83a5c7f54e",
       "executable": false
     },
+    "src/gasket/stock-sources.ts": {
+      "sha256": "82e090f84953063dcc5612e1bfb44b1e67738fdd68ac420e9d427ee0ac84ea6e",
+      "executable": false
+    },
     "src/gasket/stores.ts": {
-      "sha256": "60890da7aee4883790df15f8c9c03a27d8e111f240c3ed2f904cb76cbf5a3e98",
+      "sha256": "cf518af179489d4c467edc1892292914f0088eb250e611fd5d831fae080a45b9",
       "executable": false
     },
     "src/gasket/suppliers.ts": {
@@ -1864,7 +1872,7 @@
       "executable": false
     },
     "src/gasket/ui/html.ts": {
-      "sha256": "d8959985f492e0acf95a1aae8a4b99ed4e845f53bd16ecea55e1dec3b45caa7e",
+      "sha256": "4556001ad60924eba8d1cb2b078f9ec50b60954c8c52bf69f5a8bc61e5b5a417",
       "executable": false
     },
     "src/gasket/ui/icons.ts": {
@@ -1876,7 +1884,7 @@
       "executable": false
     },
     "src/gasket/ui/labels.ts": {
-      "sha256": "3347dcd6dd376b4c82af2206707e2318f8914d431925297136518ef5f846514b",
+      "sha256": "1c09b042df485003d43bc139497fe9d3c60bffee7b86307fc0cc891b0140fb83",
       "executable": false
     },
     "src/gasket/ui/labor.ts": {
@@ -1908,7 +1916,7 @@
       "executable": false
     },
     "src/gasket/ui/parts.ts": {
-      "sha256": "526988509f2c2fad8100e184c4fb4807b48192c4974057bc4ac498e529f050e8",
+      "sha256": "744cba9982aa127377a563158f23862b1c6af1bf5a3a27700a83a28b0850390c",
       "executable": false
     },
     "src/gasket/ui/performance.ts": {
@@ -1940,7 +1948,7 @@
       "executable": false
     },
     "src/gasket/ui/receiving.ts": {
-      "sha256": "9fbef72daddc0f20f707d0ae95879b4aa0be0a98eb7aea09790e1b7e33bbff3c",
+      "sha256": "954c8ae8dbf6593a3691a976969f203bef594e8445011f081d6cd7c0e8679540",
       "executable": false
     },
     "src/gasket/ui/reliability.ts": {
@@ -1984,7 +1992,7 @@
       "executable": false
     },
     "src/gasket/ui/stores.ts": {
-      "sha256": "aa0cbbeaedf4c49735b17a3c7cad1bbbe5a93085b985cf45bba74a8e68ee66e9",
+      "sha256": "d0f69d27c860d39a85fb947f723e90d592b540f4041646b13f1c76738bd81888",
       "executable": false
     },
     "src/gasket/ui/templates.ts": {
@@ -1996,11 +2004,11 @@
       "executable": false
     },
     "src/gasket/ui/work.ts": {
-      "sha256": "066a391b7e5a76ab462458957a2c8be9b49dee9ab727381928cf8a3291ebf529",
+      "sha256": "33d7da619826322601e23175f2e6b3e16c53e8d823bb9dafe367277ee7d89b88",
       "executable": false
     },
     "src/gasket/valuation.ts": {
-      "sha256": "19e2fed86bea6111b9b4713b57e07d7e02a6fe6566ed557afa4faeafea32e73e",
+      "sha256": "ac7331d1766add8ba73b827285351bbb5edca37f7962e4af41c72d86942170d7",
       "executable": false
     },
     "src/gasket/vendor-follow-up-metrics.ts": {
@@ -4040,11 +4048,11 @@
       "executable": false
     },
     "tests/gasket/receiving-browser.mjs": {
-      "sha256": "1371bad1915c2575e62da27937bc3c208f3f8a6327f52d0a0c436ed9cc7961a0",
+      "sha256": "43b78d42d8f4682b316cddc39a22c2e90b8479ce5b70a851cb8717ce0cb8cd3c",
       "executable": false
     },
     "tests/gasket/receiving.mjs": {
-      "sha256": "c83ad89ce2450190cab52a53b030476f234817ffbc76c1f921d7a2c2b4bd183f",
+      "sha256": "992f712b235debf896b4e735efdd90b1682a22995478093582b3839c6977b6a4",
       "executable": false
     },
     "tests/gasket/recovery.mjs": {

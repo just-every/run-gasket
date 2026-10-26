@@ -558,3 +558,13 @@ wait, administrative, pending and legacy unclassified entries are excluded.
 Capacity uses explicit site-clock availability minus absence intersections;
 without recorded availability there is no utilization denominator. Team
 capacity shares its members with other teams, so team capacities are not additive.
+
+### Controlled receipt stock
+
+`receipt.receive` lines accept optional `expiresOn` as a site-local date in `YYYY-MM-DD` format. Issue is permitted through that date and refused afterward. `GET /api/gasket/parts/ID` includes `stockSources`, each with its receipt line `id`, `bin`, `lot`, `serial`, `expires_on`, `onHand`, `expired` and `reconciliationRequired`. These are receipt-source quantities, not complete bin balances: reservation allocation, bin valuation, on-order allocation and bin counts remain under PART-001. `stores` includes current `expiringLots` within 90 site-local days, including expired sources, independently of its movement-date filter.
+
+`workorder.issue` takes `receiptLine` and a unique `identity` for controlled stock, beside `workOrder`, `part` and `quantity`. A source must belong to that part, remain unexpired and have sufficient quantity; a serial requires exactly one unit. The request still rechecks stock reserved for other work. Reusing the identity is refused with 409, including when another source is supplied. Without a source, only unattributed shelf stock can be issued. Existing JSON clients issuing unattributed shelf stock retain their current input shape.
+
+`workorder.return` requires `sourceIssue` for controlled holdings. It must name an issue for this part and work order; total returns cannot exceed that issue. Usable returns replenish the original source; damaged returns remain quarantined at their original work value. Owner-confirmed inspection release restores the original source, including serial identity. Serialized returns and dispositions cannot split the unit. Controlled movement detail retains `controlled_source`, `source_issue`, `bin`, `lot` and `serial`.
+
+Historical unallocated issues and new nonzero count variances leave explicit source holds. Further issues of that part return `source_reconciliation_required`; complete bin reconciliation remains unfinished under PART-001. The current bin lookup is `/app/parts?bin=BIN_NAME`, behind ordinary member authentication. A published bin label links members to the matching name without adding any stock to signed-out intake. Additional sites remain under ADMIN-002 and transit remains under PART-006.

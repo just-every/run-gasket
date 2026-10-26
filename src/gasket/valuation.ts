@@ -53,14 +53,14 @@ const STOCK = '(SELECT COALESCE(SUM(value_cents), 0) AS value, COALESCE(SUM(quan
 const HELD = "(SELECT -COALESCE(SUM(value_cents), 0) AS value, -COALESCE(SUM(quantity_milli), 0) AS qty FROM gk_stock_moves WHERE part_id = ? AND work_order_id = ? AND kind IN ('issue', 'return'))"
 
 /** The issue's insert, valued inside the batch at the stock's average (its guard has already refused a short issue). */
-export const issueInsert = (env: Bindings, id: string, part: string, quantity: number, workOrder: string, actor: string) =>
-  stmt(env, `INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, value_cents, work_order_id, actor, at) SELECT ?, ?, 'issue', ?, -((2 * s.value * CAST(? AS INTEGER) + s.qty) / (2 * s.qty)), ?, ?, ? FROM ${STOCK} s`,
-    id, part, -quantity, quantity, workOrder, actor, now(), part)
+export const issueInsert = (env: Bindings, id: string, part: string, quantity: number, workOrder: string, actor: string, note: string | null = null) =>
+  stmt(env, `INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, value_cents, work_order_id, actor, at, note) SELECT ?, ?, 'issue', ?, -((2 * s.value * CAST(? AS INTEGER) + s.qty) / (2 * s.qty)), ?, ?, ?, ? FROM ${STOCK} s`,
+    id, part, -quantity, quantity, workOrder, actor, now(), note, part)
 
 /** The return's insert, valued inside the batch at the work order's own issued value. */
-export const returnInsert = (env: Bindings, id: string, part: string, quantity: number, workOrder: string, actor: string) =>
-  stmt(env, `INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, value_cents, work_order_id, actor, at) SELECT ?, ?, 'return', ?, (2 * h.value * CAST(? AS INTEGER) + h.qty) / (2 * h.qty), ?, ?, ? FROM ${HELD} h`,
-    id, part, quantity, quantity, workOrder, actor, now(), part, workOrder)
+export const returnInsert = (env: Bindings, id: string, part: string, quantity: number, workOrder: string, actor: string, note: string | null = null) =>
+  stmt(env, `INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, value_cents, work_order_id, actor, at, note) SELECT ?, ?, 'return', ?, (2 * h.value * CAST(? AS INTEGER) + h.qty) / (2 * h.qty), ?, ?, ?, ? FROM ${HELD} h`,
+    id, part, quantity, quantity, workOrder, actor, now(), note, part, workOrder)
 
 /** A count variance's value (the count's stale guard keeps it current). */
 export async function varianceValue(env: Bindings, part: string, varianceMilli: number) {

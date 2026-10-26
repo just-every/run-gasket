@@ -2,6 +2,8 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
+import { join } from 'node:path'
+import { installation } from './installation.mjs'
 import { harness, file } from './harness.mjs'
 
 export async function receivingJourney(h, cookie, onReady) {
@@ -65,6 +67,69 @@ export async function receivingJourney(h, cookie, onReady) {
   assert.deepEqual([(await h.api(`parts/${part}`,cookie.lead)).onHand,(await h.api(`parts/${part}`,cookie.lead)).valueCents],['5',5626])
   const detail=await h.api(`receipts/${serialReceipt.receipt}`,cookie.max)
   assert.deepEqual(detail.lines[0].events.map(event=>event.kind),['release','return'])
+  // Controlled work issue selects the exact incoming source, not just its part.
+  const controlled=(await h.api('part.create',cookie.lead,{number:'TRACE-6205',name:'Traceable drive bearing',unit:'each'})).id
+  const controlledOrder=(await h.api('purchase.save',cookie.owner,{...facts,kind:['part'],description:['Controlled bearings'],quantity:['5'],unit:['each'],unitPrice:['10']})).id
+  const controlledRevision=(await h.api(`purchase-orders/${controlledOrder}`,cookie.owner)).current.id
+  await h.api('purchase.approve',cookie.sam,{order:controlledOrder,revision:1})
+  const expiry=(await h.api('me',cookie.owner)).today
+  const received=await h.api('receipt.receive',cookie.lead,{order:controlledOrder,revisionId:controlledRevision,externalId:'synthetic-gasket-trace-1',lines:[
+    {line:0,part:controlled,quantity:'1',bin:'North A3',lot:'Bearing lot 1',serial:'synthetic-gasket-serial-1',expiresOn:expiry},
+    {line:0,part:controlled,quantity:'2',bin:'South B2',lot:'Bearing lot 2',expiresOn:expiry},
+    {line:0,part:controlled,quantity:'2',bin:'Hold C1',lot:'Expired bearing lot',expiresOn:'2000-01-01'}]})
+  const source=(await h.api(`receipts/${received.receipt}`,cookie.lead)).lines
+  const serial=source.find(row=>row.serial), bulk=source.find(row=>row.bin==='South B2'), expired=source.find(row=>row.bin==='Hold C1')
+  const technician=(await h.api('me',cookie.max)).id
+  const asset=(await h.api('asset.create',cookie.lead,{tag:'TRACE-MOTOR',name:'Trace motor',location:'Hall'})).id
+  const work=(await h.api('workorder.create',cookie.lead,{asset,title:'Fit traceable bearing',due:expiry,assignee:technician})).id
+  const issue={workOrder:work,part:controlled,quantity:'1',receiptLine:serial.id,identity:'synthetic-gasket-issue-1'}
+  await h.api('workorder.issue',cookie.max,{...issue,receiptLine:''},409)
+  await h.api('workorder.issue',cookie.max,{...issue,receiptLine:expired.id},409)
+  await h.api('workorder.issue',cookie.max,{...issue,quantity:'0.5'},400)
+  await h.api('workorder.issue',cookie.sam,issue,403)
+  await h.api('workorder.issue',undefined,issue,401)
+  await h.api('workorder.issue',cookie.max,issue)
+  const afterIssue=await h.api(`parts/${controlled}`,cookie.lead)
+  const issued=afterIssue.moves.find(row=>row.kind==='issue')
+  assert.deepEqual([issued.controlled_source,issued.bin,issued.lot,issued.serial],[serial.id,'North A3','Bearing lot 1','synthetic-gasket-serial-1'])
+  await h.api('workorder.issue',cookie.max,{...issue,receiptLine:bulk.id},409)
+  await h.api('workorder.issue',cookie.max,{...issue,identity:'synthetic-gasket-issue-2'},409)
+  assert.deepEqual(await h.api(`parts/${controlled}`,cookie.lead),afterIssue,'A replay or exhausted serial source moves no stock')
+  await h.api('receipt.inspect',cookie.lead,{receiptLine:serial.id,kind:'return',source:'usable',quantity:'1',reason:'Cannot return a bearing held by work'},409)
+  await h.api('workorder.return',cookie.max,{workOrder:work,part:controlled,quantity:'1',condition:'damaged',reason:'Damaged cage'},409)
+  await h.api('workorder.return',cookie.max,{workOrder:work,part:controlled,quantity:'1',sourceIssue:issued.id,condition:'damaged',reason:'Damaged cage'})
+  await h.api('workorder.return',cookie.max,{workOrder:work,part:controlled,quantity:'1',sourceIssue:issued.id,condition:'usable'},409)
+  const traced=await h.api(`parts/${controlled}`,cookie.lead)
+  assert.deepEqual([traced.onHand,traced.quarantinedQuantity,traced.quarantinedValueCents],['4','1',1000])
+  assert.equal(traced.stockSources.find(row=>row.id===serial.id).onHand,'0')
+  const expiring=(await h.api('stores',cookie.lead)).expiringLots.filter(row=>row.part_id===controlled)
+  assert.deepEqual(expiring.map(row=>[row.bin,row.onHand,row.expired]).sort(),[['Hold C1','2',true],['South B2','2',false]])
+  await h.api('stores',cookie.max,undefined,403)
+  await h.api('stores',undefined,undefined,401)
+  const damagedReturn=traced.quarantines[0].id
+  const disposition={returnId:damagedReturn,identity:'synthetic-gasket-trace-disposition',kind:'release',quantity:'1',reason:'Inspected and cleared complete serial',confirmed:true}
+  await h.api('part.quarantine.dispose',cookie.owner,{...disposition,quantity:'0.5'},400)
+  await h.api('part.quarantine.dispose',cookie.owner,disposition)
+  assert.equal((await h.api(`parts/${controlled}`,cookie.lead)).stockSources.find(row=>row.id===serial.id).onHand,'1','Inspected release retains the same serial and bin')
+  await h.api('workorder.issue',cookie.max,{...issue,identity:'synthetic-gasket-reissued'})
+  const competing=await Promise.all(['synthetic-gasket-compete-1','synthetic-gasket-compete-2'].map(identity=>h.raw('/api/gasket/workorder.issue',{cookie:cookie.max,body:{...issue,receiptLine:bulk.id,quantity:'2',identity}})))
+  assert.deepEqual(competing.map(response=>response.status).sort(),[200,409],'Only one competing issue can consume the source')
+  const bulkIssue=(await h.api(`parts/${controlled}`,cookie.lead)).moves.find(row=>row.kind==='issue'&&row.controlled_source===bulk.id)
+  await h.api('workorder.return',cookie.max,{workOrder:work,part:controlled,sourceIssue:bulkIssue.id,quantity:'2',condition:'usable'})
+  assert.equal((await h.api(`parts/${controlled}`,cookie.lead)).stockSources.find(row=>row.id===bulk.id).onHand,'2','Usable return replenishes its original bin and lot')
+  const portal=(await h.api('request.portal',cookie.owner,{name:'Stores intake',mode:'public',publicConsent:true})).id
+  const target=(await h.api('request.target',cookie.owner,{portal,kind:'bin',name:'South B2',publishConsent:true})).id
+  const scanned=await h.raw(`/scan/${target}`,{cookie:cookie.max})
+  assert.match(await scanned.text(),/Open authorized stock sources/)
+  const publicScan=await h.raw(`/scan/${target}`)
+  assert.equal(publicScan.status,303)
+  assert.ok(!publicScan.headers.get('location').includes('/app/parts'))
+  assert.equal((await h.raw('/app/parts?bin=South%20B2')).status,303)
+  assert.equal((await h.raw('/app/parts?bin=South%20B2&site=Unknown',{cookie:cookie.lead})).status,404)
+  assert.match(await (await h.raw('/app/parts?bin=South%20B2',{cookie:cookie.max})).text(),/Bearing lot 2/)
+  if(process.env.RECEIVING_SCREENSHOTS) await (await import('./receiving-browser.mjs')).controlledBrowser({h,cookie,work,part:controlled,order:controlledOrder,source:bulk.id,target})
+  else for(const identity of ['synthetic-gasket-browser-1440','synthetic-gasket-browser-390']) await h.api('workorder.issue',cookie.max,{...issue,receiptLine:bulk.id,identity})
+  assert.equal((await h.api(`parts/${controlled}`,cookie.lead)).stockSources.find(row=>row.id===bulk.id).onHand,'0')
   await h.api('purchase.save',cookie.owner,{...facts,order,revision:1,quantity:['12','4']})
   await h.api('receipt.receive',cookie.lead,{...serialPayload,externalId:'UNSENT-SUPERSEDED'},409)
   assert.equal((await h.api(`purchase-orders/${order}`,cookie.owner)).revisions[0].snapshot.lines[0].quantity,'10')
@@ -75,7 +140,17 @@ export async function receivingJourney(h, cookie, onReady) {
   const html=await (await h.raw(destination,{cookie:cookie.lead})).text()
   for(const text of ['CM-2048','RMA-704','SN-6205-0102','packing-slip-CM-2048.txt']) assert.ok(html.includes(text),text)
   await onReady?.({h,cookie,order,receipt,part,belt,variant:'returned'})
-  return {order}
+  const lastBulkIssue=(await h.api(`parts/${controlled}`,cookie.lead)).moves.find(row=>row.kind==='issue'&&row.controlled_source===bulk.id)
+  await h.api('workorder.return',cookie.max,{workOrder:work,part:controlled,sourceIssue:lastBulkIssue.id,quantity:'1',condition:'usable'})
+  await h.api('part.count',cookie.lead,{part:controlled,counted:'4',note:'Unallocated extra unit found; reconcile bins before issue'})
+  const heldForCount=await h.api(`parts/${controlled}`,cookie.lead)
+  assert.ok(heldForCount.stockSources.every(row=>row.reconciliationRequired))
+  const countRefusal=await h.api('workorder.issue',cookie.max,{...issue,receiptLine:bulk.id,identity:'synthetic-gasket-after-count'},409)
+  assert.equal(countRefusal.error,'source_reconciliation_required')
+  await h.api('workorder.issue',cookie.max,{...issue,receiptLine:'',identity:'synthetic-gasket-count-bypass'},409)
+  assert.deepEqual(await h.api(`parts/${controlled}`,cookie.lead),heldForCount,'An unallocated count cannot silently invent or bypass a controlled source')
+  if(process.env.RECEIVING_SCREENSHOTS) await (await import('./receiving-browser.mjs')).controlledRefusal({h,cookie,part:controlled,work})
+  return {order,controlled}
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
@@ -88,7 +163,19 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
       cookie[key]=await h.signIn(`${key}@example.test`)
     }
     const onReady=process.env.RECEIVING_SCREENSHOTS?(await import('./receiving-browser.mjs')).receivingBrowser:undefined
-    await receivingJourney(h,cookie,onReady)
+    const result=await receivingJourney(h,cookie,onReady)
+    const expected=await h.api(`parts/${result.controlled}`,cookie.lead)
+    await h.stop()
+    const archive=join(h.installation.root,'exports','controlled-stock.rer')
+    await h.installation.rer('export','--output',archive)
+    const restored=await installation()
+    let reader
+    try {
+      await restored.rer('import','--input',archive,'--yes')
+      reader=await harness({vars:h.vars,installation:restored})
+      const lead=await reader.signIn('lead@example.test')
+      assert.deepEqual(await reader.api(`parts/${result.controlled}`,lead),expected,'Archive retains source identities, expiry, controlled movements and disposition links')
+    } finally {await reader?.close();await restored.remove()}
     console.log('BUY-004 partial receiving, inspection and returns passed')
   }finally{await h.close()}
 }

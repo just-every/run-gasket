@@ -1,3 +1,4 @@
+import { stockSources } from './stock-sources'
 import { UNMERGED, canonicalSql } from './part-identity'
 // PART-009: the stores report, for leads, supervisors and the owner, over a
 // period of site-local days (both ends included; the last 90 days by
@@ -108,6 +109,8 @@ export async function storesReport(env: Bindings, actor: Actor, url: URL) {
   const counted = rows.reduce((sum, row) => sum + row.counts.counted, 0), hits = rows.reduce((sum, row) => sum + row.counts.hits, 0)
   return {
     from: p.from, to: p.to, site: p.site, zone: actor.zone,
+    expiringLots: (await stockSources(env, actor)).filter(row => row.on_hand_milli > 0 && row.expires_on && row.expires_on <= addDays(actor.today, 90)),
+    expiryBasis: 'Current receipt-source stock expiring within 90 site-local days, including expired stock; independent of movement date filter.',
     replenishment: { basis: 'Current open documents, independent of movement date filter', open: await openReplenishments(env, actor) },
     value: { openingCents: value.totals.opening, closingCents: value.totals.closing, averageCents, netIssuedCents, turns: averageCents > 0 ? Math.round(netIssuedCents / averageCents * 100) / 100 : null },
     stockouts: { stocked: stocked.length, withStockout: withStockout.length, percent: percent(withStockout.length, stocked.length), events: withStockout.flatMap(row => row.stockouts.map(event => ({ part: { id: row.id, number: row.number, name: row.name }, ...event }))), outNow: stocked.filter(row => row.onHandMilli <= 0).map(brief) },

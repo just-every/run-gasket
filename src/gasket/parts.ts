@@ -1,3 +1,4 @@
+import { SOURCE_BALANCE, stockSources } from './stock-sources'
 import { customStatements, customValues } from './custom-fields'
 import { canonicalPart, UNMERGED } from './part-identity'
 import { catalogView } from './catalogs'
@@ -84,12 +85,32 @@ export async function countPart(env: Bindings, actor: Actor, input: Input, { pro
 export async function issuePart(env: Bindings, actor: Actor, input: Input, workOrder: { id: string }) {
   const found = await part(env, input.text('part', { max: 100 }))
   const quantity = toMilli(input.text('quantity', { max: 20 }))
+  const source = input.text('receiptLine', { optional: true, max: 100 })
+  const identity = input.text('identity', { optional: !source, max: 100 })
+  const seen = (await one(env, 'SELECT COALESCE(MAX(seq),0) AS n FROM gk_stock_moves WHERE part_id=?', found.id))!.n
+  const sources = await stockSources(env, actor, found.id)
+  insist(!sources.some(row=>row.reconciliationRequired), 'source_reconciliation_required', 409)
+  const selected = sources.find(row => row.id === source)
+  if (source) {
+    insist(selected, 'receipt_line_not_found', 404)
+    insist(!selected.expired, 'stock_expired', 409)
+    insist(!selected.reconciliationRequired, 'source_reconciliation_required', 409)
+    insist(!selected.serial || quantity === 1000, 'serial_requires_one_unit')
+    insist(selected.on_hand_milli >= quantity, 'source_stock_unavailable', 409)
+    insist(!await one(env, 'SELECT 1 FROM gk_controlled_moves WHERE identity=?', identity), 'issue_replayed', 409)
+  } else {
+    insist(found.on_hand - sources.reduce((sum,row) => sum + Math.max(0,row.on_hand_milli),0) >= quantity, 'stock_source_required', 409)
+  }
   const free = (await one<{ n: number }>(env, `SELECT ${onHandOf} - ${RESERVED_FOR_OTHERS} AS n`, found.id, found.id, workOrder.id))!.n
   insist(free >= quantity, 'insufficient_stock', 409, { onHand: fromMilli(found.on_hand), free: fromMilli(free) })
   const id = newId()
   return { id, part: found, quantity, statements: [
     guard(env, 'insufficient_stock', `${onHandOf} - ${RESERVED_FOR_OTHERS} >= ?`, found.id, found.id, workOrder.id, quantity),
-    issueInsert(env, id, found.id, quantity, workOrder.id, actor.id),
+    ...(source ? [guard(env, 'issue_replayed', 'NOT EXISTS(SELECT 1 FROM gk_controlled_moves WHERE identity=?)', identity),
+      guard(env, 'source_stock_unavailable', `${SOURCE_BALANCE} >= ? AND NOT EXISTS(SELECT 1 FROM gk_receipt_trace_holds WHERE receipt_line_id=?)`, source, source, quantity, source)] :
+      [guard(env, 'stale', `${onHandOf} = ? AND (SELECT COALESCE(MAX(seq),0) FROM gk_stock_moves WHERE part_id=?)=?`, found.id, found.on_hand, found.id, seen)]),
+    issueInsert(env, id, found.id, quantity, workOrder.id, actor.id, selected ? `Bin ${selected.bin || 'unspecified'}; lot ${selected.lot || 'none'}; serial ${selected.serial || 'none'}; receipt source ${source}` : null),
+    ...(source ? [stmt(env, 'INSERT INTO gk_controlled_moves(move_id,receipt_line_id,identity) VALUES (?,?,?)', id, source, identity)] : []),
   ] }
 }
 
@@ -100,13 +121,28 @@ export async function returnPart(env: Bindings, actor: Actor, input: Input, work
   const condition = input.text('condition', { optional: true, max: 20 }) || 'usable'
   insist(condition === 'usable' || condition === 'damaged', 'invalid_return_condition')
   const reason = input.text('reason', { optional: condition !== 'damaged', max: 300 }) || null
+  const seen = (await one(env, 'SELECT COALESCE(MAX(seq),0) AS n FROM gk_stock_moves WHERE part_id=?', found.id))!.n
+  const sourceIssue = input.text('sourceIssue', { optional: true, max: 100 })
+  const traced = await one(env, `SELECT c.*,m.quantity_milli,l.serial FROM gk_controlled_moves c JOIN gk_part_moves m ON m.id=c.move_id JOIN gk_receipt_lines l ON l.id=c.receipt_line_id WHERE c.move_id=? AND m.part_id IN (SELECT id FROM gk_parts WHERE id=? UNION SELECT part_id FROM gk_part_canonical WHERE canonical_id=?) AND m.work_order_id=? AND m.kind='issue'`, sourceIssue, found.id, found.id, workOrder.id)
+  const sourceHeld = `(SELECT -quantity_milli FROM gk_part_moves WHERE id=?) - (SELECT COALESCE(SUM(m.quantity_milli),0) FROM gk_controlled_moves c JOIN gk_part_moves m ON m.id=c.move_id WHERE c.source_issue=?)`
+  if (sourceIssue) {
+    insist(traced, 'source_issue_not_found', 404)
+    insist(!traced.serial || quantity === 1000, 'serial_requires_one_unit')
+  } else {
+    const controlled = await one(env, `SELECT COALESCE(SUM(m.quantity_milli),0) AS n FROM gk_controlled_moves c JOIN gk_stock_moves m ON m.id=c.move_id WHERE m.part_id=? AND m.work_order_id=? AND m.kind IN ('issue','return')`, found.id, workOrder.id)
+    const total = await one(env, `SELECT -COALESCE(SUM(quantity_milli),0) AS n FROM gk_stock_moves WHERE part_id=? AND work_order_id=? AND kind IN ('issue','return')`,found.id,workOrder.id)
+    insist(total!.n + controlled!.n >= quantity, 'source_issue_required', 409)
+  }
   const held = "(SELECT -COALESCE(SUM(quantity_milli), 0) FROM gk_stock_moves WHERE part_id = ? AND work_order_id = ? AND kind IN ('issue', 'return'))"
   const holding = (await one<{ n: number }>(env, `SELECT ${held} AS n`, found.id, workOrder.id))!.n
   insist(holding >= quantity, 'return_exceeds_issue', 409, { held: fromMilli(holding) })
   const id = newId()
   return { id, part: found, quantity, condition, reason, statements: [
     guard(env, 'return_exceeds_issue', `${held} >= ?`, found.id, workOrder.id, quantity),
-    returnInsert(env, id, found.id, quantity, workOrder.id, actor.id),
+    ...(!sourceIssue ? [guard(env, 'stale', '(SELECT COALESCE(MAX(seq),0) FROM gk_stock_moves WHERE part_id=?)=?',found.id,seen)] : []),
+    ...(sourceIssue ? [guard(env, 'return_exceeds_issue', `${sourceHeld} >= ?`, sourceIssue, sourceIssue, quantity)] : []),
+    returnInsert(env, id, found.id, quantity, workOrder.id, actor.id, traced ? `Return from controlled issue ${sourceIssue}; receipt source ${traced.receipt_line_id}` : null),
+    ...(traced ? [stmt(env, 'INSERT INTO gk_controlled_moves(move_id,receipt_line_id,source_issue) VALUES (?,?,?)', id, traced.receipt_line_id, sourceIssue)] : []),
     ...(condition === 'damaged' ? [stmt(env, 'INSERT INTO gk_work_return_quarantine(return_id,reason) VALUES (?,?)', id, reason)] : []),
   ] }
 }
@@ -132,11 +168,14 @@ export async function disposeWorkQuarantine(env: Bindings, actor: Actor, input: 
   const remaining = original.quantity_milli - disposed.quantity
   insist(quantity <= remaining, 'quarantine_quantity_unavailable', 409)
   const value = portion((original.value_cents ?? 0) - disposed.value, quantity, remaining)
+  const controlled = await one(env, 'SELECT c.receipt_line_id,l.serial FROM gk_controlled_moves c JOIN gk_receipt_lines l ON l.id=c.receipt_line_id WHERE c.move_id=?', returnId)
+  insist(!controlled?.serial || quantity === 1000, 'serial_requires_one_unit')
   const move = kind === 'release' ? newId() : null, authority = capabilitySql(actor.sessionId, 'site.manage')
   const statements = [
     guard(env, 'stale', authority.sql, ...authority.params),
     guard(env, 'stale', '(SELECT COALESCE(SUM(quantity_milli),0) FROM gk_work_quarantine_dispositions WHERE return_id=?)=?', returnId, disposed.quantity),
     ...(move ? [stmt(env, `INSERT INTO gk_part_moves(id,part_id,kind,quantity_milli,value_cents,note,actor,at) VALUES (?,?,'receive',?,?,?,?,?)`, move, original.source_part_id, quantity, value, `Work return quarantine released: ${reason}`, actor.id, now())] : []),
+    ...(move && controlled ? [stmt(env, 'INSERT INTO gk_controlled_moves(move_id,receipt_line_id) VALUES (?,?)', move, controlled.receipt_line_id)] : []),
     stmt(env, 'INSERT INTO gk_work_quarantine_dispositions(id,return_id,kind,quantity_milli,value_cents,reason,fingerprint,actor,at,move_id) VALUES (?,?,?,?,?,?,?,?,?,?)', id, returnId, kind, quantity, value, reason, fingerprint, actor.id, now(), move),
   ]
   try {
@@ -167,8 +206,8 @@ export async function partDetail(env: Bindings, _actor: Actor, id: string) {
   const reserved = (await one<{ n: number }>(env, `SELECT ${RESERVED} AS n FROM gk_parts p WHERE p.id = ?`, id))!.n
   const held = await reservations(env, 'r.part_id = ?', id)
   const substitutes = (await substituteList(env)).filter(row => row.part_id === id || row.substitute_id === id)
-  const moves = await all(env, `SELECT m.id, m.source_part_id, m.seq, m.kind, m.quantity_milli, m.value_cents, m.reason, m.count_line_id, m.unit_price_cents, m.freight_cents, m.tax_cents, m.counted_milli, m.note, m.at, m.work_order_id, w.number AS work_order_number, mb.name AS actor
-    FROM gk_stock_moves m LEFT JOIN gk_work_orders w ON w.id = m.work_order_id LEFT JOIN gk_members mb ON mb.id = m.actor WHERE m.part_id = ? ORDER BY m.seq DESC, m.kind`, id)
+  const moves = await all(env, `SELECT c.receipt_line_id AS controlled_source,c.source_issue,l.bin,l.lot,l.serial,m.id, m.source_part_id, m.seq, m.kind, m.quantity_milli, m.value_cents, m.reason, m.count_line_id, m.unit_price_cents, m.freight_cents, m.tax_cents, m.counted_milli, m.note, m.at, m.work_order_id, w.number AS work_order_number, mb.name AS actor
+    FROM gk_stock_moves m LEFT JOIN gk_controlled_moves c ON c.move_id=m.id LEFT JOIN gk_receipt_lines l ON l.id=c.receipt_line_id LEFT JOIN gk_work_orders w ON w.id = m.work_order_id LEFT JOIN gk_members mb ON mb.id = m.actor WHERE m.part_id = ? ORDER BY m.seq DESC, m.kind`, id)
   const quarantines = await all(env, `SELECT m.id, m.work_order_id, w.number AS work_order_number, m.quantity_milli, m.value_cents, m.at, q.reason, mb.name AS actor
     FROM gk_stock_moves m JOIN gk_work_return_quarantine q ON q.return_id=m.id
     JOIN gk_work_orders w ON w.id=m.work_order_id LEFT JOIN gk_members mb ON mb.id=m.actor WHERE m.part_id=? ORDER BY m.seq DESC`, id)
@@ -179,5 +218,5 @@ export async function partDetail(env: Bindings, _actor: Actor, id: string) {
     row.remaining_value_cents = (row.value_cents ?? 0) - row.dispositions.reduce((sum: number, event: any) => sum + event.value_cents, 0)
     row.remaining = fromMilli(row.remaining_milli)
   }
-  return { ...found, customFields: await customValues(env, 'part', found.id, found.category), catalog, photos, merges, quarantines: quarantines.map(row => ({ ...row, quantity: fromMilli(row.quantity_milli) })), quarantinedQuantity: fromMilli(quarantines.reduce((sum,row) => sum+row.remaining_milli,0)), quarantinedValueCents: quarantines.reduce((sum,row) => sum+row.remaining_value_cents,0), ...stockValue(found.on_hand, found.stock_value), onHand: fromMilli(found.on_hand), reserved: fromMilli(reserved), available: fromMilli(found.on_hand - reserved), reservations: held, substitutes, minimum: fromMilli(found.minimum_milli), seen: moves[0]?.seq ?? 0, moves: moves.map(move => ({ ...move, quantity: fromMilli(move.quantity_milli), counted: move.counted_milli === null ? null : fromMilli(move.counted_milli) })) }
+  return { ...found, stockSources: await stockSources(env, _actor, id), customFields: await customValues(env, 'part', found.id, found.category), catalog, photos, merges, quarantines: quarantines.map(row => ({ ...row, quantity: fromMilli(row.quantity_milli) })), quarantinedQuantity: fromMilli(quarantines.reduce((sum,row) => sum+row.remaining_milli,0)), quarantinedValueCents: quarantines.reduce((sum,row) => sum+row.remaining_value_cents,0), ...stockValue(found.on_hand, found.stock_value), onHand: fromMilli(found.on_hand), reserved: fromMilli(reserved), available: fromMilli(found.on_hand - reserved), reservations: held, substitutes, minimum: fromMilli(found.minimum_milli), seen: moves[0]?.seq ?? 0, moves: moves.map(move => ({ ...move, quantity: fromMilli(move.quantity_milli), counted: move.counted_milli === null ? null : fromMilli(move.counted_milli) })) }
 }

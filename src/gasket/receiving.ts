@@ -3,6 +3,8 @@ import type { Bindings } from '../auth.server'
 import { capabilitySql, requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'
 import { Input } from './input'
+import { isDate } from './dates'
+import { SOURCE_BALANCE } from './stock-sources'
 import { purchaseOrderDetail } from './purchase-orders'
 import { approvalRoute, completionStatements } from './purchase-authority'
 import { fromMilli, toMilli } from './quantity'
@@ -15,7 +17,7 @@ const authorized = (env: Bindings, actor: Actor) => { const check = capabilitySq
 const replay = (row: Row, fingerprint: string) => { insist(row.fingerprint === fingerprint, 'receipt_identity_conflict', 409); return { id: row.order_id, receipt: row.id, replayed: true } }
 
 function readLines(input: Input, facts: Row): Row[] {
-  const fields = ['line','part','quantity','quarantine','bin','lot','serial']
+  const fields = ['line','part','quantity','quarantine','bin','lot','serial','expiresOn']
   const columns = input.has('lines') ? null : Object.fromEntries(fields.map(field => [field, input.list(field, { keepEmpty: true })]))
   const raw = columns ? columns.line.map((_, i) => Object.fromEntries(fields.map(field => [field, columns[field][i] ?? '']))).filter(row => row.quantity !== '') : input.json('lines')
   insist(Array.isArray(raw) && raw.length > 0 && raw.length <= 100, 'invalid_receipt_lines')
@@ -27,7 +29,9 @@ function readLines(input: Input, facts: Row): Row[] {
     insist(quarantine <= quantity, 'quarantine_exceeds_receipt')
     insist(facts.lines[line].kind === 'part' ? Boolean(part) : !part && !serial, 'receipt_part_required')
     insist(!serial || quantity === 1000, 'serial_requires_one_unit')
-    return { line, part: part || null, quantity, quarantine, bin, lot, serial }
+    const expiresOn = row.text('expiresOn', { optional: true, max: 10 })
+    insist(!expiresOn || isDate(expiresOn), 'invalid_expiry')
+    return { line, part: part || null, quantity, quarantine, bin, lot, serial, ...(expiresOn ? { expiresOn } : {}) }
   })
   for (const line of new Set(lines.map(row => row.line))) {
     const split = lines.filter(row => row.line === line)
@@ -72,8 +76,8 @@ export async function receivePurchaseOrder(env: Bindings, actor: Actor, input: I
   for (const row of lines) {
     const lineId = newId()
     if (row.serial) statements.push(guard(env, 'stale', "NOT EXISTS(SELECT 1 FROM gk_stock_receipt_lines WHERE part_id=? AND serial=?)", row.part, row.serial))
-    statements.push(stmt(env, `INSERT INTO gk_receipt_lines(id,receipt_id,line_index,part_id,quantity_milli,quarantine_milli,bin,lot,serial,unit_price_cents,extended_cents,freight_cents,tax_cents,value_cents,quarantine_value_cents,quarantine_freight_cents,quarantine_tax_cents) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      lineId,id,row.line,row.part,row.quantity,row.quarantine,row.bin,row.lot,row.serial,row.unitPrice,row.extended,row.freight,row.tax,row.value,row.quarantineValue,row.quarantineFreight,row.quarantineTax))
+    statements.push(stmt(env, `INSERT INTO gk_receipt_lines(id,receipt_id,line_index,part_id,quantity_milli,quarantine_milli,bin,lot,serial,unit_price_cents,extended_cents,freight_cents,tax_cents,value_cents,quarantine_value_cents,quarantine_freight_cents,quarantine_tax_cents,expires_on) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      lineId,id,row.line,row.part,row.quantity,row.quarantine,row.bin,row.lot,row.serial,row.unitPrice,row.extended,row.freight,row.tax,row.value,row.quarantineValue,row.quarantineFreight,row.quarantineTax,row.expiresOn ?? ''))
     if (row.part && row.quantity > row.quarantine) statements.push(receiptStockMove(env, actor.id,
       { id: lineId, receipt_id: id, part_id: row.part, unit_price_cents: row.unitPrice, bin: row.bin, lot: row.lot, serial: row.serial },
       'receive', row.quantity-row.quarantine, row.value-row.quarantineValue, row.freight-row.quarantineFreight, row.tax-row.quarantineTax))
@@ -105,6 +109,7 @@ export async function inspectReceipt(env: Bindings, actor: Actor, input: Input) 
   const statements = [authorized(env, actor), guard(env, 'stale', '(SELECT COUNT(*) FROM gk_receipt_events WHERE receipt_line_id=?)=?', line.id, line.event_count)]
   let stockValue = kind === 'release' ? value : 0
   if (!quarantine && line.part_id) {
+    statements.push(guard(env, 'receipt_quantity_unavailable', `${SOURCE_BALANCE} >= ?`, line.id, line.id, quantity))
     const stock = await one(env, `SELECT COALESCE(SUM(quantity_milli),0) AS quantity,COALESCE(SUM(value_cents),0) AS value,COALESCE(MAX(seq),0) AS seen FROM gk_stock_moves WHERE part_id=?`, line.part_id)
     insist(stock.quantity >= quantity, 'insufficient_stock', 409)
     stockValue = -portion(stock.value, quantity, stock.quantity)
@@ -126,6 +131,7 @@ export async function receiptDetail(env: Bindings, _actor: Actor, id: string) {
   const receipt = await one(env, `SELECT r.*,v.revision,v.snapshot,m.name AS created_by_name FROM gk_receipts r JOIN gk_purchase_revisions v ON v.id=r.revision_id JOIN gk_members m ON m.id=r.created_by WHERE r.id=?`, id)
   insist(receipt, 'receipt_not_found', 404)
   const lines = await all(env, `${RECEIPT_BALANCE} WHERE l.receipt_id=? GROUP BY l.id ORDER BY l.line_index,l.seq`, id)
+  for (const line of lines) line.expires_on = (await one(env, 'SELECT expires_on FROM gk_receipt_lines WHERE id=?', line.id))!.expires_on
   const events = await all(env, `SELECT e.*,m.name AS actor_name FROM gk_receipt_events e JOIN gk_receipt_lines l ON l.id=e.receipt_line_id JOIN gk_members m ON m.id=e.actor WHERE l.receipt_id=? ORDER BY e.seq`, id)
   const evidence = await all(env, 'SELECT id,filename,media_type,size,sha256,added_by,added_at FROM gk_receipt_evidence WHERE receipt_id=? ORDER BY id', id)
   return { ...receipt, snapshot: JSON.parse(receipt.snapshot), lines: lines.map(line => ({ ...quantities(line), events: events.filter(event => event.receipt_line_id === line.id).map(event => ({ ...event, quantity: fromMilli(event.quantity_milli) })) })), evidence }
