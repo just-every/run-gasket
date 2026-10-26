@@ -35,7 +35,7 @@ export async function reportSchedulesJourney(){
   try{
     const cookie={owner:await h.owner()},ids={}
     await h.api('site.configure',cookie.owner,{name:'Great Lakes report plant',timezone:'America/New_York'})
-    for(const [key,role] of [['lead','lead'],['supervisor','supervisor'],['tech','maintainer'],['agent','agent']]){
+    for(const [key,role] of [['lead','lead'],['supervisor','supervisor'],['tech','maintainer'],['agent','agent'],['delegate','lead'],['other','supervisor']]){
       ids[key]=(await h.api('access.give',cookie.owner,{name:key,email:`${key}@example.test`,role})).id
       cookie[key]=await h.signIn(`${key}@example.test`)
     }
@@ -128,6 +128,75 @@ export async function reportSchedulesJourney(){
       assert.ok(pack.metadata.definitions.length>0)
       assert.equal(JSON.stringify(pack).includes('synthetic-gasket-private-rate-1'),false)
     }
+    // History and valuation preserve nonempty, independently checked source values.
+    const part=(await h.api('part.create',cookie.owner,{number:'PACK-PART',name:'Synthetic gasket bearing',unit:'each'})).id
+    await h.api('part.receive',cookie.owner,{part,quantity:'3',unitPrice:'7.25'})
+    const familyIds={}
+    for(const kind of ['history','valuation']){
+      const body2={...failure,name:`Family ${kind}`,report:kind,team:'',asset:kind==='history'?asset:'',firstDay:'2027-03-14',paused:true}
+      familyIds[kind]=(await h.api('report.schedule',cookie.owner,body2)).id
+      const response=await h.raw(`/app/report-packs/${familyIds[kind]}.csv`,{cookie:cookie.owner})
+      assert.equal(response.status,200)
+      const csv2=await response.text(),pack=dataset(csv2)
+      const expected=await h.api(`${kind}?from=2027-03-07&to=2027-03-13${kind==='history'?`&asset=${asset}`:''}`,cookie.owner)
+      assert.deepEqual(pack.data,expected,`${kind} complete dataset matches its public read door`)
+      assert.ok(pack.metadata.definitions.length>0)
+      assert.equal(csv2.includes('synthetic-gasket-private-rate-1'),false)
+      assert.equal(csv2.includes('documents'),false)
+      if(kind==='history'){
+        assert.equal(pack.data.asset.tag,'PACK-1')
+        assert.ok(pack.data.events.some(e=>e.what==='Work order created'))
+        assert.ok(pack.data.events.some(e=>e.what.includes('Synthetic conveyor stop')))
+      }else{
+        assert.equal(pack.data.parts.find(p=>p.id===part).closing.quantity,'3')
+        assert.equal(pack.data.parts.find(p=>p.id===part).closing.valueCents,2175)
+        assert.equal(pack.data.totals.closing,2175)
+      }
+      const pdfResponse=await h.raw(`/app/report-packs/${familyIds[kind]}.pdf`,{cookie:cookie.owner})
+      assert.equal(pdfResponse.status,200)
+      const task2=getDocument({data:new Uint8Array(await pdfResponse.arrayBuffer()),isEvalSupported:false,disableFontFace:true}),pdf2=await task2.promise
+      let text2='';for(let page=1;page<=pdf2.numPages;page++)text2+=(await(await pdf2.getPage(page)).getTextContent()).items.map(i=>i.str??'').join(' ')
+      await task2.destroy();assert.ok(text2.includes(kind==='history'?'Work order created':'2175'))
+      await h.api('report.schedule',cookie.owner,{...body2,schedule:familyIds[kind],revision:1,paused:false})
+    }
+    await h.api('report.schedule',cookie.owner,{...failure,report:'history',team:'',asset:''},400)
+    await h.api('report.schedule',cookie.owner,{...failure,report:'valuation',team:'',asset},400)
+    for(const role of ['tech','agent'])await h.api(`history?from=2027-03-07&to=2027-03-13&asset=${asset}`,cookie[role],undefined,403)
+    await h.scheduled('*/15 * * * *',after)
+    for(const kind of ['history','valuation']){
+      const delivered=h.mails.filter(m=>m.subject===`Gasket report: Family ${kind}`)
+      assert.equal(delivered.length,1);assert.deepEqual(delivered[0].to,['owner@example.test'])
+      const csv2=Buffer.from(delivered[0].attachments.find(a=>a.filename==='dataset.csv').content,'base64').toString()
+      assert.equal(dataset(csv2).metadata.report,kind)
+      assert.ok(kind==='history'?csv2.includes('Work order created'):csv2.includes('2175'))
+    }
+    // Owners delegate preparation for one schedule; editing can never authorize outbound delivery.
+    const delegatedBody={...failure,name:'Delegated pack',editor:ids.delegate,paused:true}
+    const delegatedId=(await h.api('report.schedule',cookie.owner,delegatedBody)).id
+    await h.api('report.schedule',cookie.owner,{...delegatedBody,editor:ids.tech},403)
+    const own=await h.api('report-schedules',cookie.delegate)
+    assert.deepEqual(own.schedules.map(s=>s.id),[delegatedId]);assert.deepEqual(own.deliveries,[])
+    await h.api('report.schedule',cookie.other,{...delegatedBody,schedule:delegatedId,revision:1},403)
+    assert.equal((await h.raw(`/app/report-packs/${schedule}.csv`,{cookie:cookie.delegate})).status,403)
+    const draft={...delegatedBody,schedule:delegatedId,revision:1,name:'Delegated revised',paused:false,editor:ids.other}
+    assert.equal((await h.api('report.schedule',cookie.delegate,draft)).revision,2)
+    const row=(await h.api('report-schedules',cookie.owner)).schedules.find(s=>s.id===delegatedId)
+    assert.equal(row.paused,1);assert.equal(row.editor_id,ids.delegate)
+    assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,200)
+    await h.api('report.schedule',cookie.delegate,draft,409)
+    await h.scheduled('*/15 * * * *',first)
+    assert.equal(h.mails.filter(m=>m.subject==='Gasket report: Delegated revised').length,0)
+    await h.api('report.schedule',cookie.owner,{...draft,revision:2,editor:ids.delegate})
+    await h.scheduled('*/15 * * * *',first)
+    assert.equal(h.mails.filter(m=>m.subject==='Gasket report: Delegated revised').length,1)
+    await h.api('access.role',cookie.owner,{member:ids.delegate,role:'maintainer'})
+    await h.api('report-schedules',cookie.delegate,undefined,403)
+    assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,403)
+    await h.api('report.schedule',cookie.delegate,{...draft,revision:3},403)
+    await h.api('access.role',cookie.owner,{member:ids.delegate,role:'lead'})
+    await h.api('report.schedule',cookie.owner,{...draft,revision:3,editor:ids.other,paused:true})
+    await h.api('report-schedules',cookie.delegate,undefined,403)
+    assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,403)
     if(process.env.REPORT_SCREENSHOTS){
       await mkdir(process.env.REPORT_SCREENSHOTS,{recursive:true})
       const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
@@ -135,11 +204,20 @@ export async function reportSchedulesJourney(){
         const context=await browser.newContext({ignoreHTTPSErrors:true})
         await context.addCookies(cookie.owner.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
         const page=await context.newPage()
-        for(const width of [1440,390])for(const [name,path]of [['report-schedules','/app/settings/reports'],['report-edit',`/app/settings/reports?edit=${schedule}`]]){
+        for(const width of [1440,390])for(const [name,path]of [['report-schedules','/app/settings/reports'],['report-edit',`/app/settings/reports?edit=${schedule}`],['report-history',`/app/settings/reports?edit=${familyIds.history}`],['report-valuation',`/app/settings/reports?edit=${familyIds.valuation}`]]){
           await page.setViewportSize({width,height:1100});await page.goto(h.origin+path)
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
           assert.equal(await page.getByRole('heading',{name:'Scheduled reports',exact:true}).count(),1)
           await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
+        }
+        await context.clearCookies()
+        await context.addCookies(cookie.other.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
+        for(const width of [1440,390]){
+          await page.setViewportSize({width,height:1100});await page.goto(`${h.origin}/app/settings/reports?edit=${delegatedId}`)
+          assert.equal(await page.getByRole('button',{name:'Save for owner review'}).count(),1)
+          assert.equal(await page.getByLabel('Delegated author').count(),0)
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+          await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/report-delegate-${width}.png`,fullPage:true})
         }
         await context.close()
       }finally{await browser.close()}

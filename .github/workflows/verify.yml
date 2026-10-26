@@ -101,6 +101,7 @@ jobs:
       WRANGLER_SEND_METRICS: 'false'
       GASKET_FLOWS_SHARD: ${{ matrix.shard }}
       PLANNING_SCREENSHOTS: /tmp/gasket-planning
+      REPORT_SCREENSHOTS: /tmp/gasket-reports
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:

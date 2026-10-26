@@ -1,3 +1,4 @@
+import { historyReport } from './history-report'
 import { reportSchedules } from './report-schedules'
 import { serviceCredentials } from './service-auth'
 import { complianceTemplates, readSafety } from './safety'
@@ -70,6 +71,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  historyReport:(env,actor,_id,url)=>historyReport(env,actor,url),
   reportSchedules: (env,actor) => reportSchedules(env,actor),
   serviceCredentials: (env, actor) => serviceCredentials(env, actor),
   complianceTemplates: env=>complianceTemplates(env),
