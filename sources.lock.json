@@ -4068,7 +4068,7 @@
       "executable": false
     },
     "tests/gasket/replenishment.mjs": {
-      "sha256": "1b37ed921e50c1baf313ba87e5e84f21c2b84e72e4db2684eaa2b5eef3f846de",
+      "sha256": "fef2a98c82b269b013e3f15b9a89f56910c6fe3bfef4c4c6ac4926d26186f8f0",
       "executable": false
     },
     "tests/gasket/request-draft-privacy.mjs": {

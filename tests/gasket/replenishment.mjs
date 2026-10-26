@@ -104,9 +104,12 @@ export async function replenishmentJourney() {
     if(process.env.REPLENISHMENT_SCREENSHOTS) await (await import('./replenishment-browser.mjs')).replenishmentBrowser({h,cookie,order:doc.order_id,variant:'partial'})
     const first=(await h.api(`purchase-orders/${doc.order_id}/receipts`,cookie.lead)).receipts[0].lines[0]
     await h.api('receipt.inspect',cookie.lead,{receiptLine:first.id,kind:'return',source:'quarantine',quantity:'1',reason:'Damaged package returned for replacement'})
-    await h.api('receipt.receive',cookie.lead,{...receipt,externalId:'NC-4011',packingSlip:undefined,lines:[{line:0,part,quantity:'6',quarantine:'0',bin:'A3',lot:'NC-LOT-5'}]})
+    const finalDelivery=await h.api('receipt.receive',cookie.lead,{...receipt,externalId:'NC-4011',packingSlip:undefined,lines:[{line:0,part,quantity:'6',quarantine:'0',bin:'A3',lot:'NC-LOT-5'}]})
+    const finalSource=(await h.api(`receipts/${finalDelivery.receipt}`,cookie.lead)).lines[0]
     await catchup(); assert.equal((await h.api('replenishment',cookie.lead)).open.length,0)
-    await h.api('workorder.issue',cookie.max,{workOrder:work,part,quantity:'8'})
+    await h.api('workorder.issue',cookie.max,{workOrder:work,part,quantity:'8'},409)
+    await h.api('workorder.issue',cookie.max,{workOrder:work,part,quantity:'2',receiptLine:first.id,identity:'synthetic-gasket-replenishment-issue-1'})
+    await h.api('workorder.issue',cookie.max,{workOrder:work,part,quantity:'6',receiptLine:finalSource.id,identity:'synthetic-gasket-replenishment-issue-2'})
     await catchup(); await catchup()
     data=await h.api('replenishment',cookie.lead)
     assert.equal(data.open.length,1)
