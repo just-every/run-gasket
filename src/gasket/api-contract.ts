@@ -21,6 +21,8 @@ const RETRYABLE: Record<string, Capability> = {
   'asset.contact': 'register.manage', 'asset.sighting': 'register.manage', 'asset.state': 'register.manage', 'asset.retire': 'register.manage',
   'meter.feed': 'register.manage', 'meter.adjust': 'register.manage', 'meter.window': 'register.manage',
   'part.create': 'register.manage', 'part.receive': 'register.manage', 'part.count': 'register.manage',
+  'part.price': 'register.manage', 'part.substitute': 'register.manage', 'kit.create': 'register.manage', 'bom.revise': 'register.manage',
+  'workorder.reserve': 'work.assign', 'reservation.release': 'work.assign',
   'workorder.create': 'work.create',
   'checklist.create': 'register.manage', 'checklist.revise': 'register.manage',
   'template.save': 'work.assign', 'workorder.assign': 'work.assign',
