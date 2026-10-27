@@ -74,7 +74,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.equal(await page.getByRole('main').evaluate(el=>el===document.activeElement),true)
     await proof(name)
   }
-  const open = async(path,name)=>{assert.equal((await page.goto(h.origin+path)).status(),200);await inspect(name)}
+  const open = async(path,name)=>{assert.equal((await page.goto(h.origin+path)).status(),200,`${name} ${path} opens`);await inspect(name)}
   const submit = async (form, notice = /Saved/) => {
     const action = await form.getAttribute('action')
     console.log('workspace save proof',action)
@@ -83,10 +83,11 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       'site.configure':'site', 'access.give':'members', 'access.role':'members', 'access.end':'members', 'asset.create':'assets', 'meter.create':`assets/${asset}`,
       'checklist.create':'checklists', 'schedule.create':'schedules', 'workorders.generate':'work',
       'part.create':'parts', 'part.receive':'parts', 'part.count':'parts',
-      'request.triage':'requests', 'request.convert':'work', 'planning.slot':'planning', 'asset.update':`assets/${asset}`, 'checklist.revise':'checklists', 'workorder.create':'work',
+      'request.triage':'requests', 'request.convert':'work', 'planning.slot':'planning', 'asset.update':`assets/${asset}`, 'checklist.revise':'checklists', 'workorder.create':'work', 'supplier.save':'purchasing', 'costcenter.save':'purchasing', 'requisition.request':'purchasing', 'purchase.save':'purchase-orders', 'site.countApproval':'site', 'count.plan':'counts', 'count.decide':'counts',
     }
     const record = before.find(([key])=>key==='workOrder')?.[1]
-    const view = reads[action.slice('/app/do/'.length)] || `work/${record}`
+    const count = before.find(([key])=>key==='count')?.[1]
+    const view = reads[action.slice('/app/do/'.length)] || (count ? `counts/${count}` : `work/${record}`)
     const who = (await context.cookies()).map(item=>`${item.name}=${item.value}`).join('; ')
     const submitted = await form.evaluate(async el=>Promise.all([...new FormData(el)].map(async([key,value])=>[key,typeof value==='string'?value:{name:value.name,type:value.type,bytes:[...new Uint8Array(await value.arrayBuffer())]}])))
     const unchanged = await h.api(view,who)
@@ -579,10 +580,74 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await submit(reopen)
       assert.equal((await h.api(`work/${repair}`,cookie.lead)).status,'open')
       await use('owner')
+      await open('/app/purchasing','purchasing-setup')
+      const vendorForm=page.locator('form[action="/app/do/supplier.save"]')
+      const vendorName='Great Lakes maintenance components and replacement drives '+ 'SUPPLIER'.repeat(5)
+      for (const [label,value] of Object.entries({'Supplier name':vendorName,'Contact person':'Synthetic maintenance buyer','Email':'synthetic-gasket-buyer@example.test','Phone':'+1 216 555 0182','Street address':'4100 Lakeside Avenue','City':'Cleveland','State or territory code':'OH','ZIP code':'44114','Payment terms':'Net 30'})) await vendorForm.getByLabel(label,{exact:true}).fill(value)
+      await submit(vendorForm)
+      const vendor=new URL(page.url()).pathname.split('/').pop()
+      assert.equal((await h.api(`suppliers/${vendor}`,cookie.owner)).name,vendorName)
+      await open('/app/purchasing','cost-center-setup')
+      const centerForm=page.locator('form[action="/app/do/costcenter.save"]')
+      await centerForm.getByLabel('Code',{exact:true}).fill('ACCESS-MAINT')
+      await centerForm.getByLabel('Name',{exact:true}).fill('Packaging maintenance and planned corrective repair')
+      await submit(centerForm)
+      const center=(await h.api('purchasing',cookie.owner)).costCenters.find(row=>row.code==='ACCESS-MAINT').id
+      const requisition=page.locator('form[action="/app/do/requisition.request"]')
+      await requisition.getByLabel('Asset',{exact:true}).selectOption(asset)
+      await requisition.getByLabel('Why is this needed?').fill('Replacement guarding for the west packaging mezzanine')
+      await requisition.getByLabel('Description',{exact:true}).first().fill('Replacement guard fasteners and mounting kit')
+      await requisition.getByLabel('Quantity',{exact:true}).first().fill('2')
+      await requisition.getByLabel('Unit',{exact:true}).first().fill('each')
+      await submit(requisition)
+      const purchaseRequest=new URL(page.url()).pathname.split('/').pop()
+      assert.deepEqual((await h.api(`requisitions/${purchaseRequest}`,cookie.owner)).lines.map(row=>[row.description,row.quantity]),[['Replacement guard fasteners and mounting kit','2']])
+      await open(`/app/requisitions/${purchaseRequest}`,'purchase-request')
+      await open('/app/purchase-orders','purchase-draft')
+      const purchase=page.locator('form[action="/app/do/purchase.save"]')
+      await purchase.getByLabel('Supplier',{exact:true}).selectOption(vendor)
+      await purchase.getByLabel('Cost center',{exact:true}).selectOption(center)
+      await purchase.getByLabel('Asset',{exact:true}).selectOption(asset)
+      await purchase.getByLabel('Description',{exact:true}).first().fill('Replacement guard fasteners and mounting kit')
+      await purchase.getByLabel('Quantity',{exact:true}).first().fill('2')
+      await purchase.getByLabel('Unit',{exact:true}).first().fill('each')
+      await purchase.getByLabel('USD per unit',{exact:true}).first().fill('12.50')
+      await purchase.getByLabel('Reason for purchase').fill('Restore approved guarding after the maintenance inspection')
+      await submit(purchase)
+      const order=new URL(page.url()).pathname.split('/').pop()
+      assert.equal((await h.api(`purchase-orders/${order}`,cookie.owner)).current.snapshot.totalCents,2500)
+      await open(`/app/purchase-orders/${order}`,'purchase-awaiting-approval')
+      await open('/app/site','count-approval-policy')
+      const approval=page.locator('form[action="/app/do/site.countApproval"]')
+      await approval.getByLabel('Approve variances worth at least (USD)').fill('0.00')
+      await submit(approval)
+      await use('lead')
+      await open('/app/parts','cycle-count-plan')
+      const plan=page.locator('form[action="/app/do/count.plan"]')
+      await plan.getByLabel('Title',{exact:true}).fill('Guard fastener shelf reconciliation')
+      await plan.locator(`[name=part][value="${part}"]`).check()
+      await plan.getByLabel('Counter',{exact:true}).selectOption(technician)
+      await submit(plan)
+      const count=new URL(page.url()).pathname.split('/').pop()
+      await use('max')
+      await open(`/app/counts/${count}`,'blind-cycle-count')
+      const sheet=page.locator('form[action="/app/do/count.submit"]')
+      await sheet.locator('[name=counted]').fill('3')
+      await sheet.getByLabel('Reason for a difference').selectOption('lost')
+      await submit(sheet)
+      assert.equal((await h.api(`counts/${count}`,cookie.lead)).lines[0].state,'waiting')
+      assert.equal((await h.api(`parts/${part}`,cookie.lead)).onHand,'4','unapproved count keeps confirmed stock')
+      await use('lead')
+      await open(`/app/counts/${count}`,'independent-count-approval')
+      await submit(page.locator('form[action="/app/do/count.decide"]').filter({has:page.locator('[name=decision][value=approve]')}))
+      assert.equal((await h.api(`parts/${part}`,cookie.lead)).onHand,'3','independent approval posts the counted stock once')
+      const duplicate=(await h.api('part.create',cookie.lead,{number:'ACCESS-GUARD-DUPLICATE',name:'Duplicate guard fastener for '+longName,unit:'each'})).id
+      await use('owner')
       // Enumerate the implemented workspace destinations rather than a representative menu subset.
       for (const [pattern, name] of PAGE_DOORS) {
         if (pattern.includes('(') || pattern.includes('\\.')) continue
-        await open(pattern.slice(1,-1), `workspace-door-${name}`)
+        const path=pattern.slice(1,-1)+(name==='partMerge'?`?source=${duplicate}&canonical=${part}`:'')
+        await open(path, `workspace-door-${name}`)
       }
     }
   } finally {for (const snapshot of snapshots) await snapshot.close();await context.close()}
