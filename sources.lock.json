@@ -4152,7 +4152,7 @@
       "executable": false
     },
     "tests/gasket/form-save-interruptions.mjs": {
-      "sha256": "ea2873692deaefa374e7e554155ccc09c523d41f235401a1caa85227e5646077",
+      "sha256": "6053556d175241de85b70cff7117666eea602836c5a31fc9a9f614ee3f60521a",
       "executable": false
     },
     "tests/gasket/generic-migration.mjs": {
@@ -4160,7 +4160,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "1bac13b1d6d23cfd602bb641bdf58e8fbfdc8975eaf50d647527deaf3ce76a7c",
+      "sha256": "cb7dfaa416255ac1837c854923e4dfcea494556735f20781260772c2e9f7276b",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4332,7 +4332,7 @@
       "executable": false
     },
     "tests/gasket/workspace-conditional-saves.mjs": {
-      "sha256": "834fbbc62ac0939903b00b7109205d40b6d0d4258bfd3ff4f733a6a475b65d96",
+      "sha256": "ee1181ada8d91278683db8292f61db1372c02bb0bd4180b7c21a3b6cdc1ac8e5",
       "executable": false
     },
     "tests/incremental-typecheck.test.mjs": {
