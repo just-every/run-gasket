@@ -171,6 +171,7 @@ export async function apiJourney() {
     assert.deepEqual(kits.substitutes.map(row => [row.part_id, row.substitute_id]), [[part, substitute]])
     await stockWrite('bom.revise', { asset: lifecycleAsset, part: [part], alternateFor: [part], alternate: [substitute] })
     const bom = (await h.api(`/v1/assets/${lifecycleAsset}`, owner)).bom
+    documented('BillOfMaterials', bom)
     assert.equal(bom.revision, 1)
     assert.deepEqual(bom.lines.map(row => [row.part.id, row.quantity, row.fits, row.alternates.map(alternate => alternate.part.id)]), [[part, '1', true, [substitute]]])
     await write('bom.revise', { ...example('bom.revise'), asset: lifecycleAsset, part: [part], revision: 0 }, 'synthetic-gasket-stale-bom', lead, 409)
@@ -182,6 +183,8 @@ export async function apiJourney() {
     await write('workorder.reserve', { workOrder: work, part, quantity: '4' }, 'synthetic-gasket-duplicate-reserve', lead, 409)
     await stockWrite('reservation.release', { reservation: reserved.reservations[0] })
     const releasedStock = await h.api(`/v1/parts/${part}`, owner)
+    documented('PartDetail', releasedStock)
+    documented('WorkDetail', await h.api(`/v1/work/${work}`, owner))
     assert.equal(releasedStock.onHand, '3')
     assert.equal(releasedStock.reserved, '0')
     assert.equal(releasedStock.available, '3')
@@ -212,8 +215,13 @@ export async function apiJourney() {
     assert.deepEqual(Buffer.from(await commentDownload.arrayBuffer()), Buffer.concat([png, Buffer.alloc(100000)]))
     assert.equal((await h.raw(`/api/gasket/v1/comment-photos/${commentPhoto.id}/file`)).status, 401)
     for (const action of ['comment.post', 'comment.edit']) assert.equal((await h.api('audit?action=' + action, owner)).rows.filter(row => row.subject === lifecycleAsset).length, 1)
+    await h.api('access.give', owner, { name: 'Synthetic API agent', email: 'synthetic-gasket-api-agent@example.test', role: 'agent' })
+    const agent = await h.signIn('synthetic-gasket-api-agent@example.test')
+    await write('comment.post', commentBody, 'synthetic-gasket-agent-comment', agent, 403)
+    await write('comment.edit', editedCommentBody, 'synthetic-gasket-agent-comment-edit', agent, 403)
+    await write('part.photo', { part, photo: file('synthetic-gasket-agent-photo.png', png) }, 'synthetic-gasket-agent-photo', agent, 403)
     await write('comment.post', { ...commentBody, photo: Array(5).fill(file('synthetic-gasket-handoff.png', png)) }, 'synthetic-gasket-too-many-comment-photos', lead, 400)
-    for (const [action, subject] of [['part.price', part], ['part.substitute', part], ['kit.create', kit.id], ['bom.revise', lifecycleAsset], ['workorder.reserve', work], ['reservation.release', work]]) assert.equal((await h.api('audit?action=' + action, owner)).rows.filter(row => row.subject === subject).length, 1, action + ' retains one business effect')
+    for (const [action, subject] of [['part.price', part], ['part.substitute', part], ['part.photo', part], ['kit.create', kit.id], ['bom.revise', lifecycleAsset], ['workorder.reserve', work], ['reservation.release', work]]) assert.equal((await h.api('audit?action=' + action, owner)).rows.filter(row => row.subject === subject).length, 1, action + ' retains one business effect')
     // Full-size document originals use the same file limits with retry keys.
     const largeOriginal = Buffer.from('synthetic-gasket-1'.repeat(100000).slice(0, 1500000))
     const largeBody = { ...example('document.add'), asset: lifecycleAsset, file: file('synthetic-gasket-large.txt', largeOriginal) }

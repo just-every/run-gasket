@@ -2990,7 +2990,7 @@
                 "workOrder": "WORK_ID",
                 "file": {
                   "filename": "synthetic-gasket-photo.png",
-                  "base64": "PHOTO_BASE64"
+                  "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNoAAAAggCBd81ytgAAAABJRU5ErkJggg=="
                 },
                 "phase": "before",
                 "takenOn": "2026-10-26T14:00"
@@ -8204,7 +8204,7 @@
                 "part": "PART_ID",
                 "photo": {
                   "filename": "synthetic-gasket-photo.png",
-                  "base64": "PNG_BASE64"
+                  "base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAAAAAA6fptVAAAACklEQVR4nGNoAAAAggCBd81ytgAAAABJRU5ErkJggg=="
                 }
               }
             }
@@ -9397,6 +9397,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "reservations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reservation"
+            }
           }
         },
         "required": [
@@ -9418,7 +9424,8 @@
           "parts",
           "reviews",
           "items",
-          "missing"
+          "missing",
+          "reservations"
         ],
         "additionalProperties": true
       },
@@ -9595,6 +9602,9 @@
               "contacts"
             ],
             "additionalProperties": true
+          },
+          "bom": {
+            "$ref": "#/components/schemas/BillOfMaterials"
           }
         },
         "required": [
@@ -9610,7 +9620,8 @@
           "states",
           "sightings",
           "lifecycle",
-          "documents"
+          "documents",
+          "bom"
         ],
         "additionalProperties": true
       },
@@ -9696,6 +9707,12 @@
               ],
               "additionalProperties": true
             }
+          },
+          "reservations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reservation"
+            }
           }
         },
         "required": [
@@ -9710,7 +9727,8 @@
           "available",
           "minimum",
           "customFields",
-          "moves"
+          "moves",
+          "reservations"
         ],
         "additionalProperties": true
       },
@@ -10375,6 +10393,361 @@
         "required": [
           "unread",
           "comments"
+        ],
+        "additionalProperties": true
+      },
+      "Reservation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "workOrder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "title",
+              "status"
+            ],
+            "additionalProperties": true
+          },
+          "part": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "number": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "unit": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "name",
+              "unit"
+            ],
+            "additionalProperties": true
+          },
+          "insteadOf": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "kit": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "type": "string"
+          },
+          "issued": {
+            "type": "string"
+          },
+          "stillNeeded": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "released",
+              "issued",
+              "open"
+            ]
+          },
+          "reservedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reservedAt": {
+            "type": "integer"
+          },
+          "releasedBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "releasedAt": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "releaseReason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "workOrder",
+          "part",
+          "insteadOf",
+          "kit",
+          "quantity",
+          "issued",
+          "stillNeeded",
+          "state",
+          "reservedBy",
+          "reservedAt",
+          "releasedBy",
+          "releasedAt",
+          "releaseReason"
+        ],
+        "additionalProperties": true
+      },
+      "BillOfMaterials": {
+        "type": [
+          "object",
+          "null"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdBy": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "integer"
+          },
+          "serial": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "part": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "canonicalId": {
+                      "type": "string"
+                    },
+                    "number": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "unit": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "canonicalId",
+                    "number",
+                    "name",
+                    "unit"
+                  ],
+                  "additionalProperties": true
+                },
+                "onHand": {
+                  "type": "string"
+                },
+                "available": {
+                  "type": "string"
+                },
+                "serialFrom": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "serialTo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fits": {
+                  "type": "boolean"
+                },
+                "short": {
+                  "type": "boolean"
+                },
+                "quantity": {
+                  "type": "string"
+                },
+                "alternates": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "part": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "canonicalId": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "unit": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "canonicalId",
+                          "number",
+                          "name",
+                          "unit"
+                        ],
+                        "additionalProperties": true
+                      },
+                      "onHand": {
+                        "type": "string"
+                      },
+                      "available": {
+                        "type": "string"
+                      },
+                      "serialFrom": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "serialTo": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "fits": {
+                        "type": "boolean"
+                      },
+                      "short": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "part",
+                      "onHand",
+                      "available",
+                      "serialFrom",
+                      "serialTo",
+                      "fits",
+                      "short"
+                    ],
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "required": [
+                "part",
+                "onHand",
+                "available",
+                "serialFrom",
+                "serialTo",
+                "fits",
+                "short",
+                "quantity",
+                "alternates"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "revisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "number": {
+                  "type": "integer"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdBy": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "number",
+                "note",
+                "createdBy",
+                "createdAt"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "note",
+          "tools",
+          "createdBy",
+          "createdAt",
+          "serial",
+          "lines",
+          "revisions"
         ],
         "additionalProperties": true
       }
