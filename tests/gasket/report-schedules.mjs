@@ -64,6 +64,10 @@ export async function reportSchedulesJourney(){
     await h.api('report.schedule',cookie.owner,{...body,recipients:[ids.agent]},403)
     await h.api('report.schedule',cookie.owner,{...body,clock:'24:00'},400)
     const schedule=(await h.api('report.schedule',cookie.owner,body)).id
+    const authorization=(await h.api('audit?action=report.schedule',cookie.owner)).rows.find(r=>r.subject===schedule)
+    assert.equal(authorization.actor,(await h.api('me',cookie.owner)).id)
+    const authorized=JSON.parse(authorization.detail)
+    assert.deepEqual([authorized.consent,authorized.delegated,authorized.revision,authorized.authorization],[true,false,1,'Owner authorized'])
     await h.api('report-schedules',undefined,undefined,401)
     await h.api('report.schedule',undefined,body,401)
     for(const path of ['/app/settings/reports',`/app/report-packs/${schedule}.csv`,`/app/report-packs/${schedule}.pdf`]){
@@ -121,6 +125,13 @@ export async function reportSchedulesJourney(){
     assert.equal(deliveries.filter(d=>d.state==='excluded').length,4)
     // Provider failures are visible and never automatically retried.
     const ownerId=(await h.api('me',cookie.owner)).id
+    const separateBody={...body,team:'',name:'Separate recipient pack',recipients:[ownerId,ids.other]}
+    const separate=await h.api('report.schedule',cookie.owner,separateBody)
+    await h.scheduled('*/15 * * * *',first)
+    const separatelyAddressed=h.mails.filter(m=>m.subject==='Gasket report: Separate recipient pack')
+    assert.deepEqual(separatelyAddressed.map(m=>m.to).sort(),[['other@example.test'],['owner@example.test']])
+    assert.deepEqual(separatelyAddressed.map(m=>dataset(Buffer.from(m.attachments.find(a=>a.filename==='dataset.csv').content,'base64').toString()).metadata.scope.recipient).sort(),[ownerId,ids.other].sort())
+    await h.api('report.schedule',cookie.owner,{...separateBody,schedule:separate.id,revision:1,paused:true})
     const failure={...body,schedule:'',name:'Failure pack',firstDay:'2027-03-07',recipients:[ownerId]}
     const failed=(await h.api('report.schedule',cookie.owner,failure)).id
     h.setMailOutcome('rejected');await h.scheduled('*/15 * * * *',first)
@@ -238,6 +249,10 @@ export async function reportSchedulesJourney(){
     assert.equal((await h.api('report.schedule',cookie.delegate,draft)).revision,2)
     const row=(await h.api('report-schedules',cookie.owner)).schedules.find(s=>s.id===delegatedId)
     assert.equal(row.paused,1);assert.equal(row.editor_id,ids.delegate)
+    const editAudit=(await h.api('audit?action=report.schedule',cookie.owner)).rows.find(r=>r.subject===delegatedId)
+    assert.equal(editAudit.actor,ids.delegate)
+    const edited=JSON.parse(editAudit.detail)
+    assert.deepEqual([edited.revision,edited.delegated,edited.paused,edited.authorization],[2,true,true,'Owner review required'])
     assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,200)
     await h.api('report.schedule',cookie.delegate,draft,409)
     await h.scheduled('*/15 * * * *',first)

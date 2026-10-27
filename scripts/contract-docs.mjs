@@ -14,7 +14,7 @@ for (const [name, selected] of [['Published', rows.filter(row => row[2] === 'pub
 }
 const contract = parseContract(source)
 const marker = '<!-- Generated from CONTRACT.md by contract-docs. Edit CONTRACT.md, then regenerate. -->'
-const seed = source.match(/^# (.+?) (?:target product )?contract/im)?.[1] ?? 'Gasket'
+const seed = source.match(new RegExp('^# (.+?) (?:target product )?contract','im'))?.[1] ?? 'Gasket'
 const output = [marker, '', `# Accept a ${seed} installation`, '', 'The requirements, evidence and remaining gaps below come from CONTRACT.md.', '', '## Progress', '', '| Clauses | Done | Partial | Missing | Total |', '| --- | ---: | ---: | ---: | ---: |', ...source.match(/^\| (?:Published|Target and push further|All) \|.*$/gm), '', source.match(/^Judged from.*$/m)[0]]
 for (const kind of ['published', 'target', 'push-further']) {
   output.push('', `## ${kind === 'published' ? 'Published clauses' : kind === 'target' ? 'Target clauses' : 'Push further'}`)

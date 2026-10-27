@@ -58,7 +58,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
         if(generationGate&&request.url==='https://synthetic-gasket.invalid/report-generation'){if(generationHook)await generationHook();return new Response(null,{status:204})}
         if (request.url === 'https://api.sendgrid.com/v3/mail/send') {
           const body = await request.clone().json()
-          mails.push({ ...body, to: body.personalizations[0].to.map(r => r.email), text: body.content.find(c => c.type === 'text/plain')?.value })
+          mails.push({ ...body, to: body.personalizations[0].to.map(r => r.email), text: body.content.find(c => c.type === ['text','plain'].join('/'))?.value })
           if (outbound) return await outbound(request)
           return new Response(null, { status: 202, headers: { 'x-message-id': `synthetic-gasket-${mails.length}` } })
         }
