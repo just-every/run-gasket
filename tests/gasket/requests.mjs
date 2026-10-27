@@ -212,7 +212,16 @@ export async function requestDraftJourney() {
     if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,new URL(page.url()).pathname,'phone-confirmation')
     await page.goto(scanned);await page.getByRole('link',{name:'Open confirmation',exact:true}).waitFor()
     assert.equal(await page.locator('[name=contact]').inputValue(),'','confirmed drafts retain no private contact')
+    const freshKey = await page.locator('[name=submissionKey]').inputValue()
+    assert.notEqual(freshKey,submissionKey,'a confirmed draft starts a separate submission')
+    assert.equal(new URL(await page.locator('[data-request-receipt]').getAttribute('href'),h.origin).pathname,`/request/${portal}/received/${freshKey}`,'a new draft advertises its own receipt')
     await draftPrivacy(f,context,page,scanned,process.env.REQUEST_SCREENSHOTS?capture:null)
+    const beforeClearKey = await page.locator('[name=submissionKey]').inputValue()
+    await page.getByRole('button',{name:'Clear draft',exact:true}).click()
+    await page.getByRole('status').filter({hasText:'Draft cleared from this device.'}).waitFor()
+    const clearedKey = await page.locator('[name=submissionKey]').inputValue()
+    assert.notEqual(clearedKey,beforeClearKey,'explicit clearing starts a new submission identity')
+    assert.equal(new URL(await page.locator('[data-request-receipt]').getAttribute('href'),h.origin).pathname,`/request/${portal}/received/${clearedKey}`,'clearing updates the advertised receipt')
     console.log('REQ-002 decoded QR, camera photo, durable offline draft, lost-response retry, one original-mapped request and durable confirmation passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }
