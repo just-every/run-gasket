@@ -19,25 +19,26 @@ async function member(env:Bindings,id:string,zone:string):Promise<Actor|null>{
 export async function saveReportSchedule(env:Bindings,actor:Actor,input:Input){
   const id=input.text('schedule',{optional:true,max:100})||newId(),old=await one(env,'SELECT * FROM gk_report_schedules WHERE id=?',id)
   await author(env,actor,old);insist(input.flag('consent'),'report_consent_required')
+  const zone=old?.zone??actor.zone,reportActor={...actor,zone,today:today(zone,now())}
   const delegated=actor.role!=='owner',editor=delegated?old!.editor_id:input.text('editor',{optional:true,max:100})||null
   if(editor)insist(await member(env,editor,actor.zone),'editor_forbidden',403)
   const paused=delegated||input.flag('paused')
   const revision=input.integer('revision',{min:0})!,name=input.text('name',{max:100}),report=input.text('report',{max:30}) as ReportKind
   const weekday=input.integer('weekday',{min:0,max:6})!,clock=input.text('clock',{max:5}),firstDay=input.text('firstDay',{max:10})
   insist(Object.hasOwn(REPORTS,report),'invalid_report');insist(/^([01]\d|2[0-3]):[0-5]\d$/.test(clock),'invalid_clock')
-  insist(isDate(firstDay)&&firstDay>=actor.today&&new Date(firstDay+'T12:00:00Z').getUTCDay()===weekday,'invalid_firstDay')
+  insist(isDate(firstDay)&&firstDay>=reportActor.today&&new Date(firstDay+'T12:00:00Z').getUTCDay()===weekday,'invalid_firstDay')
   const recipients=[...new Set(input.list('recipients'))];insist(recipients.length>0&&recipients.length<=20,'invalid_recipients')
   for(const recipient of recipients)insist(await member(env,recipient,actor.zone),'recipient_forbidden',403)
   const filters:Record<string,string>={};const team=input.text('team',{optional:true,max:100}),asset=input.text('asset',{optional:true,max:100})
   insist(!(team&&report!=='performance')&&!(asset&&['performance','valuation'].includes(report)),'invalid_report_filter')
   if(team)filters.team=team;if(asset)filters.asset=asset
-  await reportPack(env,actor,report,filters,firstDay)
+  await reportPack(env,reportActor,report,filters,firstDay)
   insist(old || revision===0,'stale',409)
   const admission=capabilitySql(actor.sessionId,delegated?'history.export':'site.manage')
-  const values=[name,report,JSON.stringify(filters),JSON.stringify(recipients),weekday,clock,actor.zone,firstDay,paused?1:0]
+  const values=[name,report,JSON.stringify(filters),JSON.stringify(recipients),weekday,clock,zone,firstDay,paused?1:0]
   await commit(env,[guard(env,'forbidden',admission.sql,...admission.params),guard(env,'stale',old?'EXISTS(SELECT 1 FROM gk_report_schedules WHERE id=? AND revision=? AND (?=0 OR editor_id=?))':'NOT EXISTS(SELECT 1 FROM gk_report_schedules WHERE id=?)',...old?[id,revision,delegated?1:0,actor.id]:[id]),
     ...(old?[stmt(env,'UPDATE gk_report_schedules SET name=?,report=?,filters_json=?,recipients_json=?,weekday=?,clock=?,zone=?,next_day=?,paused=?,revision=revision+1,owner_id=?,editor_id=? WHERE id=?',...values,delegated?old!.owner_id:actor.id,editor,id)]:[stmt(env,'INSERT INTO gk_report_schedules(name,report,filters_json,recipients_json,weekday,clock,zone,next_day,paused,owner_id,editor_id,id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',...values,actor.id,editor,id,now())])],
-    {actor:actor.id,action:'report.schedule',subject:id,detail:{revision:old?revision+1:1,consent:true,name,report,filters,recipients,weekday,clock,zone:actor.zone,firstDay,paused,editor,delegated,authorization:delegated?'Owner review required':'Owner authorized'}})
+    {actor:actor.id,action:'report.schedule',subject:id,detail:{revision:old?revision+1:1,consent:true,name,report,filters,recipients,weekday,clock,zone,firstDay,paused,editor,delegated,authorization:delegated?'Owner review required':'Owner authorized'}})
   return {id,revision:old?revision+1:1}
 }
 export async function reportSchedules(env:Bindings,actor:Actor){
@@ -50,7 +51,7 @@ export async function reportSchedules(env:Bindings,actor:Actor){
 }
 export async function previewReportPack(env:Bindings,actor:Actor,id:string){
   const row=await one(env,'SELECT * FROM gk_report_schedules WHERE id=?',id);await author(env,actor,row);insist(row,'report_schedule_not_found',404)
-  return reportPack(env,actor,row.report,JSON.parse(row.filters_json),row.next_day)
+  return reportPack(env,{...actor,zone:row.zone,today:today(row.zone,now())},row.report,JSON.parse(row.filters_json),row.next_day)
 }
 async function result(env:Bindings,id:string,state:string,error:string|null,extra:{provider?:string|null;providerMessageId?:string|null;fingerprint?:string;scope?:unknown}={}){
   await commit(env,[stmt(env,'UPDATE gk_report_deliveries SET state=?,error=?,finished_at=?,provider=?,provider_message_id=?,fingerprint=?,scope_json=? WHERE id=?',state,error,now(),extra.provider??null,extra.providerMessageId??null,extra.fingerprint??null,JSON.stringify(extra.scope??null),id)],{actor:'scheduler',action:'report.result',subject:id,detail:{state,error,...extra}})

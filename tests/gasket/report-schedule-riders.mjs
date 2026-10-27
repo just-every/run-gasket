@@ -15,6 +15,10 @@ export async function scheduleRiders(h, cookie, ids, body, readDataset) {
 
   const zone = await create({ name: 'Retained zone' })
   await h.api('site.configure', cookie.owner, { name: 'Great Lakes report plant', timezone: ['Pacific','Auckland'].join('/') })
+  const savedPreview=await h.raw(`/app/report-packs/${zone.id}.csv`,{cookie:cookie.owner})
+  assert.equal(savedPreview.status,200)
+  assert.equal(readDataset(await savedPreview.text()).metadata.zone,'America/New_York','preview retains the saved clock after the site changes')
+  await h.api('report.schedule',cookie.owner,{...base,schedule:zone.id,revision:1,name:'Retained zone'})
   await h.scheduled(cron, instant('2027-03-07T13:59:00Z'))
   assert.equal(messages('Retained zone').length, 0)
   await h.scheduled(cron, instant('2027-03-07T14:00:00Z'))

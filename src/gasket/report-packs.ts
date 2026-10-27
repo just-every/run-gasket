@@ -30,7 +30,7 @@ export async function reportPack(env: Bindings, actor: Actor, kind: ReportKind, 
   const metadata = { report:kind, period:{from:url.searchParams.get('from'),to:url.searchParams.get('to')}, generatedAt:now(), zone:actor.zone,
     scope:{site:(await one(env,'SELECT name FROM gk_site WHERE singleton=1')).name,filters,role:actor.role,recipient:actor.id,policy:'Current report access only. No original files or individual labor rates.'},
     sourceRevision:audit.revision,latestChangeAt:audit.latestAt,freshness:'Recomputed from retained records at dispatch; external source completeness is not implied.',definitions,
-    dashboard:kind==='history'?`/app/assets/${filters.asset}${url.search}`:`/app/${kind}${url.search}`,sourceDoor:url.pathname+url.search }
+    dashboard:kind==='history'?`/app/assets/${filters.asset}${url.search}`:`/app/${kind==='valuation'?'parts':kind}${url.search}`,sourceDoor:url.pathname+url.search }
   const quality=await metrics(env,actor,url)
   const sourceQuality={scope:'Site-wide data quality context; independent of the selected report filter.',quality:quality.quality,policy:quality.policy}
   const fingerprint=await sha256Hex(JSON.stringify({data,filters,zone:actor.zone,definitions,sourceQuality,sourceRevision:audit.revision}))

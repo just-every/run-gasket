@@ -22,7 +22,7 @@ export async function assertPack(h, cookie, pack, expected, pdfText) {
   assert.match(pack.metadata.freshness, /retained records/)
   assert.match(pack.metadata.freshness, /external source completeness is not implied/)
   assert.equal(pack.metadata.sourceDoor, `/api/gasket/${kind}?${query}`)
-  const dashboard = `${kind === 'history' ? `/app/assets/${filters.asset}` : `/app/${kind}`}?${query}`
+  const dashboard = `${kind === 'history' ? `/app/assets/${filters.asset}` : `/app/${kind === 'valuation' ? 'parts' : kind}`}?${query}`
   assert.equal(pack.metadata.dashboard, dashboard)
   assert.equal((await h.raw(dashboard, { cookie })).status, 200, 'the exported dashboard link opens the saved period and scope')
   assert.deepEqual(pack.sourceQuality.quality, metrics.quality, 'site-wide context retains every authorized finding')
