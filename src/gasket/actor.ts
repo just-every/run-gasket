@@ -77,8 +77,8 @@ export async function currentActor(env: Bindings, request: Request): Promise<Act
 export function capabilitySql(sessionId: string, capability: Capability) {
   const roles = (Object.keys(GRANTS) as Role[]).filter(role => role !== 'owner' && GRANTS[role].includes(capability))
   return {
-    sql: `EXISTS(SELECT 1 FROM oa_sessions s JOIN oa_operators o ON o.id = s.operator_id WHERE s.id = ? AND s.revoked_at IS NULL AND s.expires_at > CAST(strftime('%s','now') AS INTEGER) * 1000 AND o.version = s.operator_version AND o.status = 'active'
+    sql: `EXISTS(SELECT 1 FROM oa_sessions s JOIN oa_operators o ON o.id = s.operator_id WHERE s.id = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND o.version = s.operator_version AND o.status = 'active'
       AND EXISTS(SELECT 1 FROM gk_members m WHERE m.operator_id = o.id AND m.status = 'active' AND (o.role = 'owner' OR m.role IN (${roles.map(() => '?').join(', ') || "''"}))))`,
-    params: [sessionId, ...roles],
+    params: [sessionId, now(), ...roles],
   }
 }
