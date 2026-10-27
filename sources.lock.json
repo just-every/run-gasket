@@ -4276,7 +4276,7 @@
       "executable": false
     },
     "tests/gasket/report-pack-assertions.mjs": {
-      "sha256": "b3bffa6cdfcd74794ff7619a161588ceb1706a19add1ed38ac2e3eb6f67bb145",
+      "sha256": "02963c4f419a07e80f4504c01c2338bc547d9c306d3031180a3d20a5e5a03e96",
       "executable": false
     },
     "tests/gasket/report-provider.mjs": {

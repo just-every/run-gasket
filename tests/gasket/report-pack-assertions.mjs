@@ -40,8 +40,11 @@ export async function assertPack(h, cookie, pack, expected, pdfText) {
     for (const value of [kind, from, to, new Date(at).toISOString(), role, dashboard, String(revision), fingerprint, pack.metadata.freshness, pack.sourceQuality.scope]) {
       assert.ok(readable.includes(value.replace(/\s/g, '')), `readable PDF retains metadata ${value}`)
     }
-    for (const definition of definitions) for (const key of ['id', 'name', 'version', 'formula', 'eventTime', 'exclusions', 'freshness', 'sourceDoor']) {
-      assert.ok(readable.includes(String(definition[key]).replace(/\s/g, '')), `readable PDF retains ${definition.id} ${key}`)
+    for (const [key, value] of Object.entries({report:kind,generatedAt:at,zone:'America/New_York',sourceRevision:revision,latestChangeAt,freshness:pack.metadata.freshness,dashboard,sourceDoor:pack.metadata.sourceDoor})) {
+      assert.ok(readable.includes(`$["metadata"][${JSON.stringify(key)}]:${value}`.replace(/\s/g,'')), `PDF metadata ${key} retains its own value`)
+    }
+    for (const [index, definition] of definitions.entries()) for (const key of ['id', 'name', 'version', 'formula', 'eventTime', 'exclusions', 'freshness', 'sourceDoor']) {
+      assert.ok(readable.includes(`$["metadata"]["definitions"]["${index}"][${JSON.stringify(key)}]:${definition[key]}`.replace(/\s/g,'')), `readable PDF retains ${definition.id} ${key} at its own path`)
     }
   }
 }
