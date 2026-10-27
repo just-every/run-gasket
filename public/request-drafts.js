@@ -43,15 +43,15 @@
     if(!current())return;
     if(!ready){status.textContent='Device storage is not ready. Keep this page open or retry shortly.';return;}
     clearTimeout(timer);if(form.elements.namedItem('saveOnDevice').checked && !await save())return;submitting=true;const body=new FormData(form),controls=[...form.elements].filter(c=>!c.disabled);controls.forEach(c=>c.disabled=true);
-    status.textContent='Sending request…';try{
+    status.setAttribute('role','status');status.textContent='Sending request…';try{
       const response=await fetch(form.action,{method:'POST',body,headers:{Accept:'application/json'}}),result=await response.json();
-      if(!response.ok)throw new Error(result.error||'send_failed');
+      if(!response.ok){const failure=new Error(result.error||'send_failed');failure.persistence=result.persistence;throw failure;}
       // Retain the receipt in the draft before clearing private contact/photo data.
       if(!current())return;
       if(db)await transact('readwrite',s=>form.elements.namedItem('saveOnDevice').checked?s.put({receipt:result.receipt,generation:openedGeneration},scope):s.delete(scope));
       if(!current())return;
       location.assign(result.receipt);
-    }catch(error){if(!current())return;const explanation=error.message==='intake_rate_limited'?'Too many requests from this network. Try again next hour.':error.message==='portal_changed'?'The site form changed. Reload and check its required fields.':error.message==='label_retired'?'This label is retired. Ask maintenance for its current label.':error.message==='portal_closed'?'This intake is closed. Contact maintenance.':error.message==='submission_key_reused'?'An earlier version was sent. Check its confirmation before starting another report.':error.message==='file_size'?'Each photo must be 1.5 MB or smaller.':error.message.startsWith('missing_')?'Complete all required site fields.':'';status.textContent=`Not confirmed. ${form.elements.namedItem('saveOnDevice').checked?'Your saved draft is kept. ':''}Reconnect and press Send request again. ${explanation}`;}
+    }catch(error){if(!current())return;const explanation=error.message==='intake_rate_limited'?'Too many requests from this network. Try again next hour.':error.message==='portal_changed'?'The site form changed. Reload and check its required fields.':error.message==='label_retired'?'This label is retired. Ask maintenance for its current label.':error.message==='portal_closed'?'This intake is closed. Contact maintenance.':error.message==='submission_key_reused'?'An earlier version was sent. Check its confirmation before starting another report.':error.message==='file_size'?'Each photo must be 1.5 MB or smaller.':error.message.startsWith('missing_')?'Complete all required site fields.':'';status.setAttribute('role','alert');status.tabIndex=-1;status.focus();status.textContent=`${error.persistence==='none'?'Nothing was saved.':'Not confirmed. Check the confirmation link before retrying.'} ${form.elements.namedItem('saveOnDevice').checked?'Your saved draft is kept. ':''}Reconnect and press Send request again. ${explanation}`;}
     finally{submitting=false;controls.forEach(c=>c.disabled=false);}
   });
 })();
