@@ -279,6 +279,14 @@ export async function reportSchedulesJourney(){
     await h.api('report-schedules',cookie.delegate,undefined,403)
     assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,403)
     await scheduleRiders(h,cookie,ids,body,dataset)
+    // A source value unsupported by the PDF font fails the real renderer, before any submission.
+    await h.api('workorder.create',cookie.owner,{asset,title:'Synthetic report rendering \u{1F6A7}',due:'2027-03-01'})
+    const unrenderable=(await h.api('report.schedule',cookie.owner,{...failure,name:'Unrenderable pack',team:''})).id
+    await h.scheduled('*/15 * * * *',first)
+    await h.scheduled('*/15 * * * *',first+60_000)
+    const renderFailures=(await h.api('report-schedules',cookie.owner)).deliveries.filter(d=>d.schedule_id===unrenderable)
+    assert.deepEqual(renderFailures.map(d=>[d.state,d.error]),[['failed','pdf_character_not_supported']],'a real rendering failure is retained once with its cause')
+    assert.equal(h.mails.filter(m=>m.subject==='Gasket report: Unrenderable pack').length,0,'failed generation never submits or automatically retries')
     await reportScheduleScreens(h,cookie,schedule,familyIds,delegatedId)
     console.log('REPORT-006 weekly packs: DST, provider PDF and complete CSV, dispatch authorization, failure and restart passed')
   }finally{await h.close();await store.remove()}

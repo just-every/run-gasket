@@ -25,6 +25,18 @@ export async function reportScheduleScreens(h,cookie,schedule,familyIds,delegate
           if(name==='report-history'||name==='report-valuation')assert.equal(await page.getByLabel('Report',{exact:true}).inputValue(),name.slice(7))
           await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/${name}-${width}.png`,fullPage:false})
           if(name==='report-schedules'){
+            for(const [result,reason] of [
+              [/Recipient excluded/,/Report access ended|Schedule or permission changed/],
+              [/Provider refused/,/Provider refused the message/],
+              [/Submission uncertain/,/Provider response was uncertain/],
+              [/Submission unconfirmed/,/Execution interrupted/],
+              [/^Failed$/, /pdf character not supported/],
+            ]){
+              const outcome=page.getByRole('row').filter({has:page.getByRole('cell',{name:result})}).first()
+              assert.equal(await outcome.count(),1,'every retained failure outcome is visible in Settings')
+              assert.match(await outcome.innerText(),reason,'the visible outcome explains its cause')
+              if(!result.source.includes('Recipient'))assert.match(await outcome.innerText(),/Reconcile this attempt/,'outbound repair requires reconciliation')
+            }
             const interrupted=page.getByRole('row').filter({hasText:'Submission unconfirmed'}).first()
             await interrupted.scrollIntoViewIfNeeded()
             await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/report-results-${width}.png`,fullPage:false})

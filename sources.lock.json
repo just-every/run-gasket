@@ -4284,7 +4284,7 @@
       "executable": false
     },
     "tests/gasket/report-schedule-browser.mjs": {
-      "sha256": "d0b80f0242baa4d883dddebf61fdcdb692325446bbcc9ec82c159874e5e292c4",
+      "sha256": "966776ce02b96f8d83e39c5f03372bd7dfa474485434a5883a46bc480dcec703",
       "executable": false
     },
     "tests/gasket/report-schedule-riders.mjs": {
@@ -4292,7 +4292,7 @@
       "executable": false
     },
     "tests/gasket/report-schedules.mjs": {
-      "sha256": "722473606c027a64bc630bfe9e7a1176377f1d2df5e5457f8031c1c1e8f089d4",
+      "sha256": "c1aac436c567513cd7193ffff188cc0bfd01ffe16ffe3129b912ffee6cb8bf73",
       "executable": false
     },
     "tests/gasket/request-draft-privacy.mjs": {
