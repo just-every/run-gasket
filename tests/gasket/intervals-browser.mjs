@@ -58,7 +58,7 @@ export async function intervalBrowser(h,cookie,proposal) {
 // Playwright's second HTTPS client can disconnect before forwarding to workerd.
 async function loseSaveReply(h, router, path, committed = true, {holdReceipt=false}={}) {
   const handled = Promise.withResolvers(), requested = Promise.withResolvers(), released = Promise.withResolvers()
-  const receiptHandler = async route => { requested.resolve(); await released.promise; await route.continue() }
+  const receiptHandler = async route => { requested.resolve(); await released.promise; if (!route.request().failure()) await route.continue() }
   if (holdReceipt) await router.route('**/app/save-receipts/*', receiptHandler)
   const handler = async route => {
     try {
@@ -607,11 +607,14 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       // Lose the response after a real write: the UI must not claim it was unsaved or retry it automatically.
       const again=page.locator('form[action="/app/do/workorder.time"]')
       await again.getByLabel('Minutes worked').fill('3');await again.getByLabel('Time note').fill(`Uncertain confirmation ${width}`)
-      const lost = await loseSaveReply(h, page, '/app/do/workorder.time')
+      const lost = await loseSaveReply(h, page, '/app/do/workorder.time', true, {holdReceipt:true})
       await Promise.all([lost.completed, again.getByRole('button',{name:'Record time'}).click()])
-      await again.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s}).waitFor()
+      await lost.receiptRequested
+      await again.getByRole('alert').filter({hasText:/connection ended.*Checking the save receipt/s}).waitFor()
+      await again.getByRole('alert').filter({hasText:/receipt could not be reached/}).waitFor()
+      lost.releaseReceipt()
       await lost.close()
-      assert.match(await again.getByRole('alert').innerText(),new RegExp('connection ended.*Saved. The server confirmed','s'))
+      assert.match(await again.getByRole('alert').innerText(), /connection ended.*receipt could not be reached.*Check it before retrying/s)
       assert.equal(await again.getByLabel('Time note').inputValue(),`Uncertain confirmation ${width}`)
       assert.equal(await again.getByRole('button',{name:'Record time'}).isDisabled(),true)
       const receiptPath = new URL(await again.getByRole('link',{name:'Check save receipt in a new tab.'}).getAttribute('href'),h.origin).pathname

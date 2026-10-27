@@ -9,6 +9,13 @@ import { harness, file } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { installation } from './installation.mjs'
 
+async function command(installation, verb, ...args) {
+  const started = performance.now()
+  console.log(`Recovery ${verb} started`)
+  try { return await installation.rer(verb, ...args) }
+  finally { console.log(`Recovery ${verb} finished (${((performance.now()-started)/1000).toFixed(3)}s)`) }
+}
+
 export async function recoveryJourney() {
   const h = await harness(), target = await installation(), corruptTarget = await installation()
   try {
@@ -53,7 +60,7 @@ export async function recoveryJourney() {
     const erasedRecords=await erasureFixture(h,owner,asset)
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'recovery.rer')
-    await h.installation.rer('export', '--output', archive)
+    await command(h.installation, 'export', '--output', archive)
     const bytes = await readFile(archive)
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')
     assert.ok(!bytes.includes(Buffer.from(credential.token)), 'service bearer secrets are absent from exports')
@@ -64,10 +71,10 @@ export async function recoveryJourney() {
     assert.ok(!records[0].tables.some(table => ['oa_sessions','oa_tokens','oa_credentials'].includes(table.name)))
     const damaged = join(h.installation.root, 'damaged.rer')
     await writeFile(damaged, bytes.subarray(0, Math.floor(bytes.length / 2)))
-    await assert.rejects(corruptTarget.rer('import', '--input', damaged, '--yes'))
+    await assert.rejects(command(corruptTarget, 'import', '--input', damaged, '--yes'))
     // A clean import succeeds after the rejected corrupt attempt.
-    await corruptTarget.rer('import', '--input', archive, '--yes')
-    await target.rer('import', '--input', archive, '--yes')
+    await command(corruptTarget, 'import', '--input', archive, '--yes')
+    await command(target, 'import', '--input', archive, '--yes')
     const restored = await harness({ vars: h.vars, installation: target })
     try {
       assert.equal((await restored.raw('/api/gasket/me', { cookie: owner })).status, 401, 'source sessions are excluded')
@@ -131,7 +138,7 @@ export async function recoveryJourney() {
         } finally { await browser.close() }
       }
       await restored.stop()
-      await assert.rejects(target.rer('import', '--input', archive, '--yes'), /empty|occupied|not_empty/)
+      await assert.rejects(command(target, 'import', '--input', archive, '--yes'), /empty|occupied|not_empty/)
       const unchanged = await harness({ vars: h.vars, installation: target })
       try {
         const stillOwner = await unchanged.signIn(h.vars.OWNER_EMAIL)
@@ -165,14 +172,14 @@ export async function recoveryJourney() {
       await source.api('attachment.erase', signed, { evidence: workPhoto, version: attachment.version, confirm: true })
       assert.equal((await source.raw(`/app/evidence/${workPhoto}`, { cookie: signed })).status, 404)
       await source.stop()
-      await assert.rejects(h.installation.rer('export', '--output', archive))
+      await assert.rejects(command(h.installation, 'export', '--output', archive))
       const reopened = await harness({ vars: h.vars, installation: h.installation })
       try {
         const checkOwner = await reopened.signIn(h.vars.OWNER_EMAIL)
         assert.deepEqual((await reopened.api('recovery', checkOwner)).backup, backup.backup, 'refused export does not advance backup freshness')
       } finally { await reopened.close() }
       const later = join(h.installation.root, 'exports', 'after-erasure.rer')
-      await h.installation.rer('export', '--output', later)
+      await command(h.installation, 'export', '--output', later)
       const afterBytes = await readFile(later)
       for (const text of ['synthetic-gasket-erased-person','synthetic-gasket-erased@example.test','synthetic-gasket-erased-work','synthetic-gasket-erased-description','synthetic-gasket-erased-original.png','synthetic-gasket-erased-second.png','synthetic-gasket-erased-comment']) assert.ok(!afterBytes.includes(Buffer.from(text)),`archive removes ${text}`)
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-fault')), 'anonymous archive contains no erased fault')
@@ -183,8 +190,8 @@ export async function recoveryJourney() {
         const journal = join(fenced.root, 'later-erasure.rer')
         await copyFile(later, journal)
         await chmod(journal, 0o600)
-        await assert.rejects(fenced.rer('import', '--input', archive, '--journal', 'later-erasure.rer', '--yes'), /erasure_epoch/, 'a later erasure journal blocks an older archive before publication')
-        await fenced.rer('import', '--input', later, '--yes')
+        await assert.rejects(command(fenced, 'import', '--input', archive, '--journal', 'later-erasure.rer', '--yes'), /erasure_epoch/, 'a later erasure journal blocks an older archive before publication')
+        await command(fenced, 'import', '--input', later, '--yes')
         const clean = await harness({ vars: h.vars, installation: fenced })
         try {
           const cleanOwner = await clean.signIn(h.vars.OWNER_EMAIL)

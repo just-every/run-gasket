@@ -133,11 +133,8 @@ jobs:
           name: gasket-built-worker
           path: dist
       - run: pnpm run verify
-      - name: Verify archive recovery
-        run: |
-          export GASKET_RECOVERY_SCREENSHOTS="$RUNNER_TEMP/gasket-recovery"
-          mkdir -p "$GASKET_RECOVERY_SCREENSHOTS"
-          node tests/gasket/recovery.mjs
+      - name: Verify scheduled report delivery
+        run: GASKET_FLOWS_SHARD=foundation pnpm run test:flows
 
   # All four intake/label/triage journeys remain required on every push.
   requests:
@@ -182,8 +179,8 @@ jobs:
           mkdir -p "$STOCK_SCREENSHOTS"
           pnpm run test:agent-stock
 
-  # Preserve every journey across eight test shards. The two longer workspace
-  # journeys own separate installations and run independently of the other flows.
+  # Eight required test shards retain every journey. Recovery owns a full shard;
+  # the workspace journeys retain their independent installations within one job.
   flows:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
@@ -192,7 +189,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, automation, inventory, reports, workspace, workspace-conditional]
+        shard: [core, automation, inventory, reports, workspace, recovery]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -201,6 +198,7 @@ jobs:
       PLANNING_SCREENSHOTS: /tmp/gasket-planning
       REPORT_SCREENSHOTS: /tmp/gasket-reports
       MIGRATION_SCREENSHOTS: /tmp/gasket-migration
+      GASKET_RECOVERY_SCREENSHOTS: /tmp/gasket-recovery
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
@@ -225,7 +223,9 @@ jobs:
         with:
           name: gasket-built-worker
           path: dist
-      - run: pnpm run test:flows
+      - run: |
+          if [ "$GASKET_FLOWS_SHARD" = recovery ]; then mkdir -p "$GASKET_RECOVERY_SCREENSHOTS"; fi
+          pnpm run test:flows
 
 
   verify:

@@ -1,3 +1,4 @@
+import { recoveryJourney } from './recovery.mjs'
 import { siteAccessJourney } from './site-access.mjs'
 import { reportSchedulesJourney } from './report-schedules.mjs'
 import { genericMigrationJourney } from './generic-migration.mjs'
@@ -45,18 +46,18 @@ import { now, zone } from './clock.mjs'
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
 const independent = new Map([
-  [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
+  [apiJourney, 'automation'], [reportSchedulesJourney, 'foundation'],
   [genericMigrationJourney,'inventory'],
-  [safetyJourney,'reports'],
+  [safetyJourney,'core'],
   [qualificationPlanningJourney,'reports'], [calendarPlanningJourney,'reports'],
-  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
+  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'automation'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [conditionalWorkspaceJourney, 'workspace-conditional'],
+  [conditionalWorkspaceJourney, 'workspace'], [recoveryJourney, 'recovery'],
   [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'workspace'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
-assert.ok(['all', 'core', 'automation', 'inventory', 'reports', 'workspace', 'workspace-conditional'].includes(shard), `Unknown flows shard: ${shard}`)
+assert.ok(['all', 'core', 'automation', 'inventory', 'reports', 'workspace', 'foundation', 'recovery'].includes(shard), `Unknown flows shard: ${shard}`)
 const h = shard === 'all' || shard === 'core' ? await harness() : null
 let passed = 0
 const check = async (id, run) => {
@@ -2284,6 +2285,7 @@ try {
 
   await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
   await check('ADMIN-011 conditional workspace save recovery', conditionalWorkspaceJourney)
+  await check('Inactive archive recovery and erasure reconciliation', recoveryJourney)
 
   await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
 
