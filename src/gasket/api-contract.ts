@@ -13,6 +13,7 @@ import { isCollaborator } from './crew'
 import { didWork } from './review'
 import { DOCUMENT_BYTES } from './documents'
 import { EVIDENCE_BYTES } from './work'
+import { exceptionAuthority } from './exceptions'
 
 const JSON_TYPE = ['application', 'json'].join('/')
 const RETRYABLE: Record<string, Capability> = {
@@ -37,6 +38,11 @@ const RETRYABLE: Record<string, Capability> = {
   'workorder.tool': 'work.do', 'workorder.sign': 'work.do',
   'finding.record': 'work.do', 'downtime.start': 'work.do', 'downtime.end': 'work.do',
   'workorder.cancel': 'work.assign', 'workorder.reopen': 'work.assign',
+  'planning.qualification': 'site.manage', 'planning.tool': 'site.manage', 'planning.retire': 'site.manage',
+  'planning.window': 'work.assign', 'planning.window.remove': 'work.assign', 'planning.requirements': 'work.assign', 'planning.slot': 'work.assign',
+  'safety.publish': 'register.manage', 'safety.attest': 'work.do',
+  'schedule.skip': 'work.assign', 'schedule.defer': 'work.assign', 'schedule.exception': 'work.review', 'schedule.edit': 'register.manage',
+  'labor.entry': 'work.do', 'labor.timer': 'work.do', 'labor.rate': 'site.manage', 'labor.review': 'site.manage', 'labor.invoice': 'site.manage',
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -44,7 +50,7 @@ async function body(request: Request, action: string) {
   insist(request.headers.get('content-type')?.startsWith(JSON_TYPE), 'idempotency_requires_json', 415)
   // Base64 originals plus bounded metadata; each handler still enforces its
   // decoded file limit. Only fingerprints and small results enter receipts.
-  const fileBytes = action === 'document.add' || action === 'document.revise' ? DOCUMENT_BYTES : action === 'workorder.evidence' || action === 'part.photo' ? EVIDENCE_BYTES : action === 'comment.post' ? EVIDENCE_BYTES * 4 : action === 'workorder.sign' ? 200_000 : 0
+  const fileBytes = action === 'document.add' || action === 'document.revise' || action === 'safety.attest' ? DOCUMENT_BYTES : action === 'workorder.evidence' || action === 'part.photo' ? EVIDENCE_BYTES : action === 'comment.post' ? EVIDENCE_BYTES * 4 : action === 'workorder.sign' ? 200_000 : 0
   const limit = fileBytes ? Math.ceil(fileBytes / 3) * 4 + 64_000 : 64_000
   const reader = request.body?.getReader(), chunks: Uint8Array[] = []
   let size = 0
@@ -70,6 +76,14 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
   const capability = action === 'workorder.sign' && input.text('role', { max: 12 }) === 'supervisor' ? 'work.review' : RETRYABLE[action]
   requireCapability(actor, capability)
+  if ((action === 'planning.slot' || action === 'schedule.edit') && input.flag('preview')) throw new GasketError('idempotency_preview_not_supported', 400)
+  if (action === 'schedule.exception') await exceptionAuthority(env, actor, input)
+  if (action === 'labor.entry') insist(actor.role === 'owner' || !input.has('person') || input.text('person') === actor.id, 'forbidden', 403)
+  if (action === 'labor.entry' || action === 'labor.timer' || action === 'labor.invoice') await workOrder(env, input.text('workOrder', { max: 100 }))
+  if (action === 'safety.attest') {
+    const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+    insist(order.assignee_id === actor.id, 'not_your_work', 403)
+  }
   if (action === 'comment.edit') {
     const comment = await one(env, 'SELECT author_id FROM gk_comments WHERE id=?', input.text('comment', { max: 100 }))
     insist(comment, 'comment_not_found', 404)

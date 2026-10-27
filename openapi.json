@@ -8742,6 +8742,2333 @@
           }
         }
       }
+    },
+    "/planning.qualification": {
+      "post": {
+        "summary": "planning.qualification",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "member": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "expires": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "remind": {
+                    "type": "boolean"
+                  },
+                  "remindDays": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "member",
+                  "name",
+                  "expires",
+                  "reference"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "member": "MEMBER_ID",
+                "name": "Synthetic isolation",
+                "expires": "2027-01-01",
+                "reference": "synthetic-gasket-1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/planning.tool": {
+      "post": {
+        "summary": "planning.tool",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "identifier": {
+                    "type": "string"
+                  },
+                  "calibrationDue": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "identifier",
+                  "calibrationDue",
+                  "revision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "name": "Synthetic tester",
+                "identifier": "synthetic-gasket-2",
+                "calibrationDue": "2027-01-01",
+                "revision": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/planning.retire": {
+      "post": {
+        "summary": "planning.retire",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "member": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "reason",
+                  "revision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "kind": "tool",
+                "id": "TOOL_ID",
+                "reason": "Removed from service",
+                "revision": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/planning.window": {
+      "post": {
+        "summary": "planning.window",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "member": {
+                    "type": "string"
+                  },
+                  "starts": {
+                    "type": "string"
+                  },
+                  "ends": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "member",
+                  "starts",
+                  "ends",
+                  "kind",
+                  "reason",
+                  "revision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "member": "MEMBER_ID",
+                "starts": "2026-10-26T08:00",
+                "ends": "2026-10-26T17:00",
+                "kind": "available",
+                "reason": "Published shift",
+                "revision": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/planning.window.remove": {
+      "post": {
+        "summary": "planning.window.remove",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "id",
+                  "reason",
+                  "revision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "id": "WINDOW_ID",
+                "reason": "Shift corrected",
+                "revision": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/planning.requirements": {
+      "post": {
+        "summary": "planning.requirements",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string"
+                  },
+                  "qualifications": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "qualifications",
+                  "revision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "qualifications": "Synthetic isolation",
+                "revision": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/planning.slot": {
+      "post": {
+        "summary": "planning.slot",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. A preview must omit Idempotency-Key; a keyed preview is refused with idempotency_preview_not_supported.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string"
+                  },
+                  "starts": {
+                    "type": "string"
+                  },
+                  "ends": {
+                    "type": "string"
+                  },
+                  "tool": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "remove": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "starts",
+                  "ends",
+                  "revision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "starts": "2026-10-26T09:00",
+                "ends": "2026-10-26T10:00",
+                "tool": [
+                  "TOOL_ID"
+                ],
+                "revision": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/safety.publish": {
+      "post": {
+        "summary": "safety.publish",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "checklist": {
+                    "type": "string"
+                  },
+                  "hazard": {
+                    "type": "string"
+                  },
+                  "isolation": {
+                    "type": "string"
+                  },
+                  "qualification": {
+                    "type": "string"
+                  },
+                  "siteApproved": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "checklist",
+                  "hazard",
+                  "isolation",
+                  "qualification",
+                  "siteApproved"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "checklist": "CHECKLIST_ID",
+                "hazard": "Stored energy",
+                "isolation": "Site-approved isolation procedure",
+                "qualification": "Synthetic isolation",
+                "siteApproved": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/safety.attest": {
+      "post": {
+        "summary": "safety.attest",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Only the current assignee may retrieve a receipt. A permit original is limited to 1500000 decoded bytes; streamed keyed JSON is limited to 2064000 bytes.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer"
+                  },
+                  "isolated": {
+                    "type": "boolean"
+                  },
+                  "permit": {
+                    "type": "string"
+                  },
+                  "expires": {
+                    "type": "string"
+                  },
+                  "file": {
+                    "type": "object",
+                    "properties": {
+                      "filename": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "base64": {
+                        "type": "string",
+                        "description": "Base64 original bytes; decoded file and streamed JSON limits apply."
+                      },
+                      "type": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "required": [
+                      "filename",
+                      "base64"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "version",
+                  "isolated",
+                  "permit",
+                  "expires",
+                  "file"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "version": 1,
+                "isolated": true,
+                "permit": "synthetic-gasket-3",
+                "expires": "2027-01-01",
+                "file": {
+                  "filename": "permit.txt",
+                  "base64": "U3ludGhldGljIHBlcm1pdA=="
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/schedule.skip": {
+      "post": {
+        "summary": "schedule.skip",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schedule": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schedule",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "schedule": "SCHEDULE_ID",
+                "reason": "Equipment unavailable"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/schedule.defer": {
+      "post": {
+        "summary": "schedule.defer",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schedule": {
+                    "type": "string"
+                  },
+                  "until": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schedule",
+                  "until",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "schedule": "SCHEDULE_ID",
+                "until": "2026-10-27",
+                "reason": "Planned isolation window"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/schedule.exception": {
+      "post": {
+        "summary": "schedule.exception",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Independent decision authority is rechecked on replay, including the explicitly confirmed sole-owner exception.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "exception": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  },
+                  "singleApprover": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "exception",
+                  "decision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "exception": "EXCEPTION_ID",
+                "decision": "approve",
+                "note": "Independent decision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/schedule.edit": {
+      "post": {
+        "summary": "schedule.edit",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. A preview must omit Idempotency-Key; a keyed preview is refused with idempotency_preview_not_supported.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "schedule": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "everyDays": {
+                    "type": "integer"
+                  },
+                  "cadence": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "schedule",
+                  "revision",
+                  "everyDays",
+                  "cadence"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "schedule": "SCHEDULE_ID",
+                "revision": 1,
+                "everyDays": 14,
+                "cadence": "fixed"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/labor.rate": {
+      "post": {
+        "summary": "labor.rate",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "person": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "overtimeAfterMinutes": {
+                    "type": "integer"
+                  },
+                  "overtimeMultiplier": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "person",
+                  "amount",
+                  "overtimeAfterMinutes",
+                  "overtimeMultiplier"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "person": "MEMBER_ID",
+                "amount": "60.00",
+                "overtimeAfterMinutes": 480,
+                "overtimeMultiplier": 150
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/labor.entry": {
+      "post": {
+        "summary": "labor.entry",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "started": {
+                    "type": "string"
+                  },
+                  "ended": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "person": {
+                    "type": "string"
+                  },
+                  "supersedes": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "category",
+                  "started",
+                  "ended",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "category": "wrench",
+                "started": "2026-10-26T09:00",
+                "ended": "2026-10-26T10:00",
+                "reason": "Inspection complete"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/labor.review": {
+      "post": {
+        "summary": "labor.review",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "entry": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "entry",
+                  "decision",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "entry": "ENTRY_ID",
+                "decision": "approve",
+                "reason": "Checked source time"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/labor.invoice": {
+      "post": {
+        "summary": "labor.invoice",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string"
+                  },
+                  "contractor": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "minutes": {
+                    "type": "integer"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "contractor",
+                  "reference",
+                  "amount",
+                  "minutes",
+                  "note"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "contractor": "Synthetic contractor",
+                "reference": "synthetic-gasket-4",
+                "amount": "25.00",
+                "minutes": 30,
+                "note": "Completed service"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/labor.timer": {
+      "post": {
+        "summary": "labor.timer",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "operation",
+                  "category"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "operation": "start",
+                "category": "wrench"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/planning": {
+      "get": {
+        "summary": "Read PlanningView",
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningView"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/work/{id}/safety": {
+      "get": {
+        "summary": "Read SafetyState",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SafetyState"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/schedules": {
+      "get": {
+        "summary": "Read Schedule",
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Schedule"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -9403,6 +11730,9 @@
             "items": {
               "$ref": "#/components/schemas/Reservation"
             }
+          },
+          "labor": {
+            "$ref": "#/components/schemas/LaborView"
           }
         },
         "required": [
@@ -10748,6 +13078,496 @@
           "serial",
           "lines",
           "revisions"
+        ],
+        "additionalProperties": true
+      },
+      "Schedule": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "active": {
+            "type": "integer"
+          },
+          "next_due_date": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exceptions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "decision": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "decision"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "active",
+          "next_due_date",
+          "exceptions"
+        ],
+        "additionalProperties": true
+      },
+      "PlanningQualification": {
+        "type": "object",
+        "properties": {
+          "member_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "expires_on": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "integer"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "expired": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "member_id",
+          "name",
+          "expires_on",
+          "recorded_at",
+          "provenance",
+          "expired"
+        ],
+        "additionalProperties": true
+      },
+      "PlanningTool": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "calibration_due": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "identifier",
+          "calibration_due"
+        ],
+        "additionalProperties": true
+      },
+      "PlanningView": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "qualifications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningQualification"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanningTool"
+            }
+          },
+          "windows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "member_id": {
+                  "type": "string"
+                },
+                "starts": {
+                  "type": "string"
+                },
+                "ends": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "member_id",
+                "starts",
+                "ends",
+                "kind",
+                "reason"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "retired": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "work": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "qualifications": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "toolIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "conflicts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "plannedMinutes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "qualifications",
+                "toolIds",
+                "conflicts",
+                "plannedMinutes"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "utilization": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "capacityMinutes": {
+                  "type": "integer"
+                },
+                "assignedMinutes": {
+                  "type": "integer"
+                },
+                "productiveMinutes": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "capacityMinutes",
+                "assignedMinutes",
+                "productiveMinutes"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "people",
+          "qualifications",
+          "tools",
+          "windows",
+          "retired",
+          "work",
+          "utilization"
+        ],
+        "additionalProperties": true
+      },
+      "SafetyState": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "requirement": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "procedure": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "attestations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "signer": {
+                  "type": "string"
+                },
+                "permit": {
+                  "type": "string"
+                },
+                "expires_on": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "signer",
+                "permit",
+                "expires_on",
+                "sha256",
+                "reasons"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "requirement",
+          "procedure",
+          "attestations",
+          "missing"
+        ],
+        "additionalProperties": true
+      },
+      "LaborEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "person_id": {
+            "type": "string"
+          },
+          "category": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "started_at": {
+            "type": "integer"
+          },
+          "ended_at": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "pendingFlags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "person_id",
+          "category",
+          "state",
+          "started_at",
+          "ended_at",
+          "reason",
+          "pendingFlags"
+        ],
+        "additionalProperties": true
+      },
+      "LaborView": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LaborEntry"
+            }
+          },
+          "timer": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "approvedMinutes": {
+            "type": "number"
+          },
+          "byCategory": {
+            "type": "object",
+            "properties": {
+              "wrench": {
+                "type": "number"
+              },
+              "travel": {
+                "type": "number"
+              },
+              "wait": {
+                "type": "number"
+              },
+              "admin": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "wrench",
+              "travel",
+              "wait",
+              "admin"
+            ],
+            "additionalProperties": true
+          },
+          "people": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "invoices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "contractor": {
+                  "type": "string"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "cents": {
+                  "type": "integer"
+                },
+                "minutes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "contractor",
+                "reference",
+                "cents",
+                "minutes"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "mayManage": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entries",
+          "timer",
+          "approvedMinutes",
+          "byCategory",
+          "people",
+          "invoices",
+          "mayManage"
         ],
         "additionalProperties": true
       }

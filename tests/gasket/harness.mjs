@@ -65,3 +65,26 @@ export async function harness({ vars, installation, clockOffset = offset, clockI
 }
 
 export const file = (filename, content, type = 'application/octet-stream') => ({ filename, base64: Buffer.from(content).toString('base64'), type })
+
+/** Exercise existing business journeys through documented keyed JSON doors. */
+export function exerciseKeyedActions(h, owner, actions) {
+  const ordinary = h.api, selected = new Set(actions)
+  let sequence = 0
+  h.api = async (path, cookie, body, status = 200) => {
+    if (!selected.has(path) || body === undefined || body.preview) return ordinary(path, cookie, body, status)
+    const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + (++sequence) }
+    const request = () => h.raw('/api/gasket/v1/' + path, { cookie, body, headers })
+    const first = await request(), result = await first.json()
+    assert.equal(first.status, status, path + ': ' + JSON.stringify(result))
+    if (status === 200) {
+      assert.equal(first.headers.get('idempotency-replayed'), 'false', path)
+      const audit = await ordinary('audit', owner)
+      const replay = await request()
+      assert.equal(replay.status, 200, path)
+      assert.equal(replay.headers.get('idempotency-replayed'), 'true', path)
+      assert.deepEqual(await replay.json(), result, path + ' retains its original result')
+      assert.deepEqual(await ordinary('audit', owner), audit, path + ' replay adds no business or audit effect')
+    }
+    return result
+  }
+}

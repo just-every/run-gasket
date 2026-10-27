@@ -56,20 +56,26 @@ export async function requestDeferral(env: Bindings, actor: Actor, input: Input)
   return { id: asked.id, decision: null }
 }
 
-/** An independent decision on a pending skip or deferral: an owner or supervisor other than the person who asked. */
-export async function decideException(env: Bindings, actor: Actor, input: Input) {
+/** Current decision authority also protects completed API retry receipts. */
+export async function exceptionAuthority(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.review')
   const exception = await one(env, 'SELECT * FROM gk_schedule_exceptions WHERE id = ?', input.text('exception', { max: 100 }))
   insist(exception, 'exception_not_found', 404)
-  insist(!exception.decision, 'already_decided', 409)
-  const decision = input.text('decision', { max: 10 }), note = input.text('note', { optional: true, max: 500 }) || null
-  insist(decision === 'approve' || decision === 'reject', 'invalid_decision')
-  const own = exception.requested_by === actor.id
-  if (own) {
+  if (exception.requested_by === actor.id) {
     const people = await one<{ owners: number; supervisors: number }>(env, "SELECT SUM(role = 'owner') AS owners, SUM(role = 'supervisor') AS supervisors FROM gk_members WHERE status = 'active'")
     insist(actor.role === 'owner' && people!.owners === 1 && !people!.supervisors, 'not_independent', 403)
     insist(input.flag('singleApprover'), 'confirm_single_approver', 409)
   }
+  return exception
+}
+
+/** An independent decision on a pending skip or deferral: an owner or supervisor other than the person who asked. */
+export async function decideException(env: Bindings, actor: Actor, input: Input) {
+  const exception = await exceptionAuthority(env, actor, input)
+  insist(!exception.decision, 'already_decided', 409)
+  const decision = input.text('decision', { max: 10 }), note = input.text('note', { optional: true, max: 500 }) || null
+  insist(decision === 'approve' || decision === 'reject', 'invalid_decision')
+  const own = exception.requested_by === actor.id
   const schedule = await one(env, 'SELECT * FROM gk_schedules WHERE id = ?', exception.schedule_id)
   const statements = [stmt(env, 'UPDATE gk_schedule_exceptions SET decision = ?, decided_by = ?, decided_at = ?, note = ?, single_approver = ? WHERE id = ? AND decision IS NULL', decision === 'approve' ? 'approved' : 'rejected', actor.id, now(), note, own ? 1 : 0, exception.id)]
   if (decision === 'approve') {

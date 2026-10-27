@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
-import { file, harness } from './harness.mjs'
+import { file, harness, exerciseKeyedActions } from './harness.mjs'
 import { png } from './fixtures.mjs'
 
 const provenance='Owner-entered reference — not verified by Gasket with the issuing body.'
@@ -11,7 +11,7 @@ const unzip=buffer=>{const b=Buffer.from(buffer),out={};for(let at=0;b.readUInt3
 export async function safetyJourney() {
  const h=await harness({clockInstant:Date.parse('2026-10-26T16:00:00Z')})
  try {
-  const owner=await h.owner();await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
+  const owner=await h.owner();exerciseKeyedActions(h,owner,['safety.publish','safety.attest']);await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
   const tech=(await h.api('access.give',owner,{name:'Synthetic technician',email:'safety-tech@example.test',role:'maintainer'})).id
   const who=await h.signIn('safety-tech@example.test')
   const supervisor=(await h.api('access.give',owner,{name:'Independent reviewer',email:'safety-review@example.test',role:'supervisor'})).id

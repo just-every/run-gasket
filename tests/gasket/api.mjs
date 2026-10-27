@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
-import { harness, file } from './harness.mjs'
+import { harness, file, exerciseKeyedActions } from './harness.mjs'
 import { png } from './fixtures.mjs'
 
 export async function apiJourney() {
@@ -634,6 +634,64 @@ export async function apiJourney() {
     assert.equal((await h.api(`/v1/work/${job}`, owner)).status, 'closed')
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id, [[`assets/${lifecycleAsset}`, 'Synthetic API pump']], 'lifecycle-')
+    // Documented schedule and labor writes preserve their decisions and exact amounts on retry.
+    const schedule = (await repeat('schedule.create', { ...example('schedule.create'), asset, checklist, firstDue: '2026-10-25', maxDeferDays: 10 }, 'synthetic-gasket-schedule-retry', lead)).id
+    const skip = await repeat('schedule.skip', { ...example('schedule.skip'), schedule }, 'synthetic-gasket-skip', lead)
+    await write('schedule.exception', { ...example('schedule.exception'), exception: skip.id }, 'synthetic-gasket-skip-forbidden', lead, 403)
+    const skipDecision = { ...example('schedule.exception'), exception: skip.id }
+    await repeat('schedule.exception', skipDecision, 'synthetic-gasket-skip-decision')
+    let scheduled = (await h.api('v1/schedules', owner)).find(row => row.id === schedule)
+    documented('Schedule', scheduled)
+    assert.equal(scheduled.next_due_date, '2026-11-24')
+    const defer = await repeat('schedule.defer', { ...example('schedule.defer'), schedule, until: '2026-11-25' }, 'synthetic-gasket-defer', lead)
+    await repeat('schedule.exception', { ...example('schedule.exception'), exception: defer.id }, 'synthetic-gasket-defer-decision')
+    scheduled = (await h.api('v1/schedules', owner)).find(row => row.id === schedule)
+    assert.equal(scheduled.next_due_date, '2026-11-25')
+    const edit = { ...example('schedule.edit'), schedule, revision: scheduled.revision }
+    await write('schedule.edit', { ...edit, preview: true }, 'synthetic-gasket-preview-key', lead, 400)
+    await repeat('schedule.edit', edit, 'synthetic-gasket-schedule-edit', lead)
+    scheduled = (await h.api('v1/schedules', owner)).find(row => row.id === schedule)
+    assert.equal(scheduled.every_days, 14)
+    assert.deepEqual(scheduled.exceptions.map(row => [row.kind, row.decision]), [['skip', 'approved'], ['defer', 'approved']])
+    const laborWork = (await h.api('workorder.create', lead, { asset, title: 'Synthetic API reviewed labor', due: '2026-10-26', assignee: member })).id
+    const laborActions = ['labor.rate','labor.entry','labor.review','labor.invoice','labor.timer']
+    exerciseKeyedActions(h, owner, laborActions)
+    await h.api('labor.rate', lead, { ...example('labor.rate'), person: member }, 403)
+    await h.api('labor.rate', owner, { ...example('labor.rate'), person: member })
+    await h.api('labor.entry', lead, { ...example('labor.entry'), workOrder: laborWork, person: (await h.api('me', owner)).id }, 403)
+    const labor = await h.api('labor.entry', lead, { ...example('labor.entry'), workOrder: laborWork })
+    await h.api('labor.review', lead, { ...example('labor.review'), entry: labor.id }, 403)
+    await h.api('labor.review', owner, { ...example('labor.review'), entry: labor.id })
+    const invoiceBody = { ...example('labor.invoice'), workOrder: laborWork }
+    await h.api('labor.invoice', lead, invoiceBody, 403)
+    const invoice = await h.api('labor.invoice', owner, invoiceBody)
+    const laborState = (await h.api(`v1/work/${laborWork}`, owner)).labor
+    documented('LaborView', laborState)
+    assert.equal(laborState.approvedMinutes, 60)
+    assert.deepEqual(laborState.entries.map(row => [row.id, row.state, row.cents]), [[labor.id, 'approved', 6000]])
+    assert.deepEqual(laborState.invoices.map(row => [row.id, row.cents, row.minutes]), [[invoice.id, 2500, 30]])
+    assert.equal((await h.api(`v1/work/${laborWork}`, lead)).labor.entries[0].cents, undefined)
+    await h.api('labor.timer', lead, { ...example('labor.timer'), workOrder: laborWork })
+    assert.equal((await h.api(`v1/work/${laborWork}`, lead)).labor.timer.state, 'running')
+    // A sole-owner decision receipt stops being available when independent review becomes possible.
+    const sole = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
+    try {
+      const soleOwner = await sole.owner()
+      await sole.api('site.configure', soleOwner, { name: 'Synthetic sole owner', timezone: 'UTC' })
+      const a = (await sole.api('asset.create', soleOwner, { tag: 'synthetic-gasket-sole', name: 'Synthetic sole pump', location: 'Shop' })).id
+      const c = (await sole.api('checklist.create', soleOwner, { name: 'Synthetic sole inspection', items: ['Inspect guard'] })).id
+      const schedule = (await sole.api('schedule.create', soleOwner, { asset: a, checklist: c, title: 'Synthetic sole PM', everyDays: 30, firstDue: '2026-10-25' })).id
+      const exception = (await sole.api('schedule.skip', soleOwner, { schedule, reason: 'Unavailable equipment' })).id
+      const body = { exception, decision: 'approve', singleApprover: true }, headers = { 'idempotency-key': 'synthetic-gasket-sole-decision' }
+      for (const replayed of ['false', 'true']) {
+        const response = await sole.raw('/api/gasket/v1/schedule.exception', { cookie: soleOwner, body, headers })
+        assert.equal(response.status, 200); assert.equal(response.headers.get('idempotency-replayed'), replayed)
+      }
+      await sole.api('access.give', soleOwner, { name: 'Synthetic independent reviewer', email: 'synthetic-gasket-sole-review@example.test', role: 'supervisor' })
+      const refused = await sole.raw('/api/gasket/v1/schedule.exception', { cookie: soleOwner, body, headers })
+      assert.equal(refused.status, 403); assert.equal((await refused.json()).error, 'not_independent')
+      assert.equal((await sole.api('schedules', soleOwner))[0].exceptions.length, 1)
+    } finally { await sole.close() }
     // Receipt and stock survive a complete Worker restart, without replaying writes.
     await h.stop()
     resumed = await harness({ vars: h.vars, installation: h.installation, clockInstant: Date.UTC(2026, 9, 26, 16) })
