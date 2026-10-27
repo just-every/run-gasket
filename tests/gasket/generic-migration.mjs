@@ -17,14 +17,16 @@ export async function genericMigrationJourney(){
     await h.api('site.configure',owner,{name:'Lakeside maintenance',timezone:'America/New_York'})
     const techId=(await h.api('access.give',owner,{name:'Sam Mechanic',email:'sam@example.test',role:'maintainer'})).id
     const tech=await h.signIn('sam@example.test')
+    await h.api('access.give',owner,{name:'Lee Planner',email:'planner@example.test',role:'lead'})
+    const importer=await h.signIn('planner@example.test')
     const team=(await h.api('team.create',owner,{name:'Utilities',trade:'Mechanical',member:[techId]})).id
     const field=(await h.api('workfield.save',owner,{label:'Inspection type',kind:'choice',option:['Mechanical','Electrical'],required:true})).id
     const refrigerant=(await h.api('customfield.save',owner,{name:'Refrigerant type',entityType:'asset',type:'single',scope:'category',category:'HVAC',required:true,options:'R134a,R32'})).id
     const voltage=(await h.api('customfield.save',owner,{name:'Voltage',entityType:'part',type:'number',scope:'organization',unit:'V'})).id
-    const preview=(entity,rows,format='csv',extra={})=>h.api('spreadsheet.preview',owner,{entity,dateFormat:'MDY',spreadsheet:file(`synthetic-gasket-1.${format}`,format==='csv'?csv(rows):workbook(rows,format,entity)),...extra})
+    const preview=(entity,rows,format='csv',extra={})=>h.api('spreadsheet.preview',importer,{entity,dateFormat:'MDY',spreadsheet:file(`synthetic-gasket-1.${format}`,format==='csv'?csv(rows):workbook(rows,format,entity)),...extra})
     async function apply(p){
-      let job=await h.api('spreadsheet.apply',owner,{...p.carry,fingerprint:p.fingerprint})
-      for(let n=0;n<100&&job.state!=='completed';n++)job=await h.api('spreadsheet.job',owner,{job:job.job,action:'resume'})
+      let job=await h.api('spreadsheet.apply',importer,{...p.carry,fingerprint:p.fingerprint})
+      for(let n=0;n<100&&job.state!=='completed';n++)job=await h.api('spreadsheet.job',importer,{job:job.job,action:'resume'})
       assert.equal(job.state,'completed')
       return job.job
     }
@@ -118,7 +120,7 @@ export async function genericMigrationJourney(){
       await mkdir(process.env.MIGRATION_SCREENSHOTS,{recursive:true})
       const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
       try{
-        const context=await browser.newContext({ignoreHTTPSErrors:true});await context.addCookies(owner.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
+        const context=await browser.newContext({ignoreHTTPSErrors:true});await context.addCookies(importer.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
         const page=await context.newPage()
         for(const width of [1440,390]){
           await page.setViewportSize({width,height:1100})

@@ -4092,7 +4092,7 @@
       "executable": false
     },
     "tests/gasket/generic-migration.mjs": {
-      "sha256": "3ce3524234a613e840a07a324b45b8e4161e8a25a621ce9c485821fc80907a6e",
+      "sha256": "c7c85e985882b0b7d62046238e14e1ff293634265be64f449dca21bbede59e84",
       "executable": false
     },
     "tests/gasket/harness.mjs": {
