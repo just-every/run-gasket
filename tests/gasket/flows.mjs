@@ -46,18 +46,18 @@ import { now, zone } from './clock.mjs'
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
 const independent = new Map([
-  [apiJourney, 'automation'], [reportSchedulesJourney, 'foundation'],
+  [apiJourney, 'automation'], [reportSchedulesJourney, 'reports'],
   [genericMigrationJourney,'inventory'],
-  [safetyJourney,'core'],
+  [safetyJourney,'inventory'],
   [qualificationPlanningJourney,'reports'], [calendarPlanningJourney,'reports'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'automation'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [conditionalWorkspaceJourney, 'workspace'], [recoveryJourney, 'recovery'],
+  [conditionalWorkspaceJourney, 'workspace-conditional'], [recoveryJourney, 'recovery'],
   [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'workspace'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
-assert.ok(['all', 'core', 'automation', 'inventory', 'reports', 'workspace', 'foundation', 'recovery'].includes(shard), `Unknown flows shard: ${shard}`)
+assert.ok(['all', 'core', 'automation', 'inventory', 'reports', 'workspace', 'workspace-conditional', 'recovery'].includes(shard), `Unknown flows shard: ${shard}`)
 const h = shard === 'all' || shard === 'core' ? await harness() : null
 let passed = 0
 const check = async (id, run) => {

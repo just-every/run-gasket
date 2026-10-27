@@ -133,8 +133,8 @@ jobs:
           name: gasket-built-worker
           path: dist
       - run: pnpm run verify
-      - name: Verify scheduled report delivery
-        run: GASKET_FLOWS_SHARD=foundation pnpm run test:flows
+      - name: Verify core product flows
+        run: GASKET_FLOWS_SHARD=core pnpm run test:flows
 
   # All four intake/label/triage journeys remain required on every push.
   requests:
@@ -179,8 +179,8 @@ jobs:
           mkdir -p "$STOCK_SCREENSHOTS"
           pnpm run test:agent-stock
 
-  # Eight required test shards retain every journey. Recovery owns a full shard;
-  # the workspace journeys retain their independent installations within one job.
+  # Eight required test shards retain every journey. Foundation also runs core;
+  # recovery and the two workspace journeys each own a separate job.
   flows:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
@@ -189,7 +189,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, automation, inventory, reports, workspace, recovery]
+        shard: [automation, inventory, reports, workspace, workspace-conditional, recovery]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
