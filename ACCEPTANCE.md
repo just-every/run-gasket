@@ -12,7 +12,7 @@ The requirements, evidence and remaining gaps below come from CONTRACT.md.
 | Target and push further | 55 | 30 | 39 | 124 |
 | All | 69 | 30 | 39 | 138 |
 
-Judged from the code and tests at commit `d82f6980b15c02585c0e9c1a7e53178e06cadd41` (27 October 2026). REPORT-006 is rejudged on this implementation; other rows preserve main evidence and scope.
+Judged from the code and tests at commit `c7ec53154e2c557e3a1a890742539a9bb9897f61` (27 October 2026). REPORT-006 is rejudged on this implementation; other rows preserve main evidence and scope.
 
 ## Published clauses
 
