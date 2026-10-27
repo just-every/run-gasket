@@ -211,6 +211,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       const originalURL = draft.url()
       const nativeReceipt = await offline.locator('noscript a').getAttribute('href')
       const lose = async (form, path, committed) => {
+        const retained = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
         await native.route('**'+path,async route=>{if(committed) await route.fetch();await route.abort('failed')},{times:1})
         const opened = native.waitForEvent('page')
         await form.getByRole('button',{name:/./}).last().click()
@@ -218,7 +219,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
         await result.waitForLoadState('domcontentloaded').catch(()=>{})
         await result.close()
         assert.equal(draft.url(),originalURL,'native transport error leaves the source page intact')
-        assert.equal(await draft.getByLabel('Time note').inputValue(),'Native connection failure keeps the original draft')
+        assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name])),retained,'native transport error retains every field')
       }
       await lose(offline,'/app/do/workorder.time',false)
       assert.equal((await h.raw(nativeReceipt,{cookie:cookie.max})).status,404,'request never reached the server')
@@ -235,6 +236,8 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       assert.match(await refusal.getByRole('alert').innerText(),/already attempted.*Saved/s)
       assert.equal((await h.api(`work/${work}`,cookie.max)).timeEntries.filter(row=>row.minutes===17).length,1)
       await refusal.close()
+      // A new edit starts from the confirmed version after inspecting the previous saved change.
+      await draft.goto(h.origin+`/app/work/${work}`)
       const attachment = draft.locator('form[action="/app/do/workorder.evidence"]')
       await attachment.getByLabel('Photo or document').setInputFiles({name:'synthetic-gasket-2.png',mimeType:['image','png'].join('/'),buffer:png})
       await attachment.getByLabel('Before or after the work').selectOption('after')
