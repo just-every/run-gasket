@@ -240,6 +240,9 @@ export async function qualificationPlanningJourney() {
     if(raced[0].status===200) {
       assert.equal(racePreview.erased,false);assert.equal(racePreview.eligible,false)
       assert.equal((await view()).retired.find(r=>r.id===raceResource).snapshot.reference,disposable.reference)
+      const held=await raced[0].json()
+      await h.api('retention.hold',owner,{kind:'qualification',id:raceResource,revision:held.revision,held:false,reason:'Race evidence inspected and released'})
+      await h.api('qualification.erase',owner,{id:raceResource,revision:(await view()).revision,confirm:true})
     } else assert.equal(racePreview.erased,true)
     if(process.env.PLANNING_SCREENSHOTS) await browserProof(f,'resources')
   } finally {await h.close()}
