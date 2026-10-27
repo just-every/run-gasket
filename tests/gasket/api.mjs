@@ -621,6 +621,9 @@ export async function apiJourney() {
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id, [[`assets/${lifecycleAsset}`, 'Synthetic API pump']], 'lifecycle-')
     {
+    // This member is independent of the authority-loss fixtures above.
+    const member = (await h.api('access.give', owner, { name: 'Synthetic retry lead', email: 'synthetic-gasket-retry@example.test', role: 'lead' })).id
+    const lead = await h.signIn('synthetic-gasket-retry@example.test')
     // Documented schedule and labor writes preserve their decisions and exact amounts on retry.
     const schedule = (await repeat('schedule.create', { ...example('schedule.create'), asset, checklist: checklist.id, firstDue: '2026-10-25', maxDeferDays: 10 }, 'synthetic-gasket-schedule-retry', lead)).id
     const skip = await repeat('schedule.skip', { ...example('schedule.skip'), schedule }, 'synthetic-gasket-skip', lead)
@@ -660,6 +663,7 @@ export async function apiJourney() {
     assert.equal((await h.api(`v1/work/${laborWork}`, lead)).labor.entries[0].cents, undefined)
     await h.api('labor.timer', lead, { ...example('labor.timer'), workOrder: laborWork })
     assert.equal((await h.api(`v1/work/${laborWork}`, lead)).labor.timer.state, 'running')
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, laborWork, part, issued.id, [[`work/${laborWork}`, 'Synthetic API reviewed labor']], 'labor-')
     // A sole-owner decision receipt stops being available when independent review becomes possible.
     const sole = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
     try {
