@@ -253,6 +253,20 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       const kept = await h.raw(`/app/evidence/${persisted[0].id}`,{cookie:cookie.max})
       assert.equal(Buffer.from(await kept.arrayBuffer()).equals(png),true,'native lost reply kept the exact saved attachment')
       for(const width of [1440,390]) {await draft.setViewportSize({width,height:1100});await draft.screenshot({path:`${directory}/workspace-native-unreachable-${width}.png`,fullPage:true})}
+      await native.clearCookies()
+      await native.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+      const member = (await h.api('access.give',cookie.owner,{name:'Synthetic native role correction',email:'synthetic-gasket-native-role@example.test',role:'maintainer'})).id
+      await draft.goto(h.origin+'/app/access')
+      await draft.getByLabel('Role for Synthetic native role correction',{exact:true}).selectOption('supervisor')
+      h.setSaveFault('before')
+      await nativeSubmit(draft.locator(`#role-form-${member}`),/\/app\/do\/access.role/)
+      assert.match(await draft.getByRole('alert').innerText(),/internal error.*Nothing was saved/s)
+      assert.equal(await draft.getByLabel('Role for Synthetic native role correction',{exact:true}).inputValue(),'supervisor','native failed role save retains its associated selector')
+      assert.equal((await h.api('members',cookie.owner)).find(row=>row.id===member).role,'maintainer','failed role save leaves authority unchanged')
+      for(const width of [1440,390]) {await draft.setViewportSize({width,height:1100});await draft.screenshot({path:`${directory}/workspace-native-role-failure-${width}.png`,fullPage:true})}
+      await nativeSubmit(draft.locator(`#role-form-${member}`),/notice=/)
+      assert.equal((await h.api('members',cookie.owner)).find(row=>row.id===member).role,'supervisor','corrected native role save applies the retained selection')
+
 
     } finally {await native.close()}
   }
