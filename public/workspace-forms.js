@@ -11,7 +11,7 @@ document.addEventListener('submit', async event => {
   const receipt = typeof id === 'string' ? `/app/save-receipts/${encodeURIComponent(id)}` : null
   form.dataset.saving = 'yes'
   form.setAttribute('aria-busy', 'true')
-  let message, retry = false, nextSaveId, signIn = false
+  let message, retry = false, nextSaveId, signIn = false, feedbackShown = false
   try {
     const response = await fetch(form.action, { method: 'POST', body, headers: { accept: ['application', 'json'].join('/') } })
     if (response.status === 401 || (response.status === 403 && !response.headers.get('content-type')?.includes(['application', 'json'].join('/')))) {
@@ -31,9 +31,10 @@ document.addEventListener('submit', async event => {
     }
   } catch {
     message = 'The connection ended before a save confirmation arrived.'
+    showFeedback(message + (receipt ? ' Checking the save receipt.' : ' Check the saved record before retrying.'))
     if (receipt) {
       try {
-        const response = await fetch(receipt, { headers: { accept: ['application', 'json'].join('/') } })
+        const response = await fetch(receipt, { headers: { accept: ['application', 'json'].join('/') }, signal: AbortSignal.timeout(10_000) })
         if (response.ok) message += ' ' + (await response.json()).message
         else message += ' No receipt is available yet. Check again before retrying.'
       } catch { message += ' The receipt could not be reached. Check it before retrying.' }
@@ -42,24 +43,30 @@ document.addEventListener('submit', async event => {
     delete form.dataset.saving
     form.removeAttribute('aria-busy')
   }
-  if (retry && nextSaveId) form.elements.namedItem('__gk_save').value = nextSaveId
-  else for (const button of form.querySelectorAll('button[type=submit],input[type=submit]')) button.disabled = true
-  let error = form.querySelector('[data-save-error]')
-  if (!error) {
-    error = document.createElement('div')
-    error.dataset.saveError = 'yes'
-    error.className = 'gk-flash gk-error'
-    error.setAttribute('role', 'alert')
-    error.tabIndex = -1
-    form.prepend(error)
+  showFeedback(message, retry, nextSaveId, signIn)
+
+  function showFeedback(message, retry = false, nextSaveId, signIn = false) {
+    form.removeAttribute('aria-busy')
+    if (retry && nextSaveId) form.elements.namedItem('__gk_save').value = nextSaveId
+    else for (const button of form.querySelectorAll('button[type=submit],input[type=submit]')) button.disabled = true
+    let error = form.querySelector('[data-save-error]')
+    if (!error) {
+      error = document.createElement('div')
+      error.dataset.saveError = 'yes'
+      error.className = 'gk-flash gk-error'
+      error.setAttribute('role', 'alert')
+      error.tabIndex = -1
+      form.prepend(error)
+    }
+    error.replaceChildren(document.createTextNode(`${message} Your entries are still in this form. `))
+    const check = document.createElement('a')
+    check.href = signIn ? '/signin' : receipt || location.href
+    check.target = '_blank'; check.rel = 'noopener'
+    check.textContent = signIn ? 'Sign in in a new tab before retrying.' : 'Check save receipt in a new tab.'
+    error.append(check)
+    if (!feedbackShown) error.focus()
+    feedbackShown = true
   }
-  error.replaceChildren(document.createTextNode(`${message} Your entries are still in this form. `))
-  const check = document.createElement('a')
-  check.href = signIn ? '/signin' : receipt || location.href
-  check.target = '_blank'; check.rel = 'noopener'
-  check.textContent = signIn ? 'Sign in in a new tab before retrying.' : 'Check save receipt in a new tab.'
-  error.append(check)
-  error.focus()
 })
 // A server-rendered failed form uses the same keyboard focus as an enhanced form.
 document.querySelector('#save-error')?.focus()
