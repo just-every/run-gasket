@@ -23,11 +23,12 @@ export async function requestPortalPage(env:Bindings,actor:Actor|null,url:URL,id
   const targetId=url.searchParams.get('target') || ''
   const target=targetId?(await intake(env,actor,id,targetId)).target:null
   const targets=actor?await all(env,`SELECT t.id,t.name FROM gk_request_targets t LEFT JOIN gk_assets a ON a.id=t.asset_id WHERE portal_id=? AND t.retired_at IS NULL AND a.retired_at IS NULL ORDER BY t.name`,id):[]
+  const submissionKey=newId()
   const body=h`<p><img src="/brand/mark.svg" width="40" height="40" alt="Gasket"></p><h1>${p.name}</h1>
     <p class="gk-lede">Report an equipment fault</p><p>For immediate danger, follow your site's emergency procedure. This form does not summon emergency services.</p>
     ${target?h`<h2>${target.name}</h2>`:h`<p>Scan a site label or choose its published code. Private maintenance records are never available here.</p>`}
-    ${card('Fault details',h`<form method="post" enctype="multipart/form-data" action="/request/${id}" class="gk-form" id="request-form" data-portal="${id}" data-target="${targetId}">
-      ${hidden('submissionKey',newId())}${target?hidden('target',target.id):actor?select('Asset or location','target',targets.map(t=>({value:t.id,label:t.name})),'',{blank:'Choose…'}):field('Label code','target',{hint:'The code printed below the QR label.'})}
+    ${card('Fault details',h`<form method="post" enctype="multipart/form-data" action="/request/${id}" class="gk-form" id="request-form" target="_blank" rel="noopener" data-portal="${id}" data-target="${targetId}">
+      ${hidden('submissionKey',submissionKey)}<noscript><p>Save results open in a new tab. Keep this draft until confirmation. If the connection fails, <a href="/request/${id}/received/${submissionKey}" target="_blank" rel="noopener">check request receipt</a> before submitting again.</p></noscript>${target?hidden('target',target.id):actor?select('Asset or location','target',targets.map(t=>({value:t.id,label:t.name})),'',{blank:'Choose…'}):field('Label code','target',{hint:'The code printed below the QR label.'})}
       ${area('What is wrong?','description')}${select('Urgency','urgency',[{value:'normal',label:'Normal'},{value:'high',label:'High'},{value:'emergency',label:'Emergency'}],'normal')}
       ${field('Your name and contact','contact',{hint:'Contact details are kept for the maintenance team. They do not create or verify an account.'})}
       ${raw(fileField('Photo (optional)','photo',{accept:'image/png,image/jpeg',hint:'Use your camera or choose a PNG/JPEG, up to 1.5 MB.'}).html.replace('type="file"','type="file" capture="environment"'))}
