@@ -351,7 +351,8 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
   await open(`/app/work/${execution}`,'execution-finding')
   await save('finding.record',{'Checklist step':'0','What was found and what was done':'Guard fastener inspected and isolated for the next maintenance shift','Severity':'low'},executionView)
   assert.deepEqual((await h.api(executionView,cookie.max)).findings.map(row=>[row.text,row.severity]),[['Guard fastener inspected and isolated for the next maintenance shift','low']])
-  const photo=(await h.api('workorder.evidence',cookie.max,{workOrder:execution,file:{filename:'synthetic-gasket-49.png',base64:png.toString('base64'),type:['image','png'].join('/')},phase:'before'})).id
+  await h.api('workorder.evidence',cookie.max,{workOrder:execution,file:{filename:'synthetic-gasket-49.png',base64:png.toString('base64'),type:['image','png'].join('/')},phase:'before'})
+  const photo=(await h.api(executionView,cookie.max)).evidence.find(row=>row.filename==='synthetic-gasket-49.png').id
   await open(`/app/work/${execution}`,'original-photo-annotation')
   await save('workorder.annotate',{'Photo':photo,'Mark':'box','Across from (%)':'10','Down from (%)':'20','Across to (%)':'40','Down to (%)':'60','What it shows':'Guard fastener inspected before isolation'},executionView)
   const annotated=(await h.api(executionView,cookie.max)).evidence.find(row=>row.id===photo)
