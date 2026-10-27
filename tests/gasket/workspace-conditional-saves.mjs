@@ -280,5 +280,59 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
   await save('site.technicianWork',{},'site')
   assert.equal(Boolean((await h.api('site',cookie.owner)).technician_create_work),!Boolean(allowed))
   await open('/app/site','changed-technician-create-work-setting')
+  await use('lead')
+  const checklist=(await h.api('checklist.create',cookie.lead,{name:'Workshop guard route procedure',items:['Inspect guard fasteners']})).id
+  const previousDay=new Date(Date.parse(day+'T12:00Z')-86_400_000).toISOString().slice(0,10)
+  const schedule=(await h.api('schedule.create',cookie.lead,{asset,checklist,title:'Workshop guard calendar inspection',everyDays:30,firstDue:previousDay,assignee:technician})).id
+  await open('/app/schedules','calendar-revision')
+  await save('schedule.edit',{'Every (days)':'45'},'schedules',form('schedule.edit').filter({has:page.locator(`[name=schedule][value="${schedule}"]`)}))
+  assert.equal((await h.api('schedules',cookie.lead)).find(row=>row.id===schedule).every_days,45)
+  await save('schedule.skip',{'Reason to skip this occurrence':'Guard inspection completed under the retained corrective order'},'schedules',form('schedule.skip').filter({has:page.locator(`[name=schedule][value="${schedule}"]`)}))
+  const skip=(await h.api('schedules',cookie.lead)).find(row=>row.id===schedule).exceptions[0]
+  assert.equal(skip.kind,'skip');assert.equal(skip.decision,null)
+  await use('sam')
+  await open('/app/schedules','independent-skip-review')
+  await save('schedule.exception',{},'schedules',form('schedule.exception').filter({has:page.locator(`[name=exception][value="${skip.id}"]`)}).filter({has:page.locator('[name=decision][value=approve]')}))
+  assert.equal((await h.api('schedules',cookie.sam)).find(row=>row.id===schedule).exceptions[0].decision,'approved')
+  const deferred=(await h.api('schedule.create',cookie.lead,{asset,checklist,title:'Workshop guard deferred inspection',everyDays:30,firstDue:previousDay,assignee:technician})).id
+  await use('lead')
+  await open('/app/schedules','calendar-deferral')
+  await save('schedule.defer',{'Schedule':deferred,'Defer to':windowDay,'Reason':'Guard platform access needs an independently reviewed window'},'schedules')
+  const deferral=(await h.api('schedules',cookie.lead)).find(row=>row.id===deferred).exceptions[0]
+  assert.equal(deferral.kind,'defer');assert.equal(deferral.until,windowDay)
+  await use('sam')
+  await open('/app/schedules','independent-deferral-review')
+  await save('schedule.exception',{},'schedules',form('schedule.exception').filter({has:page.locator(`[name=exception][value="${deferral.id}"]`)}).filter({has:page.locator('[name=decision][value=reject]')}))
+  const rejected=(await h.api('schedules',cookie.sam)).find(row=>row.id===deferred)
+  assert.equal(rejected.exceptions[0].decision,'rejected');assert.equal(rejected.next_due_date,previousDay)
+  await use('lead')
+  await open('/app/schedules','route-authoring')
+  await save('route.create',{'Route name':'Workshop guard inspection route','Stop 1 asset':asset,'Stop 1 checklist':checklist,'Stop 2 asset':parent,'Stop 2 checklist':checklist,'Required tool':'Guard torque wrench'},'routes')
+  const route=(await h.api('routes',cookie.lead)).find(row=>row.name==='Workshop guard inspection route')
+  assert.deepEqual(route.stops.map(row=>[row.asset_id,row.checklist_id]),[[asset,checklist],[parent,checklist]])
+  await save('route.issue',{'Route':route.id,'Due':day,'Assign to':technician},'routes')
+  const run=(await h.api('routes',cookie.lead)).find(row=>row.id===route.id).runs[0]
+  assert.equal(run.stops.length,2);assert.equal(run.complete,false)
+  await use('max')
+  await open(`/app/work/${run.stops[0].id}`,'missed-route-stop')
+  await save('route.miss',{'Why this stop could not be done':'Isolation platform was temporarily unavailable'},`work/${run.stops[0].id}`)
+  assert.equal((await h.api('routes',cookie.max)).find(row=>row.id===route.id).runs[0].stops[0].state,'missed')
+  await save('workorder.tool',{'Tool':'0','Which one (serial or asset number)':'synthetic-gasket-47'},`work/${run.stops[0].id}`)
+  assert.equal((await h.api(`work/${run.stops[0].id}`,cookie.max)).tools[0].identifier,'synthetic-gasket-47')
+  await open(`/app/work/${run.stops[0].id}`,'retained-route-tool-and-missed-reason')
+  for(const stop of run.stops) {
+    const door=`work/${stop.id}`
+    if(stop.id!==run.stops[0].id)await h.api('workorder.tool',cookie.max,{workOrder:stop.id,tool:'0',identifier:'synthetic-gasket-48'})
+    await h.api('workorder.results',cookie.max,{workOrder:stop.id,item:['0'],outcome:['pass'],note:['Guard fasteners inspected after platform access was restored']})
+    await h.api('workorder.submit',cookie.max,{workOrder:stop.id,version:(await h.api(door,cookie.max)).version})
+    await h.api('workorder.review',cookie.sam,{workOrder:stop.id,version:(await h.api(door,cookie.sam)).version,decision:'approve'})
+  }
+  await use('sam')
+  await open('/app/schedules','complete-route-sign-off')
+  await save('route.sign',{},'routes',form('route.sign').filter({has:page.locator(`[name=run][value="${run.id}"]`)}))
+  const signed=(await h.api('routes',cookie.sam)).find(row=>row.id===route.id).runs[0]
+  assert.equal(signed.complete,true);assert.equal(signed.signed_by,(await h.api('me',cookie.sam)).name)
+  assert.deepEqual(signed.stops.map(row=>row.state),['done','done'])
+  await open('/app/schedules','signed-route-and-calendar-decisions')
   await proof('conditional-saves-complete')
 }
