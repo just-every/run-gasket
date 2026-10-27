@@ -4236,7 +4236,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "479a24f674c5e5aaf3e66c0146baf80f4ef2618aa24e415ee983a2be469317f2",
+      "sha256": "37062abf6cc42e4de2f179d3101c99f7d03fb3a1460096a3f45187103be4b980",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {

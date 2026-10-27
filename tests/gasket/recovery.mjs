@@ -17,7 +17,7 @@ async function command(installation, verb, ...args) {
 }
 
 export async function recoveryJourney() {
-  const h = await harness(), target = await installation(), corruptTarget = await installation()
+  const h = await harness(), target = await installation()
   try {
     const owner = await h.owner()
     await h.api('site.configure', owner, { name: 'Recovery estate', timezone: 'UTC' })
@@ -71,9 +71,8 @@ export async function recoveryJourney() {
     assert.ok(!records[0].tables.some(table => ['oa_sessions','oa_tokens','oa_credentials'].includes(table.name)))
     const damaged = join(h.installation.root, 'damaged.rer')
     await writeFile(damaged, bytes.subarray(0, Math.floor(bytes.length / 2)))
-    await assert.rejects(command(corruptTarget, 'import', '--input', damaged, '--yes'))
+    await assert.rejects(command(target, 'import', '--input', damaged, '--yes'))
     // A clean import succeeds after the rejected corrupt attempt.
-    await command(corruptTarget, 'import', '--input', archive, '--yes')
     await command(target, 'import', '--input', archive, '--yes')
     const restored = await harness({ vars: h.vars, installation: target })
     try {
@@ -212,7 +211,7 @@ export async function recoveryJourney() {
 
     } finally { await source.close() }
     console.log('Inactive recovery: corrupt refusal, clean restore, excluded sessions, preserved work, paused PMs and connectors, and nonempty refusal passed')
-  } finally { await h.close(); await target.remove(); await corruptTarget.remove() }
+  } finally { await h.close(); await target.remove() }
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) await recoveryJourney()
 
