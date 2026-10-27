@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { readFile, writeFile, copyFile, chmod } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { harness, file } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { installation } from './installation.mjs'
@@ -32,6 +32,9 @@ export async function recoveryJourney() {
     const retiredResources=(await h.api('planning',owner)).retired
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
     const credential = await h.api('service.create', owner, { name: 'Synthetic recovery service', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
+    const bearerHash = createHash('sha256').update(credential.token).digest('hex')
+    const serviceUse = () => h.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })
+    assert.equal((await serviceUse()).status, 200)
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
     await h.api('webhook.control', owner, { subscription: subscription.id, revision: 1, paused: false, reason: 'Receiver confirmed' })
     const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today, assignee: (await h.api('me', owner)).id })
@@ -51,6 +54,9 @@ export async function recoveryJourney() {
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')
     assert.ok(!bytes.includes(Buffer.from(credential.token)), 'service bearer secrets are absent from exports')
     const records = bytes.toString().trim().split('\n').map(line => JSON.parse(line))
+    assert.ok(!bytes.includes(Buffer.from(bearerHash)), 'archives exclude the usable bearer verifier as well as its token')
+    const credentials = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_api_credentials')
+    assert.deepEqual(credentials.map(item => [item.row.id, item.row.token_hash, item.row.revoked_at]), [[credential.id, `inactive-${credential.id}`, null]])
     const subscriptions = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_connector_subscriptions')
     assert.equal(subscriptions.length, 1)
     assert.equal(subscriptions[0].row.secret_cipher, '', 'encrypted signing keys are also excluded')
@@ -69,6 +75,15 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
+      const replacement = await restored.api('service.create', signed, { name: 'Synthetic restored replacement', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
+      assert.notEqual(replacement.id, credential.id)
+      const replacementUse = await restored.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${replacement.token}` } })
+      assert.equal(replacementUse.status, 200, 'deliberate replacement issuance restores only fresh authority')
+      assert.ok((await replacementUse.json()).rows.some(row => row.id === asset))
+      assert.equal((await restored.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })).status, 401)
+      await restored.api('service.revoke', signed, { credential: replacement.id })
+      assert.equal((await restored.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${replacement.token}` } })).status, 401)
+      assert.ok((await restored.api('service-credentials', signed)).find(row => row.id === replacement.id).revoked_at !== null)
       const restoredPlanning=await restored.api('planning',signed)
       assert.deepEqual(restoredPlanning.retired,retiredResources,'retired evidence and attribution reconcile after empty restore')
       assert.deepEqual(restoredPlanning.qualifications,[],'retired qualification is not restored into eligibility')
@@ -134,6 +149,7 @@ export async function recoveryJourney() {
     const source = await harness({ vars: h.vars, installation: h.installation })
     try {
       const signed = await source.signIn(h.vars.OWNER_EMAIL)
+      assert.equal((await source.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })).status, 200, 'export leaves the source credential active')
       const backup = await source.api('recovery', signed)
       assert.equal(backup.backup.kind, 'backup')
       assert.equal(backup.backup.recovery_point, records[0].exportedAt)

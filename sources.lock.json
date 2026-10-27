@@ -4220,7 +4220,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "6d753a68fddc162ec5c49daacc4c994c74a1f4e5bd2f3b11a6b2984e4515a23c",
+      "sha256": "cad5a42b1f4bf03e85843351817360f32bbdee941f14fc39f73bee62958c9794",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {
