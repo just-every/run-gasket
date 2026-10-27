@@ -10,9 +10,11 @@ function saveDatabase(db) {
     raw: (...args) => statement.raw(...args),
   }; originals.set(wrapped,statement);queries.set(wrapped,query);return wrapped }
   return { prepare: query => wrap(db.prepare(query), query), async batch(statements) {
+    const tracked = statements.some(s=>queries.get(s)?.startsWith('UPDATE gk_form_saves SET batches=batches+1'))
+    if (tracked && !(await fetch('https://synthetic-gasket.invalid/form-save?phase=before')).ok) throw new Error('synthetic-gasket failure before durable commit')
     const result = await db.batch(statements.map(s=>originals.get(s)??s))
-    if (statements.some(s=>queries.get(s)?.startsWith('UPDATE gk_form_saves SET batches=batches+1'))) {
-      const reply = await fetch('https://synthetic-gasket.invalid/form-save')
+    if (tracked) {
+      const reply = await fetch('https://synthetic-gasket.invalid/form-save?phase=after')
       if (!reply.ok) throw new Error('synthetic-gasket failure after durable commit')
     }
     return result
