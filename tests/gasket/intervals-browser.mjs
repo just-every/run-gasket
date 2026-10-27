@@ -120,10 +120,12 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       catch (error) { interceptionError = error }
       finally { await route.abort('failed') }
     },{times:1})
-    await form.getByRole('button',{name:/./}).last().focus()
-    await page.keyboard.press('Enter')
+    await form.getByRole('button',{name:/./}).last().press('Enter')
     const error = form.getByRole('alert')
-    await error.waitFor()
+    await error.waitFor().catch(async failure=>{
+      const state=await form.evaluate(el=>({busy:el.dataset.saving||null,focused:el.contains(document.activeElement),valid:el.checkValidity()}))
+      throw new Error(`${action} retry: ${JSON.stringify({intercepted,state,error:interceptionError?.message})}`,{cause:failure})
+    })
     assert.equal(intercepted,true,`${action} keyboard retry reaches the server`)
     if(interceptionError)throw interceptionError
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
