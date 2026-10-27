@@ -112,6 +112,9 @@ export async function apiJourney() {
     await h.api('/v1/work?cursor=invalid', owner, undefined, 400)
     assert.equal((await h.api('/v1/assets?site=Forbidden%20site', owner)).total, 0)
     assert.equal((await h.raw('/api/gasket/v1/assets')).status, 401)
+    const unknownSite = await h.raw('/api/gasket/v1/assets', { cookie: owner, headers: { 'x-gasket-site': 'synthetic-gasket-unknown-site' } })
+    assert.equal(unknownSite.status, 404)
+    assert.deepEqual(await unknownSite.json(), { error: 'site_not_found' })
     await h.api('/v2/assets', owner, undefined, 404)
     // Keep the documented lifecycle and feed estate attributable across retries.
     const lifecycleAsset = (await h.api('/v1/asset.create', lead, { ...assetBody, tag: 'synthetic-gasket-record-lifecycle' })).id
@@ -124,6 +127,10 @@ export async function apiJourney() {
       return repeat(action, body, key, lead)
     }
     const moved = await maintain('asset.move', { asset: lifecycleAsset, parent })
+    const refusedSiteReplay = await h.raw('/api/gasket/v1/asset.move', { cookie: lead, body: maintenanceWrites[0].body, headers: { 'idempotency-key': maintenanceWrites[0].key, 'x-gasket-site': 'synthetic-gasket-unknown-site' } })
+    assert.equal(refusedSiteReplay.status, 404)
+    assert.deepEqual(await refusedSiteReplay.json(), { error: 'site_not_found' })
+    assert.equal(refusedSiteReplay.headers.get('idempotency-replayed'), null)
     assert.equal(moved.revision, 2)
     assert.equal((await h.api(`/v1/assets/${lifecycleAsset}`, owner)).hierarchy.parent.id, parent)
     await write('asset.move', { asset: lifecycleAsset, parent, revision: 1 }, 'synthetic-gasket-stale-move', lead, 409)
@@ -449,6 +456,9 @@ export async function apiJourney() {
       return response.json()
     }
     const serviceAsset = await scoped(complete.token, 'asset.create', { ...assetBody, tag: 'synthetic-gasket-complete' }, 'synthetic-gasket-complete-asset')
+    const forbiddenServiceSite = await h.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${complete.token}`, 'x-gasket-site': 'synthetic-gasket-unknown-site' } })
+    assert.equal(forbiddenServiceSite.status, 404)
+    assert.deepEqual(await forbiddenServiceSite.json(), { error: 'site_not_found' })
     const serviceUpdate = { ...assetBody, tag: 'synthetic-gasket-complete', name: 'Synthetic service update', asset: serviceAsset.id, revision: 1 }
     const serviceUpdated = await scoped(complete.token, 'asset.update', serviceUpdate, 'synthetic-gasket-complete-update')
     assert.equal(serviceUpdated.revision, 2)
