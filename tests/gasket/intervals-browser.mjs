@@ -34,7 +34,7 @@ export async function intervalBrowser(h,cookie,proposal) {
 }
 
 // ADMIN-011: all six implemented core doors, with actual edits and independent reads.
-export async function workspaceBrowser(h, cookie, browser, directory) {
+export async function workspaceBrowser(h, cookie, browser, directory, {conditionalOnly=false}={}) {
   const context = await browser.newContext({ignoreHTTPSErrors:true})
   const use = async who => {
     await context.clearCookies()
@@ -112,6 +112,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     // The displayed failed receipt must refer to the attempted id, even after preparing a new retry id.
     const failedReceipt = await (await h.raw(failedPath,{cookie:who,headers:{accept:['application','json'].join('/')}})).json()
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
+    await proof('refused-'+action.slice('/app/do/'.length))
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
     let confirmation
@@ -130,6 +131,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     const receipt = await response.json()
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
+    await proof('confirmed-'+action.slice('/app/do/'.length))
     await snapshot.interrupt({action,fields:submitted,cookie:who,view,steps:receipt.batches})
     await snapshot.close()
     assert.equal(confirmation.saved,true)
@@ -287,6 +289,13 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     } finally {await native.close()}
   }
   try {
+    if (conditionalOnly) {
+      const part=(await h.api('part.create',cookie.lead,{number:'ACCESS-CONDITIONAL',name:'Guard fastener for maintenance workshop inspections',unit:'each'})).id
+      await h.api('part.receive',cookie.lead,{part,quantity:'5',unitPrice:'2.00'})
+      await page.setViewportSize({width:1440,height:1100})
+      await conditionalSaves({h,cookie,page,use,open,submit,proof,day,technician,longName,part})
+      return
+    }
     for(const width of [1440]) {
       await page.setViewportSize({width,height:1100})
       await use('owner')
