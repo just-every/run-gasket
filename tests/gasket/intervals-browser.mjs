@@ -141,8 +141,16 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     let confirmation
     // Keep interception active until receipt readback finishes; tearing it down at abort can strand the next request.
     await page.route('**'+action,async route=>{confirmation=await (await route.fetch()).json();await route.abort('failed')})
-    await form.getByRole('button',{name:/./}).last().focus()
-    await page.keyboard.press('Enter')
+    // Captures change the viewport and scroll position. Target the keyboard event at
+    // the submitter, and observe this submission leaving the browser before its feedback.
+    const submitter = form.getByRole('button',{name:/./}).last()
+    await submitter.scrollIntoViewIfNeeded()
+    assert.deepEqual(await form.evaluate(el=>el.noValidate?[]:[...el.elements].filter(control=>control.validity&&!control.validity.valid).map(control=>({name:control.name,error:control.validationMessage}))),[],`${action} retained retry is valid`)
+    const retryId = retryDraft.find(([key])=>key==='__gk_save')[1]
+    await Promise.all([
+      page.waitForRequest(request=>request.method()==='POST'&&new URL(request.url()).pathname===action&&request.postData()?.includes(retryId)),
+      submitter.press('Enter'),
+    ])
     const error = form.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s})
     await error.waitFor()
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
@@ -328,6 +336,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       await h.api('part.receive',cookie.lead,{part,quantity:'5',unitPrice:'2.00'})
       await page.setViewportSize({width:1440,height:1100})
       await conditionalSaves({h,cookie,page,use,open,submit,proof,day,technician,longName,part})
+      console.log('conditional workspace save coverage distinct='+exercisedActions.size+' actions='+JSON.stringify([...exercisedActions].sort()))
       return
     }
     for(const width of [1440]) {
