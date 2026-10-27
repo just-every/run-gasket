@@ -193,7 +193,7 @@ export async function requestDraftJourney() {
     await page.getByRole('status').filter({hasText:'Saved draft restored'}).waitFor()
     assert.equal(await page.locator('[name=description]').inputValue(),'Leak around the pump seal')
     assert.equal(await page.locator('[name=submissionKey]').inputValue(),submissionKey)
-    const restoredReceipt = await page.locator('[data-request-receipt]').getAttribute('href')
+    const restoredReceipt = new URL(await page.locator('[data-request-receipt]').getAttribute('href'),h.origin).pathname
     assert.equal(new URL(restoredReceipt,h.origin).pathname,`/request/${portal}/received/${submissionKey}`,'restored portal advertises the retained submission identity')
     assert.equal(await page.locator('[name=target]').inputValue(),target)
     assert.equal(await page.locator('[name=photo]').evaluate(n=>n.files[0].name),'leak.png')

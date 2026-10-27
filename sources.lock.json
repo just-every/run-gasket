@@ -4272,7 +4272,7 @@
       "executable": false
     },
     "tests/gasket/requests.mjs": {
-      "sha256": "7a97930d065d4bcf94d755b2ca01550d77977fc8ac6a7b5abfa46bd781d272b4",
+      "sha256": "3319c8f7a1f750461ba04d471a838d04e0e47a898da23cfcb4401e1580560482",
       "executable": false
     },
     "tests/gasket/rule-sources.mjs": {
