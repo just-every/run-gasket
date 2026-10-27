@@ -23,8 +23,15 @@ export async function recoveryJourney() {
     const checklist = (await h.api('checklist.create', owner, { name: 'Recovery inspection', items: ['Listen for noise'] })).id
     const today = (await h.api('me', owner)).today
     const member=(await h.api('me',owner)).id
-    const qualification={member,name:'Recovery training',expires:'2099-12-31',reference:'synthetic-gasket-retired-reference'}
+    const qualification={member,name:'Recovery training',expires:today,reference:'synthetic-gasket-retired-reference',remind:true,remindDays:1}
     await h.api('planning.qualification',owner,qualification)
+    const expiryGrant=(await h.api('automation',owner)).rules.find(r=>r.id==='expiry')
+    const expiryJob=await h.api('automation.catchup',owner,{rule:'expiry',revision:expiryGrant.revision})
+    const reminderEvidence=(await h.api(`/automation/jobs?job=${expiryJob.job}`,owner)).input.qualificationReminders
+    assert.equal(reminderEvidence.qualifications[0].expires_on,today)
+    assert.equal(reminderEvidence.qualifications[0].remind_days,1)
+    assert.equal(reminderEvidence.qualifications[0].consent,1)
+    assert.equal(expiryJob.output.notices.filter(n=>n.kind==='qualification_expiry').length,1)
     await h.api('planning.retire',owner,{kind:'qualification',member,name:qualification.name,reason:'Reference withdrawn before backup',revision:(await h.api('planning',owner)).revision})
     const resourceTool=(await h.api('planning.tool',owner,{name:'Recovery gauge',identifier:'synthetic-gasket-retired-tool',calibrationDue:'2099-12-31',revision:(await h.api('planning',owner)).revision})).id
     await h.api('planning.retire',owner,{kind:'tool',id:resourceTool,reason:'Gauge withdrawn before backup',revision:(await h.api('planning',owner)).revision})
@@ -69,6 +76,7 @@ export async function recoveryJourney() {
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
       const restoredPlanning=await restored.api('planning',signed)
       assert.deepEqual(restoredPlanning.retired,retiredResources,'retired evidence and attribution reconcile after empty restore')
+      assert.deepEqual((await restored.api(`/automation/jobs?job=${expiryJob.job}`,signed)).input.qualificationReminders,reminderEvidence,'qualification reminder inputs survive retirement and inactive empty restore')
       assert.deepEqual(restoredPlanning.qualifications,[],'retired qualification is not restored into eligibility')
       assert.deepEqual(restoredPlanning.tools,[],'retired tool is not restored into eligibility')
       assert.equal((await restored.api('audit?action=planning.retire',signed)).rows.length,2)

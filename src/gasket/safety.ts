@@ -5,6 +5,13 @@ import { isDate } from './dates'
 import type { Input } from './input'
 import { workOrder, OPEN } from './work'
 
+// Pre-identity snapshots bind only to the original migrated record, never a replacement.
+const legacyQualificationId = (member: string, name: string) => {
+  const hex = (value: string) => [...new TextEncoder().encode(value)].map(byte=>byte.toString(16).padStart(2,'0').toUpperCase()).join('')
+  return `legacy-${hex(member)}-${hex(name)}`
+}
+const qualificationIdentity = (member: string, qualification: Row) => !qualification.record_id || qualification.record_id==='legacy' ? legacyQualificationId(member,qualification.name) : qualification.record_id
+
 export const QUALIFICATION_PROVENANCE = 'Owner-entered reference — not verified by Gasket with the issuing body.'
 
 export async function publishSafety(env: Bindings, actor: Actor, input: Input) {
@@ -31,7 +38,7 @@ export async function safetyState(env: Bindings, actor: Actor, order: Row) {
     const reasons=[]
     if(row.requirement_id!==requirement.id||row.procedure_revision!==procedure.latest||row.work_version!==version)reasons.push('Changed evidence requires reapproval')
     if(row.expires_on<=actor.today)reasons.push('Permit expired')
-    if(row.member_status!=='active'||!current||current.expires_on<=actor.today||JSON.stringify(current)!==JSON.stringify(qualification))reasons.push('Qualification missing, expired or changed')
+    if(row.member_status!=='active'||!current||current.expires_on<=actor.today||current.name!==qualification.name||current.expires_on!==qualification.expires_on||current.reference!==qualification.reference||qualificationIdentity(row.signer,current)!==qualificationIdentity(row.signer,qualification))reasons.push('Qualification missing, expired or changed')
     attestations.push({...row,qualification:can(actor,'work.assign')||actor.id===row.signer?{...qualification,provenance:QUALIFICATION_PROVENANCE}:undefined,qualification_json:undefined,member_status:undefined,reasons})
   }
   const latest=attestations.at(-1)
@@ -75,7 +82,7 @@ export async function safetyGuards(env: Bindings,actor: Actor,order: Row) {
   insist(!state.missing.length,'safety_evidence_required',409,{missing:state.missing})
   if(!state.requirement)return [guard(env,'safety_changed','NOT EXISTS(SELECT 1 FROM gk_safety_requirements WHERE checklist_id=(SELECT checklist_id FROM gk_checklist_revisions WHERE id=?))',order.checklist_revision_id)]
   const r=state.requirement,a=state.attestations.at(-1)!,q=JSON.parse((await one(env,'SELECT qualification_json FROM gk_safety_attestations WHERE id=?',a.id)).qualification_json)
-  return [guard(env,'safety_changed','(SELECT id FROM gk_safety_requirements WHERE checklist_id=? ORDER BY revision DESC LIMIT 1)=?',r.checklist_id,r.id),guard(env,'procedure_changed','(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?',r.checklist_id,state.procedure.latest),guard(env,'qualification_changed',"EXISTS(SELECT 1 FROM gk_qualifications q JOIN gk_members m ON m.id=q.member_id WHERE m.id=? AND m.status='active' AND q.name=? AND q.expires_on=? AND q.reference=? AND q.record_id=?)",a.signer,q.name,q.expires_on,q.reference,q.record_id)]
+  return [guard(env,'safety_changed','(SELECT id FROM gk_safety_requirements WHERE checklist_id=? ORDER BY revision DESC LIMIT 1)=?',r.checklist_id,r.id),guard(env,'procedure_changed','(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?',r.checklist_id,state.procedure.latest),guard(env,'qualification_changed',"EXISTS(SELECT 1 FROM gk_qualifications q JOIN gk_members m ON m.id=q.member_id WHERE m.id=? AND m.status='active' AND q.name=? AND q.expires_on=? AND q.reference=? AND q.record_id=?)",a.signer,q.name,q.expires_on,q.reference,qualificationIdentity(a.signer,q))]
 }
 
 /** Required inspection library: existing procedure revisions and their published intervals. */

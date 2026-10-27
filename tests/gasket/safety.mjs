@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
+import { copyFile, rm } from 'node:fs/promises'
+import { join } from 'node:path'
+import { promisify } from 'node:util'
+import { installation } from './installation.mjs'
 import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
@@ -8,7 +13,69 @@ import { png } from './fixtures.mjs'
 const provenance='Owner-entered reference — not verified by Gasket with the issuing body.'
 const unzip=buffer=>{const b=Buffer.from(buffer),out={};for(let at=0;b.readUInt32LE(at)===0x04034b50;){const size=b.readUInt32LE(at+18),n=b.readUInt16LE(at+26),start=at+30+n+b.readUInt16LE(at+28);out[b.subarray(at+30,at+30+n).toString()]=b.subarray(start,start+size);at=start+size}return out}
 
+// Build the actual pre-identity schema, retain an old-format sign-off, then apply the upgrade.
+async function upgradeQualificationProof() {
+ const old=await installation(), run=promisify(execFile)
+ const migrations=['0099_resource_retirement.sql','0100_qualification_identity.sql']
+ const sql=async command=>JSON.parse((await run(join(old.root,'node_modules/.bin/wrangler'),
+  ['d1','execute','foundation','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--json','--command',command],
+  {cwd:old.root,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:4*1024*1024})).stdout)
+ let before,after
+ try {
+  for(const name of migrations)await rm(join(old.root,'./migrations/core',name))
+  await old.migrate()
+  before=await harness({installation:old,clockInstant:Date.parse('2026-10-26T16:00:00Z')})
+  const owner=await before.owner()
+  await before.api('site.configure',owner,{name:'Upgrade plant',timezone:'America/New_York'})
+  const tech=(await before.api('access.give',owner,{name:'Upgrade technician',email:'upgrade-tech@example.test',role:'maintainer'})).id
+  const who=await before.signIn('upgrade-tech@example.test')
+  await before.api('access.give',owner,{name:'Upgrade reviewer',email:'upgrade-review@example.test',role:'supervisor'})
+  const reviewer=await before.signIn('upgrade-review@example.test')
+  const checklist=(await before.api('checklist.create',owner,{name:'Upgrade isolation',items:['Verify isolation']})).id
+  const prerequisite=await before.api('safety.publish',owner,{checklist,hazard:'Stored energy',isolation:'Site-approved isolation',qualification:'Isolation training',siteApproved:true})
+  const template=(await before.api('template.save',owner,{name:'Upgrade repair',title:'Isolated repair',checklist})).id
+  const work=(await before.api('workorder.create',owner,{location:'Workshop',template,due:'2026-10-26',assignee:tech})).id
+  await before.api('workorder.results',who,{workOrder:work,outcome:['pass'],note:['Verified isolation']})
+  const current=await before.api(`work/${work}`,who)
+  await before.stop()
+  // This fixture is the legacy persisted shape; all post-upgrade assertions use public doors.
+  await sql(`INSERT INTO gk_qualifications(member_id,name,expires_on,reference) VALUES ('${tech}','Isolation training','2027-01-01','synthetic-gasket-upgrade'), ('${tech}','Other training','2027-01-01','synthetic-gasket-other');
+   INSERT INTO gk_safety_attestations SELECT 'synthetic-gasket-upgrade',w.id,'${prerequisite.requirement}',w.checklist_revision_id,w.version,'${tech}',
+    '{"name":"Isolation training","expires_on":"2027-01-01","reference":"synthetic-gasket-upgrade"}',
+    'synthetic-gasket-permit','2026-11-01','permit.txt',X'01','${createHash('sha256').update(Buffer.from([1])).digest('hex')}',1 FROM gk_work_orders w WHERE w.id='${work}';`)
+  await copyFile(new URL('../../migrations/core/'+migrations[0],import.meta.url),join(old.root,'./migrations/core',migrations[0]))
+  await old.migrate()
+  // The intermediate release saved the shared legacy marker in new snapshots.
+  await sql(`INSERT INTO gk_safety_attestations SELECT 'synthetic-gasket-upgrade-with-id',work_order_id,requirement_id,procedure_revision,work_version,signer,json_set(qualification_json,'$.record_id','legacy'),permit,expires_on,filename,bytes,sha256,2 FROM gk_safety_attestations WHERE id='synthetic-gasket-upgrade';`)
+  const readSnapshots="SELECT qualification_json FROM gk_safety_attestations ORDER BY id"
+  const original=(await sql(readSnapshots)).flatMap(r=>r.results)
+  await copyFile(new URL('../../migrations/core/'+migrations[1],import.meta.url),join(old.root,'./migrations/core',migrations[1]))
+  await old.migrate()
+  assert.deepEqual((await sql(readSnapshots)).flatMap(r=>r.results),original,'upgrade preserves immutable saved evidence bytes')
+  after=await harness({installation:old,vars:before.vars,clockInstant:Date.parse('2026-10-26T16:00:00Z')})
+  const upgradedOwner=owner,upgradedTech=who
+  const state=()=>after.api(`work/${work}/safety`,upgradedTech)
+  assert.deepEqual((await state()).missing,[],'an unchanged pre-upgrade sign-off stays valid')
+  assert.deepEqual((await state()).attestations.map(a=>a.reasons),[[],[]],'both pre-identity and intermediate legacy snapshots stay valid')
+  const migrated=(await after.api('planning',upgradedOwner)).qualifications
+  assert.deepEqual(migrated.map(q=>q.name),['Isolation training','Other training'])
+  assert.equal(new Set(migrated.map(q=>q.record_id)).size,2,'old qualifications receive distinct identities')
+  const q={member:tech,name:'Isolation training',expires:'2027-01-01',reference:'synthetic-gasket-upgrade'}
+  const identity=(await after.api('planning',upgradedOwner)).qualifications.find(q=>q.member_id===tech).record_id
+  await after.api('planning.qualification',upgradedOwner,{...q,remind:true,remindDays:7})
+  assert.equal((await after.api('planning',upgradedOwner)).qualifications.find(q=>q.member_id===tech).record_id,identity)
+  assert.deepEqual((await state()).missing,[],'reminder consent preserves the legacy sign-off')
+  await after.api('workorder.submit',upgradedTech,{workOrder:work,version:current.version})
+  await after.api('workorder.review',reviewer,{workOrder:work,version:(await after.api(`work/${work}`,upgradedTech)).version,decision:'approve'})
+  assert.equal((await after.api(`work/${work}`,upgradedTech)).status,'closed','unchanged legacy evidence permits independent approval')
+  await after.api('planning.retire',upgradedOwner,{kind:'qualification',member:tech,name:q.name,reason:'Withdraw old evidence',revision:(await after.api('planning',upgradedOwner)).revision})
+  await after.api('planning.qualification',upgradedOwner,q)
+  assert.ok((await state()).missing.includes('Qualification missing, expired or changed'),'identical replacement never revives a pre-upgrade sign-off')
+ } finally {await before?.close();await after?.close();await old.remove()}
+}
+
 export async function safetyJourney() {
+ await upgradeQualificationProof()
  const h=await harness({clockInstant:Date.parse('2026-10-26T16:00:00Z')})
  try {
   const owner=await h.owner();await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
@@ -61,6 +128,12 @@ export async function safetyJourney() {
   if(process.env.SAFETY_SCREENSHOTS)await browserProof(h,owner,who,checklist,work,'open')
   await sign()
   assert.deepEqual((await state()).missing,[])
+  const signedQualification=(await state()).attestations.at(-1).qualification
+  for(const preferences of [{remind:true,remindDays:30},{remind:true,remindDays:7},{remind:false}]) {
+   await h.api('planning.qualification',owner,{...q,expires:'2027-01-01',...preferences})
+   assert.equal((await h.api('planning',owner)).qualifications.find(row=>row.member_id===tech).record_id,signedQualification.record_id,'reminder preferences preserve evidence identity')
+   assert.deepEqual((await state()).missing,[],'reminder preferences preserve the qualified sign-off')
+  }
   assert.equal((await state()).attestations.at(-1).qualification.provenance,provenance)
   await h.api('checklist.revise',owner,{checklist,items:['Inspect guard | number V 0..1','Confirm isolation point'],note:'New isolation point'})
   assert.ok((await state()).missing.includes('Changed evidence requires reapproval'))
