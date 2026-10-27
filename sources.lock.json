@@ -964,7 +964,7 @@
       "executable": false
     },
     "public/workspace-forms.js": {
-      "sha256": "3373ab0899da1a8f4dcc7f8332acdc2242086feac5653822927eb1285ca5206b",
+      "sha256": "d4fe3e98ffb9effcd2be8792bb44dcc902ac937d71a65aacfc3b347b76142492",
       "executable": false
     },
     "README.md": {
@@ -4168,7 +4168,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "e6508f953bd589a6edc8161f99b9da6cee7a629cfafec891c4c4fe240a566750",
+      "sha256": "68c5b7d3cafee980cb2bdaba0a494f93748d419ed0170346542fcad09a0725bf",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {

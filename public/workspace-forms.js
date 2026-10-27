@@ -31,9 +31,10 @@ document.addEventListener('submit', async event => {
     }
   } catch {
     message = 'The connection ended before a save confirmation arrived.'
+    showFeedback(message + (receipt ? ' Checking the save receipt.' : ' Check the saved record before retrying.'))
     if (receipt) {
       try {
-        const response = await fetch(receipt, { headers: { accept: ['application', 'json'].join('/') } })
+        const response = await fetch(receipt, { headers: { accept: ['application', 'json'].join('/') }, signal: AbortSignal.timeout(10_000) })
         if (response.ok) message += ' ' + (await response.json()).message
         else message += ' No receipt is available yet. Check again before retrying.'
       } catch { message += ' The receipt could not be reached. Check it before retrying.' }
@@ -42,6 +43,10 @@ document.addEventListener('submit', async event => {
     delete form.dataset.saving
     form.removeAttribute('aria-busy')
   }
+  showFeedback(message, retry, nextSaveId, signIn)
+
+  function showFeedback(message, retry = false, nextSaveId, signIn = false) {
+  form.removeAttribute('aria-busy')
   if (retry && nextSaveId) form.elements.namedItem('__gk_save').value = nextSaveId
   else for (const button of form.querySelectorAll('button[type=submit],input[type=submit]')) button.disabled = true
   let error = form.querySelector('[data-save-error]')
@@ -52,6 +57,7 @@ document.addEventListener('submit', async event => {
     error.setAttribute('role', 'alert')
     error.tabIndex = -1
     form.prepend(error)
+    error.focus()
   }
   error.replaceChildren(document.createTextNode(`${message} Your entries are still in this form. `))
   const check = document.createElement('a')
@@ -59,7 +65,7 @@ document.addEventListener('submit', async event => {
   check.target = '_blank'; check.rel = 'noopener'
   check.textContent = signIn ? 'Sign in in a new tab before retrying.' : 'Check save receipt in a new tab.'
   error.append(check)
-  error.focus()
+  }
 })
 // A server-rendered failed form uses the same keyboard focus as an enhanced form.
 document.querySelector('#save-error')?.focus()

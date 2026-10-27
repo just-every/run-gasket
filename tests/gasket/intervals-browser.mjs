@@ -56,9 +56,11 @@ export async function intervalBrowser(h,cookie,proposal) {
 // Lose only the browser's reply. Forward its original HTTP method, multipart
 // bytes and identity to the built Worker through the harness's public transport.
 // Playwright's second HTTPS client can disconnect before forwarding to workerd.
-async function loseSaveReply(h, router, path, committed = true) {
-  const handled = Promise.withResolvers()
-  await router.route('**' + path, async route => {
+async function loseSaveReply(h, router, path, committed = true, {holdReceipt=false}={}) {
+  const handled = Promise.withResolvers(), requested = Promise.withResolvers(), released = Promise.withResolvers()
+  const receiptHandler = async route => { requested.resolve(); await released.promise; await route.continue() }
+  if (holdReceipt) await router.route('**/app/save-receipts/*', receiptHandler)
+  const handler = async route => {
     try {
       let response
       if (committed) {
@@ -75,8 +77,14 @@ async function loseSaveReply(h, router, path, committed = true) {
       await route.abort('failed').catch(() => {})
       handled.reject(error)
     }
-  }, { times: 1 })
-  return { completed: handled.promise }
+  }
+  // Keep interception active through the receipt request following the aborted POST.
+  // Removing the last route during that abort can strand Chromium's next HTTPS request.
+  await router.route('**' + path, handler)
+  return { completed: handled.promise, receiptRequested: requested.promise, releaseReceipt: () => released.resolve(), close: async () => {
+    await router.unroute('**' + path, handler)
+    if (holdReceipt) await router.unroute('**/app/save-receipts/*', receiptHandler)
+  } }
 }
 
 // ADMIN-011: all six implemented core doors, with actual edits and independent reads.
@@ -173,7 +181,8 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     await proof('refused-'+action.slice('/app/do/'.length))
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
-    const lost = await loseSaveReply(h, page, action)
+    const holdReceipt = exercisedActions.size === 1
+    const lost = await loseSaveReply(h, page, action, true, {holdReceipt})
     // Captures change the viewport and scroll position. Target the keyboard event at
     // the submitter, and observe this submission leaving the browser before its feedback.
     const submitter = form.getByRole('button',{name:/./}).last()
@@ -186,7 +195,19 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       submitter.press('Enter'),
     ])
     const confirmation = await reply.json()
-    const error = form.getByRole('alert')
+    if (holdReceipt) {
+      await lost.receiptRequested
+      const pending = form.getByRole('alert')
+      await pending.waitFor()
+      assert.match(await pending.innerText(), /connection ended.*Checking the save receipt/s, `${action} discloses the interruption while its receipt is pending`)
+      assert.equal(await pending.evaluate(el => el === document.activeElement), true)
+      assert.equal(await form.getAttribute('aria-busy'), null, `${action} pending feedback is announced immediately`)
+      assert.equal(await form.getByRole('button', {name:/./}).last().isDisabled(), true, `${action} pending receipt prevents replay`)
+      assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name])), retryDraft, `${action} pending receipt keeps the draft`)
+      await proof('pending-'+action.slice('/app/do/'.length))
+      lost.releaseReceipt()
+    }
+    const error = form.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s})
     try { await error.waitFor() } catch (failure) {
       console.error('Pending workspace requests:', [...pendingRequests].map(request => [request.method(), new URL(request.url()).pathname]))
       console.error('Workspace form state:', await form.evaluate(el => ({ busy: el.getAttribute('aria-busy'), saving: el.dataset.saving, errors: [...el.querySelectorAll('[role=alert]')].map(error => ({ text: error.textContent, visible: !!error.getClientRects().length })) })))
@@ -205,6 +226,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     assert.equal(receipt.action,action.slice('/app/do/'.length),`${action} confirmation identifies this action`)
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
+    await lost.close()
     await proof('confirmed-'+action.slice('/app/do/'.length))
     await snapshot.interrupt({action,fields:submitted,cookie:who,view,steps:receipt.batches})
     await snapshot.close()
@@ -313,6 +335,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
         const [result] = await Promise.all([opened, lost.completed, form.getByRole('button',{name:/./}).last().click()])
         await result.waitForLoadState('domcontentloaded').catch(()=>{})
         await result.close()
+        await lost.close()
         assert.equal(draft.url(),originalURL,'native transport error leaves the source page intact')
         assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name])),retained,'native transport error retains every field')
       }
@@ -586,7 +609,8 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       await again.getByLabel('Minutes worked').fill('3');await again.getByLabel('Time note').fill(`Uncertain confirmation ${width}`)
       const lost = await loseSaveReply(h, page, '/app/do/workorder.time')
       await Promise.all([lost.completed, again.getByRole('button',{name:'Record time'}).click()])
-      await again.getByRole('alert').waitFor()
+      await again.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s}).waitFor()
+      await lost.close()
       assert.match(await again.getByRole('alert').innerText(),new RegExp('connection ended.*Saved. The server confirmed','s'))
       assert.equal(await again.getByLabel('Time note').inputValue(),`Uncertain confirmation ${width}`)
       assert.equal(await again.getByRole('button',{name:'Record time'}).isDisabled(),true)
