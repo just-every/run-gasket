@@ -13,6 +13,7 @@ const PAGE = 100, MAX_PAGE = 500
 /** What an entry acted on: its role, plus the proposal or move-in that carried it. */
 function authority(row: Row) {
   const detail = JSON.parse(row.detail), role = ROLE_LABELS[row.role as Role] ?? 'Former member'
+  if (detail.serviceCredential) return `${role}, service credential ${detail.serviceCredential}`
   if (row.role === 'agent') return `${role}, its own sign-in`
   if (row.action.startsWith('proposal.')) return `${role}, deciding proposal ${row.subject}`
   if (detail.proposal) return `${role}, carrying out approved proposal ${detail.proposal}`

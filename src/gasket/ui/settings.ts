@@ -90,7 +90,7 @@ export async function auditPage(env: Bindings, actor: Actor, url: URL) {
     ${field('From', 'from', { type: 'date', required: false, value: filters.get('from') ?? '' })}${field('To', 'to', { type: 'date', required: false, value: filters.get('to') ?? '' })}</div>
     <div class="gk-actions"><button type="submit" class="gk-secondary">Search</button><a class="gk-button gk-secondary" href="/app/audit.csv${filters.size ? `?${filters}` : ''}">Download CSV</a></div></form>`
   const older = next ? h`<p><a class="gk-more-rows" href="/app/audit?${new URLSearchParams([...filters, ['before', String(next)]])}">Older changes</a></p>` : ''
-  return page(env, 'Audit trail', actor, h`<h1>Audit trail</h1><p class="gk-lede">Every change, newest first, with who made it and on what authority. The download holds every matching change.</p>${search}${table(['When', 'Who', 'Action', 'Record'], rows.map(row => [showInstant(row.at, actor.zone), h`${row.actor_name ?? '—'}<span class="gk-sub">${row.authority}</span>`,
+  return page(env, 'Audit trail', actor, h`<h1>Audit trail</h1><p class="gk-lede">Every change, newest first, with who made it and on what authority. The download holds every matching change.</p>${search}${table(['When', 'Who', 'Action', 'Record'], rows.map(row => [showInstant(row.at, actor.zone), h`${row.actor_name ?? '—'}<span class="gk-sub gk-audit-authority">${row.authority}</span>`,
     ACTIONS[row.action] ?? 'Changed a record', records.get(row.subject) ?? h`<span class="gk-muted">A deleted record</span>`]), 'Audit trail', { wrap: [1, 2, 3] })}${older}`, { url })
 }
 

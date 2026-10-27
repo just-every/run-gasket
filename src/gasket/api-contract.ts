@@ -8,13 +8,19 @@ import { createsWork } from './site'
 import { ON_HAND } from './parts'
 import { RESERVED } from './reservations'
 import { fromMilli } from './quantity'
-import { workOrderDetail } from './work'
+import { workOrder, workOrderDetail } from './work'
+import { isCollaborator } from './crew'
+import { didWork } from './review'
 
 const JSON_TYPE = ['application', 'json'].join('/')
 const RETRYABLE: Record<string, Capability> = {
   'asset.create': 'register.manage', 'asset.update': 'register.manage',
   'part.create': 'register.manage', 'part.receive': 'register.manage', 'part.count': 'register.manage',
   'workorder.create': 'work.create',
+  'checklist.create': 'register.manage', 'checklist.revise': 'register.manage',
+  'template.save': 'work.assign', 'workorder.assign': 'work.assign',
+  'workorder.results': 'work.do', 'workorder.issue': 'work.do', 'workorder.return': 'work.do',
+  'workorder.submit': 'work.do', 'workorder.review': 'work.review',
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -43,6 +49,16 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   if (action === 'workorder.create') insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
   const bytes = await body(request)
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
+  // Receipt access must not outlive the record authority that made it.
+  // State and version checks stay in the handler for new effects; a completed
+  // receipt remains replayable after its own successful state transition.
+  if (action.startsWith('workorder.') && action !== 'workorder.create') {
+    const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+    if (RETRYABLE[action] === 'work.do') {
+      insist(order.assignee_id === actor.id || (action !== 'workorder.submit' && await isCollaborator(env, order.id, actor.id)), 'not_your_work', 403)
+    }
+    if (action === 'workorder.review') insist(order.assignee_id !== actor.id && !await didWork(env, order.id, actor.id), 'own_work', 403)
+  }
   const principal = actor.service ? `${actor.id}:${actor.service.id}` : actor.id
   const keyHash = await sha256Hex(key), fingerprint = await sha256Hex(bytes)
   const claimed = await stmt(env, "INSERT INTO gk_api_writes (actor_id,key_hash,action,fingerprint,role,state,created_at) VALUES (?,?,?,?,?,'pending',?) ON CONFLICT DO NOTHING", principal, keyHash, action, fingerprint, actor.role, now()).run()

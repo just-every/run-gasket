@@ -38,7 +38,7 @@ export async function serviceActor(env: Bindings, request: Request): Promise<Act
   const row = await one(env, `SELECT c.id AS credential,c.scopes_json,c.expires_at,c.revoked_at,m.id,m.email,m.name,m.status,m.role,o.status AS operator_status,o.role AS operator_role
     FROM gk_api_credentials c JOIN gk_members m ON m.id=c.member_id JOIN oa_operators o ON o.id=m.operator_id WHERE c.token_hash=?`, await sha256Hex(authorization.slice(7)))
   insist(row && row.revoked_at === null && row.expires_at > now(), 'invalid_service_credential', 401)
-  insist(row.status === 'active' && row.operator_status === 'active' && row.operator_role === 'owner' && row.role === 'owner', 'service_authority_ended', 403)
+  insist(row.status === 'active' && row.operator_status === 'active' && row.operator_role === 'owner', 'service_authority_ended', 403)
   const zone = (await one(env, 'SELECT timezone FROM gk_site WHERE singleton=1'))?.timezone ?? 'UTC'
   return { id: row.id, sessionId: '', email: row.email, name: row.name, role: 'owner', zone, today: today(zone), service: { id: row.credential, scopes: JSON.parse(row.scopes_json) } }
 }

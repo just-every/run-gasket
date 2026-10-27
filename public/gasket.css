@@ -73,6 +73,7 @@ strong, b { font-weight: 650; }
 .gk-flash.gk-error { display: block; background: var(--gk-bad-bg); border-color: var(--red-line); color: var(--gk-bad); }
 .gk-muted, .gk-sub { color: var(--rer-muted); }
 .gk-sub { display: block; font-size: 14px; line-height: 20px; }
+.gk-audit-authority, .gk-audit-authority g-id { overflow-wrap: anywhere; white-space: normal; }
 .gk-title { display: block; color: var(--rer-text); font-weight: 400; }
 .gk-wo-link:hover .gk-title { text-decoration: underline; }
 .gk-big { font-size: 28px; line-height: 32px; font-weight: 800; letter-spacing: -.02em; color: var(--gk-accent); }

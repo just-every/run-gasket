@@ -41,19 +41,19 @@ export const guard = (env: Bindings, code: string, condition: string, ...params:
 export interface Audit { actor: string; action: string; subject: string; detail?: unknown }
 
 /** An audit entry with the role its actor holds now, read inside the same statement (ADMIN-006). Binds at, actor, actor, action, subject, detail. */
-export const AUDIT_INSERT = 'INSERT INTO gk_audit (at, actor, role, action, subject, detail) VALUES (?, ?, (SELECT role FROM gk_members WHERE id = ?), ?, ?, ?)'
+export const AUDIT_INSERT = "INSERT INTO gk_audit (at, actor, role, action, subject, detail) VALUES (?, ?, (SELECT CASE WHEN o.role = 'owner' THEN 'owner' ELSE m.role END FROM gk_members m LEFT JOIN oa_operators o ON o.id = m.operator_id WHERE m.id = ?), ?, ?, ?)"
 
 /** Runs the statements atomically with their audit entries. A failed guard raises its code. */
 export async function commit(env: Bindings, statements: D1PreparedStatement[], audit: Audit | Audit[]) {
   const events = Array.isArray(audit) ? audit : [audit]
-  const authority = automationAuthority()
+  const authority = automationAuthority(), credential = serviceAuthority()
   try {
     const results = await env.DB.batch([
       ...(authority ? [guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_automation_rules WHERE id=? AND revision=? AND paused=0)', authority.rule, authority.revision)] : []),
-      ...(serviceAuthority() ? [guard(env, 'service_authority_ended', `EXISTS(SELECT 1 FROM gk_api_credentials c JOIN gk_members m ON m.id=c.member_id JOIN oa_operators o ON o.id=m.operator_id WHERE c.id=? AND c.revoked_at IS NULL AND c.expires_at>? AND m.status='active' AND m.role='owner' AND o.status='active' AND o.role='owner')`, serviceAuthority(), now())] : []),
+      ...(serviceAuthority() ? [guard(env, 'service_authority_ended', `EXISTS(SELECT 1 FROM gk_api_credentials c JOIN gk_members m ON m.id=c.member_id JOIN oa_operators o ON o.id=m.operator_id WHERE c.id=? AND c.revoked_at IS NULL AND c.expires_at>? AND m.status='active' AND o.status='active' AND o.role='owner')`, serviceAuthority(), now())] : []),
       ...statements,
       stmt(env, 'DELETE FROM gk_guard'),
-      ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), automation: authority } : event.detail ?? {}))),
+      ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority || credential ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), ...(authority ? { automation: authority } : {}), ...(credential ? { serviceCredential: credential } : {}) } : event.detail ?? {}))),
     ])
     const relevant = events.some(event => /^(request\.submit|workorder\.(create|generate|schedule|trigger|submit|approve|return|cancel|reopen|merged|merge|readings|results|evidence|time|annotate)|asset\.(state|retire)|downtime\.(start|end)|meter\.feed|part\.(create|receive|count|issue|return|disposition)|finding\.record)$/.test(event.action))
     if (relevant) { const { dispatchRuleEvents } = await import('./rule-events'); await dispatchRuleEvents(env, events, results.slice(results.length-events.length).map(result => result.meta.last_row_id)) }
