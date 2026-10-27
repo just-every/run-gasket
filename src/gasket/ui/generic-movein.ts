@@ -19,5 +19,5 @@ export async function genericPreviewPage(env:Bindings,actor:Actor,input:Input,ur
 }
 export async function reconciliationPage(env:Bindings,actor:Actor,url:URL,id:string){
   const result=await genericReconciliation(env,actor,id,url)
-  return page(env,'Import reconciliation',actor,h`${backLink('/app/move-in','Move in')}<h1>Import reconciliation</h1>${table(['Source ID','Kind','Current imported values'],result.rows.map(r=>[String((r.value as any)?.sourceId??'Removed'),r.kind,h`<details><summary>Inspect values</summary><pre class="gk-wrap">${JSON.stringify(r.value,null,2)}</pre></details>`]),'Reconciled rows',{wrap:[0,2]})}${result.next!==null?h`<a href="?after=${result.next}">Next rows</a>`:''}`,{url})
+  return page(env,'Import reconciliation',actor,h`${backLink('/app/move-in','Move in')}<h1>Import reconciliation</h1>${table(['Source ID','Kind','Current imported values'],result.rows.map(r=>[String((r.value as any)?.sourceId??'Removed'),r.kind,h`<details><summary>Inspect values</summary><pre class="gk-import-values">${JSON.stringify(r.value,null,2)}</pre></details>`]),'Reconciled rows',{wrap:[0,2]})}${result.next!==null?h`<a href="?after=${result.next}">Next rows</a>`:''}`,{url})
 }

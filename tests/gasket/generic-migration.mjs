@@ -123,7 +123,9 @@ export async function genericMigrationJourney(){
         for(const width of [1440,390]){
           await page.setViewportSize({width,height:1100})
           for(const [name,path]of [['migration-journal','/app/move-in'],['migration-reconciliation',`/app/move-in/reconciliation/${job}`],['migration-work',`/app/work/${firstOpen}`]]){
-            await page.goto(h.origin+path);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
+            await page.goto(h.origin+path)
+            if(name==='migration-reconciliation')await page.getByText('Inspect values',{exact:true}).first().click()
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
             await page.screenshot({path:`${process.env.MIGRATION_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
           }
           await page.goto(h.origin+'/app/move-in');await page.getByText('Templates and upload',{exact:true}).click()

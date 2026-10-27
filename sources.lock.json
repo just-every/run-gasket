@@ -792,7 +792,7 @@
       "executable": false
     },
     "public/gasket.css": {
-      "sha256": "be0baaf4b68f0a57bfa03e63aabcd5216af1686ea787c28eaccc9d136e6b7169",
+      "sha256": "6bf8809129edd5516f57d61680814bb585449dd25663cdb484141d15dc1ceb4f",
       "executable": false
     },
     "public/label-scan.js": {
@@ -1576,7 +1576,7 @@
       "executable": false
     },
     "src/gasket/movein/generic.ts": {
-      "sha256": "a7698366b6a557dbdade15386019986a408dabd988096970e9fbad98029bf332",
+      "sha256": "995c5762109152605f246ff8bd9c8d4a773a9faf8f66946c55952aacc1cdabf4",
       "executable": false
     },
     "src/gasket/movein/maintainx-custom.ts": {
@@ -1964,7 +1964,7 @@
       "executable": false
     },
     "src/gasket/ui/generic-movein.ts": {
-      "sha256": "b436f3cf64a77601ee54ed6280015e0a55584ff67e364d123269df300a243ca0",
+      "sha256": "bd500550f69a86bd97ea1a00cee38655d9cdb3a2c5e7ca1e9afffe06b60d1d9c",
       "executable": false
     },
     "src/gasket/ui/html.ts": {
@@ -4092,7 +4092,7 @@
       "executable": false
     },
     "tests/gasket/generic-migration.mjs": {
-      "sha256": "8e5742644754496a67c7c815c3adee1b8fd0496d424aab1535d69a12efd462b0",
+      "sha256": "3ce3524234a613e840a07a324b45b8e4161e8a25a621ce9c485821fc80907a6e",
       "executable": false
     },
     "tests/gasket/harness.mjs": {

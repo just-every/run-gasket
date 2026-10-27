@@ -558,3 +558,5 @@ td .gk-inline .gk-actions { margin: 0; }
 
 .gk-digest, #operator-reports { overflow-wrap: anywhere; }
 .gk-prompt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 20px; max-height: 360px; overflow: auto; margin: 0 0 12px; }
+
+.gk-import-values { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
