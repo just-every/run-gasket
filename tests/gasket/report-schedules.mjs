@@ -47,6 +47,10 @@ export async function reportSchedulesJourney(){
     const work=(await h.api('workorder.create',cookie.lead,{asset,title:'Repair conveyor motor',due:'2027-03-01',estimateHours:'2',team,assignee:ids.tech})).id
     await h.api('downtime.start',cookie.tech,{workOrder:work,startedOn:'2027-03-06T12:00',reason:'Synthetic conveyor stop'})
     await h.api('downtime.end',cookie.tech,{workOrder:work,endedOn:'2027-03-06T13:00'})
+    const outside=(await h.api('asset.create',cookie.lead,{tag:'PACK-2',name:'Other team pump',location:'Line 2'})).id
+    const outsideWork=(await h.api('workorder.create',cookie.lead,{asset:outside,title:'Other team repair',due:'2027-03-01',assignee:ids.tech})).id
+    await h.api('downtime.start',cookie.tech,{workOrder:outsideWork,startedOn:'2027-03-06T14:00',reason:'Synthetic other team stop'})
+    await h.api('downtime.end',cookie.tech,{workOrder:outsideWork,endedOn:'2027-03-06T14:30'})
     await h.api('work.cost',cookie.owner,{workOrder:work,category:'labor',amount:'123.45',note:'synthetic-gasket-private-rate-1'})
     await h.api('labor.rate',cookie.owner,{person:ids.tech,amount:'9876.54',overtimeAfterMinutes:60,overtimeMultiplier:175})
     const evidence='synthetic-gasket-original-content-1'
@@ -61,6 +65,14 @@ export async function reportSchedulesJourney(){
     await h.api('report.schedule',cookie.owner,{...body,recipients:[ids.agent]},403)
     await h.api('report.schedule',cookie.owner,{...body,clock:'24:00'},400)
     const schedule=(await h.api('report.schedule',cookie.owner,body)).id
+    await h.api('report-schedules',undefined,undefined,401)
+    await h.api('report.schedule',undefined,body,401)
+    for(const path of ['/app/settings/reports',`/app/report-packs/${schedule}.csv`,`/app/report-packs/${schedule}.pdf`]){
+      const response=await h.raw(path)
+      assert.equal(response.status,303);assert.match(response.headers.get('location'),/sign-in/)
+    }
+    const service=await h.api('service.create',cookie.owner,{name:'Synthetic report refusal',scopes:['assets:read'],expiresAt:Date.parse('2027-03-08T14:00:00Z'),consent:true})
+    assert.equal((await h.raw('/api/gasket/report.schedule',{body,headers:{authorization:`Bearer ${service.token}`}})).status,403,'service principals cannot authorize scheduled delivery')
     for(const role of ['lead','supervisor','tech','agent']){
       await h.api('report-schedules',cookie[role],undefined,403)
       for(const ext of ['pdf','csv'])assert.equal((await h.raw(`/app/report-packs/${schedule}.${ext}`,{cookie:cookie[role]})).status,403)
@@ -85,7 +97,7 @@ export async function reportSchedulesJourney(){
     const claim=(await h.api('audit?action=report.claim',cookie.owner)).rows.find(r=>JSON.parse(r.detail).recipient===ids.supervisor)
     assert.ok(claim)
     await assertPack(h,cookie.supervisor,dataset(csv),{kind:'performance',filters:{team},recipient:ids.supervisor,role:'supervisor',at:first,from:'2027-02-28',to:'2027-03-06',revision:claim.seq},text)
-    assert.equal(dataset(csv).sourceQuality.quality.missingFailureCodes.stops.length,1,'nonempty site-wide quality context accompanies a team-filtered pack')
+    assert.deepEqual(dataset(csv).sourceQuality.quality.missingFailureCodes.stops.map(s=>s.asset.tag).sort(),['PACK-1','PACK-2'],'site-wide quality includes the other team while the dataset remains team filtered')
     assert.deepEqual(dataset(csv).data,dashboard,'every exported dataset value reconciles to the dashboard');assert.equal(csv.includes('synthetic-gasket-private-rate-1'),false);assert.equal(dashboard.backlog.count,1);assert.equal(dashboard.backlog.hours,2)
     assert.match(csv,/backlog/);assert.match(csv,/count/)
     let deliveries=(await h.api('report-schedules',cookie.owner)).deliveries

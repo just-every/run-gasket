@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto'
 export async function assertPack(h, cookie, pack, expected, pdfText) {
   const { kind, filters, recipient, role, at, from, to, revision, latestChangeAt = at } = expected
   const query = new URLSearchParams({ ...filters, from, to })
-  const metrics = await h.api(`metrics?${query}`, cookie)
+  const metrics = await h.api(`metrics?${new URLSearchParams({from,to})}`, cookie)
   const definitions = metrics.definitions.filter(d => kind === 'history' ? d.id === 'history.events' : d.sourceDoor === `/api/gasket/${kind}`)
   assert.ok(definitions.length > 0, `${kind} has source definitions`)
   assert.deepEqual(pack.metadata.definitions, definitions, 'every versioned definition and its formula, exclusions and freshness survive export')
