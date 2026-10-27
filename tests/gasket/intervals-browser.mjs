@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
+import { PAGE_DOORS } from '../../src/gasket/doors.ts'
+import { saveSnapshot } from './form-save-interruptions.mjs'
 import { png } from './fixtures.mjs'
 import { chromium } from '@playwright/test'
 export async function intervalBrowser(h,cookie,proposal) {
@@ -38,6 +40,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     await context.addCookies(cookie[who].split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
   }
   const page = await context.newPage()
+  const snapshots = []
   const day = (await h.api('me',cookie.owner)).today
   const technician = (await h.api('me',cookie.max)).id
   const longName = 'Production compressor with extended guarding and remote isolation at the west packaging mezzanine — '+ 'COMPRESSOR'.repeat(4)
@@ -86,6 +89,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     const view = reads[action.slice('/app/do/'.length)] || `work/${record}`
     const who = (await context.cookies()).map(item=>`${item.name}=${item.value}`).join('; ')
     const unchanged = await h.api(view,who)
+    const snapshot = await saveSnapshot(h); snapshots.push(snapshot)
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
     h.setSaveFault('before')
     await form.getByRole('button',{name:/./}).last().click()
@@ -116,6 +120,8 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     const receipt = await response.json()
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
+    await snapshot.interrupt({action,fields:before,cookie:who,view,steps:receipt.batches})
+    await snapshot.close()
     assert.equal(confirmation.saved,true)
     assert.match(confirmation.notice,notice,`${action} retains its original success outcome`)
     const destination = new URL(receipt.destination,h.origin);destination.searchParams.set('notice',confirmation.notice)
@@ -520,6 +526,12 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await submit(page.locator('form[action="/app/do/workorder.review"]').filter({has:page.locator('[name=decision][value=approve]')}))
       assert.equal((await h.api(`work/${work}`,cookie.sam)).status,'closed')
       await open(`/app/work/${work}`,'reviewed-record')
+      await use('owner')
+      // Enumerate the implemented workspace destinations rather than a representative menu subset.
+      for (const [pattern, name] of PAGE_DOORS) {
+        if (pattern.includes('(') || pattern.includes('\\.')) continue
+        await open(pattern.slice(1,-1), `workspace-door-${name}`)
+      }
     }
-  } finally {await context.close()}
+  } finally {for (const snapshot of snapshots) await snapshot.close();await context.close()}
 }
