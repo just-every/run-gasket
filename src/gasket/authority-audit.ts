@@ -7,7 +7,7 @@ const authority = new AsyncLocalStorage<Authority>()
 
 export function authorityStatements(db: D1Database, event: Authority) {
   return [
-    db.prepare('INSERT INTO gk_authority_actor(singleton,actor,action,at) VALUES(1,?,?,?)').bind(event.actor, event.action, event.at),
+    db.prepare("INSERT INTO gk_authority_actor(singleton,actor,action,at,role) VALUES(1,?,?,?,(SELECT CASE WHEN o.role='owner' THEN 'owner' ELSE m.role END FROM gk_members m LEFT JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=?))").bind(event.actor, event.action, event.at, event.actor),
     db.prepare('DELETE FROM gk_authority_actor'),
   ]
 }

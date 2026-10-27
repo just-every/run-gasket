@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "f52b8b841666ce4d26ec4d3c0a17e590b281405955950c3dd504824858688bb4",
+      "sha256": "2f71dc20c2c407e53d26d46fab1b6326ee4420f8884a963378f936723a1a018e",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "287ec27210a153dc595c664e84b920781abc4ed488e12824b906b08728358a11",
+      "sha256": "779d42aab8a0864abce316a5aa59557b22cef871d5830c1ab7d7480099b293a7",
       "executable": false
     },
     "base-copies.json": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "87a668fd19197f114445403b9560f1d6eb51f1aa735fe1a76913c7eba26f5cf2",
+      "sha256": "84cd11d85e52f43d521134386aa8e09abfd81ac1ee4f55c3a6c4750e693cb8ab",
       "executable": false
     },
     "DEMO.md": {
@@ -695,12 +695,20 @@
       "sha256": "362169038c5095ab6cc663679dccc0b039e15e846e6b2a2998cdae3d968f4170",
       "executable": false
     },
+    "migrations/core/0100_service_lifecycle_audit.sql": {
+      "sha256": "2e039dedb93d520d75e98415479d78c7b551314b04a90210d242168a57539fe9",
+      "executable": false
+    },
+    "migrations/core/0101_service_authority_snapshot.sql": {
+      "sha256": "9f7665ced012b523e6440f7b79be2d6db113cb8bb0fb9d21a6a42f3f1360f1cb",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "5d20f1bd0c24def0cd6c1165d1a58d0472ad0f02f2b60047014bda962eaf4274",
       "executable": false
     },
     "openapi.json": {
-      "sha256": "ed2b152e2c474b9a718e518a6e12e4d34690d6effb1d2f5ae24492fb9af1e380",
+      "sha256": "1af3a243686d8e3a8ed5aecc904effecfe7ec0f0429d48992d143a05bf4a81df",
       "executable": false
     },
     "OPERATIONS.json": {
@@ -1168,7 +1176,7 @@
       "executable": false
     },
     "src/auth.server.ts": {
-      "sha256": "b5911fea12f8d3cfb8cda886c75640fbec16e573667bc447ab0c92c5cd10b376",
+      "sha256": "79e90f2255580521fb5877a91585b4619ed04a3207d7bc802be351ad96fa7b27",
       "executable": false
     },
     "src/base/contract-filter.ts": {
@@ -1292,7 +1300,7 @@
       "executable": false
     },
     "src/gasket/actions.ts": {
-      "sha256": "b665189d84549b5de5aa5a8d4ea2ddce80e0666996c0f5061d13eb0f14b81c65",
+      "sha256": "36d0c62fa2e31c9b686da0fd1a831ff210c5159370fe6d73cbcdf8d235d75a61",
       "executable": false
     },
     "src/gasket/actor.ts": {
@@ -1328,7 +1336,7 @@
       "executable": false
     },
     "src/gasket/api-contract.ts": {
-      "sha256": "e632f7c88b64d22164f183decad7bcb89db854b9456573e5fcc45698c3c17eca",
+      "sha256": "7614df7ab88647b789389d79e98e2b9f0312a0d616b3ecbecd873cce49e26ca1",
       "executable": false
     },
     "src/gasket/assets.ts": {
@@ -1341,6 +1349,10 @@
     },
     "src/gasket/audit.ts": {
       "sha256": "b842a45385c2758e2475571d85112506dfa8a7914f04f3e7f32f0ee5e3a51478",
+      "executable": false
+    },
+    "src/gasket/authority-audit.ts": {
+      "sha256": "00e4f8f118eb56222d03a1276bcbe985f344701a2f9dbd7de23a09ccb9127068",
       "executable": false
     },
     "src/gasket/automation-context.ts": {
@@ -1424,7 +1436,7 @@
       "executable": false
     },
     "src/gasket/core.ts": {
-      "sha256": "56528785c107662654f743dea1fadc3a41b67ea6161963ff83cc24429a461fcf",
+      "sha256": "cb8bd23be1a75bcd03a01c8a471ac8472b877edd65284a51239158658cf50013",
       "executable": false
     },
     "src/gasket/corrections.ts": {
@@ -1500,7 +1512,7 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "4d05737cf32afb5cba2543577b9203494b07b1aa466477db5e728634d7eba1e2",
+      "sha256": "51e6d9b7ba139a5afb1cb4b70cb701e10984921d279a2cec3a67b186c0b01b4e",
       "executable": false
     },
     "src/gasket/input.ts": {
@@ -2100,7 +2112,7 @@
       "executable": false
     },
     "src/gasket/ui/settings.ts": {
-      "sha256": "f33a6fa022cfda59dafd6fabe43315826d07d211e5a2b461705ac5b2de51443a",
+      "sha256": "7b363426b2c93094693bc06fcacb7181d26656748fb9b0c0b3bbb4f82fa7d903",
       "executable": false
     },
     "src/gasket/ui/shell.ts": {
@@ -4084,7 +4096,7 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "b71eaa1b2d47d728083e3cfc6d03df4c3ac9f40cb20ff706b08224a55631b346",
+      "sha256": "4c5fcee1fd5af4988e06c7569b7aebaa7b5bddf0dfe88e6878f635eed933312f",
       "executable": false
     },
     "tests/gasket/automation.mjs": {
@@ -4184,7 +4196,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "a4b6e4e361b4fc8ba297259f553fe40eb559e1407aa0b27ae8df938c1c3fc2d4",
+      "sha256": "62c3f650ea812af8dae352f4d2d45f4e136cf9df2368219a917f6ec92c388e0e",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {

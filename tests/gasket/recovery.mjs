@@ -115,7 +115,7 @@ export async function recoveryJourney() {
       assert.equal(restored.mails.length, mailCount, 'restored jobs send no mail')
       if (process.env.GASKET_RECOVERY_SCREENSHOTS) {
         const { chromium } = await import('@playwright/test')
-        const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain','--password-store=basic'] })
+        const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
         try {
           for (const width of [1440,390]) {
             const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
@@ -212,7 +212,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) await recoveryJourney()
 
 export async function backupBrowser(h, cookie) {
   const { chromium } = await import('@playwright/test')
-  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain','--password-store=basic'] })
+  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
   try {
     for (const width of [1440,390]) {
       const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
