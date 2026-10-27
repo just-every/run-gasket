@@ -72,6 +72,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
   async function proof(name) {
     for (const width of [1440,390]) {
       await page.setViewportSize({width,height:1100})
+      await page.evaluate(()=>window.scrollTo({top:0,left:0,behavior:'instant'}))
       await page.screenshot({path:`${directory}/workspace-${name}-${width}.png`,fullPage:true})
     }
     await page.setViewportSize({width:1440,height:1100})
