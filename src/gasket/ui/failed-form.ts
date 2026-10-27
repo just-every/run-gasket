@@ -30,7 +30,7 @@ export async function failedForm(source: Response, action: string, input: Input,
   } }).on(`${selector} input`, { element(element) {
     if (active !== chosen) return
     const name = element.getAttribute('name') || '', type = element.getAttribute('type') || 'text'
-    if (name === '__gk_save') { element.setAttribute('value', newId()); return }
+    if (name === '__gk_save') { element.setAttribute('value', retry ? newId() : String(values(name)[0] || '')); return }
     if (type === 'file') {
       const kept = files.filter(file => file.name === name)
       if (kept.length) { element.removeAttribute('required'); element.after(`<p class="gk-hint">Kept attachment: ${kept.map(file => esc(file.filename)).join(', ')}. Choose a file to replace it.</p>`, { html: true }) }

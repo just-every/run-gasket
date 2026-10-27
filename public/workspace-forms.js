@@ -1,3 +1,5 @@
+// With script available, keep ordinary navigation in this tab. Native posts keep their source draft open.
+document.querySelectorAll('form[method=post][target=_blank]').forEach(form => form.removeAttribute('target'))
 // Keep the draft in its live form. A receipt never contains submitted values.
 document.addEventListener('submit', async event => {
   const form = event.target
