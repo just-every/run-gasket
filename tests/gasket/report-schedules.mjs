@@ -161,7 +161,14 @@ export async function reportSchedulesJourney(){
       assert.deepEqual(pack.data,expected,`${kind} retains every source value with saved asset scope`)
       assert.ok(pack.metadata.definitions.length>0)
       const source=await h.api('metrics',cookie.owner)
-      await assertPack(h,cookie.owner,pack,{kind,filters:{asset},recipient:ownerId,role:'owner',at:first,from:'2027-02-28',to:'2027-03-06',revision:source.sourceRevision,latestChangeAt:source.latestChangeAt})
+      const pdfResponse=await h.raw(`/app/report-packs/${saved.id}.pdf`,{cookie:cookie.owner})
+      assert.equal(pdfResponse.status,200)
+      const task=getDocument({data:new Uint8Array(await pdfResponse.arrayBuffer()),isEvalSupported:false,disableFontFace:true}),pdf=await task.promise
+      let readable='';for(let page=1;page<=pdf.numPages;page++)readable+=(await(await pdf.getPage(page)).getTextContent()).items.map(i=>i.str??'').join(' ')
+      await task.destroy()
+      const [path,value]=kind==='reliability'?['$["data"]["mttr"]["minutes"]',60]:kind==='availability'?['$["data"]["entries"]["0"]["downMinutes"]',60]:['$["data"]["totals"]["repairCents"]',12345]
+      assert.ok(readable.replace(/\s/g,'').includes(`${path}:${value}`),`${kind} PDF retains its independently calculated result`)
+      await assertPack(h,cookie.owner,pack,{kind,filters:{asset},recipient:ownerId,role:'owner',at:first,from:'2027-02-28',to:'2027-03-06',revision:source.sourceRevision,latestChangeAt:source.latestChangeAt},readable)
       for(const secret of [evidence,'synthetic-gasket-original-1.pdf',`/app/documents/${original.id}`,'987654','cents_per_hour'])assert.equal(JSON.stringify(pack).includes(secret),false,`no private original or individual rate: ${secret}`)
       assert.equal(JSON.stringify(pack).includes('synthetic-gasket-private-rate-1'),false)
     }
