@@ -1,5 +1,7 @@
 # Gasket contract rulings
 
+## RL-REPORT-006 — Delivery and assigned preparation
+
 REPORT-006 delivery and assigned preparation were approved with riders on 26 October 2026 at reviewed SHA `0e133c7e91080ac0f943360a8d73b1d0afc623fe`.
 
 CT approved the report-delivery default with riders: an active human owner explicitly authorizes a saved schedule revision and its named active recipients. Current owner authority, recipient report and export permissions, and the authorized revision are rechecked immediately before each separate recipient submission. Scheduled packs retain authorized aggregate USD measures but exclude original evidence files and individual labor rates. Durable occurrence claims prevent automatic duplicate or uncertain-send retries. Provider acceptance is not inbox delivery. Excluded, failed, rejected, uncertain and interrupted attempts remain visible with an actionable explanation. Any later repair must reconcile the original attempt before explicit authorization of another submission. This policy approval establishes neither provider qualification nor completion.

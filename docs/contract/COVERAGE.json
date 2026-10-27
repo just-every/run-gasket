@@ -4,6 +4,7 @@
   "old": {
     "commit": "e5b99032b38770d86a34472087b096be6d62769f",
     "files": [
+      "CONTRACT.md",
       "ACCEPTANCE.md"
     ]
   },
@@ -1248,6 +1249,87 @@
       "to": "clause",
       "ids": [
         "AGENT-009"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 59,
+      "text": "- **ADMIN-002 \u2014 Multiple sites and shared governance.** One organization manages sites, buildings, lines and storerooms with local calendars and shared asset/part standards. Owners delegate site managers; site membership scopes every list, attachment, report and write. Cross-site transfers retain identity and history. Reparenting a hierarchy entry (ASSET-001) under another site's parent needs management rights at both sites and is otherwise refused. The technician create-work right (FIELD-009) is turned off and on per site by its owner or site manager: that site's technicians are refused at every door while other sites' technicians still create work. The stores report (PART-009) filters by any site the reader may see. Before additional sites ship, this clause scopes REQ-001/REQ-002 portals, published targets and intake and REQ-003 queues, duplicate groups, source photos and work conversion to the authorized site. **Acceptance evidence:** Create two sites with distinct managers, move an asset with its meter history, then call each private door using the other site's member. Inspect denied access, correct local dates and organization rollups. As a manager of one site only, move a machine under the other site's line and see it refused (ASSET-001). Turn the technician create-work right off at one site and see that site's technicians refused at the web, API and app doors while the other site's technicians still create work (FIELD-009).",
+      "to": "clause",
+      "ids": [
+        "ADMIN-002"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 61,
+      "text": "- **ADMIN-003 \u2014 Role rights and separation of duties.** Owner controls identity, integrations and retention; site admin manages that site; lead plans/assigns and manages registers; technician creates corrective and emergency work, including work already completed, against assets and locations (FIELD-009) and records assigned or self-assigned work; supervisor reviews independently; storeroom clerk counts/issues/receives, and a stores supervisor independently approves count variances (PART-004); buyer drafts POs; purchasing approver authorizes spend; analyst reads authorized reports. Permission templates and custom grants keep work creation, execution, approval and cost-rate visibility separate. Create work is a default technician right that an owner or site admin revokes per role and site, and a ready-made Operator template sees and records only work assigned to that person. **Acceptance evidence:** Sign in each role and exercise its permitted public doors, including direct forbidden writes/exports. Add a custom site-scoped role, revoke it and test old sessions; technician work and purchasing cannot be self-approved. Remove create work from the technician role at one site and see that site's technicians refused at app and API while the other site's technicians still create work; give a person the Operator template and see only their assigned work.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-003"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 81,
+      "text": "- **ADMIN-013 \u2014 Per-person display language.** Owners set the organization's default display language and every person (owner, lead, technician, supervisor, stores, purchasing, requester, contractor) chooses their own. US English and US Spanish ship complete at launch; the published catalog covers at least 30 display languages, including French, Portuguese, Vietnamese, Simplified and Traditional Chinese, Korean, Tagalog, Polish and right-to-left Arabic. The chosen language applies to the web workspace, the iOS and Android app (FIELD-001), the requester portal and QR fault form (REQ-001, REQ-002), email and push notices (PM-005, INT-004), printed work packs (FIELD-008) and PDF reports (REPORT-006). Signed-out requesters get the portal's site default or their browser preference and can switch. Dates and numbers follow the person's locale while stored values, units, USD amounts and timestamps are unchanged. User-entered text (asset names, checklist steps, notes, readings, comments) is shown exactly as authored, and translated procedures come only from AGENT-007's reviewed translations. A missing translation shows the English string with a visible untranslated marker, never a blank control, and owners can download a per-language completeness report. The existing operator portal and scoped QR form under REQ-001/REQ-002 inherit this full obligation: complete language catalogs, person/site/browser preference, locale formatting and visible fallback must be asserted at both current intake doors by this clause before its language support ships. **Acceptance evidence:** Set the organization default to English and one technician and one requester to Spanish. On the technician's phone app, the requester's QR fault form and portal, an emailed and a push notification, and a printed work pack, show interface text in Spanish while user-entered checklist text, readings, units, USD amounts and audit attribution stay byte-for-byte unchanged and an English lead still sees English. Remove one Spanish catalog string and show the visible English fallback marker, not a blank control, plus the completeness report naming it. Switch a user to Arabic and check right-to-left layout at 390 width without clipping.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-013"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 249,
+      "text": "- **REPORT-006 \u2014 Scheduled reports and CSV PDF delivery.** Authorized users save report filters and schedule site-local email delivery of readable PDF and complete CSV datasets. Exports include definitions, period, freshness and permission scope; delivery failures are visible and restricted rates and files never leak to recipients. The current Settings door supports weekly Performance, Reliability, Availability, Downtime Pareto, asset history and stock valuation packs with saved team or asset filters where supported. Asset history requires one asset and retains period events with attribution and source references, excluding the asset detail document links. Valuation retains site-wide opening, movement and closing quantities and values with unpriced movement coverage; it refuses an asset filter. Each occurrence covers the seven completed site days before its delivery date. The saved site time zone survives later site setting changes. A repeated wall time uses its later occurrence; a missing wall time uses the first valid minute after the clock gap. Delayed execution handles one oldest outstanding occurrence per tick and retains each original reporting period. CSV uses typed scalar paths to retain every value and empty collection, with formula-safe cells; PDF retains readable report values and versioned definitions. Freshness, permission scope, source revision, source fingerprint, dashboard links and authorized site-wide data-quality context accompany the dataset.",
+      "to": "clause",
+      "ids": [
+        "REPORT-006"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 251,
+      "text": "Report delivery and assigned preparation policy: only active human owners create and authorize delivery schedules, with explicit audited consent and named active members. An owner may name one active human report reader as a delegated author for that schedule. Delegates can read and edit only their assigned schedules while the owning principal remains an active owner; every delegated edit is audited and forces a pause until an owner reviews and explicitly authorizes the saved revision. Delegates cannot grant authority, create independent schedules or resume delivery. Current report and export permissions, reassignment and ended access are enforced at schedule, draft, preview and download doors. Every recipient must currently have report and history-export access; the job rechecks the active owning principal, recipient role and saved revision after generation and immediately before sending one separate message per recipient. Original evidence files and individual labor rates are not included. A durable occurrence claim prevents automatic duplicate submission after retry or restart. Provider acceptance is distinct from inbox delivery; excluded, failed, rejected, uncertain and interrupted unconfirmed attempts remain visible and are never automatically resent. ADMIN-002 inherits multi-site authorization at every report, preview, dispatch and download door; ADMIN-003 inherits broader delegated scheduling rights and ADMIN-013 inherits localized packs. Additional report families must reuse their own access and redaction rules before scheduling ships for them. **Acceptance evidence:** Schedule a weekly supervisor pack across daylight saving, inspect email, PDF and CSV at the provider edge and reconcile rows with the dashboard. Remove recipient access before delivery and verify exclusion with a visible delivery result.",
+      "to": "clause",
+      "ids": [
+        "REPORT-006"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 253,
+      "text": "CT approved the report-delivery default with riders on 26 October 2026 at reviewed SHA 0e133c7e91080ac0f943360a8d73b1d0afc623fe. An active human owner explicitly authorizes a saved schedule revision and its named active recipients. Current owner authority, recipient report and export permissions, and the authorized revision are rechecked immediately before each separate recipient submission. Scheduled packs retain authorized aggregate USD measures but exclude original evidence files and individual labor rates. Durable occurrence claims prevent automatic duplicate or uncertain-send retries. Provider acceptance is not inbox delivery. Excluded, failed, rejected, uncertain and interrupted attempts remain visible with an actionable explanation. Any later repair must reconcile the original attempt before explicit authorization of another submission. This policy approval establishes neither provider qualification nor completion.",
+      "to": "rulings",
+      "ids": [
+        "RL-REPORT-006"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 255,
+      "text": "CT approved assigned schedule preparation with riders on 26 October 2026 at reviewed SHA 0e133c7e91080ac0f943360a8d73b1d0afc623fe. An owner may assign one named active human report reader to prepare a particular schedule. Assignment grants no additional report or export access. Every delegated edit is attributable, saves a new revision and pauses delivery until an active owner reviews and explicitly authorizes that saved revision. Delegates cannot create independent schedules, assign or grant authority, or resume delivery. Current assignment, reader permissions and owning-principal authority govern every draft, preview and download door.",
+      "to": "rulings",
+      "ids": [
+        "RL-REPORT-006"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 257,
+      "text": "CT review baseline (27 October 2026; current proof updates are recorded in the Status Gap):",
+      "to": "clause",
+      "ids": [
+        "REPORT-006"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 259,
+      "text": "REPORT-006 remains partial. Remaining REPORT-006 proof includes qualification of the delivery provider; retrieved exact-SHA execution evidence for the scheduled clock journey; complete metadata and definition assertions; formula-safe CSV and empty-container cases; saved-zone persistence and delayed-backlog periods; original-file and individual-rate leak fixtures; authority and revision changes during generation; interrupted and concurrent claims; owning-principal revocation; and refusal of independent schedule creation by an assigned delegate. ADMIN-002 retains future multi-site authorization, ADMIN-003 retains broader delegated scheduling authority, and ADMIN-013 retains localized packs. These carved duties require explicit receiving-clause wording in both documents. Policy approval alone does not complete REPORT-006.",
+      "to": "clause",
+      "ids": [
+        "REPORT-006"
       ]
     }
   ]
