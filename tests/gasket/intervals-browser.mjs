@@ -75,6 +75,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
   const receiptActions = new Set()
   const submit = async (form, notice = /Saved/) => {
     const action = await form.getAttribute('action')
+    console.log('workspace save proof',action)
     const before = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     const reads = {
       'site.configure':'site', 'access.give':'members', 'access.role':'members', 'access.end':'members', 'asset.create':'assets', 'meter.create':`assets/${asset}`,
@@ -127,10 +128,12 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     let draft = await native.newPage()
     const nativeSubmit = async (form, expected) => {
       const original = draft
+      console.log('native save proof',await form.getAttribute('action'))
       assert.deepEqual(await form.evaluate(el=>el.noValidate?[]:[...el.elements].filter(control=>control.validity&&!control.validity.valid).map(control=>({name:control.name,value:control.value,error:control.validationMessage}))),[],'corrected native form can be submitted')
-      const result = native.waitForEvent('page')
-      await form.getByRole('button',{name:/./}).last().click()
-      draft = await result
+      assert.equal(await form.getAttribute('target'),'_blank','native result opens beside the draft')
+      await form.locator('button[type=submit]').focus()
+      const [result] = await Promise.all([native.waitForEvent('page'),draft.keyboard.press('Enter')])
+      draft = result
       await draft.waitForLoadState('domcontentloaded')
       assert.match(draft.url(),expected)
       assert.equal(original.isClosed(),false,'native source draft stays open')
