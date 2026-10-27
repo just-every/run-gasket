@@ -17,6 +17,7 @@ export const API_DOORS: [string, string][] = [
   ['^pm-strategies$', 'pmStrategies'],
   ['^request-response$', 'requestResponse'],
   ['^request-report$', 'requestReport'],
+  ['^record-erasure-preview$', 'recordErasurePreview'],
   ['^retention-settings$', 'retentionSettings'],
   ['^retention-preview$', 'retentionPreview'],
   ['^search$', 'search'], ['^search-views$', 'searchViews'],
@@ -45,6 +46,7 @@ export const API_DOORS: [string, string][] = [
 ]
 
 export const PAGE_DOORS: [string, string][] = [
+  ['^/app/settings/erasure$', 'recordErasure'],
   ['^/app/move-in/templates/((?:assets|parts|work|locations|pms)\\.(?:csv|xls|xlsx))$', 'spreadsheetTemplate'],
   ['^/app/move-in/reconciliation/([\\w-]+)$', 'spreadsheetReconciliation'],
   ['^/app/settings/reports$', 'reportSchedules'],

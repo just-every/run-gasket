@@ -1,3 +1,4 @@
+import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 // Complete search exports go through the authenticated HTTP door, including
 // fixtures. Scale mode runs separately on the committed landing candidate.
 import assert from 'node:assert/strict'
@@ -93,7 +94,7 @@ export async function searchJourney(h, cookie, count = 12) {
 }
 
 export async function retentionJourney() {
-  const h = await harness({clockInstant:Date.parse('2026-10-25T16:00:00Z')})
+  const h = await harness({clockInstant:Date.parse('2020-10-25T16:00:00Z')})
   try {
     const owner = await h.owner()
     await h.api('site.configure', owner, { name: 'Held estate', timezone: 'America/New_York' })
@@ -249,10 +250,26 @@ export async function retentionJourney() {
   assert.deepEqual(await h.api(`work/${sourceWork}`,owner),sourceWorkBefore)
   assert.deepEqual(Buffer.from(await (await h.raw(`/app/request-files/${sourceBefore.files[0].id}`,{cookie:owner})).arrayBuffer()),png)
 
+  for (const [protectedWork,original] of [[work,signedPhoto],[requiredWork,requiredPhoto],[calibrationWork,certificate]]) {
+    const before=await h.api(`work/${protectedWork}`,owner)
+    const bytes=Buffer.from(await (await h.raw(`/app/evidence/${original}`,{cookie:owner})).arrayBuffer())
+    const retained=await h.api(`record-erasure-preview?kind=work&id=${protectedWork}`,owner)
+    assert.equal(retained.eligible,false)
+    await h.api('record.erase',owner,{kind:'work',id:protectedWork,token:retained.token,confirm:true},409)
+    assert.deepEqual(await h.api(`work/${protectedWork}`,owner),before,'full-record refusal preserves protected work')
+    assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${original}`,{cookie:owner})).arrayBuffer()),bytes,'full-record refusal preserves original bytes')
+  }
+  await eraseFixture(h,owner,await erasureFixture(h,owner,ids[0]),{screens:true})
+  const technician=(await h.api('me',tech)).id
+  await h.api('access.role',owner,{member:technician,role:'lead'})
+  await h.api(`record-erasure-preview?kind=work&id=${work}`,tech,undefined,403)
+  await h.api('record.erase',tech,{kind:'work',id:work,confirm:true,token:'synthetic-gasket-1'},403)
+  await h.api('access.role',owner,{member:technician,role:'maintainer'})
+
   if(process.env.RETENTION_SCREENSHOTS) {
     const {chromium}=await import('@playwright/test'),{mkdir}=await import('node:fs/promises')
     await mkdir(process.env.RETENTION_SCREENSHOTS,{recursive:true})
-    const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+    const browser=await chromium.launch({headless:true,...(process.env.GASKET_CHROMIUM?{executablePath:process.env.GASKET_CHROMIUM}:{}),args:['--use-mock-keychain','--password-store=basic']})
     try {
       const context=await browser.newContext({ignoreHTTPSErrors:true})
       await context.addCookies(owner.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))

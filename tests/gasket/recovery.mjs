@@ -1,3 +1,4 @@
+import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 import { fileURLToPath } from 'node:url'
 // Portable inactive recovery through supported commands and authenticated HTTP.
 import assert from 'node:assert/strict'
@@ -42,6 +43,7 @@ export async function recoveryJourney() {
     const photo = (await h.api(`requests/${request}`, owner)).files[0].id
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
+    const erasedRecords=await erasureFixture(h,owner,asset)
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'recovery.rer')
     await h.installation.rer('export', '--output', archive)
@@ -142,6 +144,7 @@ export async function recoveryJourney() {
       if (process.env.GASKET_RECOVERY_SCREENSHOTS) await backupBrowser(source, signed)
       assert.deepEqual(await source.api('schedules', signed), sourceSchedule, 'export leaves source schedules active')
       assert.deepEqual((await source.api('automation' + '/jobs', signed)).rules, sourceRules)
+      await eraseFixture(source,signed,erasedRecords)
       const current = await source.api(`requests/${request}`, signed)
       await source.api('request.erase', signed, { request, version: current.version, confirm: true })
       const erased = await source.api(`requests/${request}`, signed)
@@ -163,6 +166,7 @@ export async function recoveryJourney() {
       const later = join(h.installation.root, 'exports', 'after-erasure.rer')
       await h.installation.rer('export', '--output', later)
       const afterBytes = await readFile(later)
+      for (const text of ['synthetic-gasket-erased-person','synthetic-gasket-erased@example.test','synthetic-gasket-erased-work','synthetic-gasket-erased-description','synthetic-gasket-erased-original.png','synthetic-gasket-erased-second.png','synthetic-gasket-erased-comment']) assert.ok(!afterBytes.includes(Buffer.from(text)),`archive removes ${text}`)
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-fault')), 'anonymous archive contains no erased fault')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-photo.png')), 'work attachment filename is absent from the later archive')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-contact')), 'anonymous archive contains no erased contact')
@@ -177,6 +181,11 @@ export async function recoveryJourney() {
         try {
           const cleanOwner = await clean.signIn(h.vars.OWNER_EMAIL)
           assert.equal((await clean.raw('/setup', { cookie: cleanOwner, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
+          await clean.api(`work/${erasedRecords.work}`,cleanOwner,undefined,404)
+          assert.equal((await clean.raw(`/app/evidence/${erasedRecords.photo}`,{cookie:cleanOwner})).status,404)
+          const person=(await clean.api('members',cleanOwner)).find(row=>row.id===erasedRecords.person)
+          assert.deepEqual([person.name,person.status],['Erased user','ended'])
+          assert.equal((await clean.api(`record-erasure-preview?kind=user&id=${erasedRecords.person}`,cleanOwner)).erased,true)
           const retained = await clean.api(`requests/${request}`, cleanOwner)
           assert.equal((await clean.raw(`/app/evidence/${workPhoto}`, { cookie: cleanOwner })).status, 404, 'erased work attachment never reappears after restore')
           assert.equal((await clean.api(`retention-preview?kind=attachment&id=${workPhoto}`, cleanOwner)).erased, true)
