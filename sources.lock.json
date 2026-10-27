@@ -4092,7 +4092,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "dab22161a87c1c8152f7ba130d548e8db68236c4cf4c0074e501eac91982119e",
+      "sha256": "29943b1a9c2ed270fee51344a703362d627898137af591a874263f6921c77f6b",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
@@ -4151,12 +4151,16 @@
       "sha256": "4f24d0431d6248ccb46cc499fb9ee31aa3e78f296379ad00741a3c6cf7d14205",
       "executable": false
     },
+    "tests/gasket/form-save-interruptions.mjs": {
+      "sha256": "84388d31559376ad641c85507372926122caf4a1312a973b64ac3f5991d10e58",
+      "executable": false
+    },
     "tests/gasket/generic-migration.mjs": {
       "sha256": "ffa155b5331aee9bdbcb0e0afb9b5b5e9f4a4e8a688625b02004d8ff9cb96595",
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "aca8520f4c1ca34ca81eeaf7f2d8c5887956f8e1567f6f560f7991b0449a810c",
+      "sha256": "1bac13b1d6d23cfd602bb641bdf58e8fbfdc8975eaf50d647527deaf3ce76a7c",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4164,7 +4168,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "b2051834a92f221a31ae960f843dd099cb07fdd3be0cf2ba255ed857fec945f4",
+      "sha256": "e7642574f377d1c219fc5f54ee942777f7447e1edc442f778c31b4d57cb2db9c",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {

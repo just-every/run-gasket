@@ -37,6 +37,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   let mailOutcome = 'accepted'
   let saveFault = false
   let saveFaultStep = 1
+  let saveCommits = 0
   let generationHook
   const bindings = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'false', MAIL_PROVIDER: 'resend', MAIL_FROM: 'Gasket <auth@example.test>', MAIL_API_KEY: 'test-only-key', ...vars }
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter(file => file.endsWith('.js')).map(file => `assets/${file}`)]
@@ -53,7 +54,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
       d1Databases: { DB: installation ? config.d1_databases[0].database_id : 'gasket-test' },
       bindings,
       outboundService: async request => {
-        if(formSaveFault&&request.url.startsWith('https://synthetic-gasket.invalid/form-save?phase=')){const fail=saveFault===new URL(request.url).searchParams.get('phase') && --saveFaultStep===0;if(fail)saveFault=false;return new Response(null,{status:fail?503:204})}
+        if(formSaveFault&&request.url.startsWith('https://synthetic-gasket.invalid/form-save?phase=')){const phase=new URL(request.url).searchParams.get('phase');if(phase==='after')saveCommits++;const fail=saveFault===phase && --saveFaultStep===0;if(fail)saveFault=false;return new Response(null,{status:fail?503:204})}
         if(generationGate&&request.url==='https://synthetic-gasket.invalid/report-generation'){if(generationHook)await generationHook();return new Response(null,{status:204})}
         if (outbound && request.url !== 'https://api.resend.com/emails') return await outbound(request)
         if (request.url !== 'https://api.resend.com/emails') throw new Error(`Unexpected test network destination ${new URL(request.url).origin}`)
@@ -77,7 +78,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   } catch (error) { await close(); throw error }
   return worker()
 
-  function worker() { return { origin, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step }, request, scheduled, signInToken, close } }
+  function worker() { return { origin, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step; saveCommits=0 }, getSaveCommits: () => saveCommits, request, scheduled, signInToken, close } }
 
   /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
   async function scheduled(cron, at = instant ?? Date.now() + (offset ?? 0)) {
