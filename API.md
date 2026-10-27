@@ -421,9 +421,9 @@ users or maintenance_records), `minimumDays`, current `revision` and `reason`.
 Every type retains indefinitely by default; a minimum age only delays eligibility
 for explicit erasure. It never starts an automatic deletion job. Request-contact
 and attachment minima are enforced atomically by their existing erasure doors.
-User and maintenance-record settings are retained for their future erasure doors;
-those classes are not currently eligible for deletion. `retention.hold` also
-accepts attachment and user kinds. Attachment holds protect their original files;
+User and maintenance-record minima also protect unused retired qualification
+references through the door below. Other user and maintenance-record erasure
+remains unfinished. `retention.hold` also accepts attachment, user and qualification kinds. Attachment holds protect their original files;
 user holds protect their linked request intake and uploaded work originals.
 
 ## Register custom fields
@@ -661,3 +661,35 @@ the direct business audit entry. Standing rules execute under their own recorded
 author, using current rule authority rather than the triggering bearer. Their
 retained source event points to the original audit sequence so trigger provenance
 remains traceable without presenting it as the rule execution authority.
+
+## Retired qualification retention
+
+The owner reads `GET /api/gasket/retention-preview?kind=qualification&id=ID`,
+using the retired resource id from `planning`. The preview reports the current
+planning revision, eligibility, retained safety sign-offs, retired record count,
+reminder count and audit details to anonymize. A qualification hold uses
+`retention.hold` with `kind: qualification` and that retired id. A user hold
+protects all that person's retired qualifications. Existing user and maintenance
+minimum ages both apply, measured conservatively from retirement.
+
+`POST /api/gasket/qualification.erase` requires an ordinary owner session, the
+retired `id`, the preview's `revision` and explicit `confirm: true`. The same
+handler serves the ordinary form action. It refuses any active replacement,
+hold, unmet minimum age or retained safety sign-off for that person's named
+qualification. A hold racing erasure cannot also succeed. Nothing deletes
+automatically. Tool history and unrelated qualifications are preserved.
+
+An eligible operation removes every retired version of the same qualification
+for that person, its renewal notices and private correction and retirement
+audit payloads. Audit actor, role, action, record, site and time remain; user
+identity erasure is separate. The result reports removed and anonymized counts,
+is stored without reference text and is returned unchanged on a retry. Earlier
+exports are invalidated in the erasure transaction. A later archive supplied
+with `rer import --journal LATER_ARCHIVE` refuses an older archive before
+publication; restoring the later archive keeps the erasure result and does not
+restore the reference. Prior downloads remain outside local erasure.
+
+This conservative owner-confirmed qualification erasure default awaits CT
+approval. It supplies no legal retention period or compliance determination.
+Broader copied-data reconciliation and user identity erasure remain under
+ADMIN-007 and ADMIN-016.

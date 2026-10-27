@@ -32,10 +32,10 @@ export async function saveQualification(env: Bindings, actor: Actor, input: Inpu
   insist(await active(env, member), 'member_not_assignable', 409)
   insist(isDate(expires), 'invalid_expiry')
   const remindDays=input.flag('remind')?input.integer('remindDays',{max:365}):null
-  const seen = await revision(env)
+  const seen = await revision(env), recordId=newId()
   const previous=await one(env,'SELECT * FROM gk_qualifications WHERE member_id=? AND name=?',member,name)
-  await commit(env, [custody(env,actor),lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference,record_id,recorded_at,recorded_by,remind_days) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference,record_id=excluded.record_id,recorded_at=excluded.recorded_at,recorded_by=excluded.recorded_by,remind_days=excluded.remind_days', member,name,expires,reference,newId(),now(),actor.id,remindDays), bump(env)],
-    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,remindDays,previous}})
+  await commit(env, [custody(env,actor),lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference,record_id,recorded_at,recorded_by,remind_days) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference,record_id=excluded.record_id,recorded_at=excluded.recorded_at,recorded_by=excluded.recorded_by,remind_days=excluded.remind_days', member,name,expires,reference,recordId,now(),actor.id,remindDays), bump(env)],
+    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,remindDays,recordId,previous}})
   return {id:member}
 }
 

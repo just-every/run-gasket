@@ -24,8 +24,10 @@ export async function recoveryJourney() {
     const checklist = (await h.api('checklist.create', owner, { name: 'Recovery inspection', items: ['Listen for noise'] })).id
     const today = (await h.api('me', owner)).today
     const member=(await h.api('me',owner)).id
-    const qualification={member,name:'Recovery training',expires:'2099-12-31',reference:'synthetic-gasket-retired-reference'}
+    const qualification={member,name:'Recovery training',expires:today,reference:'synthetic-gasket-retired-reference',remind:true,remindDays:0}
     await h.api('planning.qualification',owner,qualification)
+    await h.scheduled('*/15 * * * *',Date.parse(`${today}T16:00:00Z`))
+    assert.equal((await h.api('notices',owner)).filter(n=>n.kind==='qualification_expiry').length,1,'real scheduler stores a qualification reminder before retirement')
     await h.api('planning.retire',owner,{kind:'qualification',member,name:qualification.name,reason:'Reference withdrawn before backup',revision:(await h.api('planning',owner)).revision})
     const resourceTool=(await h.api('planning.tool',owner,{name:'Recovery gauge',identifier:'synthetic-gasket-retired-tool',calibrationDue:'2099-12-31',revision:(await h.api('planning',owner)).revision})).id
     await h.api('planning.retire',owner,{kind:'tool',id:resourceTool,reason:'Gauge withdrawn before backup',revision:(await h.api('planning',owner)).revision})
@@ -131,7 +133,7 @@ export async function recoveryJourney() {
         assert.deepEqual(await unchanged.api('schedules', stillOwner), schedules, 'nonempty refusal changes no PMs')
       } finally { await unchanged.close() }
     } finally { await restored.close() }
-    const source = await harness({ vars: h.vars, installation: h.installation })
+    let source = await harness({ vars: h.vars, installation: h.installation })
     try {
       const signed = await source.signIn(h.vars.OWNER_EMAIL)
       const backup = await source.api('recovery', signed)
@@ -144,7 +146,27 @@ export async function recoveryJourney() {
       if (process.env.GASKET_RECOVERY_SCREENSHOTS) await backupBrowser(source, signed)
       assert.deepEqual(await source.api('schedules', signed), sourceSchedule, 'export leaves source schedules active')
       assert.deepEqual((await source.api('automation' + '/jobs', signed)).rules, sourceRules)
-      await eraseFixture(source,signed,erasedRecords)
+      const retiredQualification=(await source.api('planning',signed)).retired.find(r=>r.kind==='qualification')
+      const qualificationPreview=await source.api(`retention-preview?kind=qualification&id=${retiredQualification.id}`,signed)
+      assert.equal(qualificationPreview.eligible,true)
+      assert.equal(qualificationPreview.dependencies.reminders,1)
+      const qualificationErased=await source.api('qualification.erase',signed,{id:retiredQualification.id,revision:qualificationPreview.revision,confirm:true})
+      await source.stop()
+      const qualificationArchive=join(h.installation.root,'exports','qualification-erased.rer')
+      await h.installation.rer('export','--output',qualificationArchive)
+      const qualificationBytes=await readFile(qualificationArchive)
+      assert.ok(!qualificationBytes.includes(Buffer.from(qualification.reference)),'qualification erasure alone removes reference bytes')
+      assert.ok(!qualificationBytes.includes(Buffer.from(qualification.name)),'qualification erasure removes stored reminder text and correction copies')
+      const qualificationFence=await installation()
+      try {
+        await copyFile(qualificationArchive,join(qualificationFence.root,'qualification-journal.rer'))
+        await chmod(join(qualificationFence.root,'qualification-journal.rer'),0o600)
+        await assert.rejects(qualificationFence.rer('import','--input',archive,'--journal','qualification-journal.rer','--yes'),/erasure_epoch/,'qualification erasure alone fences an older archive')
+      } finally {await qualificationFence.remove()}
+      source=await harness({vars:h.vars,installation:h.installation})
+      const continued=await source.signIn(h.vars.OWNER_EMAIL)
+      const retainedBackup=(await source.api('recovery',continued)).backup
+      await eraseFixture(source,continued,erasedRecords)
       const current = await source.api(`requests/${request}`, signed)
       await source.api('request.erase', signed, { request, version: current.version, confirm: true })
       const erased = await source.api(`requests/${request}`, signed)
@@ -161,12 +183,13 @@ export async function recoveryJourney() {
       const reopened = await harness({ vars: h.vars, installation: h.installation })
       try {
         const checkOwner = await reopened.signIn(h.vars.OWNER_EMAIL)
-        assert.deepEqual((await reopened.api('recovery', checkOwner)).backup, backup.backup, 'refused export does not advance backup freshness')
+        assert.deepEqual((await reopened.api('recovery', checkOwner)).backup, retainedBackup, 'refused export does not advance backup freshness')
       } finally { await reopened.close() }
       const later = join(h.installation.root, 'exports', 'after-erasure.rer')
       await h.installation.rer('export', '--output', later)
       const afterBytes = await readFile(later)
       for (const text of ['synthetic-gasket-erased-person','synthetic-gasket-erased@example.test','synthetic-gasket-erased-work','synthetic-gasket-erased-description','synthetic-gasket-erased-original.png','synthetic-gasket-erased-second.png','synthetic-gasket-erased-comment']) assert.ok(!afterBytes.includes(Buffer.from(text)),`archive removes ${text}`)
+      assert.ok(!afterBytes.includes(Buffer.from(qualification.reference)), 'erased qualification references are absent from archive bytes')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-fault')), 'anonymous archive contains no erased fault')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-photo.png')), 'work attachment filename is absent from the later archive')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-contact')), 'anonymous archive contains no erased contact')
@@ -186,6 +209,11 @@ export async function recoveryJourney() {
           const person=(await clean.api('members',cleanOwner)).find(row=>row.id===erasedRecords.person)
           assert.deepEqual([person.name,person.status],['Erased user','ended'])
           assert.equal((await clean.api(`record-erasure-preview?kind=user&id=${erasedRecords.person}`,cleanOwner)).erased,true)
+          assert.deepEqual((await clean.api(`retention-preview?kind=qualification&id=${retiredQualification.id}`,cleanOwner)).result,qualificationErased.result,'restored erasure result is durable')
+          const planning=await clean.api('planning',cleanOwner)
+          assert.deepEqual(planning.qualifications,[],'erased references never regain eligibility')
+          assert.deepEqual(planning.retired.map(r=>r.kind),['tool'],'erased personal reference does not return; tool history remains')
+          assert.ok(!JSON.stringify((await clean.api('audit',cleanOwner)).rows).includes(qualification.reference),'restored audit remains anonymized')
           const retained = await clean.api(`requests/${request}`, cleanOwner)
           assert.equal((await clean.raw(`/app/evidence/${workPhoto}`, { cookie: cleanOwner })).status, 404, 'erased work attachment never reappears after restore')
           assert.equal((await clean.api(`retention-preview?kind=attachment&id=${workPhoto}`, cleanOwner)).erased, true)
