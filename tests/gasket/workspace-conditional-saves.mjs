@@ -1,6 +1,7 @@
 // Additional record states share the workspace journey's real save boundaries.
 import assert from 'node:assert/strict'
 import { png } from './fixtures.mjs'
+import { randomUUID } from 'node:crypto'
 
 export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,technician,longName,part}) {
   const asset=(await h.api('asset.create',cookie.lead,{tag:'ACCESS-STATES',name:longName,location:'West maintenance workshop'})).id
@@ -15,7 +16,8 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
     }
     for (const [label,value] of Object.entries(fields)) {
       const control=target.getByLabel(label,{exact:true})
-      if (typeof value==='object') await control.setInputFiles(value)
+      if (typeof value==='boolean') await control.setChecked(value)
+      else if (typeof value==='object') await control.setInputFiles(value)
       else if (await control.evaluate(el=>el.tagName)==='SELECT') await control.selectOption(value)
       else await control.fill(value)
     }
@@ -234,6 +236,45 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
   await save('labor.invoice',{'Contractor':'Synthetic workshop alignment service','Invoice reference':'synthetic-gasket-45','Minutes worked':'30','Invoice amount (USD)':'75.00','Invoice note':'Approved alignment service record'},work)
   assert.equal((await h.api(work,cookie.owner)).labor.invoices.find(row=>row.reference==='synthetic-gasket-45').cents,7500)
   await open(`/app/work/${job}`,'approved-labor-and-invoice')
+  await open(`/app/parts/${part}`,'part-identification-photo')
+  await save('part.photo',{'Photo':{...original,name:'synthetic-gasket-46.png'}},`parts/${part}`)
+  const partPhoto=(await h.api(`parts/${part}`,cookie.owner)).photos.find(row=>row.filename==='synthetic-gasket-46.png')
+  assert.equal(Buffer.from(await (await h.raw(`/app/part-photos/${partPhoto.id}`,{cookie:cookie.owner})).arrayBuffer()).equals(png),true)
+  await open('/app/request-portals','intake-portal-configuration')
+  await save('request.portal',{'Portal name':'Workshop guard fault intake'},'request-portals',form('request.portal').first())
+  const portal=(await h.api('request-portals',cookie.owner)).portals.find(row=>row.name==='Workshop guard fault intake')
+  assert.equal(portal.mode,'authenticated')
+  await save('request.field',{'Field label':'Guard access instructions','Field type':'text'},'request-portals',form('request.field').filter({has:page.locator(`[name=portal][value="${portal.id}"]`)}))
+  assert.equal((await h.api('request-portals',cookie.owner)).portals.find(row=>row.id===portal.id).fields[0].label,'Guard access instructions')
+  await save('request.target',{'Label type':'asset','Asset (for an asset label)':asset,'Published label name':'West workshop guard inspection','I approve publishing this label identity':true},'request-portals',form('request.target').filter({has:page.locator(`[name=portal][value="${portal.id}"]`)}))
+  const target=(await h.api('request-portals',cookie.owner)).targets.find(row=>row.portal_id===portal.id)
+  assert.equal(target.asset_id,asset)
+  await open('/app/request-response','request-response-targets')
+  const leadId=(await h.api('me',cookie.lead)).id
+  await save('request.responsePolicy',{'Priority':'normal','Acknowledgment target minutes':'30','Resolution target minutes':'240','Accountable owner':leadId,'Escalate to':leadId,'After-hours rule':'elapsed'},'request-response')
+  assert.equal((await h.api('request-response',cookie.owner)).policies.find(row=>row.urgency==='normal').acknowledgmentMinutes,30)
+  const intake=await h.raw(`/request/${portal.id}`,{cookie:cookie.max,body:{submissionKey:randomUUID(),target:target.id,description:'Guard access needs the workshop isolation platform',urgency:'normal',contact:'Synthetic workshop operator'}})
+  assert.equal(intake.status,303)
+  const request=(await h.api('requests',cookie.lead)).find(row=>row.description==='Guard access needs the workshop isolation platform')
+  const requestView=`requests/${request.id}`
+  await open(`/app/requests/${request.id}`,'request-clock-pause')
+  await save('request.clock',{'Clock change reason':'Waiting for authorized platform access'},requestView)
+  assert.equal((await h.api(requestView,cookie.owner)).clock.paused,true)
+  await open(`/app/requests/${request.id}`,'paused-request-clock')
+  await save('request.clock',{'Clock change reason':'Platform access restored'},requestView)
+  assert.equal((await h.api(requestView,cookie.owner)).clock.paused,false)
+  await save('request.triage',{'Decision':'ask_details','Reason or question':'Which isolation platform is required?'},requestView,form('request.triage').filter({has:page.locator('select[name=decision]')}))
+  assert.equal((await h.api(requestView,cookie.owner)).status,'needs_details')
+  await use('max')
+  await open(`/app/requests/${request.id}`,'requester-supplies-details')
+  await save('request.reply',{'Your reply':'Use the north platform after the lead isolates the line'},requestView)
+  assert.ok((await h.api(requestView,cookie.max)).timeline.some(row=>row.text==='Use the north platform after the lead isolates the line'))
+  await use('owner')
+  await open(`/app/requests/${request.id}`,'owner-request-erasure')
+  await save('request.erase',{'Remove contact, photos, answers and details, including copied corrective fault details':true},requestView)
+  const erased=await h.api(requestView,cookie.owner)
+  assert.deepEqual([erased.description,erased.contact,erased.requester_id],['','',null])
+  await open(`/app/requests/${request.id}`,'erased-request-history')
   await open('/app/site','technician-create-work-setting')
   const allowed=(await h.api('site',cookie.owner)).technician_create_work
   await save('site.technicianWork',{},'site')
