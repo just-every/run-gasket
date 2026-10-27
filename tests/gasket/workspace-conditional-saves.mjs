@@ -335,5 +335,37 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
   assert.deepEqual(signed.stops.map(row=>row.state),['done','done'])
   await open('/app/schedules','signed-route-and-calendar-decisions')
   assert.equal(await page.getByRole('table',{name:'Schedules',exact:true}).evaluate(table=>table.parentElement.scrollWidth>table.parentElement.clientWidth),false,'all schedule columns remain visible beside realistic long asset names')
+  await use('lead')
+  await open(`/app/checklists/${checklist}`,'failed-step-rule')
+  await save('rule.set',{'Severity':'high','Due within (days)':'2'},`checklists/${checklist}`)
+  const failureRule=(await h.api(`checklists/${checklist}`,cookie.lead)).rules[0]
+  assert.deepEqual([failureRule.severity,failureRule.due_days],['high',2])
+  const executionTemplate=(await h.api('template.save',cookie.lead,{name:'Workshop guard evidence procedure',title:'Inspect the retained guard evidence',checklist})).id
+  const execution=(await h.api('workorder.create',cookie.lead,{asset,template:executionTemplate,due:day,assignee:technician})).id
+  const executionView=`work/${execution}`
+  await use('sam')
+  await open(`/app/work/${execution}`,'independent-step-exception')
+  await save('step.except',{'Step':'0','Reason for the exception':'Guard inspection recorded under the retained independent procedure'},executionView)
+  assert.equal((await h.api(executionView,cookie.sam)).items[0].exception.reason,'Guard inspection recorded under the retained independent procedure')
+  await use('max')
+  await open(`/app/work/${execution}`,'execution-finding')
+  await save('finding.record',{'Checklist step':'0','What was found and what was done':'Guard fastener inspected and isolated for the next maintenance shift','Severity':'low'},executionView)
+  assert.deepEqual((await h.api(executionView,cookie.max)).findings.map(row=>[row.text,row.severity]),[['Guard fastener inspected and isolated for the next maintenance shift','low']])
+  const photo=(await h.api('workorder.evidence',cookie.max,{workOrder:execution,file:{filename:'synthetic-gasket-49.png',base64:png.toString('base64'),type:['image','png'].join('/')},phase:'before'})).id
+  await open(`/app/work/${execution}`,'original-photo-annotation')
+  await save('workorder.annotate',{'Photo':photo,'Mark':'box','Across from (%)':'10','Down from (%)':'20','Across to (%)':'40','Down to (%)':'60','What it shows':'Guard fastener inspected before isolation'},executionView)
+  const annotated=(await h.api(executionView,cookie.max)).evidence.find(row=>row.id===photo)
+  assert.deepEqual(annotated.annotations.map(row=>[row.shape,row.x1,row.y1,row.x2,row.y2,row.note]),[['box',10,20,40,60,'Guard fastener inspected before isolation']])
+  assert.equal(Buffer.from(await (await h.raw(`/app/evidence/${photo}`,{cookie:cookie.max})).arrayBuffer()).equals(png),true,'annotation keeps the original photo bytes')
+  await save('workorder.sign',{},executionView,form('workorder.sign').filter({has:page.locator('[name=role][value=technician]')}))
+  assert.deepEqual((await h.api(executionView,cookie.max)).signatures.map(row=>[row.role,row.state,row.signer_name]),[['technician','current',(await h.api('me',cookie.max)).name]])
+  await open(`/app/work/${execution}`,'signed-execution-evidence')
+  await save('workorder.decline',{'Blocked by':'access','Next action':'Obtain the independent isolation platform','Promised by':day,'Why you are declining':'Platform access is required before further work'},executionView)
+  const declined=await h.api(executionView,cookie.lead)
+  assert.equal(declined.assignee_id,null)
+  assert.equal(declined.crew.answers.at(-1).answer,'declined')
+  assert.equal(declined.chase.blockers[0].next_action,'Obtain the independent isolation platform')
+  await use('lead')
+  await open(`/app/work/${execution}`,'declined-work-awaits-reassignment')
   await proof('conditional-saves-complete')
 }
