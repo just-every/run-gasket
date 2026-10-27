@@ -16,6 +16,9 @@ jobs:
   plan:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
     permissions:
       contents: read
       actions: read
@@ -67,15 +70,38 @@ jobs:
           fi
           echo "skip=$skip" >> "$GITHUB_OUTPUT"
 
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        if: steps.reuse.outputs.skip != 'true'
+        with:
+          node-version: '22.20.0'
+          package-manager-cache: false
+      - run: npm install --global pnpm@10.12.4
+        if: steps.reuse.outputs.skip != 'true'
+      - run: pnpm install --frozen-lockfile
+        if: steps.reuse.outputs.skip != 'true'
+      - run: pnpm run deps
+        if: steps.reuse.outputs.skip != 'true'
+      - run: pnpm exec rer build
+        if: steps.reuse.outputs.skip != 'true'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: steps.reuse.outputs.skip != 'true'
+        with:
+          name: gasket-built-worker
+          path: dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
   foundation:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
       GASKET_VERIFY_SHARD: foundation
+      GASKET_REUSE_BUILD: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
         with:
@@ -102,50 +128,23 @@ jobs:
             timeout 420 pnpm exec playwright install-deps chromium
             node scripts/ci/chromium-probe.mjs
           }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: gasket-built-worker
+          path: dist
       - run: pnpm run verify
-
-  # Keep this public-door migration/browser journey parallel to the existing
-  # full suite so push validation stays within its 15-minute budget.
-  agent-stock:
-    needs: plan
-    if: needs.plan.outputs.skip != 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      CI: 'true'
-      WRANGLER_SEND_METRICS: 'false'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0; action runtime Node 24
-        with:
-          node-version: '22.20.0'
-          package-manager-cache: false
-      - run: npm install --global pnpm@10.12.4
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run deps
-      - name: Install Chromium
+      - name: Verify archive recovery
         run: |
-          set -euo pipefail
-          pnpm exec playwright install chromium
-          # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
-          node scripts/ci/chromium-probe.mjs || {
-            timeout 420 pnpm exec playwright install-deps chromium
-            node scripts/ci/chromium-probe.mjs
-          }
-      - run: pnpm exec rer build
-      - run: |
-          export STOCK_SCREENSHOTS="$RUNNER_TEMP/gasket-agent-stock"
-          mkdir -p "$STOCK_SCREENSHOTS"
-          pnpm run test:agent-stock
+          export GASKET_RECOVERY_SCREENSHOTS="$RUNNER_TEMP/gasket-recovery"
+          mkdir -p "$GASKET_RECOVERY_SCREENSHOTS"
+          node tests/gasket/recovery.mjs
 
   # All four intake/label/triage journeys remain required on every push.
   requests:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -169,23 +168,31 @@ jobs:
             timeout 420 pnpm exec playwright install-deps chromium
             node scripts/ci/chromium-probe.mjs
           }
-      - run: pnpm exec rer build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: gasket-built-worker
+          path: dist
       - run: |
           export REQUEST_SCREENSHOTS="$RUNNER_TEMP/gasket-requests"
           mkdir -p "$REQUEST_SCREENSHOTS"
           pnpm run test:requests
+      - name: Verify agent stock
+        run: |
+          export STOCK_SCREENSHOTS="$RUNNER_TEMP/gasket-agent-stock"
+          mkdir -p "$STOCK_SCREENSHOTS"
+          pnpm run test:agent-stock
 
-  # Preserve the shared fixture and archive comparison together; standalone
-  # journeys use separate installations in required parallel shards.
+  # Preserve every journey across eight test shards. The two longer workspace
+  # journeys own separate installations and run independently of the other flows.
   flows:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, automation, inventory, reports]
+        shard: [core, automation, inventory, reports, workspace, workspace-conditional]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -214,46 +221,15 @@ jobs:
             timeout 420 pnpm exec playwright install-deps chromium
             node scripts/ci/chromium-probe.mjs
           }
-      - run: pnpm exec rer build
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: gasket-built-worker
+          path: dist
       - run: pnpm run test:flows
 
 
-  archive-recovery:
-    needs: plan
-    if: needs.plan.outputs.skip != 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      CI: 'true'
-      WRANGLER_SEND_METRICS: 'false'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
-        with:
-          persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0; action runtime Node 24
-        with:
-          node-version: '22.20.0'
-          package-manager-cache: false
-      - run: npm install --global pnpm@10.12.4
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run deps
-      - name: Install Chromium
-        run: |
-          set -euo pipefail
-          pnpm exec playwright install chromium
-          # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
-          node scripts/ci/chromium-probe.mjs || {
-            timeout 420 pnpm exec playwright install-deps chromium
-            node scripts/ci/chromium-probe.mjs
-          }
-      - run: pnpm exec rer build
-      - run: |
-          export GASKET_RECOVERY_SCREENSHOTS="$RUNNER_TEMP/gasket-recovery"
-          mkdir -p "$GASKET_RECOVERY_SCREENSHOTS"
-          node tests/gasket/recovery.mjs
-
   verify:
-    needs: [plan, foundation, agent-stock, requests, flows, archive-recovery]
+    needs: [plan, foundation, requests, flows]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 1

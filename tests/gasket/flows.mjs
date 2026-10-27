@@ -51,12 +51,12 @@ const independent = new Map([
   [qualificationPlanningJourney,'reports'], [calendarPlanningJourney,'reports'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [conditionalWorkspaceJourney, 'inventory'],
-  [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
+  [conditionalWorkspaceJourney, 'workspace-conditional'],
+  [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'workspace'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
-assert.ok(['all', 'core', 'automation', 'inventory', 'reports'].includes(shard), `Unknown flows shard: ${shard}`)
+assert.ok(['all', 'core', 'automation', 'inventory', 'reports', 'workspace', 'workspace-conditional'].includes(shard), `Unknown flows shard: ${shard}`)
 const h = shard === 'all' || shard === 'core' ? await harness() : null
 let passed = 0
 const check = async (id, run) => {
