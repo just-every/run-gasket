@@ -43,6 +43,9 @@ export async function assertPack(h, cookie, pack, expected, pdfText) {
     for (const [key, value] of Object.entries({report:kind,generatedAt:at,zone:'America/New_York',sourceRevision:revision,latestChangeAt,freshness:pack.metadata.freshness,dashboard,sourceDoor:pack.metadata.sourceDoor})) {
       assert.ok(readable.includes(`$["metadata"][${JSON.stringify(key)}]:${value}`.replace(/\s/g,'')), `PDF metadata ${key} retains its own value`)
     }
+    for (const [key,value] of Object.entries({from,to})) assert.ok(readable.includes(`$["metadata"]["period"]["${key}"]:${value}`),'PDF retains the reporting boundary at its own path')
+    for (const [key,value] of Object.entries(pack.metadata.scope).filter(([key])=>key!=='filters')) assert.ok(readable.includes(`$["metadata"]["scope"]["${key}"]:${value}`.replace(/\s/g,'')),`PDF scope ${key} matches the independently reconciled CSV`)
+    assert.ok(readable.includes(`$["fingerprint"]:${fingerprint}`),'PDF fingerprint retains its own value')
     for (const [index, definition] of definitions.entries()) for (const key of ['id', 'name', 'version', 'formula', 'eventTime', 'exclusions', 'freshness', 'sourceDoor']) {
       assert.ok(readable.includes(`$["metadata"]["definitions"]["${index}"][${JSON.stringify(key)}]:${definition[key]}`.replace(/\s/g,'')), `readable PDF retains ${definition.id} ${key} at its own path`)
     }
