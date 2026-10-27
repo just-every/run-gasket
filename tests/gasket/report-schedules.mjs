@@ -1,13 +1,12 @@
 import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
-import { mkdir } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { chromium } from '@playwright/test'
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { scheduleRiders } from './report-schedule-riders.mjs'
 import { assertPack } from './report-pack-assertions.mjs'
 import { interruptClaim } from './report-interruption.mjs'
+import { reportScheduleScreens } from './report-schedule-browser.mjs'
 
 function readCsv(text){
   const rows=[];let row=[],value='',quoted=false
@@ -105,6 +104,10 @@ export async function reportSchedulesJourney(){
     let deliveries=(await h.api('report-schedules',cookie.owner)).deliveries
     assert.deepEqual(deliveries.map(d=>d.state).sort(),['accepted','excluded'])
     assert.equal(deliveries.find(d=>d.state==='excluded').error,'access_ended')
+    const accepted=deliveries.find(d=>d.state==='accepted')
+    assert.equal(accepted.fingerprint,dataset(csv).fingerprint)
+    assert.deepEqual(JSON.parse(accepted.scope_json),dataset(csv).metadata.scope)
+    assert.equal(accepted.provider,'resend');assert.ok(accepted.provider_message_id)
     assert.equal((await h.api('report-schedules',cookie.owner)).schedules[0].next_day,'2027-03-14')
     await h.scheduled('*/15 * * * *',first+60_000);assert.equal(packs().length,1)
     const varsSaved=h.vars;await h.stop()
@@ -254,49 +257,7 @@ export async function reportSchedulesJourney(){
     await h.api('report-schedules',cookie.delegate,undefined,403)
     assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,403)
     await scheduleRiders(h,cookie,ids,body,dataset)
-    if(process.env.REPORT_SCREENSHOTS){
-      await mkdir(process.env.REPORT_SCREENSHOTS,{recursive:true})
-      const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
-      try{
-        const context=await browser.newContext({ignoreHTTPSErrors:true})
-        await context.addCookies(cookie.owner.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
-        const page=await context.newPage()
-        await page.goto(`${h.origin}/app/settings/reports`)
-        await page.getByLabel('Pack name',{exact:true}).fill('Browser owner pack')
-        await page.getByLabel('Olive Owner',{exact:true}).check()
-        await page.getByRole('checkbox',{name:'I authorize weekly email attachments',exact:false}).check()
-        await page.getByRole('button',{name:'Authorize schedule',exact:true}).click()
-        await page.waitForURL(url=>url.searchParams.has('notice'))
-        const ownerSaved=(await h.api('report-schedules',cookie.owner)).schedules.find(s=>s.name==='Browser owner pack')
-        assert.ok(ownerSaved);assert.equal(ownerSaved.paused,0);assert.equal(ownerSaved.revision,1)
-        for(const width of [1440,390])for(const [name,path]of [['report-schedules','/app/settings/reports'],['report-edit',`/app/settings/reports?edit=${schedule}`],['report-history',`/app/settings/reports?edit=${familyIds.history}`],['report-valuation',`/app/settings/reports?edit=${familyIds.valuation}`]]){
-          await page.setViewportSize({width,height:1100});await page.goto(h.origin+path)
-          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
-          assert.equal(await page.getByRole('heading',{name:'Scheduled reports',exact:true}).count(),1)
-          if(name==='report-history'||name==='report-valuation')assert.equal(await page.getByLabel('Report',{exact:true}).inputValue(),name.slice(7))
-          await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
-        }
-        await context.clearCookies()
-        await context.addCookies(cookie.other.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
-        for(const width of [1440,390]){
-          await page.setViewportSize({width,height:1100});await page.goto(`${h.origin}/app/settings/reports?edit=${delegatedId}`)
-          assert.equal(await page.getByRole('button',{name:'Save for owner review'}).count(),1)
-          assert.equal(await page.getByLabel('Delegated author').count(),0)
-          if(width===1440){
-            await page.getByLabel('Pack name',{exact:true}).fill('Browser authored draft')
-            await page.getByRole('checkbox',{name:'I submit this draft for owner review.',exact:false}).check()
-            await page.getByRole('button',{name:'Save for owner review'}).click()
-            await page.waitForURL(url=>!url.searchParams.has('edit'))
-            const savedRow=(await h.api('report-schedules',cookie.owner)).schedules.find(s=>s.id===delegatedId)
-            assert.equal(savedRow.name,'Browser authored draft');assert.equal(savedRow.paused,1)
-            await page.goto(`${h.origin}/app/settings/reports?edit=${delegatedId}`)
-          }
-          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
-          await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/report-delegate-${width}.png`,fullPage:true})
-        }
-        await context.close()
-      }finally{await browser.close()}
-    }
+    await reportScheduleScreens(h,cookie,schedule,familyIds,delegatedId)
     console.log('REPORT-006 weekly packs: DST, provider PDF and complete CSV, dispatch authorization, failure and restart passed')
   }finally{await h.close();await store.remove()}
 }

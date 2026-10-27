@@ -14,11 +14,14 @@ const vars = {
   OWNER_EMAIL: recipient, MAIL_FROM: from, MAIL_PROVIDER: 'sendgrid', MAIL_API_KEY: process.env.REPORT_SENDGRID_API_KEY,
   SESSION_SECRET: 'synthetic-gasket-session-secret-123456789', SETUP_TOKEN: 'synthetic-gasket-setup-token-123456789',
 }
-let submissions = 0, providerId
+let submissions = 0, providerId, stage = 'initial'
 const h = await harness({ vars, clockInstant: Date.parse('2027-03-07T14:00:00Z'), outbound: async request => {
+  try {
+  stage = 'provider request'
   assert.equal(request.url, 'https://api.sendgrid.com/v3/mail/send')
   const message = await request.clone().json()
   if (!message.subject.startsWith('Gasket report:')) return new Response(null, { status: 202 })
+  stage = 'scheduled attachment assertions'
   assert.equal(++submissions, 1, 'one external submission only')
   assert.equal(message.subject, 'Gasket report: Synthetic provider qualification')
   assert.deepEqual(message.personalizations, [{ to: [{ email: recipient }] }])
@@ -32,11 +35,14 @@ const h = await harness({ vars, clockInstant: Date.parse('2027-03-07T14:00:00Z')
   for (let page = 1; page <= pdf.numPages; page++) text += (await (await pdf.getPage(page)).getTextContent()).items.map(i => i.str ?? '').join(' ')
   await task.destroy()
   assert.ok(text.includes('Synthetic qualification work'))
-  const response = await fetch(request.url, { method: request.method, headers: request.headers, body: await request.arrayBuffer(), signal: AbortSignal.timeout(30_000) })
+  stage = 'SendGrid submission'
+  const response = await fetch(request.url, { method: request.method, headers: { authorization: request.headers.get('authorization'), 'content-type': request.headers.get('content-type') }, body: await request.arrayBuffer(), redirect: 'manual', signal: AbortSignal.timeout(30_000) })
+  console.log(JSON.stringify({ provider: 'sendgrid', httpStatus: response.status }))
   assert.equal(response.status, 202, 'SendGrid accepts the actual scheduled PDF and CSV request')
   providerId = response.headers.get('x-message-id')
   assert.ok(providerId, 'SendGrid returns a submission reference')
   return new Response(null, { status: response.status, headers: response.headers })
+  } catch (error) { console.error(JSON.stringify({ providerStage: stage, error: error.name, code: error.cause?.code ?? error.code ?? null })); throw error }
 } })
 try {
   const cookie = await h.owner()

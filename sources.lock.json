@@ -4280,7 +4280,11 @@
       "executable": false
     },
     "tests/gasket/report-provider.mjs": {
-      "sha256": "4dbad31e1b56dd3e1763972bb8b8b41e063eef6a845f532ef796d1ee38bb3f1f",
+      "sha256": "a36d3c344bf393559708a486bf2488a97ffb245aac15dd16ef1b7cfdca38fba6",
+      "executable": false
+    },
+    "tests/gasket/report-schedule-browser.mjs": {
+      "sha256": "d0b80f0242baa4d883dddebf61fdcdb692325446bbcc9ec82c159874e5e292c4",
       "executable": false
     },
     "tests/gasket/report-schedule-riders.mjs": {
@@ -4288,7 +4292,7 @@
       "executable": false
     },
     "tests/gasket/report-schedules.mjs": {
-      "sha256": "cb85137ab95dc955fd538cf8c5bc6df708335d6ddbc3f87a432189aa4bc0eba2",
+      "sha256": "bd8f2111b038ec9c0972850dcf5ff2ac177e27d47c77e891a39aadd39fe4721a",
       "executable": false
     },
     "tests/gasket/request-draft-privacy.mjs": {
