@@ -201,6 +201,10 @@ export async function qualificationPlanningJourney() {
       assert.ok((await view()).retired.some(r=>r.id===resource),'refusal preserves private evidence')
       await h.api('retention.hold',owner,{kind,id,revision:held.revision,held:false,reason:'Release qualification evidence'})
     }
+    const personalMinimum=await h.api('retention.policy',owner,{kind:'users',minimumDays:1,revision:0,reason:'Retain personal qualification references'})
+    assert.equal((await previewErasure()).eligible,false,'personal-data minimum also protects qualifications')
+    await erase({revision:deletion.revision},409)
+    await h.api('retention.policy',owner,{kind:'users',minimumDays:0,revision:personalMinimum.revision,reason:'Release personal-data minimum'})
     await h.api('planning.qualification',owner,disposable)
     deletion=await previewErasure()
     assert.equal(deletion.eligible,false,'an active replacement protects the whole correction family')
@@ -223,6 +227,20 @@ export async function qualificationPlanningJourney() {
     assert.equal(anonymized.length,5)
     assert.ok(anonymized.every(r=>r.actor===(auditAfter.find(a=>a.action==='qualification.erase')).actor&&r.role==='owner'&&r.site==='Lake Erie Works'&&r.at))
     assert.ok((await view()).retired.some(r=>r.kind==='tool'),'erasure preserves the tool register history')
+    await h.api('planning.qualification',owner,{...disposable,name:'Race training'})
+    await change('planning.retire',{kind:'qualification',member:people.luis,name:'Race training',reason:'Unused race evidence'})
+    const raceResource=(await view()).retired.find(r=>r.snapshot.name==='Race training').id
+    const racingRevision=(await view()).revision
+    const raced=await Promise.all([
+      h.raw('/api/gasket/retention.hold',{cookie:owner,body:{kind:'qualification',id:raceResource,revision:0,held:true,reason:'Preserve concurrent evidence'}}),
+      h.raw('/api/gasket/qualification.erase',{cookie:owner,body:{id:raceResource,revision:racingRevision,confirm:true}}),
+    ])
+    assert.deepEqual(raced.map(r=>r.status).sort(),[200,409],'hold and erasure cannot both win')
+    const racePreview=await h.api(`retention-preview?kind=qualification&id=${raceResource}`,owner)
+    if(raced[0].status===200) {
+      assert.equal(racePreview.erased,false);assert.equal(racePreview.eligible,false)
+      assert.equal((await view()).retired.find(r=>r.id===raceResource).snapshot.reference,disposable.reference)
+    } else assert.equal(racePreview.erased,true)
     if(process.env.PLANNING_SCREENSHOTS) await browserProof(f,'resources')
   } finally {await h.close()}
 }

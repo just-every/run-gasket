@@ -3,7 +3,7 @@ import { attachmentErasurePreview } from './attachment-erasure'
 // Conservative retention default: retain indefinitely, with no automatic erasure.
 // Holds protect request intake and any copied fault on linked maintenance work.
 import type { Bindings } from '../auth.server'
-import type { Actor } from './actor'
+import { capabilitySql, type Actor } from './actor'
 import { all, commit, guard, insist, now, one, stmt } from './core'
 import type { Input } from './input'
 
@@ -19,7 +19,9 @@ export async function holdRecord(env: Bindings, actor: Actor, input: Input) {
   const old = await one(env, `SELECT revision FROM ${holds} WHERE kind=? AND record_id=?`, kind, id)
   const revision = input.integer('revision', { min: 0 })
   insist(revision === (old?.revision ?? 0), 'stale', 409)
+  const authority = capabilitySql(actor.sessionId, 'site.manage')
   await commit(env, [
+    guard(env, 'forbidden', authority.sql, ...authority.params),
     guard(env, 'stale', kind === 'attachment' ? 'EXISTS(SELECT 1 FROM gk_evidence WHERE id=?) OR EXISTS(SELECT 1 FROM gk_request_files WHERE id=?)' : `EXISTS(SELECT 1 FROM ${table} WHERE id=?${kind === 'request' && held ? ' AND erased_at IS NULL' : kind === 'qualification' ? " AND kind='qualification'" : ''})`, ... (kind === 'attachment' ? [id,id] : [id])),
     guard(env, 'stale', `(SELECT COALESCE((SELECT revision FROM ${holds} WHERE kind=? AND record_id=?),0))=?`, kind, id, revision),
     stmt(env, `INSERT INTO ${holds}(kind,record_id,held,reason,revision,changed_by,changed_at) VALUES(?,?,?,?,1,?,?)

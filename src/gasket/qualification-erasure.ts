@@ -4,6 +4,8 @@ import { capabilitySql, type Actor } from './actor'
 import { all, commit, guard, insist, now, one, stmt } from './core'
 import type { Input } from './input'
 
+type QualificationPair = [string, string]
+
 // Erase an unused retired qualification family, including corrections and notices.
 // Active replacements, holds and any retained safety sign-off refuse the operation.
 const FAMILY = `kind='qualification' AND json_extract(snapshot,'$.member_id')=? AND json_extract(snapshot,'$.name')=? COLLATE NOCASE`
@@ -18,16 +20,16 @@ const ELIGIBLE = `NOT EXISTS(SELECT 1 FROM gk_qualifications WHERE member_id=? A
  AND NOT EXISTS(SELECT 1 FROM gk_retention_scope_holds WHERE held=1 AND
  ((kind='user' AND record_id=?) OR (kind='qualification' AND record_id IN (SELECT id FROM gk_retired_resources WHERE ${FAMILY}))))
  AND NOT EXISTS(SELECT 1 FROM gk_retired_resources WHERE ${FAMILY}
- AND retired_at>?-COALESCE((SELECT minimum_days FROM gk_retention_policies WHERE kind='maintenance_records'),0)*86400000)`
+ AND retired_at>?-COALESCE((SELECT MAX(minimum_days) FROM gk_retention_policies WHERE kind IN ('maintenance_records','users')),0)*86400000)`
 
 async function context(env: Bindings, id: string) {
   const record = await one(env, "SELECT snapshot FROM gk_retired_resources WHERE id=? AND kind='qualification'", id)
   insist(record, 'qualification_not_found', 404)
-  const q = JSON.parse(record.snapshot), pair = [q.member_id, q.name]
+  const q = JSON.parse(record.snapshot), pair: QualificationPair = [q.member_id, q.name]
   return { pair, family: await all(env, `SELECT id FROM gk_retired_resources WHERE ${FAMILY} ORDER BY id`, ...pair) }
 }
-const noticeParams = (pair: unknown[]) => [...pair, ...pair, ...pair]
-const eligibleParams = (pair: unknown[]) => [...pair, ...pair, pair[0], ...pair, ...pair, now()]
+const noticeParams = (pair: QualificationPair) => [...pair, ...pair, ...pair]
+const eligibleParams = (pair: QualificationPair) => [...pair, ...pair, pair[0], ...pair, ...pair, now()]
 
 export async function qualificationErasurePreview(env: Bindings, actor: Actor, id: string) {
   insist(actor.role === 'owner', 'forbidden', 403)
