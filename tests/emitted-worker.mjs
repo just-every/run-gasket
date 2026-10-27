@@ -8,6 +8,7 @@ import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { formSaveGate } from './gasket/form-save-gate.mjs'
 import { reportGenerationGate } from './gasket/report-generation-gate.mjs'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -28,18 +29,19 @@ async function freePort() {
  * With `offset` (ms), the Worker's clock runs that far from the machine's: an entry module replaces Date before the
  * built Worker loads, so the test, not the hour it happens to run at, decides what day it is.
  */
-export async function emittedWorker(vars, { installation, offset, instant, outbound, generationGate = false } = {}) {
+export async function emittedWorker(vars, { installation, offset, instant, outbound, generationGate = false, formSaveFault = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort(), origin = `https://127.0.0.1:${port}`
   const mails = []
   let mailOutcome = 'accepted'
+  let saveFault = false
   let generationHook
   const bindings = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'false', MAIL_PROVIDER: 'resend', MAIL_FROM: 'Gasket <auth@example.test>', MAIL_API_KEY: 'test-only-key', ...vars }
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter(file => file.endsWith('.js')).map(file => `assets/${file}`)]
     .map(file => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
   if (offset !== undefined || instant !== undefined) modules.unshift(
-    { type: 'ESModule', path: join(root, 'dist/server/pinned-entry.mjs'), contents: `import './pinned-clock.mjs'\nexport * from './${config.main}'\n${generationGate?`import worker from './${config.main}'\n${reportGenerationGate}`:`export { default } from './${config.main}'`}\n` },
+    { type: 'ESModule', path: join(root, 'dist/server/pinned-entry.mjs'), contents: `import './pinned-clock.mjs'\nexport * from './${config.main}'\n${formSaveFault?`import worker from './${config.main}'\n${formSaveGate}`:generationGate?`import worker from './${config.main}'\n${reportGenerationGate}`:`export { default } from './${config.main}'`}\n` },
     { type: 'ESModule', path: join(root, 'dist/server/pinned-clock.mjs'), contents: `const Real = Date, offset = ${offset ?? 0}, instant = ${instant ?? "undefined"}\nclass PinnedDate extends Real { constructor(...args) { super(...(args.length ? args : [instant ?? Real.now() + offset])) } static now() { return instant ?? Real.now() + offset } }\nglobalThis.Date = PinnedDate\n` })
   const mf = new Miniflare({
     ...convertV4MiniflareOptions({
@@ -50,6 +52,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
       d1Databases: { DB: installation ? config.d1_databases[0].database_id : 'gasket-test' },
       bindings,
       outboundService: async request => {
+        if(formSaveFault&&request.url==='https://synthetic-gasket.invalid/form-save'){const fail=saveFault;saveFault=false;return new Response(null,{status:fail?503:204})}
         if(generationGate&&request.url==='https://synthetic-gasket.invalid/report-generation'){if(generationHook)await generationHook();return new Response(null,{status:204})}
         if (outbound && request.url !== 'https://api.resend.com/emails') return await outbound(request)
         if (request.url !== 'https://api.resend.com/emails') throw new Error(`Unexpected test network destination ${new URL(request.url).origin}`)
@@ -73,7 +76,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   } catch (error) { await close(); throw error }
   return worker()
 
-  function worker() { return { origin, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, request, scheduled, signInToken, close } }
+  function worker() { return { origin, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setSaveFault: () => { saveFault=true }, request, scheduled, signInToken, close } }
 
   /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
   async function scheduled(cron, at = instant ?? Date.now() + (offset ?? 0)) {
