@@ -1,0 +1,1254 @@
+{
+  "schema": 1,
+  "seed": "gasket",
+  "old": {
+    "commit": "e5b99032b38770d86a34472087b096be6d62769f",
+    "files": [
+      "ACCEPTANCE.md"
+    ]
+  },
+  "fragments": [
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 13,
+      "text": "Set up the site and its people. Through site and access pages and JSON/form doors, configure a site, invite and sign in each role, change one role and end access. Repeat private reads and writes signed out, forbidden and revoked; require refusal without leaked records.",
+      "to": "clause",
+      "ids": [
+        "GAS-01"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 14,
+      "text": "Keep the asset register. Create and edit an asset through the register, add three meter types, record each sighting outcome and retire another asset. Read its previous identity and history; duplicate tags, stale edits and unauthorized changes are refused.",
+      "to": "clause",
+      "ids": [
+        "GAS-02"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 15,
+      "text": "Keep the parts list and reconcile counts. Receive five units through the parts page, count four against the observed version, inspect the minus-one variance and retained receipt, then submit a stale count and excess precision through the API; neither changes stock.",
+      "to": "clause",
+      "ids": [
+        "GAS-03"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 16,
+      "text": "Write checklists with revisions. Create a checklist and issue a PM, publish a revision with an extra step, then open the issued work and revision history. Existing work retains its old steps and later work uses the new revision.",
+      "to": "clause",
+      "ids": [
+        "GAS-04"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 17,
+      "text": "Schedule preventive work. Create calendar and meter schedules through the API, cross each due boundary and request generation twice. Inspect one linked order per due schedule, the retained due value and no duplicate open work.",
+      "to": "clause",
+      "ids": [
+        "GAS-05"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 18,
+      "text": "Assign work. Raise corrective work through the form door, assign and reassign it, then read both maintainers' own queues. Attempt each ineligible assignee through the JSON door and inspect unchanged assignment.",
+      "to": "clause",
+      "ids": [
+        "GAS-06"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 19,
+      "text": "Capture the inspection. As the assigned technician, enter all result types, upload and download evidence, and record readings through work pages/API. Try another technician, a backwards counter and a future date; require refusal and retained original evidence.",
+      "to": "clause",
+      "ids": [
+        "GAS-07"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 20,
+      "text": "Issue and return parts, record downtime and findings. Issue and return parts through the work form/API, attempt excess stock and returns, open and close downtime, then request corrective follow-up from a finding. Inspect exact stock, minutes, linked work and refusal of overlapping open downtime.",
+      "to": "clause",
+      "ids": [
+        "GAS-08"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 21,
+      "text": "Submit and review. Submit two failed steps with only one finding and require refusal, then supply linked findings and complete inspection evidence. Return with a reason, resubmit, attempt self-review and stale approval, and approve independently. Inspect retained reviews, closure and next schedule due point.",
+      "to": "clause",
+      "ids": [
+        "GAS-09"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 22,
+      "text": "Watch overdue work and downtime. Open the board as lead and supervisor with overdue, submitted, failed and down assets plus low stock. Compare counts and clipped minutes with source records; a maintainer cannot read the board API.",
+      "to": "clause",
+      "ids": [
+        "GAS-10"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 23,
+      "text": "Read and keep the history. Read the full asset history and authorized CSV through public doors, compare events and attribution, export a populated installation using rer export, restore into an empty installation using rer import and compare domain records and attachment digests.",
+      "to": "clause",
+      "ids": [
+        "GAS-11"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 24,
+      "text": "Move in from MaintainX. Upload the three CSVs through move-in, compare a no-write preview, refuse a changed fingerprint, apply and reapply, undo and import again. Create dependent Gasket records and verify undo reports blockers without removing data.",
+      "to": "clause",
+      "ids": [
+        "GAS-12"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 25,
+      "text": "Let an agent prepare and a person approve. Sign in an agent, prepare each supported proposal via API, reject one, approve another as a different lead, change underlying stock and attempt stale approval. Try direct work capture, record mutation and self-approval; inspect refusals and attributed decisions.",
+      "to": "clause",
+      "ids": [
+        "GAS-13"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 26,
+      "text": "Health, Lobby and real 404s. Request the emitted Worker's root, health, unknown document, unknown API and health subpath; inspect branding, deployment identity and HTTP status, then attempt a private page signed out.",
+      "to": "clause",
+      "ids": [
+        "HTTP-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 27,
+      "text": "US operating defaults. Set up Ohio and Arizona sites, enter USD hourly rates and Fahrenheit/psi readings, cross a daylight-saving boundary and export. Verify due times, currency, unit labels and unchanged original readings.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 28,
+      "text": "Multiple sites and shared governance. Create two sites with distinct managers, move an asset with its meter history, then call each private door using the other site's member. Inspect denied access, correct local dates and organization rollups. As a manager of one site only, move a machine under the other site's line and see it refused (ASSET-001). Turn the technician create-work right off at one site and see that site's technicians refused at the web, API and app doors while the other site's technicians still create work (FIELD-009).",
+      "to": "clause",
+      "ids": [
+        "ADMIN-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 29,
+      "text": "Role rights and separation of duties. Sign in each role and exercise its permitted public doors, including direct forbidden writes/exports. Add a custom site-scoped role, revoke it and test old sessions; technician work and purchasing cannot be self-approved. Remove create work from the technician role at one site and see that site's technicians refused at app and API while the other site's technicians still create work; give a person the Operator template and see only their assigned work.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 30,
+      "text": "Requester and contractor access. Invite a requester by US mobile number only and an external electrician by email, have the requester sign in with a one-time SMS code, submit a fault and follow it, and finish assigned contractor work. Change URL/API identifiers to other records, inspect denied access, expire the contractor grant and test its active session. The requester and the contractor are refused a work order's and an asset's internal comments and comment photos (PLAN-006) by URL and API. A requester and a contractor are refused work creation at the web, API and app doors (FIELD-009).",
+      "to": "clause",
+      "ids": [
+        "ADMIN-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 31,
+      "text": "Enterprise identity lifecycle. Connect each identity provider at its network edge, provision two site groups, require MFA, deprovision an active technician and attempt web/API/offline sync. Repeat for a phone-only technician with queued offline work: end their access and attempt app sync. Inspect refusal of every attempt and a logged owner recovery.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 32,
+      "text": "Attributed append-only audit. Perform work, count, review and import through public doors, trigger a stale write, and inspect the audit download. The failed write adds no business change; previous readings remain visible and integration/AI actions name their authority. Filter search and export by the installation's site and by another site id (404); every entry and CSV row names its site.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 33,
+      "text": "Retention and verifiable erasure. Create a held work record and an eligible requester with a photo, preview and apply erasure through the owner door, inspect bytes and anonymized audit, and restore an older archive with the later erasure journal. Held records remain and erased records do not reappear.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 34,
+      "text": "Protected credentials and private attachments. Connect/rotate/revoke a provider, upload a private manual and hostile file, then use unauthorized, expired and cross-site download links. Export and inspect logs/context for planted secrets; revoked connectors produce no new outbound requests.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 35,
+      "text": "Complete portable archive and inactive restore. Export a realistic multi-site estate through the supported command or download, interrupt and resume, validate digests and restore to a fresh installation. Compare every record class; corrupt and nonempty restores write nothing and restored PMs do not send or buy.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 36,
+      "text": "Backup recovery and connector operations. Back up populated data, interrupt a PM or receipt job, recover to another installation and reconnect intentionally. Inspect visible recovery point, job errors and deduplicated resumed work through owner operations pages.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-010"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 37,
+      "text": "Accessible responsive maintenance workspace. Use every core journey at 1440 and 390 with realistic long records, keyboard and assistive semantics. Induce a save failure, reload the confirmed record and inspect retained draft, focus, text errors and absence of horizontal clipping.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-011"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 38,
+      "text": "Search, saved views and bulk maintenance actions. Find a serial among thousands of assets, save a cross-filtered view, bulk reassign selected work including a forbidden record and export all pages. Inspect exact selection, denial and totals.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-012"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 39,
+      "text": "Per-person display language. Set the organization default to English and one technician and one requester to Spanish. On the technician's phone app, the requester's QR fault form and portal, an emailed and a push notification, and a printed work pack, show interface text in Spanish while user-entered checklist text, readings, units, USD amounts and audit attribution stay byte-for-byte unchanged and an English lead still sees English. Remove one Spanish catalog string and show the visible English fallback marker, not a blank control, plus the completeness report naming it. Switch a user to Arabic and check right-to-left layout at 390 width without clipping.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-013"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 40,
+      "text": "Phone-number invites and SMS sign-in. (1) Invite a technician by US mobile number only and inspect the SMS invitation at the provider edge. (2) Accept it, sign in to the iOS and Android app with the one-time SMS code, and receive and complete assigned work. (3) Invite a requester the same way and follow their own request. (4) Import a MaintainX user export containing a phone-only user and see that user mapped to their completed work. (5) Submit a duplicate number, a malformed number and a number from a country that is not enabled, and see each refused with a visible reason. (6) Request a sixth code within 15 minutes and see it refused with a retry time, then enter five wrong codes and see the lockout. (7) Change one phone-only technician's number and end another's access while both hold queued offline work, then sync: existing sessions are revoked, every queued write is refused with a visible reason, and the audit records each event.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-014"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 41,
+      "text": "Sign in with Google. Enable Google with test credentials at the network edge, sign in an invited lead with Google and land on their own work, and see an uninvited Google account and an account outside the allowed Workspace domain refused. Unlink Google and sign in by email link, require Google for leads and see an email-link lead sign-in refused, then end the lead's access and see their Google sign-in refused and their active session revoked.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-015"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 42,
+      "text": "User and full maintenance-record erasure, split from ADMIN-007 by ct on 25 October 2026.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-016"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 43,
+      "text": "Asset and location hierarchy. Create a compressor under a line, move its component subtree and open parent history/report totals. Attempt a cycle and cross-site move; verify refused writes and retained descendant records.",
+      "to": "clause",
+      "ids": [
+        "ASSET-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 44,
+      "text": "QR and barcode identification. Print asset and location labels, scan at a technician phone and signed-out operator portal, report a fault against a location label with no asset, reprint a retired asset label and scan an unknown code. Inspect correct route, restricted fields and explicit retired/unknown states.",
+      "to": "clause",
+      "ids": [
+        "ASSET-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 45,
+      "text": "Manuals, documents and warranties. Attach two manual revisions, link one to work, set a warranty expiration and download the job pack. Change the master and inspect issued/offline documents plus the named owner's expiry reminder.",
+      "to": "clause",
+      "ids": [
+        "ASSET-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 46,
+      "text": "Status, criticality and failure taxonomy. Take a critical pump down, correct its outage classification and map an imported failure code. Inspect effective status history and unclassified/contradictory evidence in reports without rewriting the original event.",
+      "to": "clause",
+      "ids": [
+        "ASSET-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 47,
+      "text": "Meters, units and counter corrections. Enter manual readings then a replacement counter and late/corrected feed through public doors. Compare normalized run hours, quality flags and due work, and attempt an unexplained backwards reading.",
+      "to": "clause",
+      "ids": [
+        "ASSET-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 48,
+      "text": "Bill of materials and interchangeable spares. Create a motor BOM with two approved bearings and a serial restriction, plan a repair with one out of stock and select a substitute. Inspect compatibility and quantities on the resulting work/parts reservation.",
+      "to": "clause",
+      "ids": [
+        "ASSET-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 49,
+      "text": "Asset lifecycle and replacement decision. Import an older asset, record its purchase and service agreement, compare repair cost with replacement value and retire it. Open its history and export the ledger handoff without deleting prior work.",
+      "to": "clause",
+      "ids": [
+        "ASSET-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 50,
+      "text": "Inspections, rounds and calibration. Schedule a route across three assets and a gauge calibration, fail one reading and skip one stop. Inspect independent follow-up, calibration certificate/version and incomplete route state; signing a route cannot close missing work.",
+      "to": "clause",
+      "ids": [
+        "ASSET-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 51,
+      "text": "Custom asset and part fields. Define a required \"Refrigerant type\" choice field on the HVAC asset category and a \"Voltage\" number field in volts on parts. Set values through the register and the app, read them back on the page, the QR scan view and the API, filter assets by refrigerant type and export CSV with the values. An invalid choice and a missing required value are refused. Rename one field and retire another, then inspect retained values and history. Import a MaintainX asset export with a custom-field column and see it mapped onto the field.",
+      "to": "clause",
+      "ids": [
+        "ASSET-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 52,
+      "text": "Web operator request portal. Add a required \"Is the line stopped?\" choice to one site's form, then submit a noisy-motor fault with a photo through signed-in and public configured intake and see the answer on the request; omit the required field and see refusal. Test invalid asset, file limit and abuse controls, then inspect a persisted request and private-data refusal.",
+      "to": "clause",
+      "ids": [
+        "REQ-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 53,
+      "text": "QR mobile fault reporting. At 390 width scan the pump label, photograph a leak, lose connectivity before sending and reconnect/retry. Inspect exactly one request, original asset mapping and a durable confirmation.",
+      "to": "clause",
+      "ids": [
+        "REQ-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 54,
+      "text": "Triage, duplicate linking and corrective conversion. Triage two reports of the same fault, request more details, link one as duplicate and create one corrective order. Open both request timelines and work evidence; reject a third with an explained outcome.",
+      "to": "clause",
+      "ids": [
+        "REQ-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 55,
+      "text": "Requester status and two-way updates. Submit as an operator, receive acknowledgment, reply with a photo, observe a waiting-on-parts update and then a technician resolution. Inspect mailbox/push edge and portal privacy using another requester, and see none of the work order's internal comments (PLAN-006) in the portal.",
+      "to": "clause",
+      "ids": [
+        "REQ-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 56,
+      "text": "Response targets and escalation. Create urgent and routine requests before a site holiday, advance the clock, pause one for access and inspect distinct target clocks, overdue notices and escalation ownership until acknowledged.",
+      "to": "clause",
+      "ids": [
+        "REQ-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 57,
+      "text": "Email and Google Forms intake. Send an operator email and replay a Google Forms response at the network edge, reply to the acknowledgment and submit an unmappable asset. Inspect one request per source ID, linked reply and actionable rejection.",
+      "to": "clause",
+      "ids": [
+        "REQ-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 58,
+      "text": "Request reporting and operator adoption. Submit, duplicate, decline, convert and leave requests untriaged, then filter and download the request dashboard and compare counts and time denominators with source timestamps.",
+      "to": "clause",
+      "ids": [
+        "REQ-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 59,
+      "text": "Escalation to assigned staff and groups, split from REQ-005 by ct on 25 October 2026.",
+      "to": "clause",
+      "ids": [
+        "REQ-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 60,
+      "text": "Priority, lifecycle and reusable work templates. Create urgent corrective work from a template, create location-only work for a dock light, add a required field and custom waiting status, bulk-create selected jobs and try to bypass completion requirements through the API as a lead and as the technician who created the work. Inspect persistent numbers and refusal.",
+      "to": "clause",
+      "ids": [
+        "PLAN-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 61,
+      "text": "Teams, trades and accountable assignments. Assign an electrical job to a team and lead technician, add a collaborator and hand over across shifts. Inspect both queues, acknowledgment and recorded contributor; an unrelated technician cannot write.",
+      "to": "clause",
+      "ids": [
+        "PLAN-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 62,
+      "text": "Calendar and workload scheduling. Schedule five repairs into a 16-hour team window, mark a technician absent and move a job between days. Inspect capacity and conflicts, unassigned work and unchanged PM due evidence on desktop and phone.",
+      "to": "clause",
+      "ids": [
+        "PLAN-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 63,
+      "text": "Skills, qualifications and resources. Plan a high-voltage repair for a technician with an expired credential and a shared tool already booked. Resolve both constraints and inspect the schedulable slot and utilization denominator.",
+      "to": "clause",
+      "ids": [
+        "PLAN-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 64,
+      "text": "Dependencies and production windows. Plan a repair after isolation and parts receipt in a production window, move that window from the connected calendar and inspect blocked/ready states and affected owner notices.",
+      "to": "clause",
+      "ids": [
+        "PLAN-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 65,
+      "text": "Comments, mentions and shift handoff. Mention the incoming technician on a returning job with a photo and internal cost note, sign in on their phone and follow the notice. Inspect unread state, retained edit history and contractor/requester privacy.",
+      "to": "clause",
+      "ids": [
+        "PLAN-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 66,
+      "text": "Bulk actions and controlled cancellation. Select mixed authorized/stale work, preview a bulk reschedule (each row shows its schedule consequence and open follow-up work) and cancel one PM, then reopen a reviewed, closed corrective repair whose fault came back and see it Returned for rework and fresh review, and reopen canceled work to Open. Inspect per-row outcomes, retained evidence and an overdue PM obligation until explicitly resolved. Select several rows on the Work page and apply a bulk action there.",
+      "to": "clause",
+      "ids": [
+        "PLAN-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 67,
+      "text": "Team, group and direct messaging. Create a team and confirm its conversation appears for current members and for a member added later. Send a one-to-one message and a group message with a photo between a technician's phone and a lead's browser; inspect push delivery at the APNs/FCM edge, deep-link opening and unread/read state. Turn one message into corrective work that links back to the message and keeps the original photo digest. Queue a message offline, reconnect twice and see it delivered once. Remove a member and verify app and API refuse messages sent after removal; a requester and a contractor are refused internal conversations by URL and API.",
+      "to": "clause",
+      "ids": [
+        "PLAN-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 68,
+      "text": "No-code automation rules. Build a rule that routes new requests for Line 2 conveyors to the electrical team at high priority, test it against last week's requests with no changes written, then enable it and submit one matching and one non-matching request. Inspect the assignment, the rule revision in audit and no action on the non-match. Create two rules that would trigger each other and see the loop stopped with a visible error; save a rule whose action approves work and see it refused.",
+      "to": "clause",
+      "ids": [
+        "PLAN-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 69,
+      "text": "Unattended calendar generation. Save a monthly PM through the schedule door, leave the app, cross its due window and restart the scheduler twice. Open one generated order, its due occurrence and any missed-run warning without invoking manual generation.",
+      "to": "clause",
+      "ids": [
+        "PM-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 70,
+      "text": "Automatic meter and condition triggers. Configure counter and sustained-temperature triggers, send fresh, repeated, late and recovered readings through ingest and await generated work. Inspect one order per trigger, source evidence and explicit rejection of stale data.",
+      "to": "clause",
+      "ids": [
+        "PM-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 71,
+      "text": "Cadence, seasonal windows and exceptions. Configure weekday/seasonal PMs across a holiday and daylight-saving change, defer one with approval and edit an interval. Inspect next dates, retained missed work and unchanged issued checklist/due evidence.",
+      "to": "clause",
+      "ids": [
+        "PM-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 72,
+      "text": "Failed inspection creates accountable correction. Fail a required inspection item through mobile/API without manually asking for follow-up, inspect the linked corrective work and its in-app notice (the assignee's list, the board and the audit entry), see submission refused until the assignee acknowledges, complete/review it and verify the originating failure closes only under the checklist's numbered rule and only on an independent approval.",
+      "to": "clause",
+      "ids": [
+        "PM-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 73,
+      "text": "Assignee and approver notifications. Generate and return work, inspect email and mobile push at provider edges, open the deep link and acknowledge. Turn off a technician's email for assignment events while keeping push and set quiet hours, assign work and inspect push delivered, email suppressed with the preference recorded as the reason, and a mandatory escalation still delivered during quiet hours. Induce a delivery failure and retry/restart; inspect visible failure and no duplicated business event.",
+      "to": "clause",
+      "ids": [
+        "PM-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 74,
+      "text": "Overdue escalation and blocker chasing. Leave urgent PM unacknowledged, advance the clock, report a parts blocker and miss its promised date. Inspect escalating notices, accountable blocker and approved reassignment while the original overdue age remains.",
+      "to": "clause",
+      "ids": [
+        "PM-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 75,
+      "text": "PM template rollout and change control. Copy the library air-compressor template, adapt and approve it, then publish a revised compressor program to two sites with one local override, review the diff and approve rollout. Inspect future schedules, unchanged issued work and a conflict requiring local decision.",
+      "to": "clause",
+      "ids": [
+        "PM-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 76,
+      "text": "Scheduler health and automation controls. Test then enable a PM rule, stop its worker across a due slot and inspect a visible missed-run condition. Resume/catch up and inspect one due work order with rule revision; test mode sends no live notification.",
+      "to": "clause",
+      "ids": [
+        "PM-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 77,
+      "text": "Nested and coordinated preventive programs. Schedule weekly, monthly and annual nested services, complete an annual package with one mapped task missing and inspect lower-level obligations. Only fully evidenced approved equivalents suppress duplicate work; missed steps stay due. Exactly: leads publish numbered, immutable task mappings between higher and lower schedules, including schedules on linked assets, with a reason for the equivalence. Every lower task maps to a higher task of the same type, unit, limits and choices; the mapping pins both procedure revisions and cycles are refused. On the Programs page a lead previews and applies a specific pair of occurrences with the same due day. The higher work must be independently approved and closed; each mapped task needs a passing result or its required photo, never an exception or an unanswered, failed or conditional non-applicable task. The lower work must still be untouched and open. A missing mapped task leaves that occurrence and its due date unchanged. Applying the equivalent records both work versions, procedure revisions, mapping revision, review and original result/photo references, retains the lower work as cancelled with a visible satisfaction link (never as separately performed maintenance), releases its reservations and advances only its schedule by its ordinary cadence. A satisfied occurrence cannot be reopened or applied twice; later mapping or procedure revisions do not rewrite earlier satisfaction evidence.",
+      "to": "clause",
+      "ids": [
+        "PM-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 78,
+      "text": "iOS and Android technician app. Install release builds on an iPhone and Android phone, sign in one technician by email link and a phone-only technician with a one-time SMS code, scan an asset and create corrective work against it, open an assigned job from push and update the app while retaining authorized drafts. On the app, scan an asset QR label, create corrective work with priority, description and a photo, assign it to yourself and see it in your own queue and on the lead's board; omit a template's required field and photo and see the API's refusal; see the audit record the door `app`; a requester, a contractor and a technician whose site has the create-work right off are refused (FIELD-009). On the app, record a typed checklist with a conditional step and a step photo and see submission blocked exactly as at the API (FIELD-004).",
+      "to": "clause",
+      "ids": [
+        "FIELD-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 79,
+      "text": "Offline work packs and durable capture. Download a job, enter airplane mode, record every evidence type, kill/restart the app and reopen the draft. Create a new corrective work order with a photo in airplane mode, restart the device, reconnect twice and see exactly one work order with one server number. Verify all bytes/times survive, stock is labeled a snapshot and the app shows what remains unsynced. The audit records the synced work order's creator and the door `sync` (FIELD-009). Offline, record a typed checklist whose conditional step and limit evaluate on the device and whose step photo syncs bound to its step (FIELD-004).",
+      "to": "clause",
+      "ids": [
+        "FIELD-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 80,
+      "text": "Reconnection, conflicts and device revocation. Two devices edit the same job offline and consume the last part, then reconnect in reverse order and interrupt photo sync. Inspect one accepted movement, visible conflict and retained draft; revoke a device and verify refused upload. Create work in airplane mode, revoke the creator's create-work right before reconnecting, sync, and see the work refused with a visible reason that stays on the device and the lead's view (FIELD-009).",
+      "to": "clause",
+      "ids": [
+        "FIELD-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 81,
+      "text": "Typed checklists and required evidence. Publish a checklist with conditional temperature and photo steps, fail a limit and try to submit with missing required evidence through phone and API. Inspect blocked submission, linked finding and retained step revision.",
+      "to": "clause",
+      "ids": [
+        "FIELD-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 82,
+      "text": "Photos, annotations and signatures. Capture/annotate two photos, obtain a named signature, change the work and submit a stale signature. Download originals and inspect revision binding, required re-signing and offline upload provenance.",
+      "to": "clause",
+      "ids": [
+        "FIELD-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 83,
+      "text": "Wrench time, labor and contractor costs. Record two technicians' timed work and a contractor invoice, cross midnight, correct a timer and attempt overlap. Inspect approved hours and USD costs on work and asset reports, with rates hidden from a requester.",
+      "to": "clause",
+      "ids": [
+        "FIELD-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 84,
+      "text": "Crew completion and independent review. Complete a repair with two technicians, reassign to a third, submit and attempt review by each contributor. Require independent approval of the exact final revision and retain the return/rework history.",
+      "to": "clause",
+      "ids": [
+        "FIELD-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 85,
+      "text": "Field usability, print and secure device lifecycle. Use a job at 390 width with long instructions and measure every interactive control at no less than 48 by 48 CSS pixels with 8 pixels spacing, print a pack, re-enter its evidence with provenance, sign out a shared device and revoke another. Inspect cache isolation and intact server records.",
+      "to": "clause",
+      "ids": [
+        "FIELD-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 86,
+      "text": "Technician-created and after-the-fact work. (1) On the iOS and Android app, a technician scans an asset QR label and creates corrective work with priority, description and a photo, assigns it to themselves, and sees it in their own queue and on the lead's board. (2) The technician records work already done with a past start and end time, parts issued, a closed downtime and a checklist from a template; it goes to independent supervisor review and the creator's approval is refused. (3) Omit a required template field and required photo evidence on technician-created work through the app and the API and see the same refusal a lead gets. (4) An owner removes the create-work right from the technician role at one site; that site's technicians are refused at the app and the API while technicians at the other site still create work. (5) A requester and a contractor are refused at the same app and API doors. (6) Open the backlog, MTTR and downtime reports and the audit download, and see the technician-created work counted, with its creator and door attributed. (7) Create work in airplane mode, revoke the creator's right before reconnecting, sync, and see the work refused with a visible reason that stays on the device and the lead's view. Point (1), the app half of (3), the second site of (4), the requester and contractor of (5) and point (7) are asserted under FIELD-001, ADMIN-002, ADMIN-004, FIELD-002 and FIELD-003, which carry them.",
+      "to": "clause",
+      "ids": [
+        "FIELD-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 87,
+      "text": "Multi-location stock and bin visibility. Receive the same bearing into two sites and three bins, reserve one quantity and scan a bin. Compare available, on-hand and on-order totals and attempt an unauthorized cross-site read.",
+      "to": "clause",
+      "ids": [
+        "PART-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 88,
+      "text": "Parts reservations, kits and approved substitution. Reserve a repair kit to two competing work orders, substitute an approved part and cancel one order. Inspect exact available stock, released reservation and unchanged physical on-hand until issue.",
+      "to": "clause",
+      "ids": [
+        "PART-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 89,
+      "text": "Controlled issues, returns and traceability. Issue a serialized spare from a named bin, return one damaged item and attempt an excess return and replayed offline issue. Inspect linked movements, quarantine quantity, original valuation and duplicate refusal.",
+      "to": "clause",
+      "ids": [
+        "PART-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 90,
+      "text": "Cycle counts and inventory adjustments. Count a bin while another technician issues one unit, submit a variance and approve as the stores supervisor. Inspect reconciled expected balance, stale-count refusal and auditable quantity/value adjustments.",
+      "to": "clause",
+      "ids": [
+        "PART-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 91,
+      "text": "Reorder points, lead time and automatic replenishment. Consume below minimum, run the replenishment worker twice, inspect one draft and delivered notice, approve within a spend envelope and receive a partial delivery. Inspect remaining shortage and due-date follow-up.",
+      "to": "clause",
+      "ids": [
+        "PART-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 92,
+      "text": "Inter-site transfers and stock reconciliation. Transfer ten seals between sites, receive eight and mark two lost after approval, then replay delivery confirmation. Inspect source/destination/transit movements and variance cost without a second receipt.",
+      "to": "clause",
+      "ids": [
+        "PART-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 93,
+      "text": "Inventory valuation and transaction history. Receive two differently priced lots with freight and sales tax, issue/return units and change the vendor price. Download a period reconciliation and verify exact USD valuation and immutable historic work cost.",
+      "to": "clause",
+      "ids": [
+        "PART-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 94,
+      "text": "Supplier catalogs and duplicate part control. Import two supplier catalogs with each/box quantities and duplicate manufacturer numbers, preview and approve a merge, then scan either old number. Inspect correct conversion, compatibility and complete movement history.",
+      "to": "clause",
+      "ids": [
+        "PART-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 95,
+      "text": "Stock performance and inventory history. Receive, reserve, issue, count and age spare stock, then filter the stores dashboard by site and download source movements. Reconcile stockout and inventory value denominators with the same period.",
+      "to": "clause",
+      "ids": [
+        "PART-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 96,
+      "text": "Vendor records and maintenance requisitions. Create a supplier and a technician requisition for bearings plus contractor labor, link the asset and cost center, and inspect the buyer queue. Disable the supplier and try to place new work against it.",
+      "to": "clause",
+      "ids": [
+        "BUY-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 97,
+      "text": "Quotes and numbered purchase orders. Compare two quotes, draft a mixed parts/service PO, approve and send through vendor email, then revise quantity. Inspect numbered versions, totals, linked work and the requirement to reapprove changed spend.",
+      "to": "clause",
+      "ids": [
+        "BUY-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 98,
+      "text": "Spend approval and purchasing separation. Submit a $4,500 PO across two approval limits, attempt self-approval, delegate during leave and change a line after approval. Inspect correct routing, renewed approval and separately reported emergency override. Extends BUY-002 exact-revision independent approval, invalidation on every edit and immutable send history with budgets, multi-step limits, delegation and emergency controls before shipping, including approval thresholds that may permit small POs to skip manual approval.",
+      "to": "clause",
+      "ids": [
+        "BUY-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 99,
+      "text": "Partial receiving, inspection and returns. Receive six of ten ordered parts, quarantine one, upload the packing slip and replay the receipt ID. Inspect five usable units, remaining order, quarantine/return movement and no duplicate quantity.",
+      "to": "clause",
+      "ids": [
+        "BUY-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 100,
+      "text": "Bills, match exceptions and financial handoff. Record two deliveries and bills, introduce a price/quantity mismatch, resolve under authorized tolerance and sync to QuickBooks Online. Replay and reverse a receipt; inspect one ledger bill per approved source and retained credit linkage.",
+      "to": "clause",
+      "ids": [
+        "BUY-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 101,
+      "text": "Vendor delivery follow-up and replenishment control. Send an approved PO, withhold vendor acknowledgment, advance past promised delivery and receive only part. Inspect vendor reminder, planner escalation, outstanding quantity and blocked overspend.",
+      "to": "clause",
+      "ids": [
+        "BUY-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 102,
+      "text": "Contractor and external repair work. Send a pump rebuild to a contractor with an expiring qualification, receive quote and completion evidence, return incomplete work, then accept and match its invoice. Inspect scoped access and actual cost in asset history.",
+      "to": "clause",
+      "ids": [
+        "BUY-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 103,
+      "text": "Purchasing visibility and vendor performance. Draft, approve, partially receive and bill POs from two vendors, then download a monthly purchasing report. Reconcile commitments, actuals, late quantities and exception age to source documents.",
+      "to": "clause",
+      "ids": [
+        "BUY-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 104,
+      "text": "Work and asset maintenance costing. Complete a two-technician repair using parts and a contractor, return an unused part and reconcile work, asset, parent and site cost downloads with underlying approved entries. Open the downtime Pareto (REPORT-005) and see each failure's repair cost equal its work order's reconciled cost.",
+      "to": "clause",
+      "ids": [
+        "REPORT-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 105,
+      "text": "Downtime and production availability. Enter overlapping component outages across a reporting boundary and a planned shutdown, then inspect asset/line availability and source timeline. Verify clipped windows, excluded planned time policy and explicit unknown coverage.",
+      "to": "clause",
+      "ids": [
+        "REPORT-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 106,
+      "text": "MTBF, MTTR and failure analysis. Record three failures, one planned stop and missing operating coverage; compare MTBF/MTTR/MTTA and failure Pareto to hand-calculated source events. Correct a failure classification and inspect revised definitions and retained provenance.",
+      "to": "clause",
+      "ids": [
+        "REPORT-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 107,
+      "text": "Backlog, PM compliance and schedule performance. Create on-time, late, canceled and ungenerated PM obligations plus reactive repairs, then filter by site/team and compare counts/hours and compliance denominator against source due occurrences.",
+      "to": "clause",
+      "ids": [
+        "REPORT-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 108,
+      "text": "Downtime Pareto and cost of bad actors. Enter costed failures across three assets, including overlapping components and one unknown loss rate, then inspect Pareto/cumulative percentages and exported inputs without a fabricated loss estimate.",
+      "to": "clause",
+      "ids": [
+        "REPORT-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 109,
+      "text": "Scheduled reports and CSV PDF delivery. Schedule a weekly supervisor pack across daylight saving, inspect email, PDF and CSV at the provider edge and reconcile rows with the dashboard. Remove recipient access before delivery and verify exclusion with a visible delivery result.",
+      "to": "clause",
+      "ids": [
+        "REPORT-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 110,
+      "text": "Custom dashboards and cross-site comparisons. Build a cost-per-operating-hour dashboard for two sites, save/share it and remove one site grant. Inspect recomputed permitted totals, a missing-hours warning and portable measure definitions.",
+      "to": "clause",
+      "ids": [
+        "REPORT-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 111,
+      "text": "Maintenance budgets and repair replacement planning. Set a budget, approve POs and complete work across month end, then compare forecast/actual/commitment and a replacement scenario. Inspect no double counting between PO commitment and posted bill.",
+      "to": "clause",
+      "ids": [
+        "REPORT-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 112,
+      "text": "Reliable measure definitions and data quality. Import incomplete history and late readings, open a KPI's definition and source list, then resolve a missing code. Inspect traceable recomputation, explicit coverage and unchanged original history.",
+      "to": "clause",
+      "ids": [
+        "REPORT-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 113,
+      "text": "Completed work-order PDF. Complete a work order with a failed step, two readings, two photos, a named signature, parts, time and a contractor charge, then approve it. Download its PDF as the supervisor and compare every step result, reading, photo digest, signature, review decision and audit entry with the record. Download it as a technician without rate visibility and see no labor rates or costs. A requester and a technician from another site are refused. Bulk-download three work orders as a ZIP and see one PDF per work order.",
+      "to": "clause",
+      "ids": [
+        "REPORT-010"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 114,
+      "text": "Documented maintenance REST API. Use API documentation to create/read/update and page an asset/work/stock estate, retry a timed-out write with the same key and attempt forbidden site and approval operations. Compare API results with UI/history.",
+      "to": "clause",
+      "ids": [
+        "INT-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 115,
+      "text": "Signed webhooks and reliable connector jobs. Subscribe to work/receipt events, verify signatures at the receiver edge, return rate limits and timeouts, rotate signing secret and resume from a cursor. Inspect deduplication, expired replay refusal and actionable dead letters.",
+      "to": "clause",
+      "ids": [
+        "INT-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 116,
+      "text": "QuickBooks Online maintenance spend sync. Connect a QuickBooks sandbox, map an approved partial receipt/bill and cost allocation, sync twice, change a ledger tax/account mapping and return payment/credit status. Inspect one posted document and a visible conflict requiring correction. Mark a completed tenant repair billable to a customer, approve it and see one QuickBooks invoice with its labor and part lines; replay the sync and see no second invoice, and return its paid status.",
+      "to": "clause",
+      "ids": [
+        "INT-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 117,
+      "text": "Email and APNs FCM push delivery. Send a real provider-edge test and work notice to email/iOS/Android, simulate bounced mail and expired device token, rotate credentials and inspect exact event links, suppression and visible failure state.",
+      "to": "clause",
+      "ids": [
+        "INT-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 118,
+      "text": "Slack maintenance intake and alerts. Connect Slack at its network edge, create a request from a channel, post overdue work and acknowledge as a mapped technician. Replay an interaction and revoke that member; inspect one request/action and denied stale interaction.",
+      "to": "clause",
+      "ids": [
+        "INT-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 119,
+      "text": "Microsoft Teams through Zapier. Configure a Teams/Zapier flow, receive a down-asset notice and submit a fault card, replay the response and disconnect the Zap. Inspect one linked request, mapped site and visible paused/failed routing.",
+      "to": "clause",
+      "ids": [
+        "INT-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 120,
+      "text": "Zapier triggers and actions. Build a Zap from a new fault to a maintenance request and from review completion to another authorized tool, replay both event/action and edit a field mapping. Inspect one source-linked result and actionable schema error.",
+      "to": "clause",
+      "ids": [
+        "INT-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 121,
+      "text": "SAP procurement and asset exchange. Map a SAP equipment/material/cost-center set, exchange an approved requisition and partial receipt, replay and introduce an unknown material. Inspect linked external IDs, reconciled quantities/costs and a blocked unmapped line.",
+      "to": "clause",
+      "ids": [
+        "INT-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 122,
+      "text": "Oracle procurement and maintenance cost exchange. Connect an Oracle sandbox, map a supplier/item, send an approved PO cost allocation, return a partial receipt/bill and interrupt/reconnect. Inspect one financial event per external ID and visible mapping exceptions.",
+      "to": "clause",
+      "ids": [
+        "INT-009"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 123,
+      "text": "OPC UA and PLC SCADA condition ingest. Connect a gateway to a controlled OPC UA server and a mapped PLC feed, cross a temperature threshold, lose/recover the link and replay buffered samples. Inspect fresh/unknown states, one condition job and no control writes.",
+      "to": "clause",
+      "ids": [
+        "INT-010"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 124,
+      "text": "Fluke condition monitoring. Connect a supported Fluke condition-monitoring source at its network edge, ingest vibration/temperature alarm and recovery, replay it and remove source permission. Inspect one fault/work link, original readings and explicit stale/disconnected state.",
+      "to": "clause",
+      "ids": [
+        "INT-011"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 125,
+      "text": "Tractian sensor alarms and diagnosis context. Map a Tractian sensor to a motor, deliver an alarm, repeat it and deliver later recovery plus conflicting manual evidence. Inspect one linked work order, full context and unresolved disagreement until reviewed.",
+      "to": "clause",
+      "ids": [
+        "INT-012"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 126,
+      "text": "Samsara fleet meters and inspection defects. Connect a Samsara fleet sandbox, import a vehicle with engine hours and a DVIR defect, replay/update that inspection and revoke the connection. Inspect one source-linked fault, correct PM trigger and disconnected freshness.",
+      "to": "clause",
+      "ids": [
+        "INT-013"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 127,
+      "text": "MachineMetrics production and machine data. Connect two machine feeds, ingest running/stopped periods and a condition event, remap a tag and interrupt coverage. Inspect meter/production context, one fault work item and explicit classification/coverage gaps.",
+      "to": "clause",
+      "ids": [
+        "INT-014"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 128,
+      "text": "Existing CMMS and EAM exchange. Connect a separate SAP/Maximo/UpKeep test tenant in turn, create a fault, route its work and exchange completion twice. Inspect stable links, no echo loop and visible conflicting status requiring human decision.",
+      "to": "clause",
+      "ids": [
+        "INT-015"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 129,
+      "text": "Power BI and analytics export. Refresh Power BI from a multi-site dataset, close/reclassify work and erase an eligible contact, then refresh incrementally. Compare counts/costs to source reports and verify excluded site/rate data does not leak.",
+      "to": "clause",
+      "ids": [
+        "INT-016"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 130,
+      "text": "Production and business calendar integration. Connect each calendar provider, import a shutdown, publish a work slot, move it externally and replay the change across daylight saving. Inspect one updated appointment, planner conflict and unchanged work completion/cost authority.",
+      "to": "clause",
+      "ids": [
+        "INT-017"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 131,
+      "text": "Reviewed, reversible and attributable move-in. Preview an export containing duplicates, malformed units, orphan work and an unknown user, change the source after review and attempt apply. Apply the reviewed data, resume/reapply, then undo before and after dependent work; inspect the exact journal and refusal. Import MaintainX assets with parents and see them placed under those parents (ASSET-001).",
+      "to": "clause",
+      "ids": [
+        "MIG-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 132,
+      "text": "MaintainX complete maintenance migration. Upload real-format MaintainX CSVs plus completed-work PDF/detail and attachment inputs through move-in, including multiple date ranges, a phone-only user and custom-field columns. Reconcile open/closed work, results, users (by email or phone number), custom-field values, costs, stock, PM next dates and file digests, then replay. Any unavailable record class is an explicit blocking discrepancy, never silently dropped.",
+      "to": "clause",
+      "ids": [
+        "MIG-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 133,
+      "text": "UpKeep complete maintenance migration. Import documented-format UpKeep work/history and entity files with PDF/ZIP detail, API/file mapping and meter/Edge history across date ranges. Compare original file digests, work status/dates, users, costs, PM rules and current stock; reject unresolved source/file IDs and reimport without duplication.",
+      "to": "clause",
+      "ids": [
+        "MIG-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 134,
+      "text": "Fiix complete maintenance migration. Import a Fiix CSV/report set and an available database/file ZIP through reviewed move-in, including failures, completed tasks and meter timestamps. Reconcile identities, work steps, PM recurrence, hours, costs and attachment digests; list missing source entitlements and prevent incomplete cutover.",
+      "to": "clause",
+      "ids": [
+        "MIG-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 135,
+      "text": "Limble complete maintenance migration. Import Limble export samples containing multiple labor entries, downtime, historical parts and task files, and obtain originals via supported authorized extraction. Compare PM next dates, stock, users, costs, audit and file/reading totals; show unresolved coverage as a blocking exception.",
+      "to": "clause",
+      "ids": [
+        "MIG-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 136,
+      "text": "Tractian complete maintenance migration. Use an authorized tenant export/API schema to import an asset with PM, historical repair, purchase, timer, alarm and attachment. Reconcile each source class and explicitly resolve missing raw timer/file/meter data; replay without duplicate work, balances or alarms.",
+      "to": "clause",
+      "ids": [
+        "MIG-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 137,
+      "text": "Open-work CSV and Excel migration. Upload a 2,000-row open/history spreadsheet with leading-zero assets, mixed dates, custom fields and orphan assignees. Fix preview errors, apply and compare every accepted row, no stock side effects and no historical notices.",
+      "to": "clause",
+      "ids": [
+        "MIG-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 138,
+      "text": "Reconciled cutover and a complete exit. Run the old and imported estate side by side, change work during the freeze, apply a reviewed delta and resolve discrepancies. Approve cutover and observe exactly one future PM/notice, then export all records/files for another tool.",
+      "to": "clause",
+      "ids": [
+        "MIG-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 139,
+      "text": "Hazard, isolation and permit evidence. Configure an isolation prerequisite, attempt work submission without the required qualified sign-off, record the permit and its expiry, and change the procedure. Inspect refusal, human attribution and required reapproval of the changed evidence.",
+      "to": "clause",
+      "ids": [
+        "SAFE-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 140,
+      "text": "Compliance templates and calibration evidence. Publish a required inspection template, issue work, change the template and export an audit pack containing original instructions, results, qualifications, certificates and independent review. Verify missing/expired evidence remains explicit.",
+      "to": "clause",
+      "ids": [
+        "SAFE-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 141,
+      "text": "Capacity, ownership and honest service state. Load a representative estate at the declared capacity through import/public API, page/search/export all records, download an offline pack at that 7-day, 200-work-order, 2 GB floor on a phone and work it in airplane mode, and exceed a configured limit. Inspect exact counts, usable core workflows and explicit refusal without lost accepted data.",
+      "to": "clause",
+      "ids": [
+        "SAFE-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 142,
+      "text": "Detect developing failures from live evidence. Feed authorized rising vibration, missing samples and two comparable historical failures through ingest. Inspect a source-cited proposal before the failure threshold, explicit insufficient-coverage state for gaps and no live work beyond the lead's grant.",
+      "to": "clause",
+      "ids": [
+        "AGENT-001"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 143,
+      "text": "Stage an executable repair around production. Provide an impending motor fault with a missing bearing and a two-hour production window. Inspect a cited plan, compatible part/skill/slot choices and a purchasing draft; approve, change availability before execution and require replanning rather than silent substitution.",
+      "to": "clause",
+      "ids": [
+        "AGENT-002"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 144,
+      "text": "Propose evidence-backed PM interval changes. Give comparable assets different failure histories and OEM minimum intervals, inspect a cited proposed change and expected trade-off, reject an unsupported extension and approve a constrained revision. Change the source history and verify stale approval is refused.",
+      "to": "clause",
+      "ids": [
+        "AGENT-003"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 145,
+      "text": "Measure whether reliability actually improves. Approve a PM change, provide post-change operation with lower downtime and then a telemetry gap/production reduction. Inspect exposure-normalized results, stated uncertainty and a human-approved reversal proposal when failures worsen.",
+      "to": "clause",
+      "ids": [
+        "AGENT-004"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 146,
+      "text": "Follow overdue work through verified closure. Leave a PM blocked on parts and a repair awaiting review, answer one agent query with a promised date (valid through its site-local day) and miss it; unanswered questions use the chase rule's elapsed 24-hour-day response interval. Inspect contextual escalation, proposed reassignment and refusal to mark either work or finding closed without technician evidence and supervisor decision.",
+      "to": "clause",
+      "ids": [
+        "AGENT-005"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 147,
+      "text": "Reconcile spare-parts reality. Provide a duplicate bearing, late PO and inconsistent count/issue history. Inspect cited correction/replenishment proposals and value impacts, approve one after a physical count, and reject an unsupported receipt. Changed stock invalidates the prepared adjustment.",
+      "to": "clause",
+      "ids": [
+        "AGENT-006"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 148,
+      "text": "Draft grounded procedures and technician assistance. Ask for a repair checklist using an OEM manual and past work, inspect citations and conflicting instructions, then submit malicious instructions inside a manual. Publish only after lead review and verify no authority or procedure revision changes from retrieved text. Draft a Spanish translation of a lockout step, reject a mistranslation, approve a corrected version and verify its source link, then change the source and see the translation marked stale.",
+      "to": "clause",
+      "ids": [
+        "AGENT-007"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 149,
+      "text": "Extract purchasing documents for human review. Upload a skewed packing slip and invoice with a new vendor part, mismatched unit pack and tax. Inspect source-highlighted proposed matches and exceptions, correct them, approve bill creation and confirm no inventory receipt occurs without stores confirmation.",
+      "to": "clause",
+      "ids": [
+        "AGENT-008"
+      ]
+    },
+    {
+      "file": "ACCEPTANCE.md",
+      "line": 150,
+      "text": "Accountable agent execution and measurable value. Grant a bounded reliability run with a dollar budget, inspect its data/action preview, approve one proposal and revoke during another run. Export decisions/cost/outcome history; verify no post-revocation writes, secret leakage or invented success after provider failure.",
+      "to": "clause",
+      "ids": [
+        "AGENT-009"
+      ]
+    }
+  ]
+}

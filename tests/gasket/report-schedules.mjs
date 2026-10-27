@@ -69,7 +69,9 @@ export async function reportSchedulesJourney(){
     await h.api('report.schedule',undefined,body,401)
     for(const path of ['/app/settings/reports',`/app/report-packs/${schedule}.csv`,`/app/report-packs/${schedule}.pdf`]){
       const response=await h.raw(path)
-      assert.equal(response.status,303);assert.match(response.headers.get('location'),/sign-in/)
+      assert.equal(response.status,303)
+      const redirect=new URL(response.headers.get('location'),h.origin)
+      assert.equal(redirect.pathname,'/signin');assert.equal(redirect.searchParams.get('returnTo'),path)
     }
     const service=await h.api('service.create',cookie.owner,{name:'Synthetic report refusal',scopes:['assets:read'],expiresAt:Date.parse('2027-03-08T14:00:00Z'),consent:true})
     assert.equal((await h.raw('/api/gasket/report.schedule',{body,headers:{authorization:`Bearer ${service.token}`}})).status,403,'service principals cannot authorize scheduled delivery')
@@ -259,6 +261,14 @@ export async function reportSchedulesJourney(){
         const context=await browser.newContext({ignoreHTTPSErrors:true})
         await context.addCookies(cookie.owner.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
         const page=await context.newPage()
+        await page.goto(`${h.origin}/app/settings/reports`)
+        await page.getByLabel('Pack name',{exact:true}).fill('Browser owner pack')
+        await page.getByLabel('Olive Owner',{exact:true}).check()
+        await page.getByRole('checkbox',{name:'I authorize weekly email attachments',exact:false}).check()
+        await page.getByRole('button',{name:'Authorize schedule',exact:true}).click()
+        await page.waitForURL(url=>url.searchParams.has('notice'))
+        const ownerSaved=(await h.api('report-schedules',cookie.owner)).schedules.find(s=>s.name==='Browser owner pack')
+        assert.ok(ownerSaved);assert.equal(ownerSaved.paused,0);assert.equal(ownerSaved.revision,1)
         for(const width of [1440,390])for(const [name,path]of [['report-schedules','/app/settings/reports'],['report-edit',`/app/settings/reports?edit=${schedule}`],['report-history',`/app/settings/reports?edit=${familyIds.history}`],['report-valuation',`/app/settings/reports?edit=${familyIds.valuation}`]]){
           await page.setViewportSize({width,height:1100});await page.goto(h.origin+path)
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)

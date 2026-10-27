@@ -227,6 +227,10 @@
       "sha256": "b839ddc5ef690fc9ea6d01d5d2626d1b1637b76af657708497d7cca182d3f8d9",
       "executable": false
     },
+    "docs/contract/COVERAGE.json": {
+      "sha256": "3f35d6b052592d44c1d392fd7d75cd0148cd5bf7e13fa5ae28d5b9ed8d503e12",
+      "executable": false
+    },
     "docs/doing-the-work.md": {
       "sha256": "5c1d8e08fe6713756416c6f9b55c78e821a798b9b127d8dda8780c4344866792",
       "executable": false
@@ -4284,7 +4288,7 @@
       "executable": false
     },
     "tests/gasket/report-schedules.mjs": {
-      "sha256": "2775dea7e6b7310faa8428155276e7baca092275e877a8eace52e4c57ac84845",
+      "sha256": "cb85137ab95dc955fd538cf8c5bc6df708335d6ddbc3f87a432189aa4bc0eba2",
       "executable": false
     },
     "tests/gasket/request-draft-privacy.mjs": {
