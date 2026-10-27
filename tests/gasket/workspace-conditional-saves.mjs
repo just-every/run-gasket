@@ -1,10 +1,12 @@
 // Additional record states share the workspace journey's real save boundaries.
 import assert from 'node:assert/strict'
+import { png } from './fixtures.mjs'
 
 export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,technician,longName,part}) {
   const asset=(await h.api('asset.create',cookie.lead,{tag:'ACCESS-STATES',name:longName,location:'West maintenance workshop'})).id
   const job=(await h.api('workorder.create',cookie.lead,{asset,title:'Inspect guard with the maintenance crew',due:day,assignee:technician})).id
   const work=`work/${job}`, record=`assets/${asset}`
+  const windowDay=new Date(Date.parse(day+'T12:00Z')+2*86_400_000).toISOString().slice(0,10)
   const form=action=>page.locator(`form[action="/app/do/${action}"]`)
   async function save(action,fields,view,which) {
     const target=which || form(action)
@@ -13,16 +15,18 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
     }
     for (const [label,value] of Object.entries(fields)) {
       const control=target.getByLabel(label,{exact:true})
-      if (await control.evaluate(el=>el.tagName)==='SELECT') await control.selectOption(value)
+      if (typeof value==='object') await control.setInputFiles(value)
+      else if (await control.evaluate(el=>el.tagName)==='SELECT') await control.selectOption(value)
       else await control.fill(value)
     }
     await submit(target,/Saved/,view)
   }
   await use('owner')
   await open('/app/settings/resources','resource-availability')
-  await save('planning.window',{'Person':technician,'Window':'available','Starts':`${day}T06:00`,'Ends':`${day}T18:00`,'Reason':'Explicit workshop shift'},'planning')
+  await save('planning.window',{'Person':technician,'Window':'available','Starts':`${windowDay}T06:00`,'Ends':`${windowDay}T18:00`,'Reason':'Explicit workshop shift'},'planning')
   assert.ok((await h.api('planning',cookie.owner)).windows.some(row=>row.member_id===technician&&row.reason==='Explicit workshop shift'))
-  const remove=form('planning.window.remove').filter({has:page.locator('input[name=id]')}).last()
+  const window=(await h.api('planning',cookie.owner)).windows.find(row=>row.reason==='Explicit workshop shift')
+  const remove=form('planning.window.remove').filter({has:page.locator(`[name=id][value="${window.id}"]`)})
   await save('planning.window.remove',{'Removal reason':'Replaced by the confirmed production shift'},'planning',remove)
   assert.equal((await h.api('planning',cookie.owner)).windows.some(row=>row.reason==='Explicit workshop shift'),false)
   await open('/app/settings/resources','qualification-entry')
@@ -166,6 +170,57 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
   await save('workorder.respond',{},work,form('workorder.respond').filter({has:page.locator('[name=response][value=on_it]')}))
   assert.equal((await h.api(work,cookie.max)).chase.responses.at(-1).response,'on_it')
   await open(`/app/work/${job}`,'recorded-response')
+  await use('lead')
+  await open(`/app/assets/${asset}`,'document-original')
+  const original={name:'synthetic-gasket-43.png',mimeType:['image','png'].join('/'),buffer:png}
+  await save('document.add',{'Title':'Guard alignment instructions with retained original drawings','File':original,'Source (publisher and reference)':'Owner-entered synthetic workshop instructions'},record)
+  const document=(await h.api(record,cookie.lead)).documents.documents.find(row=>row.title==='Guard alignment instructions with retained original drawings')
+  assert.equal(document.revisions[0].filename,original.name)
+  const revise=form('document.revise').filter({has:page.locator(`[name=document][value="${document.id}"]`)})
+  await save('document.revise',{'File':{...original,name:'synthetic-gasket-44.png'},'What changed':'Add the guard fastener inspection'},record,revise)
+  assert.deepEqual((await h.api(record,cookie.lead)).documents.documents.find(row=>row.id===document.id).revisions.map(row=>row.filename),['synthetic-gasket-44.png',original.name])
+  await save('document.expiry',{'Expires on':'2099-12-31','Owner to remind':technician,'Remind days ahead':'14'},record,form('document.expiry').filter({has:page.locator(`[name=document][value="${document.id}"]`)}))
+  assert.equal((await h.api(record,cookie.lead)).documents.documents.find(row=>row.id===document.id).remind_days,14)
+  await save('asset.contact',{'Name':'Synthetic workshop service desk','Company':'Synthetic mechanical services','Phone':'+1 216 555 0143','Email':'synthetic-gasket-service@example.test'},record)
+  assert.equal((await h.api(record,cookie.lead)).documents.contacts[0].name,'Synthetic workshop service desk')
+  await open(`/app/work/${job}`,'document-link')
+  await save('document.link',{'Document':document.id},work)
+  assert.deepEqual((await h.api(work,cookie.lead)).documents.map(row=>[row.title,row.revision]),[[document.title,2]])
+  await save('work.cost',{'Category':'tools','Amount (USD)':'35.50','Note':'Guard alignment tool rental'},work)
+  assert.equal((await h.api(work,cookie.lead)).costs.totalCents,3550)
+  await open(`/app/work/${job}`,'linked-documents-and-cost')
+  await open('/app/settings/fields','custom-asset-field')
+  await save('customfield.save',{'Field name':'Guard inspection register note','Record type':'asset','Type':'text','Scope':'organization'},'custom-fields',page.locator('#define-field').locator('form'))
+  const custom=(await h.api('custom-fields',cookie.lead)).find(row=>row.name==='Guard inspection register note')
+  assert.equal(custom.type,'text')
+  await open(`/app/assets/${asset}`,'custom-asset-value')
+  await save('customvalue.set',{'Guard inspection register note':'Inspect the north guard platform'},record)
+  assert.equal((await h.api(record,cookie.lead)).customFields.find(row=>row.id===custom.id).value,'Inspect the north guard platform')
+  await open('/app/settings/fields','archive-custom-field')
+  await save('customfield.retire',{},'custom-fields',form('customfield.retire').filter({has:page.locator(`[name=id][value="${custom.id}"]`)}))
+  assert.equal(Boolean((await h.api('custom-fields',cookie.lead)).find(row=>row.id===custom.id).retired),true)
+  await open(`/app/assets/${asset}`,'archived-custom-value')
+  await open(`/app/parts/${part}`,'part-category')
+  await save('part.category',{'Category':'Guard fasteners'},`parts/${part}`)
+  assert.equal((await h.api(`parts/${part}`,cookie.lead)).category,'Guard fasteners')
+  await open('/app/schedules','closed-day-entry')
+  await save('closure.add',{'Name':'Guard workshop shutdown','From':day,'To (inclusive)':day},'closures')
+  const closure=(await h.api('closures',cookie.lead)).find(row=>row.label==='Guard workshop shutdown')
+  assert.equal(closure.starts_on,day)
+  await save('closure.remove',{},'closures',form('closure.remove').filter({has:page.locator(`[name=closure][value="${closure.id}"]`)}))
+  assert.equal((await h.api('closures',cookie.lead)).some(row=>row.id===closure.id),false)
+  await open('/app/bad-actors','production-loss-rate')
+  await save('loss.rate',{'Entry':asset,'USD per production hour':'120.00','Basis':'Documented synthetic production contribution'},'bad-actors')
+  assert.match(await page.getByRole('main').innerText(),/120\.00 per production hour/)
+  const parent=(await h.api('asset.create',cookie.lead,{tag:'ACCESS-PARENT',name:'Workshop guard inspection line',location:'West workshop',level:'line'})).id
+  await open(`/app/assets/${asset}`,'move-maintenance-hierarchy')
+  await save('asset.move',{'Move under':parent},record)
+  assert.equal((await h.api(record,cookie.lead)).hierarchy.parent.id,parent)
+  const retired=(await h.api('asset.create',cookie.lead,{tag:'ACCESS-RETIRED',name:'Retired workshop guard fixture with retained maintenance identity',location:'West workshop'})).id
+  await open(`/app/assets/${retired}`,'asset-retirement')
+  await save('asset.retire',{'Reason to retire':'Replaced by the approved guard fixture'},`assets/${retired}`)
+  assert.equal((await h.api(`assets/${retired}`,cookie.lead)).status,'retired')
+  await open(`/app/assets/${retired}`,'retired-asset-history')
   await use('owner')
   await open('/app/site','technician-create-work-setting')
   const allowed=(await h.api('site',cookie.owner)).technician_create_work
