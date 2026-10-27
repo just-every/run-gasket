@@ -1,7 +1,7 @@
 // Runs the built Worker (dist/) in Miniflare with its own migrated D1, at a
 // production HTTPS origin so sign-in mail goes through the real Resend adapter.
-// The only fake is the network edge: outbound requests are captured here and
-// can never reach a provider.
+// The only fake is the network edge. An explicit outbound callback can qualify
+// a real provider; ordinary journeys capture requests without external effects.
 import { createRequire } from 'node:module'
 import { mkdtemp, readdir, readFile, realpath, rm } from 'node:fs/promises'
 import { createServer } from 'node:net'
@@ -56,6 +56,12 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
       outboundService: async request => {
         if(formSaveFault&&request.url.startsWith('https://synthetic-gasket.invalid/form-save?phase=')){const phase=new URL(request.url).searchParams.get('phase');if(phase==='after')saveCommits++;const fail=saveFault===phase && --saveFaultStep===0;if(fail)saveFault=false;return new Response(null,{status:fail?503:204})}
         if(generationGate&&request.url==='https://synthetic-gasket.invalid/report-generation'){if(generationHook)await generationHook();return new Response(null,{status:204})}
+        if (request.url === 'https://api.sendgrid.com/v3/mail/send') {
+          const body = await request.clone().json()
+          mails.push({ ...body, to: body.personalizations[0].to.map(r => r.email), text: body.content.find(c => c.type === 'text/plain')?.value })
+          if (outbound) return await outbound(request)
+          return new Response(null, { status: 202, headers: { 'x-message-id': `synthetic-gasket-${mails.length}` } })
+        }
         if (outbound && request.url !== 'https://api.resend.com/emails') return await outbound(request)
         if (request.url !== 'https://api.resend.com/emails') throw new Error(`Unexpected test network destination ${new URL(request.url).origin}`)
         mails.push(await request.json())
@@ -78,7 +84,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   } catch (error) { await close(); throw error }
   return worker()
 
-  function worker() { return { origin, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step; saveCommits=0 }, getSaveCommits: () => saveCommits, request, scheduled, signInToken, close } }
+  function worker() { return { origin, scratch: directory, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step; saveCommits=0 }, getSaveCommits: () => saveCommits, request, scheduled, signInToken, close } }
 
   /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
   async function scheduled(cron, at = instant ?? Date.now() + (offset ?? 0)) {

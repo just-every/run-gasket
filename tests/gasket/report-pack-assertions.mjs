@@ -1,0 +1,47 @@
+import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+
+// Compare exported metadata with independent public reads and retained audit events.
+export async function assertPack(h, cookie, pack, expected, pdfText) {
+  const { kind, filters, recipient, role, at, from, to, revision, latestChangeAt = at } = expected
+  const query = new URLSearchParams({ ...filters, from, to })
+  const metrics = await h.api(`metrics?${query}`, cookie)
+  const definitions = metrics.definitions.filter(d => kind === 'history' ? d.id === 'history.events' : d.sourceDoor === `/api/gasket/${kind}`)
+  assert.ok(definitions.length > 0, `${kind} has source definitions`)
+  assert.deepEqual(pack.metadata.definitions, definitions, 'every versioned definition and its formula, exclusions and freshness survive export')
+  assert.deepEqual(pack.metadata.period, { from, to })
+  assert.equal(pack.metadata.report, kind)
+  assert.equal(pack.metadata.generatedAt, at)
+  assert.equal(pack.metadata.zone, 'America/New_York')
+  assert.deepEqual(pack.metadata.scope, {
+    site: 'Great Lakes report plant', filters, role, recipient,
+    policy: 'Current report access only. No original files or individual labor rates.',
+  })
+  assert.equal(pack.metadata.sourceRevision, revision)
+  assert.equal(pack.metadata.latestChangeAt, latestChangeAt)
+  assert.match(pack.metadata.freshness, /retained records/)
+  assert.match(pack.metadata.freshness, /external source completeness is not implied/)
+  assert.equal(pack.metadata.sourceDoor, `/api/gasket/${kind}?${query}`)
+  const dashboard = `${kind === 'history' ? `/app/assets/${filters.asset}` : `/app/${kind}`}?${query}`
+  assert.equal(pack.metadata.dashboard, dashboard)
+  assert.equal((await h.raw(dashboard, { cookie })).status, 200, 'the exported dashboard link opens the saved period and scope')
+  assert.deepEqual(pack.sourceQuality.quality, metrics.quality, 'site-wide context retains every authorized finding')
+  assert.equal(pack.sourceQuality.policy, metrics.policy)
+  assert.match(pack.sourceQuality.scope, /Site-wide/)
+  assert.equal(pack.sourceQuality.quality.importAccess, role === 'owner')
+  if (role !== 'owner') assert.deepEqual(pack.sourceQuality.quality.unresolvedImports, [], 'restricted import details are absent')
+  const fingerprint = createHash('sha256').update(JSON.stringify({
+    data: pack.data, filters, zone: 'America/New_York', definitions,
+    sourceQuality: pack.sourceQuality, sourceRevision: revision,
+  })).digest('hex')
+  assert.equal(pack.fingerprint, fingerprint, 'the source fingerprint covers data, filters, clock, definitions, quality and revision')
+  if (pdfText) {
+    const readable = pdfText.replace(/\s/g, '')
+    for (const value of [kind, from, to, new Date(at).toISOString(), role, dashboard, String(revision), fingerprint, pack.metadata.freshness, pack.sourceQuality.scope]) {
+      assert.ok(readable.includes(value.replace(/\s/g, '')), `readable PDF retains metadata ${value}`)
+    }
+    for (const definition of definitions) for (const key of ['id', 'name', 'version', 'formula', 'eventTime', 'exclusions', 'freshness', 'sourceDoor']) {
+      assert.ok(readable.includes(String(definition[key]).replace(/\s/g, '')), `readable PDF retains ${definition.id} ${key}`)
+    }
+  }
+}

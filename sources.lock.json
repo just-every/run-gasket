@@ -164,7 +164,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "d1c6f4cb109af05d8482e12b0c799429b6b3535aedd69ad7445288396caa8602",
+      "sha256": "fe2aec8798d3d4e2dd9378a96fea6f2be01cecfd1e4bbd8e849c95cf8e860f11",
       "executable": false
     },
     ".gitignore": {
@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "5c560dbab747e0f681f768c968715c8f4305119c5a66a6d6f7704f429f619876",
+      "sha256": "22b61bdc4246d780289d0fd0b96f127d579652bf093e3bd5d205279eb6bf0d23",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -184,7 +184,7 @@
       "executable": false
     },
     "AGENTS.md": {
-      "sha256": "fcbb429eeb7088f97da92f4fd7919d0a31e0d2e075de51b47197c1c4cc3980c5",
+      "sha256": "a3eb02a61d159dbdbbc07fa09bcc3faea3ea8257e79c01da64061a7bafb0afaf",
       "executable": false
     },
     "API.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "be858210e816fb0fe6b339ffd66acf97ed58f78f5e17fb4a50c24ff207e11ff8",
+      "sha256": "9d4c7d389b95231fcb02c64446d8cb62579d945b3e423d6a04e18a771f910d53",
       "executable": false
     },
     "DEMO.md": {
@@ -221,6 +221,10 @@
     },
     "docs/backup-and-restore.md": {
       "sha256": "d483a5349cdb811eb12bf5cd527eac7a276a5962e5aa11982ec64c0ecd14c1b9",
+      "executable": false
+    },
+    "docs/CLAIMS.md": {
+      "sha256": "b839ddc5ef690fc9ea6d01d5d2626d1b1637b76af657708497d7cca182d3f8d9",
       "executable": false
     },
     "docs/doing-the-work.md": {
@@ -987,6 +991,10 @@
       "sha256": "3e74b68fd8255992aaa39dd92f89a8e493fa27efd64a74ce238c7f07046317d0",
       "executable": false
     },
+    "RULINGS.md": {
+      "sha256": "49acfef34c9103a1aeb4baa7a39034fca43a042dfd78c0135f21b21cf543c45c",
+      "executable": false
+    },
     "RUN-LOCALLY.md": {
       "sha256": "d6a16b0b428d79742bf01c34795028cc795cdc101bbdf0675a21cc0ad549989d",
       "executable": false
@@ -997,6 +1005,10 @@
     },
     "scripts/ci/chromium-probe.mjs": {
       "sha256": "b660d6603c7038f2846a37836c10061b7c7b678d041b6075c461251e12264adc",
+      "executable": false
+    },
+    "scripts/contract-docs.mjs": {
+      "sha256": "90ff61375a8038f6425d25fd078a7cebda4913a522f54ef3340d9b6049630fbe",
       "executable": false
     },
     "scripts/delivery/base/artifact.mjs": {
@@ -2112,7 +2124,7 @@
       "executable": false
     },
     "src/gasket/ui/report-schedules.ts": {
-      "sha256": "5f29c22ec7dc9b36e7643ebcd991f18ae26c6353de6a84bbf041a671e7bd6ca5",
+      "sha256": "241e18a342ddce6acba1d6af14549b799269f8994c04b40370e462bbcfeb085d",
       "executable": false
     },
     "src/gasket/ui/request-report.ts": {
@@ -4092,7 +4104,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "29943b1a9c2ed270fee51344a703362d627898137af591a874263f6921c77f6b",
+      "sha256": "28c6003ecf573588888bdb2e1bd6cf119e4076fef43e24b65f306bf4f7b422e6",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
@@ -4160,7 +4172,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "1bac13b1d6d23cfd602bb641bdf58e8fbfdc8975eaf50d647527deaf3ce76a7c",
+      "sha256": "e81e35b3ec7e8c85ccb13569be73c5d300f9cac23d2b5b9a7245d6bf07fdac87",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4255,12 +4267,24 @@
       "sha256": "e9588213bb09cf0952d3feed7c5a6374d6a81e1b9089f1f125bdef096ecea07b",
       "executable": false
     },
+    "tests/gasket/report-interruption.mjs": {
+      "sha256": "be5626217cbc1631dee16bd3fe0a5c7a2c000abfa872082b56d02403765e13cc",
+      "executable": false
+    },
+    "tests/gasket/report-pack-assertions.mjs": {
+      "sha256": "c90e0758a49caec07cc5e580484569183eff642de60b0234ab67e23314e1529a",
+      "executable": false
+    },
+    "tests/gasket/report-provider.mjs": {
+      "sha256": "4dbad31e1b56dd3e1763972bb8b8b41e063eef6a845f532ef796d1ee38bb3f1f",
+      "executable": false
+    },
     "tests/gasket/report-schedule-riders.mjs": {
       "sha256": "3031cf175f2d02c4ba333a8e15ad3cecd0f7a41abd17520efb76a86e3ee718ed",
       "executable": false
     },
     "tests/gasket/report-schedules.mjs": {
-      "sha256": "4a3fbbd7b3c0c2cc3bf99a92c36c46bb2d9d786e74f9799842b5d08e8fde2801",
+      "sha256": "87bbf910cf5b12b60773b90c9669f6cf868f1cdbb9798ef4201b555d095ededa",
       "executable": false
     },
     "tests/gasket/request-draft-privacy.mjs": {

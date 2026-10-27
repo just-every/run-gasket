@@ -1,5 +1,8 @@
 # Agent instructions
 
+Lander-Regenerate: node scripts/contract-docs.mjs write
+Lander-Regenerate: node scripts/edition-authoring/cli.mjs lock
+
 ## Launch for review
 
 When asked to launch, run or review this app, run this from the checkout root
