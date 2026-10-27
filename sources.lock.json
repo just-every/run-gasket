@@ -1724,7 +1724,7 @@
       "executable": false
     },
     "src/gasket/record-erasure.ts": {
-      "sha256": "cc5e3783fae5412098df174659cce212af5c752c595566d3f600dc626a4dcd40",
+      "sha256": "ae82fb693e1fc6a437e507866899b60180d09cc2a8443be82b8abc8f928e2846",
       "executable": false
     },
     "src/gasket/recovery.ts": {
@@ -4208,7 +4208,7 @@
       "executable": false
     },
     "tests/gasket/record-erasure.mjs": {
-      "sha256": "1261882c53ba98189d29794b432dd9320990f55afb6fb533bd11728aef5741b0",
+      "sha256": "108212bfe3bc8bf6b1e02ba1c6cb02c14f5cb81f34aa00aa47f5ec2e726d86b7",
       "executable": false
     },
     "tests/gasket/recovery.mjs": {

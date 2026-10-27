@@ -20,6 +20,7 @@ const workChildren: Record<string, string> = {
   gk_work_requirements: 'work_order_id=?', gk_time_entries: 'work_order_id=?',
 }
 const userChildren: Record<string, string> = {
+  gk_site_memberships: 'member_id IN (SELECT id FROM gk_members WHERE operator_id=?)',
   oa_provider_session_pins: 'session_id IN (SELECT id FROM oa_sessions WHERE operator_id=?)',
   oa_provider_sessions: 'session_id IN (SELECT id FROM oa_sessions WHERE operator_id=?)',
   oa_sessions: 'operator_id=?', oa_step_up_challenges: 'operator_id=?', oa_credentials: 'operator_id=?',
