@@ -96,6 +96,22 @@ export async function apiJourney() {
     assert.equal((await h.api('/v1/assets?site=Forbidden%20site', owner)).total, 0)
     assert.equal((await h.raw('/api/gasket/v1/assets')).status, 401)
     await h.api('/v2/assets', owner, undefined, 404)
+    // Custom definitions and retained values are part of the documented stock estate.
+    const fieldBody = example('customfield.save')
+    const custom = await repeat('customfield.save', fieldBody, 'synthetic-gasket-custom-definition', lead)
+    const customValue = { ...example('customvalue.set'), entityId: part, customValues: { [custom.id]: 240 } }
+    await repeat('customvalue.set', customValue, 'synthetic-gasket-custom-value', lead)
+    await write('customvalue.set', { ...customValue, customValues: { [custom.id]: 481 } }, 'synthetic-gasket-custom-invalid', lead, 400)
+    let stockDetail = await h.api(`/v1/parts/${part}`, owner)
+    assert.deepEqual(stockDetail.customFields.map(row => [row.id, row.value, row.history.length]), [[custom.id, 240, 1]])
+    const renamed = await repeat('customfield.save', { ...fieldBody, id: custom.id, revision: custom.revision, name: 'Synthetic rated voltage' }, 'synthetic-gasket-custom-rename', lead)
+    await repeat('part.category', { ...example('part.category'), part, revision: stockDetail.revision }, 'synthetic-gasket-category', lead)
+    assert.equal((await h.api(`/v1/parts/${part}`, owner)).category, 'Synthetic electrical')
+    await repeat('customfield.retire', { ...example('customfield.retire'), id: custom.id, revision: renamed.revision }, 'synthetic-gasket-custom-retire', lead)
+    stockDetail = await h.api(`/v1/parts/${part}`, owner)
+    assert.deepEqual(stockDetail.customFields.map(row => [row.id, row.name, row.value, row.archived, row.history.length]), [[custom.id, 'Synthetic rated voltage', 240, true, 1]])
+    assert.ok((await h.api('/v1/custom-fields', owner)).some(row => row.id === custom.id && row.retired === 1))
+    await write('customvalue.set', customValue, 'synthetic-gasket-retired-value', lead, 400)
     // Operate a complete procedure-bound job using the published request examples.
     const checklist = await repeat('checklist.create', example('checklist.create'), 'synthetic-gasket-procedure', lead)
     const revised = await repeat('checklist.revise', { ...example('checklist.revise'), checklist: checklist.id }, 'synthetic-gasket-procedure-revision', lead)
@@ -274,7 +290,7 @@ export async function apiJourney() {
     assert.equal((await service(`assets/${asset}`)).id, asset)
     assert.ok((await service('assets?limit=2')).next)
     for (const path of ['parts', `work/${work}`, 'service-credentials']) await service(path, undefined, 403)
-    for (const action of ['site.configure', 'meter.create', 'schedule.create', 'workorder.evidence', 'workorder.annotate', 'workorder.time', 'workorder.readings', 'workorder.tool', 'workorder.sign', 'finding.record', 'downtime.start', 'downtime.end', 'workorder.cancel', 'workorder.reopen', 'checklist.create', 'checklist.revise', 'template.save', 'workorder.assign', 'workorder.results', 'workorder.issue', 'workorder.return', 'workorder.submit', 'workorder.review', 'service.create', 'service.revoke']) await service(action, {}, 403)
+    for (const action of ['site.configure', 'customfield.save', 'customfield.retire', 'customvalue.set', 'part.category', 'meter.create', 'schedule.create', 'workorder.evidence', 'workorder.annotate', 'workorder.time', 'workorder.readings', 'workorder.tool', 'workorder.sign', 'finding.record', 'downtime.start', 'downtime.end', 'workorder.cancel', 'workorder.reopen', 'checklist.create', 'checklist.revise', 'template.save', 'workorder.assign', 'workorder.results', 'workorder.issue', 'workorder.return', 'workorder.submit', 'workorder.review', 'service.create', 'service.revoke']) await service(action, {}, 403)
     assert.equal((await h.raw('/app/assets', { headers: { authorization: `Bearer ${issued.token}` } })).status, 403)
     const serviceEvents = (await h.api('audit?action=asset.create', owner)).rows.filter(row => row.subject === serviceCreated.id)
     assert.equal(serviceEvents.length, 1)
@@ -322,7 +338,7 @@ export async function apiJourney() {
     const otherOwnerId = (await h.api('me', otherOwner)).id
     const lifecycleEvents = async id => (await h.api('audit?action=service.invalidate', otherOwner)).rows.filter(row => row.subject === id)
     assert.deepEqual(await lifecycleEvents(lifecycle.id), [])
-    assert.equal((await h.raw('/auth/operator/role', { cookie: lead, body: { operatorId: ownerSession.operator.id, role: 'member' } })).status, 403)
+    assert.equal((await h.raw('/auth/operator/role', { cookie: await h.signIn('synthetic-gasket-api@example.test'), body: { operatorId: ownerSession.operator.id, role: 'member' } })).status, 403)
     assert.deepEqual(await lifecycleEvents(lifecycle.id), [], 'a refused account change has no credential lifecycle effect')
     const lifecycleBody = { ...assetBody, tag: 'synthetic-gasket-lifecycle' }
     const lifecycleRequest = (token, body) => h.raw('/api/gasket/v1/' + (body ? 'asset.create' : 'assets'), { body, headers: { authorization: `Bearer ${token}`, ...(body ? { 'idempotency-key': 'synthetic-gasket-lifecycle' } : {}) } })
