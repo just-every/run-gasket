@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "cab75fce585bc533884471dfb97eb565925079f25f7b68cecb9214e5a5fac7d0",
+      "sha256": "b595b00dca57014da8a83eb287cb23ffbe7be077aff363e92fd03feb8239264f",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "94a0685d2b60ee6f575b96c51ee29809d8cd635fca678a6895aca92f40f87220",
+      "sha256": "4258996d58a72d582d55665b0e46dd3586a1655826fa30b35e436dcc75d84638",
       "executable": false
     },
     "DEMO.md": {
@@ -1328,7 +1328,7 @@
       "executable": false
     },
     "src/gasket/actor.ts": {
-      "sha256": "2942ac363d1b2a63c11443b35cb1feb0908f9c607f53aafbc2c5f9577cc76a32",
+      "sha256": "08f3f6394015a52672894a34fba64efaa59a1f9bf6899ea1792e412a0966968b",
       "executable": false
     },
     "src/gasket/agent-follow-up.ts": {
@@ -4284,7 +4284,7 @@
       "executable": false
     },
     "tests/gasket/report-schedule-browser.mjs": {
-      "sha256": "966776ce02b96f8d83e39c5f03372bd7dfa474485434a5883a46bc480dcec703",
+      "sha256": "52357412d34bf6b01f32d0705fc718be8f54e1139113dfffd148b38fd73f303e",
       "executable": false
     },
     "tests/gasket/report-schedule-riders.mjs": {

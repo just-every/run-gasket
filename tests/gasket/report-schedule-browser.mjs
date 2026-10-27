@@ -18,6 +18,37 @@ export async function reportScheduleScreens(h,cookie,schedule,familyIds,delegate
         await page.waitForURL(url=>url.searchParams.has('notice'))
         const ownerSaved=(await h.api('report-schedules',cookie.owner)).schedules.find(s=>s.name==='Browser owner pack')
         assert.ok(ownerSaved);assert.equal(ownerSaved.paused,0);assert.equal(ownerSaved.revision,1)
+        await page.goto(`${h.origin}/app/settings/reports?edit=${ownerSaved.id}`)
+        const edit=page.locator('form[action="/app/do/report.schedule"]')
+        await edit.getByLabel('Pack name',{exact:true}).fill('Browser receipt pack')
+        await edit.getByRole('checkbox',{name:'I authorize weekly email attachments',exact:false}).check()
+        let submitted,submissionHeaders
+        const loseReply=async route=>{
+          const request=route.request(),headers=await request.allHeaders()
+          submitted=request.postDataBuffer();submissionHeaders={accept:headers.accept,'content-type':headers['content-type']}
+          const response=await h.raw('/app/do/report.schedule',{cookie:cookie.owner,form:submitted,headers:submissionHeaders})
+          assert.equal((await response.json()).saved,true)
+          await route.abort('failed')
+        }
+        await page.route('**/app/do/report.schedule',loseReply)
+        try{
+          await edit.getByRole('button',{name:'Authorize schedule',exact:true}).click()
+          const confirmed=edit.getByRole('alert').filter({hasText:/Saved. The server confirmed/})
+          await confirmed.waitFor()
+          assert.equal(await edit.getByLabel('Pack name',{exact:true}).inputValue(),'Browser receipt pack')
+          assert.equal(await edit.getByRole('button',{name:'Authorize schedule',exact:true}).isDisabled(),true)
+          assert.equal(await edit.getAttribute('aria-busy'),null)
+          const receipt=await(await h.raw(await confirmed.getByRole('link').getAttribute('href'),{cookie:cookie.owner,headers:{accept:['application','json'].join('/')}})).json()
+          assert.equal(receipt.state,'saved');assert.equal(receipt.action,'report.schedule');assert.ok(receipt.batches>0)
+          assert.equal((await h.raw('/app/do/report.schedule',{cookie:cookie.owner,form:submitted,headers:submissionHeaders})).status,409,'the same receipt cannot authorize a second revision')
+          const saved=(await h.api('report-schedules',cookie.owner)).schedules.filter(s=>s.id===ownerSaved.id)
+          assert.deepEqual(saved.map(s=>[s.name,s.revision,s.paused]),[['Browser receipt pack',2,0]])
+          for(const width of [1440,390]){
+            await page.setViewportSize({width,height:1100})
+            assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+            await page.screenshot({path:`${process.env.REPORT_SCREENSHOTS}/report-save-receipt-${width}.png`,fullPage:false})
+          }
+        }finally{await page.unroute('**/app/do/report.schedule',loseReply)}
         for(const width of [1440,390])for(const [name,path]of [['report-schedules','/app/settings/reports'],['report-edit',`/app/settings/reports?edit=${schedule}`],['report-history',`/app/settings/reports?edit=${familyIds.history}`],['report-valuation',`/app/settings/reports?edit=${familyIds.valuation}`]]){
           await page.setViewportSize({width,height:1100});await page.goto(h.origin+path)
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`${name} fits ${width}`)
@@ -32,7 +63,7 @@ export async function reportScheduleScreens(h,cookie,schedule,familyIds,delegate
               [/Submission unconfirmed/,/Execution interrupted/],
               [/^Failed$/, /pdf character not supported/],
             ]){
-              const outcome=page.getByRole('row').filter({has:page.getByRole('cell',{name:result})}).first()
+              const outcome=page.getByRole('row').filter({has:page.locator('td > .gk-cell').filter({hasText:result})}).first()
               assert.equal(await outcome.count(),1,'every retained failure outcome is visible in Settings')
               assert.match(await outcome.innerText(),reason,'the visible outcome explains its cause')
               if(!result.source.includes('Recipient'))assert.match(await outcome.innerText(),/Reconcile this attempt/,'outbound repair requires reconciliation')

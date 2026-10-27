@@ -79,6 +79,7 @@ export function capabilitySql(sessionId: string, capability: Capability) {
   return {
     sql: `EXISTS(SELECT 1 FROM oa_sessions s JOIN oa_operators o ON o.id = s.operator_id WHERE s.id = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND o.version = s.operator_version AND o.status = 'active'
       AND EXISTS(SELECT 1 FROM gk_members m WHERE m.operator_id = o.id AND m.status = 'active' AND (o.role = 'owner' OR EXISTS(SELECT 1 FROM gk_site_memberships sm WHERE sm.member_id=m.id AND sm.site_id='primary' AND sm.status='active')) AND (o.role = 'owner' OR m.role IN (${roles.map(() => '?').join(', ') || "''"}))))`,
+    // Session expiry uses the Worker's clock, including inside a dated job.
     params: [sessionId, Date.now(), ...roles],
   }
 }
