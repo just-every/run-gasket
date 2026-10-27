@@ -76,6 +76,30 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
   const submit = async (form, notice = /Saved/) => {
     const action = await form.getAttribute('action')
     const before = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
+    const reads = {
+      'site.configure':'site', 'asset.create':'assets', 'meter.create':`assets/${asset}`,
+      'checklist.create':'checklists', 'schedule.create':'schedules', 'workorders.generate':'work',
+      'part.create':'parts', 'part.receive':'parts', 'part.count':'parts',
+      'request.triage':'requests', 'request.convert':'work', 'planning.slot':'planning',
+    }
+    const record = before.find(([key])=>key==='workOrder')?.[1]
+    const view = reads[action.slice('/app/do/'.length)] || `work/${record}`
+    const who = (await context.cookies()).map(item=>`${item.name}=${item.value}`).join('; ')
+    const unchanged = await h.api(view,who)
+    await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
+    h.setSaveFault('before')
+    await form.getByRole('button',{name:/./}).last().click()
+    const refusal = form.getByRole('alert');await refusal.waitFor()
+    assert.match(await refusal.innerText(),/Nothing was saved/,`${action} refuses before commit`)
+    assert.equal(await refusal.evaluate(el=>el===document.activeElement),true)
+    assert.deepEqual(await h.api(view,who),unchanged,`${action} independent read confirms no effects`)
+    assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].filter(([key])=>key!=='__gk_save').map(([key,value])=>[key,typeof value==='string'?value:value.name])),before.filter(([key])=>key!=='__gk_save'),`${action} failed draft retains all fields`)
+    const failedPath = new URL(await refusal.getByRole('link').getAttribute('href'),h.origin).pathname
+    // The displayed failed receipt must refer to the attempted id, even after preparing a new retry id.
+    const failedReceipt = await (await context.request.get(h.origin+failedPath,{headers:{accept:['application','json'].join('/')}})).json()
+    assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
+    const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
+    await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
     await page.route('**'+action,async route=>{await route.fetch();await route.abort('failed')},{times:1})
     await form.getByRole('button',{name:/./}).last().focus()
     await page.keyboard.press('Enter')
@@ -84,7 +108,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
     assert.equal(await error.evaluate(el=>el===document.activeElement),true,`${action} error has keyboard focus`)
     assert.equal(await form.getByRole('button',{name:/./}).last().isDisabled(),true,`${action} cannot repeat an uncertain save`)
-    assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name])),before,`${action} retains every submitted field`)
+    assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name])),retryDraft,`${action} retains every submitted field`)
     const receiptPath = new URL(await error.getByRole('link').getAttribute('href'),h.origin).pathname
     const response = await context.request.get(h.origin+receiptPath,{headers:{accept:['application','json'].join('/')}})
     assert.equal(response.status(),200)
