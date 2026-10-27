@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "d4afc1e997ead34ed6677ea1ac6ae3c5066aafe04e3ea29e35c3d8ad429e99a3",
+      "sha256": "c6194d72aeec432ab5f7a15e15fc2333c815dfe96a160b1e56ac41e217618ea5",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "f28aa17354e17ff908f51850ef0fd28508ddbc45ce474b743d2b8f5384df7bf6",
+      "sha256": "d6539a999cb05473350766f50d9586b059eb4a3d57973daa4abf31e019191bd3",
       "executable": false
     },
     "DEMO.md": {
@@ -1988,7 +1988,7 @@
       "executable": false
     },
     "src/gasket/ui/failed-form.ts": {
-      "sha256": "294123f4219e10edd46498f1dbdecb17f54f3a3bdccc07c40f744a11622acf62",
+      "sha256": "78ab1c2d60980f78a96d919f4de8cb28cff1b65e0cdda7965951d9f2a0448e1c",
       "executable": false
     },
     "src/gasket/ui/generic-movein.ts": {
@@ -4136,7 +4136,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "564ad3de90b715eb0fdeca976da51aa5638c1c8abeb9c3599d28789de01706eb",
+      "sha256": "a7bbf9f4762747b8b10efea5aa7ed6221f0f222180e4211f1a2661d7f476e591",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
