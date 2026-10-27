@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { mkdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { PAGE_DOORS } from '../../src/gasket/doors.ts'
+import { PAGE_DOORS, match } from '../../src/gasket/doors.ts'
 import { saveSnapshot } from './form-save-interruptions.mjs'
 import { png } from './fixtures.mjs'
 import { chromium } from '@playwright/test'
@@ -41,6 +41,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
   }
   const page = await context.newPage()
   const snapshots = []
+  const linked = new Map()
   const day = (await h.api('me',cookie.owner)).today
   const technician = (await h.api('me',cookie.max)).id
   const longName = 'Production compressor with extended guarding and remote isolation at the west packaging mezzanine — '+ 'COMPRESSOR'.repeat(4)
@@ -72,6 +73,10 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.notEqual(await page.locator('.gk-skip').evaluate(el=>getComputedStyle(el).outlineStyle),'none')
     await page.keyboard.press('Enter')
     assert.equal(await page.getByRole('main').evaluate(el=>el===document.activeElement),true)
+    for (const href of await page.locator('a[href]').evaluateAll(elements=>elements.map(el=>el.getAttribute('href')))) {
+      const destination=new URL(href,h.origin), door=match(PAGE_DOORS,destination.pathname)
+      if (destination.origin===h.origin && door && !/(?:Csv|Pdf|Zip|File|Photo|Evidence|Pack|Mark|Template)$/i.test(door.name)) linked.set(destination.pathname,destination.pathname+destination.search)
+    }
     await proof(name)
   }
   const open = async(path,name)=>{assert.equal((await page.goto(h.origin+path)).status(),200,`${name} ${path} opens`);await inspect(name)}
@@ -644,11 +649,21 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       const duplicate=(await h.api('part.create',cookie.lead,{number:'ACCESS-GUARD-DUPLICATE',name:'Duplicate guard fastener for the west packaging mezzanine',unit:'each'})).id
       await use('owner')
       // Enumerate the implemented workspace destinations rather than a representative menu subset.
+      const inspected=new Set()
       for (const [pattern, name] of PAGE_DOORS) {
         if (pattern.includes('(') || pattern.includes('\\.')) continue
         const path=pattern.slice(1,-1)+(name==='partMerge'?`?source=${duplicate}&canonical=${part}`:'')
         await open(path, `workspace-door-${name}`)
+        inspected.add(new URL(path,h.origin).pathname)
       }
+      const fixed=inspected.size
+      for (const [path,destination] of linked) {
+        if (inspected.has(path)) continue
+        inspected.add(path)
+        await open(destination, `linked-record-${inspected.size}`)
+      }
+      console.log(`workspace pages proof fixed=${fixed} linked=${inspected.size-fixed} assistive-names=present keyboard=usable`)
+
     }
   } finally {for (const snapshot of snapshots) await snapshot.close();await context.close()}
 }
