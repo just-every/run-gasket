@@ -324,7 +324,7 @@ async function browserProof(f,name,move) {
           await qualificationForm.getByLabel('Remind the owner in Notices',{exact:true}).check()
           await qualificationForm.getByLabel('Days before expiry',{exact:true}).fill(String(lead))
           await qualificationForm.getByRole('button',{name:'Record qualification',exact:true}).click()
-          await page.getByRole('table',{name:'Qualifications',exact:true}).getByRole('row').filter({hasText:browserName}).waitFor()
+          await page.getByRole('table',{name:'Qualifications',exact:true}).getByRole('row').filter({hasText:browserName}).getByText(`Owner reminder ${lead} days before expiry and after expiry`,{exact:true}).waitFor()
         }
         await enterQualification(2)
         const browserIdentity=(await view()).qualifications.find(q=>q.name===browserName).record_id
