@@ -21,7 +21,8 @@ export async function confirmRecoveryDrill(env: Bindings, actor: Actor, input: I
   if (receipt.drill_at) return { id }
   const tables = JSON.parse(receipt.tables_json) as { name: string; count: number }[]
   const conditions: D1PreparedStatement[] = []
-  for (const table of tables.filter(row => row.name.startsWith('gk_') && !['gk_guard','gk_recovery_receipts'].includes(row.name))) {
+  // Operational receipts advance during confirmation; import already validates their archived counts and digests.
+  for (const table of tables.filter(row => row.name.startsWith('gk_') && !['gk_guard','gk_recovery_receipts','gk_form_saves'].includes(row.name))) {
     insist(/^gk_[a-z0-9_]+$/.test(table.name), 'invalid_recovery_table')
     conditions.push(guard(env, 'stale', `(SELECT COUNT(*) FROM "${table.name}")=?`, table.count))
   }
