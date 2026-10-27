@@ -72,22 +72,52 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     await proof(name)
   }
   const open = async(path,name)=>{assert.equal((await page.goto(h.origin+path)).status(),200);await inspect(name)}
+  const receiptActions = new Set()
   const submit = async (form, notice = /Saved/) => {
+    const action = await form.getAttribute('action')
+    const before = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
+    await page.route('**'+action,async route=>{await route.fetch();await route.abort('failed')},{times:1})
     await form.getByRole('button',{name:/./}).last().focus()
-    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.keyboard.press('Enter')])
-    assert.match(await page.getByRole('status').first().innerText(),notice)
+    await page.keyboard.press('Enter')
+    const error = form.getByRole('alert')
+    await error.waitFor()
+    assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
+    assert.equal(await error.evaluate(el=>el===document.activeElement),true,`${action} error has keyboard focus`)
+    assert.equal(await form.getByRole('button',{name:/./}).last().isDisabled(),true,`${action} cannot repeat an uncertain save`)
+    assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name])),before,`${action} retains every submitted field`)
+    const receiptPath = new URL(await error.getByRole('link').getAttribute('href'),h.origin).pathname
+    const response = await context.request.get(h.origin+receiptPath,{headers:{accept:['application','json'].join('/')}})
+    assert.equal(response.status(),200)
+    const receipt = await response.json()
+    assert.equal(receipt.state,'saved',`${action} durable receipt`)
+    assert.ok(receipt.batches>0,`${action} records a real committed write`)
+    receiptActions.add(action.slice('/app/do/'.length))
+    const destination = new URL(receipt.destination,h.origin);destination.searchParams.set('notice','Saved.')
+    await page.goto(destination.href)
+    // The server response was deliberately lost; the receipt supplies the navigation.
+    assert.match(await page.getByRole('status').first().innerText(),/Saved/)
   }
   async function noScriptDrafts(work) {
     const native = await browser.newContext({ignoreHTTPSErrors:true,javaScriptEnabled:false,viewport:{width:1440,height:1100}})
     await native.addCookies(cookie.max.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
-    const draft = await native.newPage()
+    let draft = await native.newPage()
+    const nativeSubmit = async (form, expected) => {
+      const original = draft
+      const result = native.waitForEvent('page')
+      await form.getByRole('button',{name:/./}).last().click()
+      draft = await result
+      await draft.waitForLoadState('domcontentloaded')
+      assert.match(draft.url(),expected)
+      assert.equal(original.isClosed(),false,'native source draft stays open')
+      await original.close()
+    }
     try {
       await draft.goto(h.origin+`/app/work/${work}`)
       const time=draft.locator('form[action="/app/do/workorder.time"]')
       await time.getByLabel('Minutes worked').fill('11')
       await time.getByLabel('Time note').fill('Native form retains <guard> & inspection notes')
       await time.getByLabel('Worked on',{exact:true}).fill('2099-01-01')
-      await Promise.all([draft.waitForURL('**/app/do/workorder.time'),time.getByRole('button',{name:'Record time'}).click()])
+      await nativeSubmit(time,/\/app\/do\/workorder.time/)
       assert.match(await draft.getByRole('alert').innerText(),/Nothing was saved/)
       assert.equal(await draft.getByLabel('Time note').inputValue(),'Native form retains <guard> & inspection notes')
       assert.equal(await draft.getByLabel('Minutes worked').inputValue(),'11')
@@ -98,21 +128,21 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       for(const width of [1440,390]) {await draft.setViewportSize({width,height:1100});await draft.screenshot({path:`${directory}/workspace-native-failure-${width}.png`,fullPage:true})}
       await draft.setViewportSize({width:1440,height:1100})
       await draft.getByLabel('Worked on',{exact:true}).fill(day)
-      await Promise.all([draft.waitForURL(url=>url.searchParams.has('notice')),draft.locator('form[action="/app/do/workorder.time"]').getByRole('button',{name:'Record time'}).click()])
+      await nativeSubmit(draft.locator('form[action="/app/do/workorder.time"]'),/notice=/)
       assert.equal((await h.api(`work/${work}`,cookie.max)).timeEntries.filter(row=>row.note==='Native form retains <guard> & inspection notes'&&row.minutes===11).length,1)
       const upload=draft.locator('form[action="/app/do/workorder.evidence"]')
       await upload.getByLabel('Photo or document').setInputFiles({name:'synthetic-gasket-1.png',mimeType:['image','png'].join('/'),buffer:png})
       await upload.getByLabel('Before or after the work').selectOption('before')
       await upload.getByLabel('Taken at').fill('2099-01-01T08:00')
       await upload.evaluate(el=>{el.noValidate=true})
-      await Promise.all([draft.waitForURL('**/app/do/workorder.evidence'),upload.getByRole('button',{name:'Attach evidence'}).click()])
+      await nativeSubmit(upload,/\/app\/do\/workorder.evidence/)
       assert.match(await draft.getByRole('alert').innerText(),/Nothing was saved/)
       assert.equal(await draft.getByLabel('Before or after the work').inputValue(),'before')
       assert.equal(await draft.getByLabel('Taken at').inputValue(),'2099-01-01T08:00')
       assert.match(await draft.getByText('Kept attachment:',{exact:false}).innerText(),/synthetic-gasket-1.png/)
       assert.equal((await h.api(`work/${work}`,cookie.max)).evidence.length,0)
       await draft.getByLabel('Taken at').fill(`${day}T08:00`)
-      await Promise.all([draft.waitForURL(url=>url.searchParams.has('notice')),draft.locator('form[action="/app/do/workorder.evidence"]').getByRole('button',{name:'Attach evidence'}).click()])
+      await nativeSubmit(draft.locator('form[action="/app/do/workorder.evidence"]'),/notice=/)
       const evidence=(await h.api(`work/${work}`,cookie.max)).evidence
       assert.equal(evidence.length,1)
       assert.equal(evidence[0].filename,'synthetic-gasket-1.png')
@@ -125,7 +155,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await ended.getByLabel('Minutes worked').fill('13')
       await ended.getByLabel('Time note').fill('Retain this draft after session expiry')
       await native.clearCookies()
-      await Promise.all([draft.waitForURL('**/app/do/workorder.time'),ended.getByRole('button',{name:'Record time'}).click()])
+      await nativeSubmit(ended,/\/app\/do\/workorder.time/)
       assert.match(await draft.getByRole('alert').innerText(),/session ended.*Nothing was saved/)
       assert.equal(await draft.getByLabel('Note',{exact:true}).inputValue(),'Retain this draft after session expiry')
       assert.equal((await h.api(`work/${work}`,cookie.max)).timeEntries.some(row=>row.minutes===13),false)
@@ -134,14 +164,62 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await draft.getByLabel('What is wrong?').fill('Native intake draft with retained target')
       const tooLong='Synthetic maintenance operator '.repeat(10)
       await draft.getByLabel('Your name and contact').fill(tooLong)
-      await Promise.all([draft.waitForNavigation({waitUntil:'domcontentloaded'}),draft.getByRole('button',{name:'Send request',exact:true}).click()])
+      await nativeSubmit(draft.locator('#request-form'),/\/request\//)
       assert.match(await draft.getByRole('alert').innerText(),/Nothing was saved/)
       assert.equal(await draft.getByLabel('What is wrong?').inputValue(),'Native intake draft with retained target')
       assert.equal(await draft.getByLabel('Your name and contact').inputValue(),tooLong)
       await draft.getByLabel('Your name and contact').fill('Synthetic maintenance operator')
-      await Promise.all([draft.waitForURL(/\/received\//),draft.getByRole('button',{name:'Send request',exact:true}).click()])
+      await nativeSubmit(draft.locator('#request-form'),/\/received\//)
       assert.match(await draft.getByRole('status').innerText(),/saved/)
       assert.equal((await h.api('requests',cookie.lead)).filter(row=>row.description==='Native intake draft with retained target'&&row.asset_id===asset).length,1)
+      // No server response can replace the native source tab or discard its file input.
+      await draft.goto(h.origin+`/app/work/${work}`)
+      const offline = draft.locator('form[action="/app/do/workorder.time"]')
+      await offline.getByLabel('Minutes worked').fill('17')
+      await offline.getByLabel('Time note').fill('Native connection failure keeps the original draft')
+      const originalURL = draft.url()
+      const nativeReceipt = await offline.locator('noscript a').getAttribute('href')
+      const lose = async (form, path, committed) => {
+        await native.route('**'+path,async route=>{if(committed) await route.fetch();await route.abort('failed')},{times:1})
+        const opened = native.waitForEvent('page')
+        await form.getByRole('button',{name:/./}).last().click()
+        const result = await opened
+        await result.waitForLoadState('domcontentloaded').catch(()=>{})
+        await result.close()
+        assert.equal(draft.url(),originalURL,'native transport error leaves the source page intact')
+        assert.equal(await draft.getByLabel('Time note').inputValue(),'Native connection failure keeps the original draft')
+      }
+      await lose(offline,'/app/do/workorder.time',false)
+      assert.equal((await h.raw(nativeReceipt,{cookie:cookie.max})).status,404,'request never reached the server')
+      assert.equal((await h.api(`work/${work}`,cookie.max)).timeEntries.filter(row=>row.minutes===17).length,0)
+      await lose(offline,'/app/do/workorder.time',true)
+      const savedReceipt = await (await h.raw(nativeReceipt,{cookie:cookie.max,headers:{accept:['application','json'].join('/')}})).json()
+      assert.equal(savedReceipt.state,'saved')
+      assert.ok(savedReceipt.batches>0)
+      assert.equal((await h.api(`work/${work}`,cookie.max)).timeEntries.filter(row=>row.minutes===17).length,1,'native lost reply persists exactly once')
+      // Reusing the still-open draft cannot repeat an already confirmed submission.
+      const repeated = native.waitForEvent('page')
+      await offline.getByRole('button',{name:'Record time'}).click()
+      const refusal = await repeated;await refusal.waitForLoadState('domcontentloaded')
+      assert.match(await refusal.getByRole('alert').innerText(),/already attempted.*Saved/s)
+      assert.equal((await h.api(`work/${work}`,cookie.max)).timeEntries.filter(row=>row.minutes===17).length,1)
+      await refusal.close()
+      const attachment = draft.locator('form[action="/app/do/workorder.evidence"]')
+      await attachment.getByLabel('Photo or document').setInputFiles({name:'synthetic-gasket-2.png',mimeType:['image','png'].join('/'),buffer:png})
+      await attachment.getByLabel('Before or after the work').selectOption('after')
+      const attachmentReceipt = await attachment.locator('noscript a').getAttribute('href')
+      await lose(attachment,'/app/do/workorder.evidence',true)
+      assert.equal(await attachment.getByLabel('Before or after the work').inputValue(),'after')
+      assert.equal(await attachment.getByLabel('Photo or document').evaluate(el=>el.files[0].name),'synthetic-gasket-2.png')
+      assert.equal(await attachment.getByLabel('Photo or document').evaluate(async el=>Array.from(new Uint8Array(await el.files[0].arrayBuffer()))).then(bytes=>Buffer.from(bytes).equals(png)),true,'native attachment bytes survive the failed navigation')
+      assert.equal((await (await h.raw(attachmentReceipt,{cookie:cookie.max,headers:{accept:['application','json'].join('/')}})).json()).state,'saved')
+      const persisted = (await h.api(`work/${work}`,cookie.max)).evidence.filter(row=>row.filename==='synthetic-gasket-2.png')
+      assert.equal(persisted.length,1)
+      assert.equal(persisted[0].phase,'after')
+      const kept = await h.raw(`/app/evidence/${persisted[0].id}`,{cookie:cookie.max})
+      assert.equal(Buffer.from(await kept.arrayBuffer()).equals(png),true,'native lost reply kept the exact saved attachment')
+      for(const width of [1440,390]) {await draft.setViewportSize({width,height:1100});await draft.screenshot({path:`${directory}/workspace-native-unreachable-${width}.png`,fullPage:true})}
+
     } finally {await native.close()}
   }
   try {
@@ -366,5 +444,6 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       assert.equal((await h.api(`work/${work}`,cookie.sam)).status,'closed')
       await open(`/app/work/${work}`,'reviewed-record')
     }
+    assert.deepEqual([...receiptActions].sort(),['site.configure','asset.create','meter.create','checklist.create','schedule.create','workorders.generate','workorder.results','workorder.submit','workorder.review','part.create','part.receive','part.count','request.triage','request.convert','workorder.assign','planning.slot','workorder.readings','workorder.issue','workorder.return','workorder.time'].sort(),'each core save action has a lost-reply receipt and an independent record read')
   } finally {await context.close()}
 }
