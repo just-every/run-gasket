@@ -4168,7 +4168,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "a63c81a704cd16902af2fcec700134b7ee446d4c9d9dadf9da22bf6b67403879",
+      "sha256": "74226d6b237c46c6b2ce84a21dc762b9bc47792b9301d85f0d80a865a4814667",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {

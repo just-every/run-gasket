@@ -641,7 +641,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await open(`/app/counts/${cycleCount}`,'independent-count-approval')
       await submit(page.locator('form[action="/app/do/count.decide"]').filter({has:page.locator('[name=decision][value=approve]')}))
       assert.equal((await h.api(`parts/${part}`,cookie.lead)).onHand,'3','independent approval posts the counted stock once')
-      const duplicate=(await h.api('part.create',cookie.lead,{number:'ACCESS-GUARD-DUPLICATE',name:'Duplicate guard fastener for '+longName,unit:'each'})).id
+      const duplicate=(await h.api('part.create',cookie.lead,{number:'ACCESS-GUARD-DUPLICATE',name:'Duplicate guard fastener for the west packaging mezzanine',unit:'each'})).id
       await use('owner')
       // Enumerate the implemented workspace destinations rather than a representative menu subset.
       for (const [pattern, name] of PAGE_DOORS) {
