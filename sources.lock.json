@@ -952,7 +952,7 @@
       "executable": false
     },
     "public/workspace-forms.js": {
-      "sha256": "91ae150507864f315a322e3cf4e52d4a68429a9adc8be864d88d489b7af0a23e",
+      "sha256": "3373ab0899da1a8f4dcc7f8332acdc2242086feac5653822927eb1285ca5206b",
       "executable": false
     },
     "README.md": {
@@ -1988,7 +1988,7 @@
       "executable": false
     },
     "src/gasket/ui/failed-form.ts": {
-      "sha256": "9bd12b7d0faf675b2c94c2f262a17cd86e5f8b33940bdfc22647e8937fb0798e",
+      "sha256": "3ca3a3df3b933df1955c8b075fe0f0eebdf993e5b3b315521891fcc7b4495122",
       "executable": false
     },
     "src/gasket/ui/generic-movein.ts": {
@@ -2096,7 +2096,7 @@
       "executable": false
     },
     "src/gasket/ui/requests.ts": {
-      "sha256": "2e92114fdd7070ac1c9cd1cd792988a8dfca03096645bc9ad26ff787fa6766b9",
+      "sha256": "4f0b71965329320e8a7ab08a500352f29724df50138bbb748f70b9ad309cacc4",
       "executable": false
     },
     "src/gasket/ui/rules.ts": {
@@ -2116,7 +2116,7 @@
       "executable": false
     },
     "src/gasket/ui/shell.ts": {
-      "sha256": "f4bed401c03a413ab5ae42c2a96244db7af642ce662752482c7a1a0b880c72b5",
+      "sha256": "2d53a7d7b47479fe40645d83c63aff00e0388751acbcdba57fa03d40a324b05c",
       "executable": false
     },
     "src/gasket/ui/spend-policy.ts": {
@@ -4136,7 +4136,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "b79815912ed56a2e094cc3bb6e6df6ae89f079a9d940ee1816de7494a8e54202",
+      "sha256": "3ea01bc1002830c46ec503530e6da94515be470a06219bbc74846efab18c6d9d",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
