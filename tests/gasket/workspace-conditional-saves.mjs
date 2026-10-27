@@ -334,5 +334,6 @@ export async function conditionalSaves({h,cookie,page,use,open,submit,proof,day,
   assert.equal(signed.complete,true);assert.equal(signed.signed_by,(await h.api('me',cookie.sam)).name)
   assert.deepEqual(signed.stops.map(row=>row.state),['done','done'])
   await open('/app/schedules','signed-route-and-calendar-decisions')
+  assert.equal(await page.getByRole('table',{name:'Schedules',exact:true}).evaluate(table=>table.parentElement.scrollWidth>table.parentElement.clientWidth),false,'all schedule columns remain visible beside realistic long asset names')
   await proof('conditional-saves-complete')
 }
