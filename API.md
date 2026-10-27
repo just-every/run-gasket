@@ -595,9 +595,9 @@ For example, send `GET /api/gasket/v1/assets?limit=50`, then `GET /api/gasket/v1
 
 ## Write retry receipts
 
-For the following thirty-six actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. JSON bodies and stored successful results are limited to 64,000 bytes for keyed requests; larger bodies return 413. Multipart requests with a key return 415.
+For the following forty-six actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and all stored successful results are limited to 64,000 bytes. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
 
-The receipt allowlist is `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` and `document.link`.
+The receipt allowlist is `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` `document.link`, `asset.move`, `asset.lifecycle`, `asset.agreement`, `asset.contact`, `asset.sighting`, `asset.state`, `asset.retire`, `meter.feed`, `meter.adjust` and `meter.window`.
 
 A successful retry returns the original JSON result and `Idempotency-Replayed: true`; the first response says `false`. It does not create another audit event, stock receipt, work order or asset revision. Current active membership, role and relevant create-work policy are checked again before replay. A role change refuses replay, even when the new role could make a new write. Replayed work creation also rechecks current access to that work record. Execution receipts recheck the current assignee or permitted collaborator; submission still requires the assignee. Review receipts require current review authority and independence from the work. A completed receipt remains replayable after its own transition to submitted, closed or returned; new keys still run every ordinary state, version, evidence and stock guard.
 
@@ -605,7 +605,7 @@ A durable claim is stored before execution. An overlapping request, or a claim i
 
 Example: POST `/api/gasket/v1/asset.create` with the JSON content type, the installation's `Origin`, a member session cookie and `Idempotency-Key: synthetic-gasket-1`. Body: `{"tag":"00042","name":"Pump","location":"Workshop"}`. If the response is lost, repeat those exact bytes with the same key. Read the returned id using the asset detail door and inspect its history or the register page. Errors use the existing `{error,detail?}` contract: 400 invalid input, 401 absent session, 403 forbidden access, 404 absent record or route, 409 conflict, 413 oversized keyed body and 415 unsupported keyed media type.
 
-INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the thirty-six listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the forty-six listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
 
 ## Scoped owner service credentials
 
@@ -649,8 +649,8 @@ Each documented keyed request can retry its original bytes without adding
 another revision, handoff, result log, movement, submission or review.
 
 Procedure, assignment and execution schemas describe this tested native slice.
-Other maintenance entities, attachment-size writes, broader write-key coverage
-and the remaining credential custody, retention and erasure riders remain unfinished; the thirty-six-action
+Other maintenance entities, broader write-key coverage
+and the remaining credential custody, retention and erasure riders remain unfinished; the forty-six-action
 receipt allowlist refuses every other keyed action explicitly.
 
 A template saved through JSON retains `requiredFields` in its current revision and
@@ -733,9 +733,8 @@ Versioned original-byte downloads are `GET /api/gasket/v1/documents/REVISION_ID/
 `GET /api/gasket/v1/evidence/EVIDENCE_ID/file` and
 `GET /api/gasket/v1/signature-marks/SIGNATURE_ID/file`. They use the same private-file
 handlers as workspace downloads and refuse service credentials. Document download
-identities name immutable revisions. The keyed JSON request ceiling remains 64,000
-bytes including encoded file content; larger originals use the unkeyed upload door
-and its separate file limit. No upload body or original file is stored in a retry
+identities name immutable revisions. Keyed JSON accepts originals at the same decoded size limits as the workspace
+uploads, with separate streamed JSON ceilings that include base64 and metadata. No upload body or original file is stored in a retry
 receipt.
 
 OpenAPI also describes the tested asset, work and part detail responses, retained
@@ -750,3 +749,20 @@ export preserves source authority and restore refuses source tokens. After the
 restored record counts are reconciled, the owner deliberately issues a new
 credential and can revoke it again. This does not establish client-side custody,
 legal retention, full metadata erasure or complete multi-site archive coverage.
+
+### Asset lifecycle and meter retry operations
+
+The OpenAPI examples cover asset moves, revisioned purchase and replacement
+facts, service agreements, supplier contacts, physical sightings, declared states
+and retirement with disposal facts. Reads retain lifecycle amounts in integer
+cents, original and corrected readings, state history, contacts, sightings and
+asset hierarchy. Retiring an entry refuses active children or open work; it
+preserves its records. A repeated completed retirement returns its receipt, while
+a new mutation still checks the retired state.
+
+Meter feeds retain source, site-local source time, unit and quality. Window
+changes and explained corrections use the same record handlers as screens. A
+correction preserves the original value and records its reason; unexplained
+backwards counter readings are refused. Every new keyed operation requires
+current register management authority, including replay, and remains unavailable
+to service credentials. No new service scope or outbound action is introduced.

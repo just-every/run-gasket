@@ -11,10 +11,15 @@ import { fromMilli } from './quantity'
 import { workOrder, workOrderDetail } from './work'
 import { isCollaborator } from './crew'
 import { didWork } from './review'
+import { DOCUMENT_BYTES } from './documents'
+import { EVIDENCE_BYTES } from './work'
 
 const JSON_TYPE = ['application', 'json'].join('/')
 const RETRYABLE: Record<string, Capability> = {
   'asset.create': 'register.manage', 'asset.update': 'register.manage',
+  'asset.move': 'register.manage', 'asset.lifecycle': 'register.manage', 'asset.agreement': 'register.manage',
+  'asset.contact': 'register.manage', 'asset.sighting': 'register.manage', 'asset.state': 'register.manage', 'asset.retire': 'register.manage',
+  'meter.feed': 'register.manage', 'meter.adjust': 'register.manage', 'meter.window': 'register.manage',
   'part.create': 'register.manage', 'part.receive': 'register.manage', 'part.count': 'register.manage',
   'workorder.create': 'work.create',
   'checklist.create': 'register.manage', 'checklist.revise': 'register.manage',
@@ -32,15 +37,19 @@ const RETRYABLE: Record<string, Capability> = {
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
-async function body(request: Request) {
+async function body(request: Request, action: string) {
   insist(request.headers.get('content-type')?.startsWith(JSON_TYPE), 'idempotency_requires_json', 415)
+  // Base64 originals plus bounded metadata; each handler still enforces its
+  // decoded file limit. Only fingerprints and small results enter receipts.
+  const fileBytes = action === 'document.add' || action === 'document.revise' ? DOCUMENT_BYTES : action === 'workorder.evidence' ? EVIDENCE_BYTES : action === 'workorder.sign' ? 200_000 : 0
+  const limit = fileBytes ? Math.ceil(fileBytes / 3) * 4 + 64_000 : 64_000
   const reader = request.body?.getReader(), chunks: Uint8Array[] = []
   let size = 0
   if (reader) while (true) {
     const { done, value } = await reader.read()
     if (done) break
     size += value.byteLength
-    if (size > 64_000) { await reader.cancel(); throw new GasketError('request_too_large', 413) }
+    if (size > limit) { await reader.cancel(); throw new GasketError('request_too_large', 413) }
     chunks.push(value)
   }
   const bytes = new Uint8Array(size)
@@ -54,7 +63,7 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   insist(/^[A-Za-z0-9._:-]{1,128}$/.test(key), 'invalid_idempotency_key')
   insist(Object.hasOwn(RETRYABLE, action), 'idempotency_not_supported', 400)
   if (action === 'workorder.create') insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
-  const bytes = await body(request)
+  const bytes = await body(request, action)
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
   const capability = action === 'workorder.sign' && input.text('role', { max: 12 }) === 'supervisor' ? 'work.review' : RETRYABLE[action]
   requireCapability(actor, capability)
