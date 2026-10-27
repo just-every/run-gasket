@@ -595,7 +595,9 @@ For example, send `GET /api/gasket/v1/assets?limit=50`, then `GET /api/gasket/v1
 
 ## Write retry receipts
 
-For `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit` and `workorder.review`, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. JSON bodies and stored successful results are limited to 64,000 bytes for keyed requests; larger bodies return 413. Multipart requests with a key return 415.
+For the following thirty-six actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. JSON bodies and stored successful results are limited to 64,000 bytes for keyed requests; larger bodies return 413. Multipart requests with a key return 415.
+
+The receipt allowlist is `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` and `document.link`.
 
 A successful retry returns the original JSON result and `Idempotency-Replayed: true`; the first response says `false`. It does not create another audit event, stock receipt, work order or asset revision. Current active membership, role and relevant create-work policy are checked again before replay. A role change refuses replay, even when the new role could make a new write. Replayed work creation also rechecks current access to that work record. Execution receipts recheck the current assignee or permitted collaborator; submission still requires the assignee. Review receipts require current review authority and independence from the work. A completed receipt remains replayable after its own transition to submitted, closed or returned; new keys still run every ordinary state, version, evidence and stock guard.
 
@@ -603,15 +605,15 @@ A durable claim is stored before execution. An overlapping request, or a claim i
 
 Example: POST `/api/gasket/v1/asset.create` with the JSON content type, the installation's `Origin`, a member session cookie and `Idempotency-Key: synthetic-gasket-1`. Body: `{"tag":"00042","name":"Pump","location":"Workshop"}`. If the response is lost, repeat those exact bytes with the same key. Read the returned id using the asset detail door and inspect its history or the register page. Errors use the existing `{error,detail?}` contract: 400 invalid input, 401 absent session, 403 forbidden access, 404 absent record or route, 409 conflict, 413 oversized keyed body and 415 unsupported keyed media type.
 
-INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the fifteen listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the thirty-six listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
 
 ## Scoped owner service credentials
 
 An owner using an ordinary member session can POST `service.create` with `name`, a nonempty `scopes` array, `expiresAt` (epoch milliseconds, at least one minute and at most 90 days ahead) and explicit `consent: true`. The result contains `id` and a one-time `token`. Save the token privately. Send it only to this installation in `Authorization: Bearer TOKEN`; POST still requires the exact installation `Origin`. Never put it in a URL. An Authorization header selects service authentication and never falls back to a cookie on failure.
 
-Supported read scopes are `assets:read`, `work:read` and `parts:read` for those collection, detail and asset-history doors. Supported write scopes remain exactly `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count` and `workorder.create`. The other nine keyed actions require ordinary member sessions and never add service authority. Each credential belongs to its issuing owner; no other member identity can be nominated. Owner membership and operator authority must remain active. It can never administer the site, issue or revoke credentials, approve work or spend, or open workspace pages. Every mutation checks the live credential again inside its database batch. Losing the issuing owner role or active account or membership permanently revokes that owner's credentials, even if ownership or access is restored. A replacement must be issued deliberately; browser sign-out alone does not revoke a credential. Retry keys are isolated to that credential. Existing business guards still apply.
+Supported read scopes are `assets:read`, `work:read` and `parts:read` for those collection, detail and asset-history doors. Supported write scopes remain exactly `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count` and `workorder.create`. The other thirty keyed actions require ordinary member sessions and never add service authority. Each credential belongs to its issuing owner; no other member identity can be nominated. Owner membership and operator authority must remain active. It can never administer the site, issue or revoke credentials, approve work or spend, or open workspace pages. Every mutation checks the live credential again inside its database batch. Losing the issuing owner role or active account or membership permanently revokes that owner's credentials, even if ownership or access is restored. A replacement must be issued deliberately; browser sign-out alone does not revoke a credential. Retry keys are isolated to that credential. Existing business guards still apply.
 
-`GET service-credentials` lists the owner's credential metadata without tokens or token hashes. POST `service.revoke` with `credential: ID` revokes one of that owner's credentials; next-request reads and write replays fail. Expired or revoked credentials return 401; denied scopes return 403. Creating and revoking credentials records an attributed audit event without the token. Every service business mutation also records its issuing owner and credential id atomically with the effect. Audit search, the audit page and CSV distinguish this authority from interactive owner activity. Complete actor attribution for authority-loss transitions remains unfinished; automatic revocation itself does not identify the administrator who changed the account. Archives strip token hashes; restoration retains credential metadata but revokes every credential, so a source token never becomes usable in a restored installation. The owner creates a fresh credential after reviewing the restored installation.
+`GET service-credentials` lists the owner's credential metadata without tokens or token hashes. POST `service.revoke` with `credential: ID` revokes one of that owner's credentials; next-request reads and write replays fail. Expired or revoked credentials return 401; denied scopes return 403. Creating and revoking credentials records an attributed audit event without the token. Every service business mutation also records its issuing owner and credential id atomically with the effect. Audit search, the audit page and CSV distinguish this authority from interactive owner activity. Owner-role and account-status changes now record each newly invalidated credential and issuing owner, the initiating administrator, cause and time atomically with native revocation. Refused changes produce no invalidation event, and reinstatement never repeats it. The audit page names the service client; authorized audit search and CSV preserve the same attribution. Archives strip token hashes; restoration retains credential metadata but revokes every credential, so a source token never becomes usable in a restored installation. The owner creates a fresh credential after reviewing the restored installation.
 
 Conservative policy approved with ct riders on 26 October 2026: only owners explicitly consent to issuing their own scoped, expiring credentials; no approval, administration, destructive or outbound scope is supported. Delegated service ownership remains under ADMIN-003. ADMIN-006, ADMIN-007, ADMIN-008, ADMIN-009 and ADMIN-016 inherit service audit, custody, retention, erasure and inactive-restore obligations. Read the native estate subset's OpenAPI examples in `openapi.json`; complete target-entity schemas remain unfinished.
 
@@ -648,7 +650,7 @@ another revision, handoff, result log, movement, submission or review.
 
 Procedure, assignment and execution schemas describe this tested native slice.
 Other maintenance entities, attachment-size writes, broader write-key coverage
-and the credential lifecycle riders remain unfinished; the fifteen-action
+and the remaining credential custody, retention and erasure riders remain unfinished; the thirty-six-action
 receipt allowlist refuses every other keyed action explicitly.
 
 A template saved through JSON retains `requiredFields` in its current revision and
@@ -661,3 +663,39 @@ the direct business audit entry. Standing rules execute under their own recorded
 author, using current rule authority rather than the triggering bearer. Their
 retained source event points to the original audit sequence so trigger provenance
 remains traceable without presenting it as the rule execution authority.
+
+
+### Retained execution records and original files
+
+OpenAPI request examples now cover meters, calendar schedules with required tools,
+small evidence uploads, annotations, original time entries, readings, findings,
+planned downtime, technician and independent supervisor signatures, cancellation
+and reopening. They also cover custom-field creation, rename, value changes and
+retirement, part categories, document originals, immutable revisions, expiry and
+revision links pinned to work. A retired custom definition and its last value and
+history remain readable. These are ordinary member operations; no service scope
+was added. New effects retain their existing state, version, quantity and authority
+checks. Signature retries recheck either execution authority or independent review
+authority according to the original role.
+
+Versioned original-byte downloads are `GET /api/gasket/v1/documents/REVISION_ID/file`,
+`GET /api/gasket/v1/evidence/EVIDENCE_ID/file` and
+`GET /api/gasket/v1/signature-marks/SIGNATURE_ID/file`. They use the same private-file
+handlers as workspace downloads and refuse service credentials. Document download
+identities name immutable revisions. The keyed JSON request ceiling remains 64,000
+bytes including encoded file content; larger originals use the unkeyed upload door
+and its separate file limit. No upload body or original file is stored in a retry
+receipt.
+
+OpenAPI also describes the tested asset, work and part detail responses, retained
+custom values, evidence, signatures, time, readings, findings, downtime and
+secret-free credential metadata. The API journey checks those shapes against actual
+responses as well as independently asserting their business values. Additional
+maintenance entities and comprehensive schemas remain INT-001 work.
+
+Archive proof inspects the credential rows and original archive bytes: usable bearer
+values and their verifiers are absent, metadata retains inactive placeholders,
+export preserves source authority and restore refuses source tokens. After the
+restored record counts are reconciled, the owner deliberately issues a new
+credential and can revoke it again. This does not establish client-side custody,
+legal retention, full metadata erasure or complete multi-site archive coverage.
