@@ -6,7 +6,7 @@ import { harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 const day='2026-10-20', tomorrow='2026-10-21'
 async function fixture() {
   const h=await harness({clockInstant:Date.parse('2026-10-20T16:00:00Z')}),owner=await h.owner()
-  exerciseKeyedActions(h, owner, ['planning.qualification','planning.tool','planning.retire','planning.window','planning.window.remove','planning.requirements','planning.slot'])
+  exerciseKeyedActions(h, owner, ['planning.qualification','planning.tool','planning.retire','planning.window','planning.window.remove','planning.requirements','planning.slot','automation.control'])
   await h.api('site.configure',owner,{name:'Lake Erie Works',timezone:'America/New_York'})
   const people={},cookies={owner}
   for(const [key,role] of [['lead','lead'],['maya','maintainer'],['luis','maintainer'],['supervisor','supervisor'],['agent','agent']]) {
@@ -15,7 +15,7 @@ async function fixture() {
   }
   const team=(await h.api('team.create',owner,{name:'Electrical',trade:'Electrical',member:[people.maya,people.luis]})).id
   const asset=(await h.api('asset.create',owner,{tag:'HV-1',name:'High voltage drive',location:'Plant room'})).id
-  const view=async()=>{const result=await h.api(`v1/planning?from=${day}`,owner);assertDocumented('PlanningView',result);return result}
+  const view=async()=>{const result=await h.api(`/v1/planning?from=${day}`,owner);assertDocumented('PlanningView',result);return result}
   const change=async(action,body,status=200,who=owner)=>h.api(action,who,{revision:(await view()).revision,...body},status)
   const work=async(title,assignee=people.maya,extra={})=>(await h.api('workorder.create',owner,{asset,title,due:day,assignee,team,estimateHours:'2',...extra})).id
   const window=(member,date,start='08:00',end='16:00',kind='available')=>change('planning.window',{member,starts:`${date}T${start}`,ends:`${date}T${end}`,kind,reason:kind==='available'?'Published shift':'Approved leave'})

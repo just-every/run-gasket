@@ -40,7 +40,9 @@ const RETRYABLE: Record<string, Capability> = {
   'workorder.cancel': 'work.assign', 'workorder.reopen': 'work.assign',
   'planning.qualification': 'site.manage', 'planning.tool': 'site.manage', 'planning.retire': 'site.manage',
   'planning.window': 'work.assign', 'planning.window.remove': 'work.assign', 'planning.requirements': 'work.assign', 'planning.slot': 'work.assign',
-  'safety.publish': 'register.manage', 'safety.attest': 'work.do',
+  'safety.publish': 'register.manage', 'safety.attest': 'work.do', 'calibration.create': 'register.manage',
+  'closure.add': 'register.manage', 'closure.remove': 'register.manage',
+  'automation.control': 'site.manage', 'automation.schedule': 'site.manage', 'automation.catchup': 'site.manage',
   'schedule.skip': 'work.assign', 'schedule.defer': 'work.assign', 'schedule.exception': 'work.review', 'schedule.edit': 'register.manage',
   'labor.entry': 'work.do', 'labor.timer': 'work.do', 'labor.rate': 'site.manage', 'labor.review': 'site.manage', 'labor.invoice': 'site.manage',
 }

@@ -630,19 +630,37 @@ export async function apiJourney() {
     await write('schedule.exception', { ...example('schedule.exception'), exception: skip.id }, 'synthetic-gasket-skip-forbidden', lead, 403)
     const skipDecision = { ...example('schedule.exception'), exception: skip.id }
     await repeat('schedule.exception', skipDecision, 'synthetic-gasket-skip-decision')
-    let scheduled = (await h.api('v1/schedules', owner)).find(row => row.id === schedule)
+    let scheduled = (await h.api('/v1/schedules', owner)).find(row => row.id === schedule)
     documented('Schedule', scheduled)
     assert.equal(scheduled.next_due_date, '2026-11-24')
     const defer = await repeat('schedule.defer', { ...example('schedule.defer'), schedule, until: '2026-11-25' }, 'synthetic-gasket-defer', lead)
     await repeat('schedule.exception', { ...example('schedule.exception'), exception: defer.id }, 'synthetic-gasket-defer-decision')
-    scheduled = (await h.api('v1/schedules', owner)).find(row => row.id === schedule)
+    scheduled = (await h.api('/v1/schedules', owner)).find(row => row.id === schedule)
     assert.equal(scheduled.next_due_date, '2026-11-25')
     const edit = { ...example('schedule.edit'), schedule, revision: scheduled.revision }
     await write('schedule.edit', { ...edit, preview: true }, 'synthetic-gasket-preview-key', lead, 400)
     await repeat('schedule.edit', edit, 'synthetic-gasket-schedule-edit', lead)
-    scheduled = (await h.api('v1/schedules', owner)).find(row => row.id === schedule)
+    scheduled = (await h.api('/v1/schedules', owner)).find(row => row.id === schedule)
     assert.equal(scheduled.every_days, 14)
     assert.deepEqual(scheduled.exceptions.map(row => [row.kind, row.decision]).sort(), [['defer', 'approved'], ['skip', 'approved']])
+    const closureBody = example('closure.add')
+    const closure = await repeat('closure.add', closureBody, 'synthetic-gasket-closure', lead)
+    assert.equal((await h.api('closures', owner)).find(row => row.id === closure.id).label, closureBody.label)
+    await repeat('closure.remove', { closure: closure.id }, 'synthetic-gasket-closure-remove', lead)
+    assert.equal((await h.api('closures', owner)).some(row => row.id === closure.id), false)
+    const pause = { ...example('automation.schedule'), schedule, revision: scheduled.revision }
+    await write('automation.schedule', pause, 'synthetic-gasket-pause-forbidden', lead, 403)
+    await repeat('automation.schedule', pause, 'synthetic-gasket-pause')
+    assert.equal((await h.api('schedules', owner)).find(row => row.id === schedule).active, 0)
+    const expiry = (await h.api('automation', owner)).rules.find(row => row.id === 'expiry')
+    const catchup = { ...example('automation.catchup'), revision: expiry.revision }
+    await write('automation.catchup', catchup, 'synthetic-gasket-catchup-forbidden', lead, 403)
+    const jobsBefore = (await h.api('automation/jobs', owner)).jobs.length
+    const caught = await repeat('automation.catchup', catchup, 'synthetic-gasket-catchup')
+    assert.equal(caught.state, 'completed')
+    const jobsAfter = (await h.api('automation/jobs', owner)).jobs
+    assert.equal(jobsAfter.length, jobsBefore + 1)
+    assert.equal(jobsAfter.find(row => row.id === caught.job).state, 'completed')
     const laborWork = (await h.api('workorder.create', lead, { asset, title: 'Synthetic API reviewed labor', due: '2026-10-26', assignee: member })).id
     const laborActions = ['labor.rate','labor.entry','labor.review','labor.invoice','labor.timer']
     exerciseKeyedActions(h, owner, laborActions)
