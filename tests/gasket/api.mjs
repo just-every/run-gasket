@@ -284,7 +284,8 @@ export async function apiJourney() {
     // The documented execution doors retain one effect when their response is lost.
     const meter = await repeat('meter.create', { ...example('meter.create'), asset }, 'synthetic-gasket-meter', lead)
     assert.deepEqual((await h.api(`/v1/assets/${asset}`, owner)).meters.map(row => [row.id, row.name, row.unit]), [[meter.id, 'Run hours', 'h']])
-    const photoBody = { ...example('workorder.evidence'), workOrder: job, file: file('synthetic-gasket-photo.png', png, ['image', 'png'].join('/')) }
+    const evidencePng = Buffer.concat([png, Buffer.alloc(1500000 - png.length)])
+    const photoBody = { ...example('workorder.evidence'), workOrder: job, file: file('synthetic-gasket-photo.png', evidencePng, ['image', 'png'].join('/')) }
     await write('workorder.evidence', photoBody, 'synthetic-gasket-foreign-evidence', owner, 403)
     const photo = await repeat('workorder.evidence', photoBody, 'synthetic-gasket-evidence', lead)
     const annotation = await repeat('workorder.annotate', { ...example('workorder.annotate'), workOrder: job, evidence: photo.evidence }, 'synthetic-gasket-annotation', lead)
@@ -302,10 +303,10 @@ export async function apiJourney() {
     await write('workorder.submit', { workOrder: job, version: stopped.version }, 'synthetic-gasket-open-stop-submit', lead, 409)
     assert.equal((await repeat('downtime.end', { ...example('downtime.end'), workOrder: job }, 'synthetic-gasket-stop-end', lead)).minutes, 30)
     current = await order(owner)
-    assert.deepEqual(current.evidence.map(row => [row.id, row.sha256, row.phase, row.annotations.map(note => note.id)]), [[photo.evidence, (await import('node:crypto')).createHash('sha256').update(png).digest('hex'), 'before', [annotation.annotation]]])
+    assert.deepEqual(current.evidence.map(row => [row.id, row.sha256, row.phase, row.annotations.map(note => note.id)]), [[photo.evidence, (await import('node:crypto')).createHash('sha256').update(evidencePng).digest('hex'), 'before', [annotation.annotation]]])
     const evidenceDownload = await h.raw(`/api/gasket/v1/evidence/${photo.evidence}/file`, { cookie: lead })
     assert.equal(evidenceDownload.status, 200)
-    assert.deepEqual(Buffer.from(await evidenceDownload.arrayBuffer()), png)
+    assert.deepEqual(Buffer.from(await evidenceDownload.arrayBuffer()), evidencePng)
     assert.deepEqual(current.timeEntries.map(row => [row.id, row.minutes, row.worked_on]), [[time.timeEntry, 25, '2026-10-26']])
     assert.deepEqual(current.readings.map(row => [row.meter, row.value, row.unit]), [['Run hours', '42', 'h']])
     assert.deepEqual(current.findings.map(row => [row.id, row.severity, row.follow_up_id]), [[finding.finding, 'low', null]])
@@ -313,11 +314,12 @@ export async function apiJourney() {
     const signBody = { ...example('workorder.sign'), workOrder: job, version: current.version }
     await write('workorder.sign', signBody, 'synthetic-gasket-foreign-signature', owner, 403)
     const signature = await repeat('workorder.sign', signBody, 'synthetic-gasket-signature', lead)
-    const customerSignature = await repeat('workorder.sign', { ...signBody, role: 'customer', name: 'Synthetic customer', mark: file('synthetic-gasket-mark.png', png, ['image', 'png'].join('/')) }, 'synthetic-gasket-customer-signature', lead)
+    const markPng = Buffer.concat([png, Buffer.alloc(200000 - png.length)])
+    const customerSignature = await repeat('workorder.sign', { ...signBody, role: 'customer', name: 'Synthetic customer', mark: file('synthetic-gasket-mark.png', markPng, ['image', 'png'].join('/')) }, 'synthetic-gasket-customer-signature', lead)
     assert.deepEqual((await order(lead)).signatures.map(row => [row.id, row.role, row.state]), [[signature.signature, 'technician', 'current'], [customerSignature.signature, 'customer', 'current']])
     const markDownload = await h.raw(`/api/gasket/v1/signature-marks/${customerSignature.signature}/file`, { cookie: lead })
     assert.equal(markDownload.status, 200)
-    assert.deepEqual(Buffer.from(await markDownload.arrayBuffer()), png)
+    assert.deepEqual(Buffer.from(await markDownload.arrayBuffer()), markPng)
     assert.equal((await h.raw(`/api/gasket/v1/signature-marks/${customerSignature.signature}/file`)).status, 401)
     assert.equal((await h.raw(`/api/gasket/v1/signature-marks/${signature.signature}/file`, { cookie: lead })).status, 404)
 
@@ -583,6 +585,7 @@ export async function apiJourney() {
     assert.equal((await h.api(`/v1/assets/${asset}`, owner)).name, 'Synthetic updated pump')
     assert.equal((await h.api(`/v1/work/${job}`, owner)).status, 'closed')
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id, [[`assets/${lifecycleAsset}`, 'Synthetic API pump']], 'lifecycle-')
     // Receipt and stock survive a complete Worker restart, without replaying writes.
     await h.stop()
     resumed = await harness({ vars: h.vars, installation: h.installation, clockInstant: Date.UTC(2026, 9, 26, 16) })
@@ -607,7 +610,7 @@ async function browserProof(h, owner, asset, work, part, credential, screens, pr
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
     await context.addCookies(owner.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
     const page = await context.newPage()
-    for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead']])) for (const width of [1440, 390]) {
+    for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead'], ['audit?action=service.invalidate', 'Invalidated a service credential']])) for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
       const response = await page.goto(h.origin + '/app/' + path)
       if (path === 'audit?action=service.invalidate') await page.locator('tbody').getByText(expected, { exact: true }).first().waitFor()
