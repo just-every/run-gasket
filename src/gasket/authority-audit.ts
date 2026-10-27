@@ -38,6 +38,12 @@ export function attributedDatabase(db: D1Database): D1Database {
 }
 
 export async function withAccountAuthority<T>(db: D1Database, operator: string, action: string, run: () => Promise<T>) {
-  const member = await db.prepare('SELECT id FROM gk_members WHERE operator_id=?').bind(operator).first<{ id: string }>()
+  let member = await db.prepare('SELECT id FROM gk_members WHERE operator_id=?').bind(operator).first<{ id: string }>()
+  if (!member) {
+    // Native account administration can precede the owner's first workspace read.
+    // Use the same automatic owner membership as the ordinary Gasket session.
+    await db.prepare("INSERT INTO gk_members(id,operator_id,email,name,role,created_at) SELECT ?,id,lower(email),COALESCE(NULLIF(display_name,''),email),'owner',? FROM oa_operators WHERE id=? AND role='owner' AND status='active' ON CONFLICT DO NOTHING").bind(crypto.randomUUID(), Date.now(), operator).run()
+    member = await db.prepare('SELECT id FROM gk_members WHERE operator_id=?').bind(operator).first<{ id: string }>()
+  }
   return authority.run({ actor: member?.id ?? operator, action, at: Date.now() }, run)
 }
