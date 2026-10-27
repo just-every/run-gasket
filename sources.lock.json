@@ -1312,7 +1312,7 @@
       "executable": false
     },
     "src/gasket/actor.ts": {
-      "sha256": "8340954be6be1e414fcc5f548e9586a6bd4a1921b7f7b075ff244a20ce04f542",
+      "sha256": "2f249fb7661ac95eb2fb66f70c1501f3fc1174930a4b28a83d3c56a9f4380e31",
       "executable": false
     },
     "src/gasket/agent-follow-up.ts": {
