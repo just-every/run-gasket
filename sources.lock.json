@@ -4296,7 +4296,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "3c2b39469b4d972339a2550a340a4154dbe6ca98b8e7dd8859e4cd16fe191929",
+      "sha256": "d23cb9ec63bc5b6eaed5376680127424062198321d7a8745298097664016f91d",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
@@ -4493,6 +4493,10 @@
     },
     "tests/gasket/work-returns.mjs": {
       "sha256": "2a2e4e07c493fae10d08936e61fd1ccdfad3ebbef6dcf6659443447eeff81d60",
+      "executable": false
+    },
+    "tests/gasket/workspace-conditional-saves.mjs": {
+      "sha256": "78dbcfe94d50fe97b3e4af54a9fff95597d9b76b0b2b436368c3a8b33afa7282",
       "executable": false
     },
     "tests/incremental-typecheck.test.mjs": {

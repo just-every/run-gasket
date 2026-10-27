@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { PAGE_DOORS, match } from '../../src/gasket/doors.ts'
 import { saveSnapshot } from './form-save-interruptions.mjs'
+import { conditionalSaves } from './workspace-conditional-saves.mjs'
 import { png } from './fixtures.mjs'
 import { chromium } from '@playwright/test'
 export async function intervalBrowser(h,cookie,proposal) {
@@ -81,7 +82,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     await proof(name)
   }
   const open = async(path,name)=>{assert.equal((await page.goto(h.origin+path)).status(),200,`${name} ${path} opens`);await inspect(name)}
-  const submit = async (form, notice = /Saved/) => {
+  const submit = async (form, notice = /Saved/, confirmedView) => {
     const action = await form.getAttribute('action')
     exercisedActions.add(action)
     console.log('workspace save proof',action)
@@ -94,7 +95,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     }
     const record = before.find(([key])=>key==='workOrder')?.[1]
     const count = before.find(([key])=>key==='count')?.[1]
-    const view = reads[action.slice('/app/do/'.length)] || (count ? `counts/${count}` : `work/${record}`)
+    const view = confirmedView || reads[action.slice('/app/do/'.length)] || (count ? `counts/${count}` : `work/${record}`)
     const who = (await context.cookies()).map(item=>`${item.name}=${item.value}`).join('; ')
     const submitted = await form.evaluate(async el=>Promise.all([...new FormData(el)].map(async([key,value])=>[key,typeof value==='string'?value:{name:value.name,type:value.type,bytes:[...new Uint8Array(await value.arrayBuffer())]}])))
     const unchanged = await h.api(view,who)
@@ -658,6 +659,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await open(`/app/counts/${cycleCount}`,'independent-count-approval')
       await submit(page.locator('form[action="/app/do/count.decide"]').filter({has:page.locator('[name=decision][value=approve]')}))
       assert.equal((await h.api(`parts/${part}`,cookie.lead)).onHand,'3','independent approval posts the counted stock once')
+      await conditionalSaves({h,cookie,page,use,open,submit,proof,day,technician,longName,part})
       const duplicate=(await h.api('part.create',cookie.lead,{number:'ACCESS-GUARD-DUPLICATE',name:'Duplicate guard fastener for the west packaging mezzanine',unit:'each'})).id
       await use('owner')
       // Enumerate the implemented workspace destinations rather than a representative menu subset.
