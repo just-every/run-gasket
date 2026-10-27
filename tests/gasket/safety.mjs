@@ -11,7 +11,7 @@ const unzip=buffer=>{const b=Buffer.from(buffer),out={};for(let at=0;b.readUInt3
 export async function safetyJourney() {
  const h=await harness({clockInstant:Date.parse('2026-10-26T16:00:00Z')})
  try {
-  const owner=await h.owner();exerciseKeyedActions(h,owner,['safety.publish','safety.attest','calibration.create']);await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
+  const owner=await h.owner();const receipts=exerciseKeyedActions(h,owner,['safety.publish','safety.attest','calibration.create']);await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
   const tech=(await h.api('access.give',owner,{name:'Synthetic technician',email:'safety-tech@example.test',role:'maintainer'})).id
   const who=await h.signIn('safety-tech@example.test')
   const supervisor=(await h.api('access.give',owner,{name:'Independent reviewer',email:'safety-review@example.test',role:'supervisor'})).id
@@ -59,6 +59,13 @@ export async function safetyJourney() {
   assert.equal((await sign({expires:'2026-10-25'},409)).error,'permit_expired')
   await sign({isolated:false},400)
   if(process.env.SAFETY_SCREENSHOTS)await browserProof(h,owner,who,checklist,work,'open')
+  await sign()
+  const receipt=receipts.filter(row=>row.path==='safety.attest').at(-1)
+  await h.api('workorder.assign',owner,{workOrder:work,assignee:(await h.api('me',owner)).id})
+  const forbiddenReplay=await h.raw('/api/gasket/v1/safety.attest',{cookie:who,body:receipt.body,headers:receipt.headers})
+  assert.equal(forbiddenReplay.status,403)
+  assert.equal((await forbiddenReplay.json()).error,'not_your_work')
+  await h.api('workorder.assign',owner,{workOrder:work,assignee:tech})
   await sign()
   assert.deepEqual((await state()).missing,[])
   assert.equal((await state()).attestations.at(-1).qualification.provenance,provenance)

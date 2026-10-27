@@ -71,6 +71,7 @@ export const file = (filename, content, type = 'application/octet-stream') => ({
 export function exerciseKeyedActions(h, owner, actions) {
   const ordinary = h.api, selected = new Set(actions)
   let sequence = 0
+  const receipts = []
   h.api = async (path, cookie, body, status = 200) => {
     if (!selected.has(path) || body === undefined || body.preview) return ordinary(path, cookie, body, status)
     const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + (++sequence) }
@@ -78,6 +79,7 @@ export function exerciseKeyedActions(h, owner, actions) {
     const first = await request(), result = await first.json()
     assert.equal(first.status, status, path + ': ' + JSON.stringify(result))
     if (status === 200) {
+      receipts.push({ path, cookie, body, headers, result })
       assert.equal(first.headers.get('idempotency-replayed'), 'false', path)
       const audit = await ordinary('audit', owner)
       const replay = await request()
@@ -88,6 +90,7 @@ export function exerciseKeyedActions(h, owner, actions) {
     }
     return result
   }
+  return receipts
 }
 
 const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
