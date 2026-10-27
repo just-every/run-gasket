@@ -214,7 +214,14 @@ export async function apiJourney() {
     const signBody = { ...example('workorder.sign'), workOrder: job, version: current.version }
     await write('workorder.sign', signBody, 'synthetic-gasket-foreign-signature', owner, 403)
     const signature = await repeat('workorder.sign', signBody, 'synthetic-gasket-signature', lead)
-    assert.deepEqual((await order(lead)).signatures.map(row => [row.id, row.role, row.state]), [[signature.signature, 'technician', 'current']])
+    const customerSignature = await repeat('workorder.sign', { ...signBody, role: 'customer', name: 'Synthetic customer', mark: file('synthetic-gasket-mark.png', png, ['image', 'png'].join('/')) }, 'synthetic-gasket-customer-signature', lead)
+    assert.deepEqual((await order(lead)).signatures.map(row => [row.id, row.role, row.state]), [[signature.signature, 'technician', 'current'], [customerSignature.signature, 'customer', 'current']])
+    const markDownload = await h.raw(`/api/gasket/v1/signature-marks/${customerSignature.signature}/file`, { cookie: lead })
+    assert.equal(markDownload.status, 200)
+    assert.deepEqual(Buffer.from(await markDownload.arrayBuffer()), png)
+    assert.equal((await h.raw(`/api/gasket/v1/signature-marks/${customerSignature.signature}/file`)).status, 401)
+    assert.equal((await h.raw(`/api/gasket/v1/signature-marks/${signature.signature}/file`, { cookie: lead })).status, 404)
+
     // Required tools survive schedule creation and reject submission until recorded.
     const schedule = await repeat('schedule.create', { ...example('schedule.create'), asset, checklist: checklist.id, assignee: member }, 'synthetic-gasket-schedule', lead)
     assert.equal((await h.api('/v1/schedules', owner)).filter(row => row.id === schedule.id).length, 1)
@@ -252,7 +259,7 @@ export async function apiJourney() {
     assert.deepEqual(current.reviews.map(row => [row.decision, row.reviewer]), [['approved', 'Olive Owner']])
     for (const action of ['workorder.evidence', 'workorder.annotate', 'workorder.time', 'workorder.readings', 'workorder.sign', 'finding.record', 'downtime.start', 'downtime.end']) {
       const entries = (await h.api(`audit?action=${action}`, owner)).rows
-      assert.equal(entries.filter(row => row.subject === (action.startsWith('downtime.') ? asset : job)).length, action === 'workorder.sign' ? 2 : 1, action + ' retains only original audit effects')
+      assert.equal(entries.filter(row => row.subject === (action.startsWith('downtime.') ? asset : job)).length, action === 'workorder.sign' ? 3 : 1, action + ' retains only original audit effects')
     }
     for (const action of ['checklist.create', 'checklist.revise', 'template.save', 'workorder.assign', 'workorder.results', 'part.issue', 'part.return', 'workorder.submit', 'workorder.approve']) {
       const entries = (await h.api(`audit?action=${action}`, owner)).rows
@@ -367,6 +374,7 @@ export async function apiJourney() {
     assert.ok((await service('assets?limit=2')).next)
     await service(`documents/${manual.revisionId}/file`, undefined, 403)
     await service(`evidence/${photo.evidence}/file`, undefined, 403)
+    await service(`signature-marks/${customerSignature.signature}/file`, undefined, 403)
     for (const path of ['parts', `work/${work}`, 'service-credentials']) await service(path, undefined, 403)
     for (const action of ['site.configure', 'document.add', 'document.revise', 'document.expiry', 'document.link', 'customfield.save', 'customfield.retire', 'customvalue.set', 'part.category', 'meter.create', 'schedule.create', 'workorder.evidence', 'workorder.annotate', 'workorder.time', 'workorder.readings', 'workorder.tool', 'workorder.sign', 'finding.record', 'downtime.start', 'downtime.end', 'workorder.cancel', 'workorder.reopen', 'checklist.create', 'checklist.revise', 'template.save', 'workorder.assign', 'workorder.results', 'workorder.issue', 'workorder.return', 'workorder.submit', 'workorder.review', 'service.create', 'service.revoke']) await service(action, {}, 403)
     assert.equal((await h.raw('/app/assets', { headers: { authorization: `Bearer ${issued.token}` } })).status, 403)
@@ -448,9 +456,20 @@ export async function apiJourney() {
     assert.ok(!lifecycleCsv.includes(lifecycle.token) && !lifecycleCsv.includes(replacement.token))
     const fresh = await credential()
     assert.equal((await lifecycleRequest(fresh.token)).status, 200)
+    // A native owner can administer accounts before ever opening the workspace.
+    assert.equal((await h.raw('/auth/invite', { cookie: owner, body: { email: 'synthetic-gasket-direct-owner@example.test', displayName: 'Synthetic direct account owner', role: 'owner' } })).status, 202)
+    const directOwner = await h.signIn('synthetic-gasket-direct-owner@example.test')
+    for (const status of ['inactive', 'active']) assert.equal((await h.raw('/auth/operator/status', { cookie: directOwner, body: { operatorId: ownerSession.operator.id, status } })).status, 200)
+    owner = await h.signIn(h.vars.OWNER_EMAIL)
+    const directEvent = (await lifecycleEvents(fresh.id))[0]
+    assert.equal(directEvent.actor_name, 'Synthetic direct account owner')
+    assert.equal(directEvent.role, 'owner')
+    assert.equal((await lifecycleEvents(fresh.id)).length, 1)
+    await scoped(fresh.token, 'assets', undefined, undefined, 401)
+    const afterDirectChange = await credential()
     // Signing out alone does not revoke separately consented service authority.
     assert.equal((await h.raw('/auth/signout', { cookie: owner, body: {} })).status, 204)
-    assert.equal((await lifecycleRequest(fresh.token)).status, 200)
+    assert.equal((await lifecycleRequest(afterDirectChange.token)).status, 200)
     owner = await h.signIn(h.vars.OWNER_EMAIL)
     assert.equal((await h.api(`/v1/assets/${asset}`, owner)).name, 'Synthetic updated pump')
     assert.equal((await h.api(`/v1/work/${job}`, owner)).status, 'closed')
@@ -482,7 +501,7 @@ async function browserProof(h, owner, asset, work, part, credential, screens, pr
     for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead']])) for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
       const response = await page.goto(h.origin + '/app/' + path)
-      if (path === 'audit?action=service.invalidate') await page.getByRole('cell', { name: expected, exact: true }).first().waitFor()
+      if (path === 'audit?action=service.invalidate') await page.locator('tbody').getByText(expected, { exact: true }).first().waitFor()
       else await page.getByText(expected, { exact: true }).first().waitFor()
       await page.evaluate(() => document.fonts.ready)
       if (width === (path.startsWith('audit') ? 390 : 1440)) {

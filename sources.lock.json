@@ -1356,7 +1356,7 @@
       "executable": false
     },
     "src/gasket/authority-audit.ts": {
-      "sha256": "52756391039befb152c3cc0b0f15039ea354dfe5a88f3c736df70eeca4b927a2",
+      "sha256": "75c34a12451e03399ceda8eb8d2776b6bfb5fef8d1e603090ac1c2cfda890e50",
       "executable": false
     },
     "src/gasket/automation-context.ts": {
@@ -4116,7 +4116,7 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "538c8ffbca7b2fda9c82c7e3c5604d1f5ae0b5c8a8e742b84c05e72d2625eee6",
+      "sha256": "3180273b9671ce9557e05646d0f86f1de81dfa5f13da55afb8babe9fc0693c7b",
       "executable": false
     },
     "tests/gasket/automation.mjs": {
