@@ -113,12 +113,19 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
-    let confirmation
-    await page.route('**'+action,async route=>{confirmation=await (await route.fetch()).json();await route.abort('failed')},{times:1})
+    let confirmation, intercepted = false, interceptionError
+    await page.route('**'+action,async route=>{
+      intercepted = true
+      try { confirmation = await (await route.fetch({timeout:15000})).json() }
+      catch (error) { interceptionError = error }
+      finally { await route.abort('failed') }
+    },{times:1})
     await form.getByRole('button',{name:/./}).last().focus()
     await page.keyboard.press('Enter')
     const error = form.getByRole('alert')
     await error.waitFor()
+    assert.equal(intercepted,true,`${action} keyboard retry reaches the server`)
+    if(interceptionError)throw interceptionError
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
     assert.equal(await error.evaluate(el=>el===document.activeElement),true,`${action} error has keyboard focus`)
     assert.equal(await form.getByRole('button',{name:/./}).last().isDisabled(),true,`${action} cannot repeat an uncertain save`)
