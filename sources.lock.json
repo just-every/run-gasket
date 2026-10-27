@@ -4496,7 +4496,7 @@
       "executable": false
     },
     "tests/gasket/workspace-conditional-saves.mjs": {
-      "sha256": "78dbcfe94d50fe97b3e4af54a9fff95597d9b76b0b2b436368c3a8b33afa7282",
+      "sha256": "fee422a3378b394d38667b243a017aebdfb371891a33d7baa79468866889f787",
       "executable": false
     },
     "tests/incremental-typecheck.test.mjs": {
