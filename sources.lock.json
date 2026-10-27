@@ -4200,7 +4200,7 @@
       "executable": false
     },
     "tests/gasket/purchasing.mjs": {
-      "sha256": "75ed0faab940d4242f7a19bd8a5c0e668407139e524e8d42421fe7024448421c",
+      "sha256": "65322b597bb0ac967122aff3731edb5725228ed83f6684066431cb177d3294ea",
       "executable": false
     },
     "tests/gasket/receipts/agent-009-live.json": {

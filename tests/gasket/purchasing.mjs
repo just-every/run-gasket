@@ -1,6 +1,8 @@
 // BUY-001: real supplier, catalog and maintenance requisition doors.
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
+import { mkdir } from 'node:fs/promises'
+import { chromium } from '@playwright/test'
 import { harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 
 export async function purchasingJourney(h, cookie, ids) {
@@ -18,6 +20,7 @@ export async function purchasingJourney(h, cookie, ids) {
   assert.equal(detail.tax_treatment, 'sales_tax'); assert.equal(detail.payment_terms, 'Net 30'); assert.equal(detail.lead_days, 6)
   await h.api('supplier.catalog', cookie.owner, { supplier: vendor, revision: detail.revision, sku: 'BRG-6205', description: '6205 sealed bearing', kind: 'part', unit: 'each', price: '18.75' })
   detail = await h.api(`suppliers/${vendor}`, cookie.lead)
+  assertDocumented('SupplierDetail',detail)
   assert.deepEqual(detail.items.map(row => [row.sku, row.kind, row.price_cents]), [['BRG-6205', 'part', 1875]])
   await h.api('supplier.catalog', cookie.owner, { supplier: vendor, revision: detail.revision, sku: 'LABOR', description: 'Contractor bearing replacement', kind: 'service', unit: 'hour', price: '95' })
   detail = await h.api(`suppliers/${vendor}`, cookie.owner)
@@ -64,6 +67,27 @@ export async function purchasingJourney(h, cookie, ids) {
   const auditPage = await (await h.raw('/app/audit?action=requisition.request', { cookie: cookie.owner })).text()
   assert.ok(auditPage.includes(`/app/requisitions/${request}`))
   assert.ok(auditPage.includes('Requested a maintenance purchase'))
+  if(process.env.PURCHASING_SCREENSHOTS) {
+    await mkdir(process.env.PURCHASING_SCREENSHOTS,{recursive:true})
+    const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']})
+    try {
+      const context=await browser.newContext({ignoreHTTPSErrors:true})
+      await context.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+      const page=await context.newPage()
+      for(const [name,path] of [['purchasing','/app/purchasing'],['supplier',`/app/suppliers/${vendor}`],['requisition',`/app/requisitions/${request}`]])for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:1000})
+        const response=await page.goto(h.origin+path)
+        await page.getByText(supplier.name,{exact:true}).first().waitFor()
+        if(width===1440) {
+          assert.equal(response.status(),200)
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+          for(const button of await page.locator('button:visible').all())assert.ok((await button.textContent()).trim()||await button.getAttribute('data-tooltip'))
+        }
+        await page.screenshot({path:`${process.env.PURCHASING_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
+      }
+      await context.close()
+    } finally {await browser.close()}
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
