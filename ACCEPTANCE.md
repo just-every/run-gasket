@@ -4,7 +4,7 @@ This is the build plan for every named clause of [CONTRACT.md](CONTRACT.md), inc
 
 The existing form, JSON, page and download journeys run in `tests/gasket/flows.mjs` against the emitted Worker and real local D1, with invented fixtures only in tests and fakes only at network/provider boundaries. Their stable GAS-01 through GAS-13 test identifiers are retained. `tests/runtime.mjs` covers HTTP-001; `tests/email-link.mjs` covers Base sign-in. Future journeys use the same public-door standard, real native app/device/gateway paths where specified and provider sandboxes or captured network edges. No fixture implementation establishes a live integration, physical count, safety determination or certification.
 
-Status is judged at `2b717f4db9cbfce6734a81d257b6b4a417de7e22` (27 October 2026). The sx-gasket-c-i925 round updates REPORT-006 and MIG-007; other rows retain their existing evidence and scope. The contract's canonical status table is authoritative for kind, exact evidence paths and remaining gaps.
+Status is judged at `33517355bfcbfa42a2203db1fb4bc5f5df8456c9` (27 October 2026). The sx-gasket-c-i925 round updates REPORT-006 and MIG-007; other rows retain their existing evidence and scope. The contract's canonical status table is authoritative for kind, exact evidence paths and remaining gaps.
 
 | # | What a person can do | Test | Status |
 | --- | --- | --- | --- |

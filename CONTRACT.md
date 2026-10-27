@@ -381,7 +381,7 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `2b717f4db9cbfce6734a81d257b6b4a417de7e22` (27 October 2026). The sx-gasket-c-i925 round updates REPORT-006 and MIG-007; other rows retain their existing evidence and scope.
+Judged from the code and tests at commit `33517355bfcbfa42a2203db1fb4bc5f5df8456c9` (27 October 2026). The sx-gasket-c-i925 round updates REPORT-006 and MIG-007; other rows retain their existing evidence and scope.
 
 REPORT-010 has the tested PDF implementation slice cited below and remains partial; this does not rejudge the remaining clauses.
 
