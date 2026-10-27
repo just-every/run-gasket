@@ -5035,6 +5035,155 @@
           }
         }
       }
+    },
+    "/assets/{id}": {
+      "get": {
+        "summary": "Read AssetDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssetDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/work/{id}": {
+      "get": {
+        "summary": "Read WorkDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/parts/{id}": {
+      "get": {
+        "summary": "Read PartDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/PartDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/service-credentials": {
+      "get": {
+        "summary": "Read CredentialMetadata",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CredentialMetadata"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5071,6 +5220,908 @@
             }
           }
         }
+      }
+    },
+    "schemas": {
+      "CustomValue": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "entity_type": {
+            "enum": [
+              "asset",
+              "part",
+              "location"
+            ]
+          },
+          "type": {
+            "enum": [
+              "text",
+              "number",
+              "single",
+              "multiple",
+              "date",
+              "boolean",
+              "link"
+            ]
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "value": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "valueRevision": {
+            "type": "integer"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "value": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "revision": {
+                  "type": "integer"
+                },
+                "actor": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "changed_at": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "value",
+                "revision",
+                "actor",
+                "changed_at"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "entity_type",
+          "type",
+          "archived",
+          "value",
+          "valueRevision",
+          "history"
+        ],
+        "additionalProperties": true
+      },
+      "Annotation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "shape": {
+            "enum": [
+              "box",
+              "ellipse",
+              "arrow"
+            ]
+          },
+          "x1": {
+            "type": "number"
+          },
+          "y1": {
+            "type": "number"
+          },
+          "x2": {
+            "type": "number"
+          },
+          "y2": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "shape",
+          "x1",
+          "y1",
+          "x2",
+          "y2",
+          "note"
+        ],
+        "additionalProperties": true
+      },
+      "Evidence": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "filename": {
+            "type": "string"
+          },
+          "media_type": {
+            "type": "string"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "item": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "phase": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "taken_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "door": {
+            "enum": [
+              "api",
+              "web",
+              null
+            ]
+          },
+          "certificate": {
+            "type": "integer"
+          },
+          "annotations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Annotation"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "filename",
+          "media_type",
+          "size",
+          "sha256",
+          "item",
+          "phase",
+          "taken_on",
+          "door",
+          "certificate",
+          "annotations"
+        ],
+        "additionalProperties": true
+      },
+      "Signature": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "role": {
+            "enum": [
+              "technician",
+              "customer",
+              "supervisor"
+            ]
+          },
+          "signer_name": {
+            "type": "string"
+          },
+          "member_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_at": {
+            "type": "integer"
+          },
+          "state": {
+            "enum": [
+              "current",
+              "stale",
+              "superseded"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "role",
+          "signer_name",
+          "member_id",
+          "recorded_by",
+          "recorded_at",
+          "state"
+        ],
+        "additionalProperties": true
+      },
+      "TimeEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "worked_on": {
+            "type": "string"
+          },
+          "minutes": {
+            "type": "integer"
+          },
+          "note": {
+            "type": "string"
+          },
+          "recorded_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_at": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "worked_on",
+          "minutes",
+          "note",
+          "recorded_by",
+          "recorded_at"
+        ],
+        "additionalProperties": true
+      },
+      "Reading": {
+        "type": "object",
+        "properties": {
+          "meter": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "counter",
+              "gauge",
+              "condition"
+            ]
+          },
+          "value": {
+            "type": "string"
+          },
+          "taken_on": {
+            "type": "string"
+          },
+          "entered_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "meter",
+          "unit",
+          "kind",
+          "value",
+          "taken_on",
+          "entered_by"
+        ],
+        "additionalProperties": true
+      },
+      "Downtime": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "started_on": {
+            "type": "string"
+          },
+          "ended_on": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minutes": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "planned": {
+            "type": "integer"
+          },
+          "degraded": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "started_on",
+          "ended_on",
+          "minutes",
+          "reason",
+          "planned",
+          "degraded"
+        ],
+        "additionalProperties": true
+      },
+      "Finding": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "item": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "follow_up_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recorded_at": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "item",
+          "severity",
+          "text",
+          "follow_up_id",
+          "recorded_at"
+        ],
+        "additionalProperties": true
+      },
+      "WorkDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "in_progress",
+              "returned",
+              "submitted",
+              "closed",
+              "cancelled"
+            ]
+          },
+          "version": {
+            "type": "integer"
+          },
+          "asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "assignee_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "due_date": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            }
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Signature"
+            }
+          },
+          "timeEntries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TimeEntry"
+            }
+          },
+          "readings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Reading"
+            }
+          },
+          "downtime": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Downtime"
+            }
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Finding"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "recorded_by": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "recorded_at": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "position",
+                "name",
+                "identifier",
+                "recorded_by",
+                "recorded_at"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "number": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "issued": {
+                  "type": "string"
+                },
+                "returned": {
+                  "type": "string"
+                },
+                "used": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "unit",
+                "issued",
+                "returned",
+                "used"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "reviews": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "integer"
+                },
+                "decision": {
+                  "enum": [
+                    "approved",
+                    "returned"
+                  ]
+                },
+                "reviewer": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "version",
+                "decision",
+                "reviewer",
+                "at"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "title",
+          "status",
+          "version",
+          "asset_id",
+          "assignee_id",
+          "due_date",
+          "evidence",
+          "signatures",
+          "timeEntries",
+          "readings",
+          "downtime",
+          "findings",
+          "tools",
+          "parts",
+          "reviews",
+          "items",
+          "missing"
+        ],
+        "additionalProperties": true
+      },
+      "AssetDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tag": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "location": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomValue"
+            }
+          },
+          "meters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "kind": {
+                  "enum": [
+                    "counter",
+                    "gauge",
+                    "condition"
+                  ]
+                },
+                "revision": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "unit",
+                "kind",
+                "revision"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "revision": {
+                  "type": "integer"
+                },
+                "changed_by": {
+                  "type": "string"
+                },
+                "changed_at": {
+                  "type": "integer"
+                },
+                "value": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "required": [
+                "revision",
+                "changed_by",
+                "changed_at",
+                "value"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "schedules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "active": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "active"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tag",
+          "name",
+          "location",
+          "revision",
+          "customFields",
+          "meters",
+          "versions",
+          "schedules"
+        ],
+        "additionalProperties": true
+      },
+      "PartDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "onHand": {
+            "type": "string"
+          },
+          "reserved": {
+            "type": "string"
+          },
+          "available": {
+            "type": "string"
+          },
+          "minimum": {
+            "type": "string"
+          },
+          "customFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CustomValue"
+            }
+          },
+          "moves": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "string"
+                },
+                "counted": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "actor": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "at": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "quantity",
+                "counted",
+                "actor",
+                "at"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "name",
+          "unit",
+          "revision",
+          "category",
+          "onHand",
+          "reserved",
+          "available",
+          "minimum",
+          "customFields",
+          "moves"
+        ],
+        "additionalProperties": true
+      },
+      "CredentialMetadata": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "scopes_json": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "revoked_at": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "scopes_json",
+          "expires_at",
+          "created_at",
+          "revoked_at"
+        ],
+        "additionalProperties": true
       }
     }
   }

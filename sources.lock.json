@@ -712,7 +712,7 @@
       "executable": false
     },
     "openapi.json": {
-      "sha256": "798e04e4791e47ac6fa38a5df3b5903bb13a1f56cbd6931fa096059519f9f651",
+      "sha256": "f898d580427f338eaa5e3df51f0cc0460e82933c405ae44573a4cfaeb401d72e",
       "executable": false
     },
     "OPERATIONS.json": {
@@ -4116,7 +4116,7 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "4507b44d173a9c3c853203b796c42334f91dbcb1070a4f831138bffc4f5566ca",
+      "sha256": "8fb33ce53d9b2cc5c74639946d423bfd75d54d4c7763a32e31e43946b1725c8c",
       "executable": false
     },
     "tests/gasket/automation.mjs": {
