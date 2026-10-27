@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
-import { file, harness, exerciseKeyedActions } from './harness.mjs'
+import { file, harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 import { png } from './fixtures.mjs'
 
 const provenance='Owner-entered reference — not verified by Gasket with the issuing body.'
@@ -30,7 +30,7 @@ export async function safetyJourney() {
   assert.equal(library[0].qualification,'Isolation training')
   assert.equal(JSON.parse(library[0].intervals)[0].everyDays,30)
   const current=()=>h.api(`work/${work}`,who)
-  const state=()=>h.api(`work/${work}/safety`,who)
+  const state=async()=>{const result=await h.api(`v1/work/${work}/safety`,who);assertDocumented('SafetyState',result);return result}
   assert.equal((await h.raw(`/api/gasket/work/${work}/safety`)).status,401)
   await h.api(`work/${work}/safety`,agent,undefined,403)
   await h.api('planning',who,undefined,403)

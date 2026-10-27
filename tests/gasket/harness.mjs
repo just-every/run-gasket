@@ -4,6 +4,7 @@
 // Every Worker runs on the flows' pinned clock (clock.mjs).
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { emittedWorker } from '../emitted-worker.mjs'
 import { offset } from './clock.mjs'
 import { installation as newInstallation } from './installation.mjs'
@@ -88,3 +89,21 @@ export function exerciseKeyedActions(h, owner, actions) {
     return result
   }
 }
+
+const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
+export function assertDocumented(name, value) {
+      const validate = (schema, actual, path) => {
+        if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
+        if (schema.type) {
+          const types = [schema.type].flat()
+          assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')
+        }
+        if (schema.enum) assert.ok(schema.enum.includes(actual), path + ' matches its published choices')
+        if (actual && !Array.isArray(actual) && typeof actual === 'object') {
+          for (const key of schema.required ?? []) assert.ok(Object.hasOwn(actual, key), path + '.' + key + ' is present')
+          for (const [key, child] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(actual, key)) validate(child, actual[key], path + '.' + key)
+        }
+        if (Array.isArray(actual) && schema.items) for (const [index, child] of actual.entries()) validate(schema.items, child, path + '[' + index + ']')
+      }
+      validate(specification.components.schemas[name], value, name)
+    }

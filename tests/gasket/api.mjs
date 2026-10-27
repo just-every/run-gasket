@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
-import { harness, file, exerciseKeyedActions } from './harness.mjs'
+import { harness, file, exerciseKeyedActions, assertDocumented as documented } from './harness.mjs'
 import { png } from './fixtures.mjs'
 
 export async function apiJourney() {
@@ -20,26 +20,12 @@ export async function apiJourney() {
       return { result, replayed: response.headers.get('idempotency-replayed') }
     }
     const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
-    const documented = (name, value) => {
-      const validate = (schema, actual, path) => {
-        if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
-        if (schema.type) {
-          const types = [schema.type].flat()
-          assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')
-        }
-        if (schema.enum) assert.ok(schema.enum.includes(actual), path + ' matches its published choices')
-        if (actual && !Array.isArray(actual) && typeof actual === 'object') {
-          for (const key of schema.required ?? []) assert.ok(Object.hasOwn(actual, key), path + '.' + key + ' is present')
-          for (const [key, child] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(actual, key)) validate(child, actual[key], path + '.' + key)
-        }
-        if (Array.isArray(actual) && schema.items) for (const [index, child] of actual.entries()) validate(schema.items, child, path + '[' + index + ']')
-      }
-      validate(specification.components.schemas[name], value, name)
-    }
     const example = action => structuredClone(specification.paths['/' + action].post.requestBody.content[['application', 'json'].join('/')].example)
     const repeat = async (action, body, key, cookie = owner) => {
       const first = await write(action, body, key, cookie)
+      const audit = await h.api('audit', owner)
       const again = await write(action, body, key, cookie)
+      assert.deepEqual(await h.api('audit', owner), audit, action + ' retry adds no audit effect')
       assert.equal(first.replayed, 'false')
       assert.equal(again.replayed, 'true')
       assert.deepEqual(again.result, first.result)
@@ -635,7 +621,7 @@ export async function apiJourney() {
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id, [[`assets/${lifecycleAsset}`, 'Synthetic API pump']], 'lifecycle-')
     // Documented schedule and labor writes preserve their decisions and exact amounts on retry.
-    const schedule = (await repeat('schedule.create', { ...example('schedule.create'), asset, checklist, firstDue: '2026-10-25', maxDeferDays: 10 }, 'synthetic-gasket-schedule-retry', lead)).id
+    const schedule = (await repeat('schedule.create', { ...example('schedule.create'), asset, checklist: checklist.id, firstDue: '2026-10-25', maxDeferDays: 10 }, 'synthetic-gasket-schedule-retry', lead)).id
     const skip = await repeat('schedule.skip', { ...example('schedule.skip'), schedule }, 'synthetic-gasket-skip', lead)
     await write('schedule.exception', { ...example('schedule.exception'), exception: skip.id }, 'synthetic-gasket-skip-forbidden', lead, 403)
     const skipDecision = { ...example('schedule.exception'), exception: skip.id }
@@ -652,7 +638,7 @@ export async function apiJourney() {
     await repeat('schedule.edit', edit, 'synthetic-gasket-schedule-edit', lead)
     scheduled = (await h.api('v1/schedules', owner)).find(row => row.id === schedule)
     assert.equal(scheduled.every_days, 14)
-    assert.deepEqual(scheduled.exceptions.map(row => [row.kind, row.decision]), [['skip', 'approved'], ['defer', 'approved']])
+    assert.deepEqual(scheduled.exceptions.map(row => [row.kind, row.decision]).sort(), [['defer', 'approved'], ['skip', 'approved']])
     const laborWork = (await h.api('workorder.create', lead, { asset, title: 'Synthetic API reviewed labor', due: '2026-10-26', assignee: member })).id
     const laborActions = ['labor.rate','labor.entry','labor.review','labor.invoice','labor.timer']
     exerciseKeyedActions(h, owner, laborActions)

@@ -4116,7 +4116,7 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "88dcad9e7b38bddd27673b74362c76a139d5e96824ee7967b4aee0551a8290ad",
+      "sha256": "0e23d5d4100e2c474740a3d90b6e7c8728abac2b7ede7ab6157575b88e6d2214",
       "executable": false
     },
     "tests/gasket/automation.mjs": {
@@ -4144,7 +4144,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "3a36d5a1c2d6767b0eca7f6d1d170bfbe74ef2e50e90ef1127255b976398ec57",
+      "sha256": "4175be827a5f475d6bf53a0bf32a70d24724fef00b2efe597b761851000343ae",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4192,7 +4192,7 @@
       "executable": false
     },
     "tests/gasket/planning.mjs": {
-      "sha256": "41032218dba5aff58a6b482031e52c0d4b58d6589c73c6f26a2056b68c93dc9f",
+      "sha256": "f4032eb5bb2d6b24604b1ccd9680cef38bd6216770925198a5f5c812cb0aacee",
       "executable": false
     },
     "tests/gasket/purchase-orders.mjs": {
@@ -4272,7 +4272,7 @@
       "executable": false
     },
     "tests/gasket/safety.mjs": {
-      "sha256": "5ea9c738564817552b78b4eec2be93379261e040cdd0eb536857682c90858ea6",
+      "sha256": "ad357ff36263cecaa9a487117dd5ad835e9e8c27ff6c69970996a924bc0b6e04",
       "executable": false
     },
     "tests/gasket/search.mjs": {
