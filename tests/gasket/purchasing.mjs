@@ -1,9 +1,10 @@
 // BUY-001: real supplier, catalog and maintenance requisition doors.
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 
 export async function purchasingJourney(h, cookie, ids) {
+  exerciseKeyedActions(h,cookie.owner,['supplier.save','supplier.catalog','costcenter.save','requisition.request'])
   const owner = (await h.api('me', cookie.owner)).id
   const supplier = { name: 'Great Lakes Bearings & Service', contact: 'Dina Morris', email: 'orders@greatlakes.example.test', phone: '+1 216 555 0164', street: '4100 Lakeside Avenue', city: 'Cleveland', state: 'OH', zip: '44114-1234', taxTreatment: 'sales_tax', taxNote: 'Ohio destination sales tax', paymentTerms: 'Net 30', leadDays: 6, active: true }
   for (const role of ['lead', 'max', 'sam', 'agent']) await h.api('supplier.save', cookie[role], supplier, 403)
@@ -11,6 +12,7 @@ export async function purchasingJourney(h, cookie, ids) {
   assert.equal(made.searchParams.get('notice'), 'Saved.')
   const vendor = made.pathname.split('/').pop()
   let detail = await h.api(`suppliers/${vendor}`, cookie.max)
+  assertDocumented('SupplierDetail',detail)
   assert.equal(detail.contact, supplier.contact); assert.equal(detail.email, supplier.email); assert.equal(detail.phone, supplier.phone)
   assert.deepEqual(detail.shipTo, { street: supplier.street, city: supplier.city, state: supplier.state, zip: supplier.zip, country: 'US' })
   assert.equal(detail.tax_treatment, 'sales_tax'); assert.equal(detail.payment_terms, 'Net 30'); assert.equal(detail.lead_days, 6)
@@ -31,6 +33,7 @@ export async function purchasingJourney(h, cookie, ids) {
   const created = await h.submit('requisition.request', cookie.max, requisition, '/app/requisitions/{id}')
   assert.equal(created.searchParams.get('notice'), 'Saved.')
   const request = created.pathname.split('/').pop(), read = await h.api(`requisitions/${request}`, cookie.owner)
+  assertDocumented('Requisition',read)
   assert.equal(read.asset_id, ids.asset); assert.equal(read.work_order_id, ids.work); assert.equal(read.cost_center_id, center)
   assert.equal(read.purchaser_id, owner); assert.equal(read.requested_by, ids.max); assert.equal(read.status, 'pending')
   assert.deepEqual(read.lines.map(row => [row.kind, row.description, row.quantity, row.unit]), [['part', '6205 sealed bearings', '2', 'each'], ['service', 'Contractor installation labor', '1.5', 'hour'], ['repair', 'Rebuild spare motor', '1', 'job']])

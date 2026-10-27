@@ -43,6 +43,7 @@ const RETRYABLE: Record<string, Capability> = {
   'safety.publish': 'register.manage', 'safety.attest': 'work.do', 'calibration.create': 'register.manage',
   'closure.add': 'register.manage', 'closure.remove': 'register.manage',
   'automation.control': 'site.manage', 'automation.schedule': 'site.manage', 'automation.catchup': 'site.manage',
+  'supplier.save': 'site.manage', 'supplier.catalog': 'site.manage', 'costcenter.save': 'site.manage', 'requisition.request': 'work.do',
   'schedule.skip': 'work.assign', 'schedule.defer': 'work.assign', 'schedule.exception': 'work.review', 'schedule.edit': 'register.manage',
   'labor.entry': 'work.do', 'labor.timer': 'work.do', 'labor.rate': 'site.manage', 'labor.review': 'site.manage', 'labor.invoice': 'site.manage',
 }

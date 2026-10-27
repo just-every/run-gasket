@@ -11791,6 +11791,677 @@
           }
         }
       }
+    },
+    "/supplier.save": {
+      "post": {
+        "summary": "supplier.save",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Supplier, catalog and cost-center upkeep remains owner-only. Requisitions do not authorize spending or an outbound send.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "contact": {
+                    "type": "string"
+                  },
+                  "email": {
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "street": {
+                    "type": "string"
+                  },
+                  "city": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "zip": {
+                    "type": "string"
+                  },
+                  "taxTreatment": {
+                    "type": "string"
+                  },
+                  "taxNote": {
+                    "type": "string"
+                  },
+                  "paymentTerms": {
+                    "type": "string"
+                  },
+                  "leadDays": {
+                    "type": "integer"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  },
+                  "supplier": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name",
+                  "contact",
+                  "email",
+                  "phone",
+                  "street",
+                  "city",
+                  "state",
+                  "zip",
+                  "taxTreatment",
+                  "taxNote",
+                  "paymentTerms",
+                  "leadDays",
+                  "active"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "name": "Synthetic supplier",
+                "contact": "Synthetic contact",
+                "email": "synthetic-gasket-supplier@example.test",
+                "phone": "216 555 0100",
+                "street": "100 Synthetic Street",
+                "city": "Cleveland",
+                "state": "OH",
+                "zip": "44114",
+                "taxTreatment": "sales_tax",
+                "taxNote": "Owner-entered tax treatment",
+                "paymentTerms": "Net 30",
+                "leadDays": 5,
+                "active": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/supplier.catalog": {
+      "post": {
+        "summary": "supplier.catalog",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Supplier, catalog and cost-center upkeep remains owner-only. Requisitions do not authorize spending or an outbound send.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "supplier": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "sku": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "unit": {
+                    "type": "string"
+                  },
+                  "price": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "supplier",
+                  "revision",
+                  "sku",
+                  "description",
+                  "kind",
+                  "unit",
+                  "price"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "supplier": "SUPPLIER_ID",
+                "revision": 1,
+                "sku": "synthetic-gasket-item",
+                "description": "Synthetic bearing",
+                "kind": "part",
+                "unit": "each",
+                "price": "18.75"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/costcenter.save": {
+      "post": {
+        "summary": "costcenter.save",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Supplier, catalog and cost-center upkeep remains owner-only. Requisitions do not authorize spending or an outbound send.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "code",
+                  "name",
+                  "active"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "code": "SYNTHETIC",
+                "name": "Synthetic maintenance",
+                "active": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requisition.request": {
+      "post": {
+        "summary": "requisition.request",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Supplier, catalog and cost-center upkeep remains owner-only. Requisitions do not authorize spending or an outbound send.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "supplier": {
+                    "type": "string"
+                  },
+                  "asset": {
+                    "type": "string"
+                  },
+                  "workOrder": {
+                    "type": "string"
+                  },
+                  "costCenter": {
+                    "type": "string"
+                  },
+                  "purchaser": {
+                    "type": "string"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "description": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "quantity": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "unit": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "supplier",
+                  "asset",
+                  "workOrder",
+                  "costCenter",
+                  "purchaser",
+                  "reason",
+                  "kind",
+                  "description",
+                  "quantity",
+                  "unit"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "supplier": "SUPPLIER_ID",
+                "asset": "ASSET_ID",
+                "workOrder": "WORK_ID",
+                "costCenter": "CENTER_ID",
+                "purchaser": "OWNER_ID",
+                "reason": "Planned maintenance need",
+                "kind": [
+                  "part"
+                ],
+                "description": [
+                  "Synthetic bearing"
+                ],
+                "quantity": [
+                  "2"
+                ],
+                "unit": [
+                  "each"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/suppliers/{id}": {
+      "get": {
+        "summary": "Read SupplierDetail",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupplierDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requisitions/{id}": {
+      "get": {
+        "summary": "Read Requisition",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native detail, retained history and exact recorded values. Additional product fields may be present.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Requisition"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -14290,6 +14961,178 @@
           "people",
           "invoices",
           "mayManage"
+        ],
+        "additionalProperties": true
+      },
+      "SupplierDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "contact": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "shipTo": {
+            "type": "object",
+            "properties": {
+              "street": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "zip": {
+                "type": "string"
+              },
+              "country": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "street",
+              "city",
+              "state",
+              "zip",
+              "country"
+            ],
+            "additionalProperties": true
+          },
+          "payment_terms": {
+            "type": "string"
+          },
+          "tax_treatment": {
+            "type": "string"
+          },
+          "lead_days": {
+            "type": "integer"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "sku": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "price_cents": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "sku",
+                "kind",
+                "unit",
+                "price_cents"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "contact",
+          "email",
+          "phone",
+          "shipTo",
+          "payment_terms",
+          "tax_treatment",
+          "lead_days",
+          "items"
+        ],
+        "additionalProperties": true
+      },
+      "Requisition": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "type": "string"
+          },
+          "cost_center_id": {
+            "type": "string"
+          },
+          "purchaser_id": {
+            "type": "string"
+          },
+          "requested_by": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "supplierSnapshot": {
+            "type": "object"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "description",
+                "quantity",
+                "unit"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "supplier_id",
+          "cost_center_id",
+          "purchaser_id",
+          "requested_by",
+          "status",
+          "supplierSnapshot",
+          "lines"
         ],
         "additionalProperties": true
       }
