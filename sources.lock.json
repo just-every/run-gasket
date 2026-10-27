@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "4a3f14d1d7ddf9b9292cabedf36d3813dc1ea7bbe1581ef1433012b663501493",
+      "sha256": "f72851b9ad89dfa9c73b345e86c15635664358d1a19e568d45806c244ede3d07",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -204,7 +204,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "dc7b9fccffe10c6b1014f26e75fb0c98a5a400a4629d57bd2f8f092a556e6232",
+      "sha256": "fb6ffe0e2d5729a70ce8e88e990db866eeb57f1c12d6fc4b3d345e24604a6557",
       "executable": false
     },
     "DEMO.md": {
@@ -2260,7 +2260,7 @@
       "executable": false
     },
     "src/gasket/ui/schedules.ts": {
-      "sha256": "f3845d9fee669f608cda2d669a90f957ff88137ae015add68c6d81f43174ac79",
+      "sha256": "f6144624b8a1a450ed4b5f55a69d2e1d8287b4361a479d6ce79562420e7ddb0b",
       "executable": false
     },
     "src/gasket/ui/settings.ts": {
@@ -4488,7 +4488,7 @@
       "executable": false
     },
     "tests/gasket/workspace-conditional-saves.mjs": {
-      "sha256": "9a0edaf1eb77dcf106c1765134b44a6daf956631a1485d0ef8c2f3318abaf85f",
+      "sha256": "49d824f9de15829b759d26ab90ef9fe3ee264aa19d9286a9cc56925a41801ff0",
       "executable": false
     },
     "tests/incremental-typecheck.test.mjs": {
