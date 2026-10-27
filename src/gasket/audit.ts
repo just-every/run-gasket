@@ -26,9 +26,19 @@ export async function audit(env: Bindings, actor: Actor, url: URL, { every = fal
   requireCapability(actor, 'audit.read')
   const params = url.searchParams, where: string[] = [], args: unknown[] = []
   const place = await site(env)
-  // One site per installation today: entries belong to it, and naming any other site finds nothing to search.
+  if (actor.role !== 'owner') {
+    where.push("(json_extract(a.detail,'$.siteId') IS NULL OR EXISTS(SELECT 1 FROM gk_site_memberships sm WHERE sm.site_id=json_extract(a.detail,'$.siteId') AND sm.member_id=? AND sm.status='active'))")
+    args.push(actor.id)
+  }
   const named = params.get('site')
-  if (named) insist(place && named === place.name, 'site_not_found', 404)
+  if (named) {
+    const selected = await all(env, `SELECT s.id FROM gk_sites s WHERE s.name=? AND (? OR EXISTS(
+      SELECT 1 FROM gk_site_memberships sm WHERE sm.site_id=s.id AND sm.member_id=? AND sm.status='active'))`, named, actor.role === 'owner' ? 1 : 0, actor.id)
+    insist(selected.length, 'site_not_found', 404)
+    // Existing operational entries without an explicit site remain primary-site events.
+    where.push(`COALESCE(json_extract(a.detail,'$.siteId'),'primary') IN (${selected.map(() => '?').join(',')})`)
+    args.push(...selected.map(row => row.id))
+  }
   const action = params.get('action')
   if (action) {
     insist(/^[a-z]+(\.[a-z]+)?$/.test(action), 'invalid_action')
@@ -50,9 +60,9 @@ export async function audit(env: Bindings, actor: Actor, url: URL, { every = fal
   }
   const size = params.get('limit') ? Number(params.get('limit')) : PAGE
   insist(Number.isSafeInteger(size) && size >= 1 && size <= MAX_PAGE, 'invalid_limit')
-  const rows = (await all(env, `SELECT a.seq, a.at, a.actor, m.name AS actor_name, COALESCE(a.role, m.role) AS role, a.action, a.subject, a.detail FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
+  const rows = (await all(env, `SELECT a.seq, a.at, a.actor, m.name AS actor_name, COALESCE(a.role, m.role) AS role, a.action, a.subject, a.detail, gs.name AS site_name FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor LEFT JOIN gk_sites gs ON gs.id=json_extract(a.detail,'$.siteId')
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY a.seq DESC LIMIT ?`, ...args, every ? -1 : size + 1))
-    .map(row => ({ ...row, site: place?.name ?? null, authority: authority(row) }))
+    .map(({ site_name, ...row }) => ({ ...row, site: site_name ?? place?.name ?? null, authority: authority(row) }))
   if (every) return { rows, next: null }
   return { rows: rows.slice(0, size), next: rows.length > size ? rows[size - 1].seq : null }
 }

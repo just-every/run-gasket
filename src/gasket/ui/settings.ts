@@ -42,6 +42,7 @@ export async function accessPage(env: Bindings, actor: Actor, url: URL) {
 export const ACTIONS: Record<string, string> = {
   'automation.control': 'Changed an automation grant', 'automation.schedule': 'Enabled or paused a PM rule',
   'supplier.create': 'Added a supplier', 'supplier.update': 'Changed supplier details', 'supplier.catalog': 'Updated a supplier catalog', 'costcenter.save': 'Saved a cost center', 'requisition.request': 'Requested a maintenance purchase',
+  'site.create': 'Added a planned site', 'site.update': 'Changed site metadata', 'site.membership': 'Changed planned site access',
   'site.configure': 'Changed the site settings', 'site.technicianwork': 'Turned technician-created work on or off', 'access.give': 'Gave access', 'access.role': 'Changed a role', 'access.end': 'Ended access',
   'asset.create': 'Registered an asset', 'asset.update': 'Changed asset details', 'asset.retire': 'Retired an asset', 'asset.move': 'Moved an asset in the hierarchy', 'asset.lifecycle': 'Recorded asset lifecycle facts', 'asset.agreement': 'Recorded a service agreement', 'asset.sighting': 'Recorded a sighting', 'asset.state': 'Declared an asset state', 'meter.create': 'Added a meter', 'meter.feed': 'Received a feed reading', 'meter.adjust': 'Explained a meter change', 'meter.window': 'Set a feed lateness window', 'code.set': 'Added or relabelled a code', 'code.move': 'Reordered a code', 'code.retire': 'Retired a code',
   'checklist.create': 'Wrote a checklist', 'checklist.revise': 'Published a checklist revision', 'rule.set': 'Approved a failed-step rule', 'workorder.acknowledge': 'Acknowledged assigned work', 'workorder.decline': 'Declined assigned work', 'workorder.collaborate': 'Added a collaborator', 'workorder.uncollaborate': 'Removed a collaborator', 'team.create': 'Named a team', 'team.join': 'Added someone to a team', 'team.leave': 'Removed someone from a team', 'schedule.create': 'Scheduled preventive work',
@@ -57,14 +58,15 @@ const PROPOSAL: Record<string, string> = { merge: 'Duplicate part merge', schedu
 
 /** The record each audit row names, by its business label and page; never its id. */
 export async function auditRecords(env: Bindings) {
-  const [orders, assets, parts, people, checklists, schedules, proposals, meters, imports, teams, suppliers, requisitions, centers] = await Promise.all([
+  const [orders, assets, parts, people, checklists, schedules, proposals, meters, imports, teams, suppliers, requisitions, centers, sites] = await Promise.all([
     all(env, 'SELECT w.id, w.number, COALESCE(a.name, w.location) AS name FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id'), all(env, 'SELECT id, tag, name FROM gk_assets'),
     all(env, 'SELECT id, number, name FROM gk_parts'), all(env, 'SELECT id, name FROM gk_members'), all(env, 'SELECT id, name FROM gk_checklists'),
     all(env, 'SELECT id, title FROM gk_schedules'), all(env, 'SELECT id, kind FROM gk_all_proposals'),
-    all(env, 'SELECT m.id, m.name, a.id AS asset, a.tag FROM gk_meters m JOIN gk_assets a ON a.id = m.asset_id'), all(env, 'SELECT id FROM ik_jobs'), all(env, 'SELECT id, name FROM gk_teams'), all(env, 'SELECT id, name FROM gk_suppliers'), all(env, 'SELECT id, number FROM gk_requisitions'), all(env, 'SELECT id, code, name FROM gk_cost_centers')])
+    all(env, 'SELECT m.id, m.name, a.id AS asset, a.tag FROM gk_meters m JOIN gk_assets a ON a.id = m.asset_id'), all(env, 'SELECT id FROM ik_jobs'), all(env, 'SELECT id, name FROM gk_teams'), all(env, 'SELECT id, name FROM gk_suppliers'), all(env, 'SELECT id, number FROM gk_requisitions'), all(env, 'SELECT id, code, name FROM gk_cost_centers'), all(env, 'SELECT id, name FROM gk_sites')])
   const link = (href: string, label: string) => h`<a href="${href}">${label}</a>`
   return new Map<string, Html>([
     ['site', link('/app/site', 'The site')],
+    ...sites.map(row => [row.id, h`${row.name}`] as const),
     ...['pm','routes','chase','expiry'].map(id => [id, link('/app/automation', 'Automation')] as const),
     ...suppliers.map(row => [row.id, link(`/app/suppliers/${row.id}`, row.name)] as const),
     ...requisitions.map(row => [row.id, link(`/app/requisitions/${row.id}`, `REQ-${row.number}`)] as const),

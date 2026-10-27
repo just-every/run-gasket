@@ -381,7 +381,7 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `33517355bfcbfa42a2203db1fb4bc5f5df8456c9` (27 October 2026). The sx-gasket-c-i925 round updates REPORT-006 and MIG-007; other rows retain their existing evidence and scope.
+Judged from the code and tests at commit `33517355bfcbfa42a2203db1fb4bc5f5df8456c9` (27 October 2026). That baseline includes REPORT-006 and MIG-007. The current ADMIN-002 row records the site-registry foundation; all other rows retain their existing evidence and scope.
 
 INT-001 evidence is updated by sx-gasket-c-i942, preserving sx-gasket-c-f2, on the exact candidate identified in its landing report. Its status remains partial; the prior review pin above continues to describe the other rows.
 
@@ -394,8 +394,8 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 54 | 30 | 40 | 124 |
-| All | 68 | 30 | 40 | 138 |
+| Target and push further | 54 | 31 | 39 | 124 |
+| All | 68 | 31 | 39 | 138 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -414,7 +414,7 @@ INT-002 is independently proved by the public-door and 1440/390 browser journeys
 | `GAS-13` | Let an agent prepare and a person approve | published | done | `src/gasket/proposals.ts`; `src/gasket/actor.ts`; `tests/gasket/flows.mjs` |  |
 | `HTTP-001` | Health, Lobby and real 404s | published | done | `tests/runtime.mjs`; `src/base/lobby.ts`; `src/gasket/http.ts` |  |
 | `ADMIN-001` | US operating defaults | target | partial | `src/gasket/site.ts`; `src/gasket/dates.ts`; `src/gasket/ui/settings.ts`; `src/gasket/bad-actors.ts`; `src/gasket/lifecycle.ts`; `tests/gasket/flows.mjs` | US English, US time-zone choices, site-local dates, recorded meter units and USD work/lifecycle costs exist; organization postal address, explicit customary/SI conversions, multiple US sites and the complete daylight-saving/export journey remain missing. |
-| `ADMIN-002` | Multiple sites and shared governance | target | missing | `src/gasket/site.ts`; `src/gasket/actor.ts` | Only one site is represented; no site-scoped records, membership or transfers. |
+| `ADMIN-002` | Multiple sites and shared governance | target | partial | `tests/gasket/flows.mjs` GAS-01 site and access, extended by `tests/gasket/site-access.mjs` siteAccessJourney: owner-created planned sites with distinct recorded managers; metadata visibility and private roster refusal; stale metadata and membership refusal; current-session planned membership revocation; no operational fallback across enumerated JSON, page and download doors and representative form writes for planned or unauthorized site selection; ended-member exclusion; attributed site audit with scoped search and download. `src/gasket/site-access.ts`; `src/gasket/site-context.ts`; `migrations/core/0099_site_registry.sql`. | Only the primary site is operational. Additional sites hold planned metadata and membership only; there is no activation door. Remaining: site-scoped estate records at every list, record, attachment, report, write and download door; asset moves preserving meter and maintenance history; destination hierarchy authority; correct operational local dates and organization rollups; independent technician create-work rights at each site across web, API and app; operational membership revocation in background jobs; complete multi-site archive reconciliation. Conservative default adopted pending CT approval: only the active owner maintains site metadata and membership; recorded managers gain no extra role permissions or personnel access. PLAN-004 qualification and tool records, REQ-001 through REQ-003 intake and source evidence, REPORT-006 preview, dispatch and download, and existing recovery duties remain subject to this full site boundary before additional sites become operational. |
 | `ADMIN-003` | Role rights and separation of duties | target | partial | `src/gasket/actor.ts`; `src/gasket/site.ts`; `tests/gasket/flows.mjs` | Fixed owner/lead/maintainer/supervisor/agent roles exist; a technician create-work right (default, self-assigned or left unassigned, owner-revocable for the site; FIELD-009) exists; site, stores, purchasing, analyst roles, custom grants, per-site revocation across sites of the create-work right and the Operator template do not. |
 | `ADMIN-004` | Requester and contractor access | target | missing |  | No requester or contractor identity, scoped portal or expiring external work grant. |
 | `ADMIN-005` | Enterprise identity lifecycle | target | missing |  | No SSO, SCIM, MFA policy or group/site mapping. |
