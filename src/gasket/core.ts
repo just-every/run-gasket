@@ -1,3 +1,4 @@
+import { siteAuthority } from './site-context'
 import { serviceAuthority } from './service-context'
 // Shared primitives: typed errors, ids, D1 helpers, audited atomic commits and
 // in-batch preconditions (gk_guard rows abort the whole batch when false).
@@ -51,6 +52,7 @@ export async function commit(env: Bindings, statements: D1PreparedStatement[], a
     const results = await env.DB.batch([
       ...(authority ? [guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_automation_rules WHERE id=? AND revision=? AND paused=0)', authority.rule, authority.revision)] : []),
       ...(serviceAuthority() ? [guard(env, 'service_authority_ended', `EXISTS(SELECT 1 FROM gk_api_credentials c JOIN gk_members m ON m.id=c.member_id JOIN oa_operators o ON o.id=m.operator_id WHERE c.id=? AND c.revoked_at IS NULL AND c.expires_at>? AND m.status='active' AND m.role='owner' AND o.status='active' AND o.role='owner')`, serviceAuthority(), now())] : []),
+      ...(siteAuthority() && !siteAuthority()!.owner ? [guard(env, 'site_access_ended', "EXISTS(SELECT 1 FROM gk_site_memberships sm JOIN gk_members m ON m.id=sm.member_id WHERE sm.site_id='primary' AND sm.member_id=? AND sm.status='active' AND m.status='active')", siteAuthority()!.member)] : []),
       ...statements,
       stmt(env, 'DELETE FROM gk_guard'),
       ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), automation: authority } : event.detail ?? {}))),

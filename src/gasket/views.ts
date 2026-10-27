@@ -1,3 +1,4 @@
+import { siteDirectory } from './site-access'
 import { historyReport } from './history-report'
 import { reportSchedules } from './report-schedules'
 import { serviceCredentials } from './service-auth'
@@ -72,6 +73,7 @@ import { workList, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  sites: (env, actor, id) => siteDirectory(env, actor, id || undefined),
   historyReport:(env,actor,_id,url)=>historyReport(env,actor,url),
   reportSchedules: (env,actor) => reportSchedules(env,actor),
   serviceCredentials: (env, actor) => serviceCredentials(env, actor),

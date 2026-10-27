@@ -608,3 +608,54 @@ Active human owners use `POST /api/gasket/report.schedule` with a name, report (
 Every recipient is checked at dispatch using current membership, operator status and report and export rights. Individual labor rates and original files are excluded. Each recipient gets a separate message. Provider acceptance records submission, not inbox delivery. Failed, rejected, uncertain or interrupted unconfirmed claims stay visible without automatic resend. Revisions, consent, claims and results are audited. This conservative delivery policy awaits ct approval under REPORT-006.
 
 The CSV is a complete typed dataset: `path,type,value`, with one scalar or empty container per row. Paths use bracketed JSON keys; numbers, booleans, nulls, arrays and objects retain their types. Spreadsheet formula prefixes are protected with a leading apostrophe. PDF and CSV include period, definitions, freshness, permission scope, source revision and fingerprint, dashboard and source links, plus separately labelled site-wide data-quality context. A pack too large for the bounded mail attachment limit fails visibly rather than truncating its CSV.
+
+## Site directory and operational boundary
+
+ADMIN-002 is partial. The owner can prepare additional sites through the existing
+JSON and form action doors. Additional sites remain `planned`; they cannot hold or
+serve operational maintenance records yet. There is no activation action. The
+existing installation is the `primary` active site.
+
+- `GET /api/gasket/sites` lists the current member's authorized sites. The owner
+  sees all sites. `GET /api/gasket/sites/:id` refuses an unauthorized site with
+  404. Only the owner receives the site's membership roster; other authorized
+  members receive site metadata and their own recorded manager flag.
+- `POST /api/gasket/site.create` takes `name` and an IANA `timezone` and returns
+  the planned site's id, state and revision. Configure the primary site first
+  through the existing `site.configure` action.
+- `POST /api/gasket/site.update` takes `site`, `revision`, `name` and `timezone`.
+  It updates planned metadata only. A stale revision returns 409.
+- `POST /api/gasket/site.membership` takes `site`, `member`, `status` (`active`
+  or `ended`), `manager` and the current membership `revision` (zero for a new
+  membership). Only an active existing non-owner member is eligible for a planned
+  site. Primary membership is managed by ordinary access controls; attempts to change it here
+  return 409 `primary_membership_managed_by_access`. The owner
+  has organization access and cannot revoke their own membership here.
+
+These three actions require the owner's ordinary member session, recheck owner
+authority in the database batch and retain attributed audit. They also use the
+existing form action door. Service credentials cannot administer or read the
+site directory. Recorded managers gain no new role permissions or access to
+other sites or personnel records. This conservative custody default awaits CT
+approval; the complete delegated governance target remains owed.
+
+Existing members migrate to primary-site membership without changing roles.
+Ordinary access invitations grant primary membership. Ending ordinary access
+ends every site membership; granting ordinary access again restores only the
+primary membership. Additional memberships require explicit owner grants.
+Revoking a planned membership immediately removes its metadata from existing
+sessions. Primary-site access remains managed by the existing ordinary access
+controls. Audited mutations and import batches also check primary membership.
+Site audit search and downloads omit site-specific events the reader cannot access.
+
+An optional `X-Gasket-Site` request header explicitly selects an operational site.
+Omitting it selects `primary`. An unknown or unauthorized selection returns 404;
+an authorized planned site returns 409 `site_not_operational`, with no fallback
+to primary records. A denied page response contains no application navigation or
+site metadata. Existing report `site` query parameters retain their documented
+filter meaning.
+
+Site-scoped estate records, cross-site transfers with meter history, organization
+rollups, operational per-site dates and technician rights, native app coverage,
+background-job membership revocation and complete multi-site archive reconciliation remain unimplemented. Preparing
+site metadata does not establish those acceptance points.

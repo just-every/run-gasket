@@ -125,5 +125,5 @@ export async function railCounts(env: Bindings, actor: Actor) {
 /** The latest changes for people who may read the audit trail. */
 export async function recentActivity(env: Bindings, actor: Actor) {
   if (!can(actor, 'audit.read')) return null
-  return await all(env, 'SELECT a.at, a.action, a.subject, m.name AS actor_name FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor ORDER BY a.at DESC, a.seq DESC LIMIT 5')
+  return await all(env, `SELECT a.at, a.action, a.subject, m.name AS actor_name FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor WHERE ? OR json_extract(a.detail,'$.siteId') IS NULL OR EXISTS(SELECT 1 FROM gk_site_memberships sm WHERE sm.site_id=json_extract(a.detail,'$.siteId') AND sm.member_id=? AND sm.status='active') ORDER BY a.at DESC, a.seq DESC LIMIT 5`, actor.role === 'owner' ? 1 : 0, actor.id)
 }

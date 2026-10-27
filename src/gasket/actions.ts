@@ -1,3 +1,4 @@
+import { createSite, updateSite, setSiteMembership } from './site-access'
 import { saveReportSchedule } from './report-schedules'
 import { createServiceCredential, revokeServiceCredential } from './service-auth'
 import { publishSafety, attestSafety } from './safety'
@@ -127,6 +128,9 @@ export const actions: Record<string, Handler> = {
   'supplier.catalog': (env, actor, input) => saveCatalogItem(env, actor, input),
   'costcenter.save': (env, actor, input) => saveCostCenter(env, actor, input),
   'requisition.request': (env, actor, input) => requestPurchase(env, actor, input),
+  'site.create': createSite,
+  'site.update': updateSite,
+  'site.membership': setSiteMembership,
   'site.configure': (env, actor, input) => configureSite(env, actor, input),
   'site.technicianWork': (env, actor, input) => setTechnicianWork(env, actor, input),
   'access.give': (env, actor, input, request) => giveAccess(env, actor, input, request),

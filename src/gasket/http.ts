@@ -1,3 +1,5 @@
+import { authorizeOperationalSite } from './site-access'
+import { withSiteAuthority } from './site-context'
 import { describeError } from './ui/html'
 import { reportSchedulesPage } from './ui/report-schedules'
 import { previewReportPack } from './report-schedules'
@@ -106,6 +108,8 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
   try {
     actor = await currentActor(env, request)
     if (actor?.service && !api) throw new GasketError('service_scope_forbidden', 403)
+    const directoryDoor = /^\/api\/gasket\/(?:v1\/)?(?:sites(?:\/[\w-]+)?|site\.(?:create|update|membership))$/.test(url.pathname) || /^\/app\/do\/site\.(?:create|update|membership)$/.test(url.pathname)
+    if (actor && !directoryDoor) await authorizeOperationalSite(env, actor, request)
     if(scan) {
       if(request.method==='POST') throw new GasketError('not_found',404)
       const code=scan[1] || url.searchParams.get('code') || ''
@@ -122,11 +126,12 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
       return key ? await requestReceiptPage(env,url,id,key) : await requestPortalPage(env,actor,url,id)
     }
     if (!actor) return api ? json({ error: 'authentication_required' }, 401) : new Response(null, { status: 303, headers: { location: `/signin?returnTo=${encodeURIComponent(url.pathname)}`, 'cache-control': 'no-store' } })
-    if (api) return await withServiceAuthority(actor.service?.id, () => apiResponse(env, actor!, request, url))
-    return await pageResponse(env, actor, request, url)
+    if (api) return await withSiteAuthority(actor, () => withServiceAuthority(actor!.service?.id, () => apiResponse(env, actor!, request, url)))
+    return await withSiteAuthority(actor, () => pageResponse(env, actor!, request, url))
   } catch (error) {
     const { code, status, detail } = failure(error)
     if (api || (publicRequest && request.headers.get('accept')?.includes(['application', 'json'].join('/')))) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
+    if (code === 'site_not_found' || code === 'site_not_operational') return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
     if (status === 404) return page(env, 'Not found', actor, h`<h1>Not found</h1><p>There is nothing here you can open.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status: 404 })
     return page(env, 'That did not work', actor, h`<h1>That did not work</h1><p>${code.replace(/_/g, ' ')}.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status })
   }

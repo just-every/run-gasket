@@ -1,3 +1,4 @@
+import { siteAccessJourney } from './site-access.mjs'
 import { reportSchedulesJourney } from './report-schedules.mjs'
 import { genericMigrationJourney } from './generic-migration.mjs'
 import { apiJourney } from './api.mjs'
@@ -130,6 +131,7 @@ try {
     assert.ok(!(await ended.text()).includes('Harbour'), 'no data after access ends')
     const people = await h.api('members', cookie.owner)
     assert.equal(people.find(person => person.id === ids.temp).status, 'ended')
+    await siteAccessJourney(h, cookie.owner, cookie.lead)
   })
 
   await check('GAS-02 asset register', async () => {
@@ -2328,7 +2330,7 @@ try {
         assert.equal(download.status, 200)
         files.push({ id: evidence.id, recorded: evidence.sha256, downloaded: createHash('sha256').update(Buffer.from(await download.arrayBuffer())).digest('hex') })
       }
-      return { partDetails, receiving, spendPolicy:await h.api('spend-policy',cookie.owner), spendReport:(({computedAt,...rest})=>rest)(await h.api('spend-report',cookie.owner)), metricQuality: (await h.api('metrics', cookie.owner)).quality, assets, orders, files, quotes: await h.api('quotes', cookie.owner), purchaseOrders: await Promise.all((await h.api('purchase-orders', cookie.owner)).map(row => h.api(`purchase-orders/${row.id}`, cookie.owner))), automation: await h.api('automation/jobs', cookie.owner), purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
+      return { sites: await Promise.all((await h.api('sites', cookie.owner)).map(row => h.api(`sites/${row.id}`, cookie.owner))), partDetails, receiving, spendPolicy:await h.api('spend-policy',cookie.owner), spendReport:(({computedAt,...rest})=>rest)(await h.api('spend-report',cookie.owner)), metricQuality: (await h.api('metrics', cookie.owner)).quality, assets, orders, files, quotes: await h.api('quotes', cookie.owner), purchaseOrders: await Promise.all((await h.api('purchase-orders', cookie.owner)).map(row => h.api(`purchase-orders/${row.id}`, cookie.owner))), automation: await h.api('/automation/jobs', cookie.owner), purchasing: await h.api('purchasing', cookie.owner), suppliers: await Promise.all((await h.api('purchasing', cookie.owner)).suppliers.map(row => h.api(`suppliers/${row.id}`, cookie.owner))), requisitions: await Promise.all((await h.api('purchasing', cookie.owner)).requests.map(row => h.api(`requisitions/${row.id}`, cookie.owner))), members: await h.api('members', cookie.owner), parts: await h.api('parts', cookie.owner), schedules: await h.api('schedules', cookie.owner), teams: await h.api('teams', cookie.owner), proposals: await h.api('proposals', cookie.owner), imports: await h.api('imports', cookie.owner), audit: await h.api('audit', cookie.owner),
         histories: await Promise.all(assets.map(asset => h.api(`assets/${asset.id}/history`, cookie.sam))), csv: await download(`/app/assets/${ids.compressor}/history.csv`, 'sam'), auditCsv: await download('/app/audit.csv', 'owner') }
     }
     const before = await read(h, cookie)
