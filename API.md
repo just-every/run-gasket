@@ -605,13 +605,13 @@ A durable claim is stored before execution. An overlapping request, or a claim i
 
 Example: POST `/api/gasket/v1/asset.create` with the JSON content type, the installation's `Origin`, a member session cookie and `Idempotency-Key: synthetic-gasket-1`. Body: `{"tag":"00042","name":"Pump","location":"Workshop"}`. If the response is lost, repeat those exact bytes with the same key. Read the returned id using the asset detail door and inspect its history or the register page. Errors use the existing `{error,detail?}` contract: 400 invalid input, 401 absent session, 403 forbidden access, 404 absent record or route, 409 conflict, 413 oversized keyed body and 415 unsupported keyed media type.
 
-INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the fifty-five listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the seventy-three listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
 
 ## Scoped owner service credentials
 
 An owner using an ordinary member session can POST `service.create` with `name`, a nonempty `scopes` array, `expiresAt` (epoch milliseconds, at least one minute and at most 90 days ahead) and explicit `consent: true`. The result contains `id` and a one-time `token`. Save the token privately. Send it only to this installation in `Authorization: Bearer TOKEN`; POST still requires the exact installation `Origin`. Never put it in a URL. An Authorization header selects service authentication and never falls back to a cookie on failure.
 
-Supported read scopes are `assets:read`, `work:read` and `parts:read` for those collection, detail and asset-history doors. Supported write scopes remain exactly `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count` and `workorder.create`. The other thirty keyed actions require ordinary member sessions and never add service authority. Each credential belongs to its issuing owner; no other member identity can be nominated. Owner membership and operator authority must remain active. It can never administer the site, issue or revoke credentials, approve work or spend, or open workspace pages. Every mutation checks the live credential again inside its database batch. Losing the issuing owner role or active account or membership permanently revokes that owner's credentials, even if ownership or access is restored. A replacement must be issued deliberately; browser sign-out alone does not revoke a credential. Retry keys are isolated to that credential. Existing business guards still apply.
+Supported read scopes are `assets:read`, `work:read` and `parts:read` for those collection, detail and asset-history doors. Supported write scopes remain exactly `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count` and `workorder.create`. The other keyed actions require ordinary member sessions and never add service authority. Each credential belongs to its issuing owner; no other member identity can be nominated. Owner membership and operator authority must remain active. It can never administer the site, issue or revoke credentials, approve work or spend, or open workspace pages. Every mutation checks the live credential again inside its database batch. Losing the issuing owner role or active account or membership permanently revokes that owner's credentials, even if ownership or access is restored. A replacement must be issued deliberately; browser sign-out alone does not revoke a credential. Retry keys are isolated to that credential. Existing business guards still apply.
 
 `GET service-credentials` lists the owner's credential metadata without tokens or token hashes. POST `service.revoke` with `credential: ID` revokes one of that owner's credentials; next-request reads and write replays fail. Expired or revoked credentials return 401; denied scopes return 403. Creating and revoking credentials records an attributed audit event without the token. Every service business mutation also records its issuing owner and credential id atomically with the effect. Audit search, the audit page and CSV distinguish this authority from interactive owner activity. Owner-role and account-status changes now record each newly invalidated credential and issuing owner, the initiating administrator, cause and time atomically with native revocation. Refused changes produce no invalidation event, and reinstatement never repeats it. The audit page names the service client; authorized audit search and CSV preserve the same attribution. Archives strip token hashes; restoration retains credential metadata but revokes every credential, so a source token never becomes usable in a restored installation. The owner creates a fresh credential after reviewing the restored installation.
 
@@ -650,7 +650,7 @@ another revision, handoff, result log, movement, submission or review.
 
 Procedure, assignment and execution schemas describe this tested native slice.
 Other maintenance entities, broader write-key coverage
-and the remaining credential custody, retention and erasure riders remain unfinished; the fifty-five-action
+and the remaining credential custody, retention and erasure riders remain unfinished; the seventy-three-action
 receipt allowlist refuses every other keyed action explicitly.
 
 A template saved through JSON retains `requiredFields` in its current revision and
@@ -791,3 +791,33 @@ work detail comments door. Read original photos using
 `GET /api/gasket/v1/comment-photos/PHOTO_ID/file`. These use the native private
 file handlers and refuse signed-out callers and service credentials. Internal
 mentions do not grant any provider send or requester access.
+
+
+## Retry-safe planning, safety, schedule and labor writes
+
+The versioned member API also accepts write keys for `planning.qualification`,
+`planning.tool`, `planning.retire`, `planning.window`, `planning.window.remove`,
+`planning.requirements`, `planning.slot`, `safety.publish`, `safety.attest`,
+`schedule.skip`, `schedule.defer`, `schedule.exception`, `schedule.edit`,
+`labor.rate`, `labor.entry`, `labor.review`, `labor.invoice` and `labor.timer`.
+Their request schemas and examples are in `openapi.json`. The planning view,
+qualification references, tool register, schedule records, safety state and labor
+records have response schemas. Work detail includes the caller-authorized labor
+view; ordinary members never gain private pay rates from a write receipt.
+
+Planning custody remains owner-only; planning changes require work assignment
+rights. Safety sign-off receipts remain available only to the current assignee.
+Schedule decisions retain independent review, including the explicitly confirmed
+sole-owner exception: hiring a supervisor makes an earlier sole-owner decision
+receipt unavailable to that owner. Labor rates, review and invoices remain
+owner-only; a non-owner can enter time only for themselves. Each successful retry
+returns its original result without another revision, booking, sign-off, time
+entry, rate, invoice, timer transition or audit event. Current site authorization
+and role are checked again; the normal handler governs every new effect.
+
+A planning-slot or schedule-edit preview omits the write key so it observes current
+state. A keyed preview returns `400 idempotency_preview_not_supported`. A keyed
+safety permit supports the existing 1,500,000-byte original limit and bounded
+2,064,000-byte streamed JSON envelope. Service scopes remain unchanged and do not
+authorize any of these operations. Interrupted claims still require explicit
+manual reconciliation; no uncertain mutation is automatically repeated.

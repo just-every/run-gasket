@@ -78,7 +78,7 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   requireCapability(actor, capability)
   if ((action === 'planning.slot' || action === 'schedule.edit') && input.flag('preview')) throw new GasketError('idempotency_preview_not_supported', 400)
   if (action === 'schedule.exception') await exceptionAuthority(env, actor, input)
-  if (action === 'labor.entry') insist(actor.role === 'owner' || !input.has('person') || input.text('person') === actor.id, 'forbidden', 403)
+  if (action === 'labor.entry') insist(actor.role === 'owner' || (input.text('person', { optional: true }) || actor.id) === actor.id, 'forbidden', 403)
   if (action === 'labor.entry' || action === 'labor.timer' || action === 'labor.invoice') await workOrder(env, input.text('workOrder', { max: 100 }))
   if (action === 'safety.attest') {
     const order = await workOrder(env, input.text('workOrder', { max: 100 }))

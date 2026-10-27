@@ -620,6 +620,7 @@ export async function apiJourney() {
     assert.equal((await h.api(`/v1/work/${job}`, owner)).status, 'closed')
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id, [[`assets/${lifecycleAsset}`, 'Synthetic API pump']], 'lifecycle-')
+    {
     // Documented schedule and labor writes preserve their decisions and exact amounts on retry.
     const schedule = (await repeat('schedule.create', { ...example('schedule.create'), asset, checklist: checklist.id, firstDue: '2026-10-25', maxDeferDays: 10 }, 'synthetic-gasket-schedule-retry', lead)).id
     const skip = await repeat('schedule.skip', { ...example('schedule.skip'), schedule }, 'synthetic-gasket-skip', lead)
@@ -678,6 +679,7 @@ export async function apiJourney() {
       assert.equal(refused.status, 403); assert.equal((await refused.json()).error, 'not_independent')
       assert.equal((await sole.api('schedules', soleOwner))[0].exceptions.length, 1)
     } finally { await sole.close() }
+    }
     // Receipt and stock survive a complete Worker restart, without replaying writes.
     await h.stop()
     resumed = await harness({ vars: h.vars, installation: h.installation, clockInstant: Date.UTC(2026, 9, 26, 16) })
