@@ -101,8 +101,9 @@ export async function reportSchedulesJourney(){
     const dashboard=await h.api(`performance?from=2027-02-28&to=2027-03-06&team=${team}`,cookie.supervisor)
     const claim=(await h.api('audit?action=report.claim',cookie.owner)).rows.find(r=>JSON.parse(r.detail).recipient===ids.supervisor)
     assert.ok(claim)
-    await assertPack(h,cookie.supervisor,dataset(csv),{kind:'performance',filters:{team},recipient:ids.supervisor,role:'supervisor',at:first,from:'2027-02-28',to:'2027-03-06',revision:claim.seq},text)
+    assert.ok(readCsv(csv).some(row=>row[1]==='array'&&row[2]===''),'empty arrays are explicit before dataset reconciliation')
     assert.deepEqual(dataset(csv).sourceQuality.quality.missingFailureCodes.stops.map(s=>s.asset.tag).sort(),['PACK-1','PACK-2'],'site-wide quality includes the other team while the dataset remains team filtered')
+    await assertPack(h,cookie.supervisor,dataset(csv),{kind:'performance',filters:{team},recipient:ids.supervisor,role:'supervisor',at:first,from:'2027-02-28',to:'2027-03-06',revision:claim.seq},text)
     assert.deepEqual(dataset(csv).data,dashboard,'every exported dataset value reconciles to the dashboard');assert.equal(csv.includes('synthetic-gasket-private-rate-1'),false);assert.equal(dashboard.backlog.count,1);assert.equal(dashboard.backlog.hours,2)
     assert.match(csv,/backlog/);assert.match(csv,/count/)
     let deliveries=(await h.api('report-schedules',cookie.owner)).deliveries
@@ -188,6 +189,26 @@ export async function reportSchedulesJourney(){
     await h.api('part.receive',cookie.owner,{part,quantity:'3',unitPrice:'7.25'})
     const unpriced=(await h.api('part.create',cookie.owner,{number:'PACK-UNPRICED',name:'Synthetic unpriced bearing',unit:'each'})).id
     await h.api('part.receive',cookie.owner,{part:unpriced,quantity:'5'})
+    // Pin both site-local boundaries independently of the reporting implementation.
+    const boundaryInstants=['2027-03-07T04:59:59.999Z','2027-03-07T05:00:00.000Z','2027-03-14T04:59:59.999Z','2027-03-14T05:00:00.000Z'].map(Date.parse)
+    let boundaryAsset
+    for(const [index,instant]of boundaryInstants.entries()){
+      const savedVars=h.vars;await h.stop()
+      h=await harness({installation:store,vars:savedVars,clockInstant:instant,generationGate:true})
+      if(index===0)boundaryAsset=(await h.api('asset.create',cookie.owner,{tag:'PACK-BOUNDARY',name:'Synthetic boundary motor',location:'Line 1'})).id
+      else await h.api('asset.update',cookie.owner,{asset:boundaryAsset,revision:index,tag:'PACK-BOUNDARY',name:`Synthetic boundary motor ${index}`,location:'Line 1'})
+    }
+    const savedVars=h.vars;await h.stop()
+    h=await harness({installation:store,vars:savedVars,clockInstant:first,generationGate:true})
+    const retained=(await h.api(`assets/${boundaryAsset}/history`,cookie.owner)).events
+    assert.deepEqual(retained.map(e=>e.at),boundaryInstants,'all four boundary fixtures remain in source history')
+    const boundarySchedule=(await h.api('report.schedule',cookie.owner,{...failure,name:'History boundary preview',report:'history',team:'',asset:boundaryAsset,firstDay:'2027-03-14',paused:true})).id
+    const boundaryCsv=await(await h.raw(`/app/report-packs/${boundarySchedule}.csv`,{cookie:cookie.owner})).text()
+    const boundaryEvents=dataset(boundaryCsv).data.events
+    assert.deepEqual(boundaryEvents.map(e=>[e.at,e.kind,e.what,e.who,e.workOrder]),[
+      [Date.parse('2027-03-07T05:00:00.000Z'),'asset','Asset details changed','Olive Owner',null],
+      [Date.parse('2027-03-14T04:59:59.999Z'),'asset','Asset details changed','Olive Owner',null],
+    ],'history period contains exactly the start and last in-period events, excluding both outside events')
     const familyIds={}
     for(const kind of ['history','valuation']){
       const body2={...failure,name:`Family ${kind}`,report:kind,team:'',asset:kind==='history'?asset:'',firstDay:'2027-03-14',paused:true}
@@ -198,7 +219,6 @@ export async function reportSchedulesJourney(){
       const source=await h.api('metrics',cookie.owner)
       for(const secret of [evidence,'synthetic-gasket-original-1.pdf',`/app/documents/${original.id}`,'987654','cents_per_hour'])assert.equal(csv2.includes(secret),false,`${kind} excludes original files and individual rates`)
       const expected=await h.api(`${kind}?from=2027-03-07&to=2027-03-13${kind==='history'?`&asset=${asset}`:''}`,cookie.owner)
-      assert.deepEqual(pack.data,expected,`${kind} complete dataset matches its public read door`)
       assert.ok(pack.metadata.definitions.length>0)
       for(const definition of pack.metadata.definitions)assert.equal((await h.raw(definition.sourceDoor,{cookie:cookie.owner})).status,200,'each definition opens a public source directory without report filters')
       assert.equal(csv2.includes('synthetic-gasket-private-rate-1'),false)
@@ -216,6 +236,7 @@ export async function reportSchedulesJourney(){
         assert.equal(pack.data.parts.find(p=>p.id===unpriced).unpriced,1)
         assert.deepEqual(pack.data.parts.find(p=>p.id===unpriced).closing,{quantity:'5',valueCents:0},'unpriced quantities remain visible without invented value')
       }
+      assert.deepEqual(pack.data,expected,`${kind} complete dataset matches its public read door`)
       const pdfResponse=await h.raw(`/app/report-packs/${familyIds[kind]}.pdf`,{cookie:cookie.owner})
       assert.equal(pdfResponse.status,200)
       const task2=getDocument({data:new Uint8Array(await pdfResponse.arrayBuffer()),isEvalSupported:false,disableFontFace:true}),pdf2=await task2.promise
