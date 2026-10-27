@@ -134,6 +134,11 @@ jobs:
           path: dist
       - run: pnpm run verify
       - name: Verify core product flows
+        env:
+          API_SCREENSHOTS: /tmp/gasket-api
+          PLANNING_SCREENSHOTS: /tmp/gasket-planning
+          REPORT_SCREENSHOTS: /tmp/gasket-reports
+          MIGRATION_SCREENSHOTS: /tmp/gasket-migration
         run: GASKET_FLOWS_SHARD=core pnpm run test:flows
 
   # All four intake/label/triage journeys remain required on every push.
