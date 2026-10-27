@@ -595,9 +595,9 @@ For example, send `GET /api/gasket/v1/assets?limit=50`, then `GET /api/gasket/v1
 
 ## Write retry receipts
 
-For the following fifty-two actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and all stored successful results are limited to 64,000 bytes. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
+For the following fifty-five actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and all stored successful results are limited to 64,000 bytes. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Catalog photos also allow 2,064,000 bytes of JSON and retain the 1,500,000-byte decoded photo limit. Comment posts allow 8,064,000 bytes of JSON with at most four photos, each at most 1,500,000 decoded bytes. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
 
-The receipt allowlist is `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` `document.link`, `asset.move`, `asset.lifecycle`, `asset.agreement`, `asset.contact`, `asset.sighting`, `asset.state`, `asset.retire`, `meter.feed`, `meter.adjust` `meter.window`, `part.price`, `part.substitute`, `kit.create`, `bom.revise`, `workorder.reserve` and `reservation.release`.
+The receipt allowlist is `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` `document.link`, `asset.move`, `asset.lifecycle`, `asset.agreement`, `asset.contact`, `asset.sighting`, `asset.state`, `asset.retire`, `meter.feed`, `meter.adjust` `meter.window`, `part.price`, `part.substitute`, `kit.create`, `bom.revise`, `workorder.reserve` `reservation.release`, `part.photo`, `comment.post` and `comment.edit`.
 
 A successful retry returns the original JSON result and `Idempotency-Replayed: true`; the first response says `false`. It does not create another audit event, stock receipt, work order or asset revision. Current active membership, role and relevant create-work policy are checked again before replay. A role change refuses replay, even when the new role could make a new write. Replayed work creation also rechecks current access to that work record. Execution receipts recheck the current assignee or permitted collaborator; submission still requires the assignee. Review receipts require current review authority and independence from the work. A completed receipt remains replayable after its own transition to submitted, closed or returned; new keys still run every ordinary state, version, evidence and stock guard.
 
@@ -605,7 +605,7 @@ A durable claim is stored before execution. An overlapping request, or a claim i
 
 Example: POST `/api/gasket/v1/asset.create` with the JSON content type, the installation's `Origin`, a member session cookie and `Idempotency-Key: synthetic-gasket-1`. Body: `{"tag":"00042","name":"Pump","location":"Workshop"}`. If the response is lost, repeat those exact bytes with the same key. Read the returned id using the asset detail door and inspect its history or the register page. Errors use the existing `{error,detail?}` contract: 400 invalid input, 401 absent session, 403 forbidden access, 404 absent record or route, 409 conflict, 413 oversized keyed body and 415 unsupported keyed media type.
 
-INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the fifty-two listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the fifty-five listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
 
 ## Scoped owner service credentials
 
@@ -650,7 +650,7 @@ another revision, handoff, result log, movement, submission or review.
 
 Procedure, assignment and execution schemas describe this tested native slice.
 Other maintenance entities, broader write-key coverage
-and the remaining credential custody, retention and erasure riders remain unfinished; the fifty-two-action
+and the remaining credential custody, retention and erasure riders remain unfinished; the fifty-five-action
 receipt allowlist refuses every other keyed action explicitly.
 
 A template saved through JSON retains `requiredFields` in its current revision and
@@ -776,3 +776,18 @@ detail, and read kit lines and directional substitute approvals at
 `GET /api/gasket/v1/kits`. Completed retries preserve the original reservation
 and release, without another movement, revision or audit effect. These six
 operations do not add spending or independent stock-variance authority.
+
+### Catalog originals and internal handoff comments
+
+`part.photo` accepts a catalog photo under existing register management authority.
+`comment.post` accepts plain internal text, an optional shift handoff flag,
+active-person mentions and at most four photos on exactly one asset or work
+record. A retry creates no duplicate comment, photo, mention notice or audit
+effect. Only the original author can call `comment.edit`; every prior text
+revision remains in the thread. Completed edit receipts recheck that authorship.
+Read threads through `GET /api/gasket/v1/assets/ID/comments` or the corresponding
+work detail comments door. Read original photos using
+`GET /api/gasket/v1/part-photos/PHOTO_ID/file` or
+`GET /api/gasket/v1/comment-photos/PHOTO_ID/file`. These use the native private
+file handlers and refuse signed-out callers and service credentials. Internal
+mentions do not grant any provider send or requester access.

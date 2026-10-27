@@ -164,8 +164,8 @@ async function apiResponse(env: Bindings, actor: Actor, request: Request, url: U
     return json(await action(env, actor, await Input.from(request), request))
   }
   if (versioned) {
-    const download = path.match(/^(documents|evidence|signature-marks)\/([\w-]+)\/file$/)
-    if (download) return await ({ documents: documentFile, evidence: evidenceFile, 'signature-marks': signatureMark }[download[1]]!)(env, actor, download[2])
+    const download = path.match(/^(documents|evidence|signature-marks|part-photos|comment-photos)\/([\w-]+)\/file$/)
+    if (download) return await ({ documents: documentFile, evidence: evidenceFile, 'signature-marks': signatureMark, 'part-photos': partPhoto, 'comment-photos': commentPhoto }[download[1]]!)(env, actor, download[2])
   }
   if (versioned && ['assets', 'work', 'parts'].includes(path)) return json(await apiEstate(env, actor, path, url))
   const { view, id } = route(path)

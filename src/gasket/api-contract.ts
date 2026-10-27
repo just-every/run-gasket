@@ -23,6 +23,7 @@ const RETRYABLE: Record<string, Capability> = {
   'part.create': 'register.manage', 'part.receive': 'register.manage', 'part.count': 'register.manage',
   'part.price': 'register.manage', 'part.substitute': 'register.manage', 'kit.create': 'register.manage', 'bom.revise': 'register.manage',
   'workorder.reserve': 'work.assign', 'reservation.release': 'work.assign',
+  'part.photo': 'register.manage', 'comment.post': 'comment.write', 'comment.edit': 'comment.write',
   'workorder.create': 'work.create',
   'checklist.create': 'register.manage', 'checklist.revise': 'register.manage',
   'template.save': 'work.assign', 'workorder.assign': 'work.assign',
@@ -43,7 +44,7 @@ async function body(request: Request, action: string) {
   insist(request.headers.get('content-type')?.startsWith(JSON_TYPE), 'idempotency_requires_json', 415)
   // Base64 originals plus bounded metadata; each handler still enforces its
   // decoded file limit. Only fingerprints and small results enter receipts.
-  const fileBytes = action === 'document.add' || action === 'document.revise' ? DOCUMENT_BYTES : action === 'workorder.evidence' ? EVIDENCE_BYTES : action === 'workorder.sign' ? 200_000 : 0
+  const fileBytes = action === 'document.add' || action === 'document.revise' ? DOCUMENT_BYTES : action === 'workorder.evidence' || action === 'part.photo' ? EVIDENCE_BYTES : action === 'comment.post' ? EVIDENCE_BYTES * 4 : action === 'workorder.sign' ? 200_000 : 0
   const limit = fileBytes ? Math.ceil(fileBytes / 3) * 4 + 64_000 : 64_000
   const reader = request.body?.getReader(), chunks: Uint8Array[] = []
   let size = 0
@@ -69,6 +70,16 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
   const capability = action === 'workorder.sign' && input.text('role', { max: 12 }) === 'supervisor' ? 'work.review' : RETRYABLE[action]
   requireCapability(actor, capability)
+  if (action === 'comment.edit') {
+    const comment = await one(env, 'SELECT author_id FROM gk_comments WHERE id=?', input.text('comment', { max: 100 }))
+    insist(comment, 'comment_not_found', 404)
+    insist(comment.author_id === actor.id, 'not_your_comment', 403)
+  }
+  if (action === 'comment.post') {
+    const work = input.text('workOrder', { optional: true, max: 100 }), asset = input.text('asset', { optional: true, max: 100 })
+    insist(Boolean(work) !== Boolean(asset), 'invalid_subject')
+    insist(await one(env, `SELECT 1 FROM ${work ? 'gk_work_orders' : 'gk_assets'} WHERE id=?`, work || asset), work ? 'work_order_not_found' : 'asset_not_found', 404)
+  }
   // Receipt access must not outlive the record authority that made it.
   // State and version checks stay in the handler for new effects; a completed
   // receipt remains replayable after its own successful state transition.

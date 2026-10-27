@@ -1421,7 +1421,9 @@
                 "name": "Synthetic API job template",
                 "title": "Synthetic procedure job",
                 "checklist": "CHECKLIST_ID",
-                "requiredFields": ["WORK_FIELD_ID"]
+                "requiredFields": [
+                  "WORK_FIELD_ID"
+                ]
               }
             }
           }
@@ -6675,7 +6677,8 @@
                   },
                   "effectiveOn": {
                     "type": "string",
-                    "format": "date-time"
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$",
+                    "description": "Site-local wall time without a UTC offset."
                   },
                   "corrects": {
                     "type": "string",
@@ -6944,7 +6947,8 @@
                   },
                   "takenOn": {
                     "type": "string",
-                    "format": "date-time"
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$",
+                    "description": "Site-local wall time without a UTC offset."
                   },
                   "value": {
                     "type": "string",
@@ -7200,7 +7204,8 @@
                   },
                   "effectiveOn": {
                     "type": "string",
-                    "format": "date-time"
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$",
+                    "description": "Site-local wall time without a UTC offset."
                   },
                   "lastValue": {
                     "type": "string",
@@ -8120,6 +8125,619 @@
             "$ref": "#/components/responses/Error"
           },
           "403": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/part.photo": {
+      "post": {
+        "summary": "part.photo",
+        "description": "Ordinary member operation using the workspace handler. Service credentials are refused. Replay rechecks current capability; comment edits also recheck authorship. Completed retries retain one original effect. Register management is required. Keyed JSON is bounded to 2064000 bytes; the decoded photo limit is 1500000 bytes.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "part": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "photo": {
+                    "type": "object",
+                    "properties": {
+                      "filename": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "base64": {
+                        "type": "string",
+                        "description": "Base64 original bytes; decoded file and streamed JSON limits apply."
+                      },
+                      "type": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "required": [
+                      "filename",
+                      "base64"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "part",
+                  "photo"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "part": "PART_ID",
+                "photo": {
+                  "filename": "synthetic-gasket-photo.png",
+                  "base64": "PNG_BASE64"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    "photo": {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "maxLength": 64
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "photo",
+                    "sha256"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/comment.post": {
+      "post": {
+        "summary": "comment.post",
+        "description": "Ordinary member operation using the workspace handler. Service credentials are refused. Replay rechecks current capability; comment edits also recheck authorship. Completed retries retain one original effect. Comment writing is required. Supply exactly one subject, asset or workOrder. Up to four photos each retain the 1500000-byte decoded file limit; streamed JSON is bounded to 8064000 bytes. Mentions create internal notices only.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "asset": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "workOrder": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "body": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "handoff": {
+                    "type": "boolean"
+                  },
+                  "mention": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  },
+                  "photo": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "filename": {
+                          "type": "string",
+                          "maxLength": 200
+                        },
+                        "base64": {
+                          "type": "string",
+                          "description": "Base64 original bytes; decoded file and streamed JSON limits apply."
+                        },
+                        "type": {
+                          "type": "string",
+                          "maxLength": 100
+                        }
+                      },
+                      "required": [
+                        "filename",
+                        "base64"
+                      ],
+                      "additionalProperties": true
+                    },
+                    "maxItems": 4
+                  }
+                },
+                "required": [
+                  "body"
+                ],
+                "additionalProperties": true,
+                "oneOf": [
+                  {
+                    "required": [
+                      "asset"
+                    ],
+                    "not": {
+                      "required": [
+                        "workOrder"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "workOrder"
+                    ],
+                    "not": {
+                      "required": [
+                        "asset"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "example": {
+                "asset": "ASSET_ID",
+                "body": "Synthetic initial handoff",
+                "handoff": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    "comment": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "comment"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/comment.edit": {
+      "post": {
+        "summary": "comment.edit",
+        "description": "Ordinary member operation using the workspace handler. Service credentials are refused. Replay rechecks current capability; comment edits also recheck authorship. Completed retries retain one original effect. Only the original author can edit; previous text revisions are retained. Keyed JSON is bounded to 64000 bytes.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "comment": {
+                    "type": "string",
+                    "maxLength": 100
+                  },
+                  "body": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "comment",
+                  "body"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "comment": "COMMENT_ID",
+                "body": "Synthetic corrected handoff"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "maxLength": 100
+                    },
+                    "comment": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "comment"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/part-photos/{id}/file": {
+      "get": {
+        "summary": "Original part photos bytes",
+        "description": "Native signed-in member access, using the same original-file handler as the workspace. Service credentials are refused. Unknown ids return 404.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original bytes with private no-store headers.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/comment-photos/{id}/file": {
+      "get": {
+        "summary": "Original comment photos bytes",
+        "description": "Native signed-in member access, using the same original-file handler as the workspace. Service credentials are refused. Unknown ids return 404.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original bytes with private no-store headers.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/assets/{id}/comments": {
+      "get": {
+        "summary": "Retained internal comments and handoffs",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thread with author, revisions, mentions, photos and per-member unread state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentThread"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/work/{id}/comments": {
+      "get": {
+        "summary": "Retained internal comments and handoffs",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Thread with author, revisions, mentions, photos and per-member unread state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommentThread"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -9595,6 +10213,168 @@
         "required": [
           "kits",
           "substitutes"
+        ],
+        "additionalProperties": true
+      },
+      "CommentThread": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "integer"
+          },
+          "comments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "seq": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "enum": [
+                    "comment",
+                    "handoff"
+                  ]
+                },
+                "body": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "author_id": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "author": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "type": "integer"
+                },
+                "edited_at": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "mentions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "name": {
+                        "type": "string",
+                        "maxLength": 200
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "photos": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "maxLength": 100
+                      },
+                      "filename": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "media_type": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "size": {
+                        "type": "integer"
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "filename",
+                      "media_type",
+                      "size",
+                      "sha256"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "revisions": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "number": {
+                        "type": "integer"
+                      },
+                      "body": {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      "by": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "edited_at": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "number",
+                      "body",
+                      "by",
+                      "edited_at"
+                    ],
+                    "additionalProperties": true
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "seq",
+                "kind",
+                "body",
+                "author_id",
+                "author",
+                "created_at",
+                "edited_at",
+                "unread",
+                "mentions",
+                "photos",
+                "revisions"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "unread",
+          "comments"
         ],
         "additionalProperties": true
       }
