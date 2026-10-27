@@ -92,6 +92,10 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.GASKET_BROWSER_CPU_RATE) })
   }
   page.on('pageerror', error => console.error('Workspace browser error:', error))
+  const pendingRequests = new Set()
+  page.on('request', request => pendingRequests.add(request))
+  page.on('requestfinished', request => pendingRequests.delete(request))
+  page.on('requestfailed', request => { pendingRequests.delete(request); console.error('Workspace request failed:', new URL(request.url()).pathname, request.failure()?.errorText) })
   const snapshots = []
   const linked = new Map(), visibleActions = new Set(), exercisedActions = new Set()
   const day = (await h.api('me',cookie.owner)).today
@@ -183,7 +187,12 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     ])
     const confirmation = await reply.json()
     const error = form.getByRole('alert')
-    await error.waitFor()
+    try { await error.waitFor() } catch (failure) {
+      console.error('Pending workspace requests:', [...pendingRequests].map(request => [request.method(), new URL(request.url()).pathname]))
+      console.error('Workspace form state:', await form.evaluate(el => ({ busy: el.getAttribute('aria-busy'), saving: el.dataset.saving, errors: [...el.querySelectorAll('[role=alert]')].map(error => ({ text: error.textContent, visible: !!error.getClientRects().length })) })))
+      await proof('timeout-'+action.slice('/app/do/'.length))
+      throw failure
+    }
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
     assert.equal(await error.evaluate(el=>el===document.activeElement),true,`${action} error has keyboard focus`)
     assert.equal(await form.getByRole('button',{name:/./}).last().isDisabled(),true,`${action} cannot repeat an uncertain save`)
