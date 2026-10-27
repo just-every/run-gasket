@@ -1,6 +1,6 @@
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
-import { all, commit, guard, insist, newId, one, stmt, type Row } from './core'
+import { all, commit, guard, insist, newId, now, one, stmt, type Row } from './core'
 import { addDays, isDate, isLocalTime, minutesBetween, zonedInstant } from './dates'
 import { assigneeFits } from './crew'
 import { fits } from './bom'
@@ -20,6 +20,25 @@ const span = (input: Input) => {
   return { starts, ends }
 }
 
+const resourceHistory = (env: Bindings, actor: Actor, kind: string, key: string, action: string, before: Row | null, after: Row) =>
+  stmt(env,'INSERT INTO gk_resource_history(id,kind,record_key,actor_id,recorded_at,action,before_json,after_json,planning_revision) VALUES(?,?,?,?,?,?,?,?,(SELECT revision+1 FROM gk_planning_state WHERE singleton=1))',newId(),kind,key,actor.id,now(),action,before?JSON.stringify(before):null,JSON.stringify(after))
+
+/** Owner retirement is final and retains both prior facts and the reason. */
+export async function retireResource(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor,'site.manage')
+  const kind=input.text('kind'), reason=input.text('reason',{max:500}), seen=input.integer('revision',{min:1})!
+  insist(kind==='qualification'||kind==='tool','invalid_resource_kind')
+  const member=kind==='qualification'?input.text('member'):'', name=kind==='qualification'?input.text('name'):'', id=kind==='tool'?input.text('id'):''
+  const table=kind==='qualification'?'gk_qualifications':'gk_planning_tools', where=kind==='qualification'?'member_id=? AND name=?':'id=?', params=kind==='qualification'?[member,name]:[id]
+  const before=await one(env,`SELECT * FROM ${table} WHERE ${where}`,...params)
+  insist(before,'resource_not_found',404)
+  insist(before.retired_at===null,'resource_retired',409)
+  const after={...before,retired_at:now(),retired_by:actor.id,retirement_reason:reason}, key=kind==='qualification'?JSON.stringify([member,before.name]):id
+  await commit(env,[lock(env,seen),stmt(env,`UPDATE ${table} SET retired_at=?,retired_by=?,retirement_reason=? WHERE ${where}`,after.retired_at,actor.id,reason,...params),resourceHistory(env,actor,kind,key,'retire',before,after),bump(env)],
+    {actor:actor.id,action:`planning.${kind}.retire`,subject:kind==='qualification'?member:id,detail:{before,after,reason}})
+  return {id:kind==='qualification'?member:id}
+}
+
 /** Owner-only credential records: these are entered references, never certification by Gasket. */
 export async function saveQualification(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'site.manage')
@@ -27,8 +46,12 @@ export async function saveQualification(env: Bindings, actor: Actor, input: Inpu
   insist(await active(env, member), 'member_not_assignable', 409)
   insist(isDate(expires), 'invalid_expiry')
   const seen = await revision(env)
-  await commit(env, [lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference) VALUES(?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference', member,name,expires,reference), bump(env)],
-    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference}})
+  const existing=await one(env,'SELECT * FROM gk_qualifications WHERE member_id=? AND name=?',member,name)
+  insist(!existing?.retired_at,'resource_retired',409)
+  const remindDays=input.present('remindDays')?input.integer('remindDays',{optional:true,max:365}):existing?.remind_days??null
+  const reminderOwner=remindDays===null?null:actor.id
+  await commit(env, [lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference,remind_days,reminder_owner_id) VALUES(?,?,?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference,remind_days=excluded.remind_days,reminder_owner_id=excluded.reminder_owner_id', member,name,expires,reference,remindDays,reminderOwner), resourceHistory(env,actor,'qualification',JSON.stringify([member,existing?.name??name]),'save',existing,{member_id:member,name:existing?.name??name,expires_on:expires,reference,remind_days:remindDays,reminder_owner_id:reminderOwner,retired_at:null}), bump(env)],
+    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,before:existing}})
   return {id:member}
 }
 
@@ -38,10 +61,11 @@ export async function savePlanningTool(env: Bindings, actor: Actor, input: Input
   insist(isDate(due), 'invalid_calibration_due')
   const seen = input.integer('revision',{min:1})!
   const existing = await one(env,'SELECT * FROM gk_planning_tools WHERE id=?',id)
+  insist(!existing?.retired_at,'resource_retired',409)
   insist(!existing || existing.name===name, 'tool_name_immutable',409)
   insist(!await one(env,'SELECT 1 FROM gk_planning_tools WHERE name=? COLLATE NOCASE AND id<>?',name,id), 'tool_name_taken',409)
-  await commit(env,[lock(env,seen),stmt(env,'INSERT INTO gk_planning_tools(id,name,identifier,calibration_due) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET identifier=excluded.identifier,calibration_due=excluded.calibration_due',id,name,identifier,due),bump(env)],
-    {actor:actor.id,action:'planning.tool',subject:id,detail:{name,identifier,due}})
+  await commit(env,[lock(env,seen),stmt(env,'INSERT INTO gk_planning_tools(id,name,identifier,calibration_due) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET identifier=excluded.identifier,calibration_due=excluded.calibration_due',id,name,identifier,due),resourceHistory(env,actor,'tool',id,'save',existing,{id,name,identifier,calibration_due:due,retired_at:null}),bump(env)],
+    {actor:actor.id,action:'planning.tool',subject:id,detail:{name,identifier,due,before:existing}})
   return {id}
 }
 
@@ -85,7 +109,7 @@ async function constraints(env: Bindings, work: Row, period: Row, member: string
   if(windows.some(w=>w.kind==='absent'&&overlap(w,period))) conflicts.push('person_absent')
   const requirements=await one(env,'SELECT qualifications FROM gk_work_requirements WHERE work_order_id=?',work.id)
   const names: string[]=JSON.parse(requirements?.qualifications??'[]')
-  const quals=await all(env,'SELECT * FROM gk_qualifications WHERE member_id=?',member)
+  const quals=await all(env,'SELECT * FROM gk_qualifications WHERE member_id=? AND retired_at IS NULL',member)
   for(const name of names) if(!quals.some(q=>q.name.toLowerCase()===name.toLowerCase()&&q.expires_on>=period.ends.slice(0,10))) conflicts.push(`qualification_required: ${name}`)
   const slots=await all(env,`SELECT s.* FROM gk_planning_slots s JOIN gk_work_orders w ON w.id=s.work_order_id WHERE s.work_order_id<>? AND w.status IN ${OPEN} AND s.starts<? AND s.ends>?`,work.id,period.ends,period.starts)
   if(slots.some(s=>s.member_id===member)) conflicts.push('person_double_booked')
@@ -110,6 +134,7 @@ async function constraints(env: Bindings, work: Row, period: Row, member: string
   for(const id of toolIds) {
     const tool=tools.find(t=>t.id===id)
     if(!tool) {conflicts.push('tool_not_found');continue}
+    if(tool.retired_at!==null) conflicts.push(`tool_retired: ${tool.name}`)
     if(tool.calibration_due<period.ends.slice(0,10)) conflicts.push(`tool_calibration_expired: ${tool.name}`)
     if(await one(env,`SELECT 1 FROM gk_planning_bookings b JOIN gk_planning_slots s ON s.work_order_id=b.work_order_id JOIN gk_work_orders w ON w.id=s.work_order_id WHERE b.tool_id=? AND b.work_order_id<>? AND w.status IN ${OPEN} AND s.starts<? AND s.ends>?`,id,work.id,period.ends,period.starts)) conflicts.push(`tool_double_booked: ${tool.name}`)
   }
@@ -164,9 +189,12 @@ export async function planningView(env: Bindings, actor: Actor, url: URL) {
   const end=addDays(from,days), start=`${from}T00:00`, finish=`${end}T00:00`
   const people=await all(env,"SELECT id,name FROM gk_members WHERE status='active' AND role IN ('owner','lead','maintainer') ORDER BY name")
   const windows=await all(env,'SELECT * FROM gk_planning_windows WHERE starts<? AND ends>? ORDER BY starts',finish,start)
-  const tools=await all(env,'SELECT * FROM gk_planning_tools ORDER BY name')
-  const qualifications=await all(env,'SELECT * FROM gk_qualifications ORDER BY name,member_id')
+  const toolRecords=await all(env,'SELECT * FROM gk_planning_tools ORDER BY name')
+  const tools=actor.role==='owner'?toolRecords:toolRecords.map(t=>({id:t.id,name:t.name,identifier:t.identifier,calibration_due:t.calibration_due,retired_at:t.retired_at}))
+  const records=await all(env,'SELECT * FROM gk_qualifications ORDER BY name,member_id')
   const work=await all(env,`SELECT w.id,w.number,w.title,w.assignee_id,w.team_id,w.trade,w.due_date,w.status,w.estimate_minutes,s.starts,s.ends,r.qualifications FROM gk_work_orders w LEFT JOIN gk_planning_slots s ON s.work_order_id=w.id LEFT JOIN gk_work_requirements r ON r.work_order_id=w.id WHERE w.status IN ${OPEN} ORDER BY w.due_date,w.number`)
+  const qualifications=actor.role==='owner'?records:records.filter(q=>work.some(w=>w.assignee_id===q.member_id&&JSON.parse(w.qualifications??'[]').some((n:string)=>n.toLowerCase()===q.name.toLowerCase()))).map(q=>({member_id:q.member_id,name:q.name,expires_on:q.expires_on,retired_at:q.retired_at}))
+  const history=actor.role==='owner'?await all(env,'SELECT h.*,m.name AS actor_name FROM gk_resource_history h JOIN gk_members m ON m.id=h.actor_id ORDER BY h.planning_revision'):[]
   const bookings=await all(env,'SELECT * FROM gk_planning_bookings')
   const rows: Row[]=[]
   for(const w of work) {
@@ -185,5 +213,5 @@ export async function planningView(env: Bindings, actor: Actor, url: URL) {
   const teams=await all(env,'SELECT id,name FROM gk_teams ORDER BY name'), members=await all(env,'SELECT team_id,member_id FROM gk_team_members')
   const utilization=totals.map(p=>({...p,legacyRecordedMinutes:legacy.find(t=>t.member===p.id)?.minutes??0,productiveMinutes:productive.filter(t=>t.member===p.id).reduce((n,t)=>n+t.minutes,0),assignedRatio:p.capacityMinutes?p.assignedMinutes/p.capacityMinutes:null}))
   const aggregate=(group: typeof utilization)=>({availableMinutes:group.reduce((n,p)=>n+p.availableMinutes,0),unavailableMinutes:group.reduce((n,p)=>n+p.unavailableMinutes,0),capacityMinutes:group.reduce((n,p)=>n+p.capacityMinutes,0),assignedMinutes:group.reduce((n,p)=>n+p.assignedMinutes,0),productiveMinutes:group.reduce((n,p)=>n+p.productiveMinutes,0)})
-  return {revision:await revision(env),from,end,days,people,windows,tools,qualifications,work:rows,utilization,site:aggregate(utilization),teams:teams.map(t=>({...t,...aggregate(utilization.filter(p=>members.some(m=>m.team_id===t.id&&m.member_id===p.id))),assignedMinutes:rows.filter(w=>w.team_id===t.id&&w.starts&&w.starts<finish&&w.ends>start).reduce((n,w)=>n+minutesBetween(w.starts<start?start:w.starts,w.ends>finish?finish:w.ends),0),productiveMinutes:productive.filter(p=>p.team_id===t.id).reduce((n,p)=>n+p.minutes,0)}))}
+  return {revision:await revision(env),from,end,days,people,windows,tools,qualifications,history,work:rows,utilization,site:aggregate(utilization),teams:teams.map(t=>({...t,...aggregate(utilization.filter(p=>members.some(m=>m.team_id===t.id&&m.member_id===p.id))),assignedMinutes:rows.filter(w=>w.team_id===t.id&&w.starts&&w.starts<finish&&w.ends>start).reduce((n,w)=>n+minutesBetween(w.starts<start?start:w.starts,w.ends>finish?finish:w.ends),0),productiveMinutes:productive.filter(p=>p.team_id===t.id).reduce((n,p)=>n+p.minutes,0)}))}
 }

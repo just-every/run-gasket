@@ -1,3 +1,4 @@
+import { qualificationReminderInputs } from './resource-reminders'
 import { responseInputs } from './request-response'
 import { connectorInputs } from './webhooks'
 // The current automatic jobs' source facts, retained before an execution.
@@ -20,5 +21,5 @@ export async function automationInputs(env: Bindings, rule: AutomationRule, day:
   }
   if (rule === 'routes') return { day, routes: await all(env, 'SELECT * FROM gk_routes'), stops: await all(env, 'SELECT * FROM gk_route_stops') }
   if (rule === 'chase') return { day, requestResponse:await responseInputs(env), rule: await chaseRule(env), orders: await all(env, "SELECT * FROM gk_work_orders WHERE status IN ('open','in_progress','returned')"), blockers: await all(env, 'SELECT * FROM gk_blockers WHERE resolved_at IS NULL'), members: await all(env, "SELECT id,role FROM gk_members WHERE status='active'") }
-  return { day, documents: await all(env, "SELECT d.*, a.retired_at, m.status AS owner_status FROM gk_documents d JOIN gk_assets a ON a.id=d.asset_id LEFT JOIN gk_members m ON m.id=d.owner_id WHERE d.expires_on IS NOT NULL") }
+  return { day, qualificationReminders:await qualificationReminderInputs(env), documents: await all(env, "SELECT d.*, a.retired_at, m.status AS owner_status FROM gk_documents d JOIN gk_assets a ON a.id=d.asset_id LEFT JOIN gk_members m ON m.id=d.owner_id WHERE d.expires_on IS NOT NULL") }
 }

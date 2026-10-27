@@ -71,6 +71,7 @@ export async function automationHealth(env: Bindings, actor: Actor) {
 export async function ledgerView(env: Bindings, actor: Actor, url?: URL) {
   requireCapability(actor, 'board.read')
   const ledger = await automationLedger(env), job = url?.searchParams.get('job')
+  if(actor.role!=='owner')ledger.jobs=ledger.jobs.map(row=>{const {qualificationReminders:_,...input}=row.input;return {...row,input}})
   if (!can(actor,'work.assign')) ledger.jobs=ledger.jobs.map(row=>{const {requestResponse:_,...input}=row.input;return {...row,input,output:visibleOutput(actor,row.output)}})
   if (!can(actor, 'work.review')) ledger.jobs = ledger.jobs.map(row => {
     if (row.rule_id !== 'replenishment' || !row.input.replenishment) return row

@@ -125,7 +125,8 @@ export const notices = async (env: Bindings, actor: Actor) => {
   const ordinary = (await all(env, `SELECT n.id, n.kind, n.text, n.work_order_id, n.asset_id, n.comment_id, n.part_id, n.purchase_order_id, n.outcome_id, ${NOTICE_UNREAD} AS unread, n.created_at FROM gk_notices n WHERE n.recipient_id = ? ORDER BY n.created_at DESC, n.id LIMIT 100`, actor.id))
   .map(row => ({ ...row, unread: Boolean(row.unread), link: row.outcome_id ? `/api/gasket/outcomes/${row.outcome_id}` : row.purchase_order_id ? `/app/purchase-orders/${row.purchase_order_id}` : noticeLink(row) }))
   const rules = await all(env, `SELECT n.id,'reminder' AS kind,n.text,n.request_id,n.part_id,n.created_at FROM gk_rule_notices n LEFT JOIN gk_requests r ON r.id=n.request_id WHERE n.recipient_id=? AND (n.request_id IS NULL OR ?=1 OR r.requester_id=?)`, actor.id, Number(can(actor,'work.assign')),actor.id)
-  return [...ordinary,...rules.map(row=>({...row,unread:false,link:row.request_id?`/app/requests/${row.request_id}`:`/app/parts/${row.part_id}`}))].sort((a,b)=>b.created_at-a.created_at).slice(0,100)
+  const resources=actor.role==='owner'?await all(env,"SELECT id,'expiry' AS kind,text,created_at FROM gk_resource_notices WHERE recipient_id=? ORDER BY created_at DESC,id LIMIT 100",actor.id):[]
+  return [...resources.map(row=>({...row,unread:false,link:'/app/settings/resources'})),...ordinary,...rules.map(row=>({...row,unread:false,link:row.request_id?`/app/requests/${row.request_id}`:`/app/parts/${row.part_id}`}))].sort((a,b)=>b.created_at-a.created_at).slice(0,100)
 }
 
 /** One work order's chase: overdue start and age, responses, blockers and every notice sent about it. */

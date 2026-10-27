@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
+import { join } from 'node:path'
+import { installation } from './installation.mjs'
 import { mkdir } from 'node:fs/promises'
 import { harness } from './harness.mjs'
 
@@ -36,26 +38,52 @@ export async function qualificationPlanningJourney() {
     const qualification={member:people.maya,name:'High voltage',expires:'2026-10-19',reference:'synthetic-gasket-2'}
     await h.api('planning.qualification',cookies.lead,qualification,403)
     await h.api('planning.qualification',owner,qualification)
+    await h.api('planning.tool',cookies.lead,{name:'Unauthorized tool',identifier:'synthetic-gasket-3',calibrationDue:'2027-01-01',revision:(await view()).revision},403)
+    const unrelated={member:people.luis,name:'Unrelated private reference',expires:'2027-01-01',reference:'synthetic-gasket-4'}
+    await h.api('planning.qualification',owner,unrelated)
+    const retiredTool=(await change('planning.tool',{name:'Retired meter',identifier:'synthetic-gasket-5',calibrationDue:'2027-01-01'})).id
+    for(const body of [{kind:'qualification',member:people.luis,name:unrelated.name,reason:'No longer required'},{kind:'tool',id:retiredTool,reason:'Removed from service'}]) {
+      await change('planning.resource.retire',body,403,cookies.lead)
+      const form=new FormData();for(const [key,value] of Object.entries({...body,revision:(await view()).revision}))form.set(key,String(value))
+      const forbidden=await h.raw('/app/do/planning.resource.retire',{cookie:cookies.lead,form})
+      assert.equal(forbidden.status,303)
+      assert.equal(new URL(forbidden.headers.get('location'),h.origin).searchParams.get('error'),'forbidden')
+      const seen=(await view()).revision
+      await change('planning.resource.retire',body)
+      assert.equal((await h.api('planning.resource.retire',owner,{...body,revision:seen},409)).error,'resource_retired')
+    }
+    await h.api('planning.qualification',owner,unrelated,409)
+    await change('planning.tool',{id:retiredTool,name:'Retired meter',identifier:'synthetic-gasket-5',calibrationDue:'2027-02-01'},409)
+
     await change('planning.requirements',{workOrder:repair,qualifications:'High voltage'})
     assert.ok((await change('planning.slot',slot(repair,day,'10:00','12:00',{tool:[tool],preview:true}))).conflicts.includes('parts_reservation_required'))
     await h.api('part.receive',owner,{part,quantity:'4'})
     for(const workOrder of [repair,other])await h.api('workorder.reserve',owner,{workOrder,part,quantity:'1'})
     await change('planning.slot',slot(other,day,'08:00','10:00',{tool:[tool]}))
+    const necessary=await h.api(`planning?from=${day}`,cookies.lead)
+    assert.deepEqual(necessary.qualifications.map(q=>[q.member_id,q.name]),[[people.maya,'High voltage']])
+    assert.equal(necessary.qualifications[0].reference,undefined,'planning authority does not expose private reference text')
+    assert.ok(necessary.tools.every(t=>!('retired_by' in t)&&!('retirement_reason' in t)),'planning reads omit private retirement attribution')
+    assert.deepEqual(necessary.history,[],'planning authority does not expose private correction history')
+    assert.ok(necessary.people.every(p=>Object.keys(p).sort().join(',')==='id,name'))
+    await change('planning.window',{member:people.luis,starts:`${tomorrow}T08:00`,ends:`${tomorrow}T16:00`,kind:'available',reason:'Lead shift planning'},200,cookies.lead)
     const proposal=slot(repair,day,'08:00','10:00',{tool:[tool],preview:true})
     let preview=await change('planning.slot',proposal)
     assert.deepEqual(preview.conflicts.sort(),['qualification_required: High voltage','tool_double_booked: Insulation tester'].sort())
     const refused=await change('planning.slot',{...proposal,preview:false},409)
     assert.equal(refused.error,'planning_conflicts')
     assert.equal((await view()).work.find(w=>w.id===repair).starts,null,'a refused booking writes no slot')
+    await h.api('planning.qualification',cookies.lead,{...qualification,expires:'2026-12-31'},403)
     await h.api('planning.qualification',owner,{...qualification,expires:'2026-12-31'})
     preview=await change('planning.slot',{...proposal,starts:`${day}T10:00`,ends:`${day}T12:00`})
     assert.deepEqual(preview.conflicts,[],'adjacent tool bookings do not overlap')
     const resolved=slot(repair,day,'10:00','12:00',{tool:[tool]})
-    await change('planning.slot',resolved)
+    await change('planning.slot',resolved,200,cookies.lead)
     assert.equal((await view()).work.find(w=>w.id===repair).plannedMinutes,120)
     // Later absence and calibration changes expose conflicts on existing slots.
     await window(people.maya,day,'11:00','12:00','absent')
     assert.ok((await view()).work.find(w=>w.id===repair).conflicts.includes('person_absent'))
+    await change('planning.tool',{id:tool,name:'Insulation tester',identifier:'synthetic-gasket-1',calibrationDue:'2026-10-19'},403,cookies.lead)
     await change('planning.tool',{id:tool,name:'Insulation tester',identifier:'synthetic-gasket-1',calibrationDue:'2026-10-19'})
     assert.ok((await view()).work.find(w=>w.id===repair).conflicts.includes('tool_calibration_expired: Insulation tester'))
     await change('planning.slot',slot(repair,day,'13:00','14:00',{tool:[tool]}),409)
@@ -85,7 +113,78 @@ export async function qualificationPlanningJourney() {
     const audit=await h.api('audit',owner)
     assert.ok(JSON.stringify(audit).includes('planning.qualification'))
     await h.api('workorder.assign',owner,{workOrder:repair,assignee:people.maya})
+    const renewal={member:people.luis,name:'Renewal reference',expires:'2026-11-01',reference:'synthetic-gasket-6',remindDays:15}
+    const catchExpiry=async()=>h.api('automation.catchup',owner,{rule:'expiry',revision:(await h.api('automation'+'/jobs',owner)).rules.find(r=>r.id==='expiry').revision})
+    const renewalNotices=async(cookie=owner)=>(await h.api('notices',cookie)).filter(n=>n.text.includes('Renewal reference'))
+    await h.api('planning.qualification',owner,{...renewal,remindDays:''})
+    await catchExpiry();assert.deepEqual(await renewalNotices(),[],'no reminder without explicit owner opt-in')
+    await h.api('planning.qualification',owner,renewal)
+    let expiryRule=(await h.api('automation'+'/jobs',owner)).rules.find(r=>r.id==='expiry')
+    await h.api('automation.control',owner,{rule:'expiry',revision:expiryRule.revision,paused:true,reason:'Pause reference reminders'})
+    await catchExpiry();assert.deepEqual(await renewalNotices(),[],'paused expiry job sends no qualification notice')
+    expiryRule=(await h.api('automation'+'/jobs',owner)).rules.find(r=>r.id==='expiry')
+    await h.api('automation.control',owner,{rule:'expiry',revision:expiryRule.revision,paused:false,reason:'Resume owner reminders'})
+    await h.scheduled('*/15 * * * *',Date.parse('2026-10-20T16:00:00Z'));await catchExpiry()
+    let reminders=await renewalNotices()
+    assert.equal(reminders.length,1,'repeated expiry runs retain one due notice')
+    assert.ok(reminders[0].text.includes('due for renewal by 2026-11-01'))
+    assert.ok(reminders[0].text.includes('Owner-entered reference — not verified by Gasket with the issuing body.'))
+    assert.equal(reminders[0].link,'/app/settings/resources')
+    assert.deepEqual(await renewalNotices(cookies.lead),[],'renewal reminder is private to the consenting owner')
+    assert.deepEqual(await renewalNotices(cookies.luis),[])
+    assert.ok((await h.api('automation'+'/jobs',cookies.lead)).jobs.every(job=>!('qualificationReminders' in job.input)))
+    await h.api('planning.qualification',owner,{...renewal,expires:'2027-01-01'})
+    await catchExpiry();assert.equal((await renewalNotices()).length,1,'renewal beyond the reminder window sends nothing')
+    await h.api('planning.qualification',owner,{...renewal,expires:'2026-10-19'})
+    await catchExpiry();await catchExpiry()
+    reminders=await renewalNotices()
+    assert.equal(reminders.length,2)
+    assert.equal(reminders.filter(n=>n.text.includes('expired after 2026-10-19')).length,1)
+    await change('planning.resource.retire',{kind:'qualification',member:people.luis,name:renewal.name,reason:'Renewal no longer required'})
+    await catchExpiry();assert.equal((await renewalNotices()).length,2,'retirement suppresses further reminders')
     if(process.env.PLANNING_SCREENSHOTS) await browserProof(f,'resources')
+    const retirement={kind:'qualification',member:people.maya,name:'High voltage',reason:'Owner retired superseded training'}
+    const stale=(await view()).revision
+    await change('planning.requirements',{workOrder:repair,qualifications:'High voltage'})
+    assert.equal((await h.api('planning.resource.retire',owner,{...retirement,revision:stale},409)).error,'stale')
+    assert.equal((await view()).qualifications.find(q=>q.member_id===people.maya).retired_at,null)
+    await h.submit('planning.resource.retire',owner,{...retirement,revision:(await view()).revision},'/app/settings/resources')
+    await change('planning.resource.retire',{kind:'tool',id:tool,reason:'Calibration instrument withdrawn'})
+    const blocked=await change('planning.slot',slot(repair,day,'13:00','14:00',{tool:[tool],preview:true}))
+    assert.deepEqual(blocked.conflicts.sort(),['qualification_required: High voltage','tool_retired: Insulation tester'].sort())
+    const beforeSlot=(await view()).work.find(w=>w.id===repair)
+    await change('planning.slot',slot(repair,day,'13:00','14:00',{tool:[tool]}),409)
+    assert.deepEqual((await view()).work.find(w=>w.id===repair),beforeSlot)
+    const history=(await view()).history
+    const changes=history.filter(e=>e.kind==='qualification'&&JSON.parse(e.after_json).member_id===people.maya)
+    assert.deepEqual(changes.map(e=>[e.action,JSON.parse(e.after_json).expires_on]),[['save','2026-10-19'],['save','2026-12-31'],['retire','2026-12-31']])
+    assert.equal(JSON.parse(changes[1].before_json).expires_on,'2026-10-19')
+    assert.equal(JSON.parse(changes[2].before_json).retired_at,null)
+    assert.equal(JSON.parse(changes[2].after_json).retirement_reason,retirement.reason)
+    assert.ok(changes.every(e=>e.actor_name==='Olive Owner'&&e.actor_id&&e.recorded_at))
+    if(process.env.PLANNING_SCREENSHOTS) await retirementProof(f,repair,tool)
+    const snapshot=data=>({qualifications:data.qualifications,tools:data.tools,history:data.history})
+    const beforeNotices=await renewalNotices()
+    const before=snapshot(await view())
+    await h.stop()
+    const archive=join(h.installation.root,'exports','resources.rer')
+    await h.installation.rer('export','--output',archive)
+    const empty=await installation()
+    try {
+      await empty.rer('import','--input',archive,'--yes')
+      const restored=await harness({vars:h.vars,installation:empty,clockInstant:Date.parse('2026-10-20T16:00:00Z')})
+      try {
+        const signed=await restored.signIn(h.vars.OWNER_EMAIL)
+        await restored.raw('/setup',{cookie:signed,form:new URLSearchParams({confirm:'yes'})})
+        const after=await restored.api(`planning?from=${day}`,signed)
+        assert.deepEqual((await restored.api('notices',signed)).filter(n=>n.text.includes('Renewal reference')),beforeNotices,'restore retains owner reminder receipts')
+        assert.deepEqual(snapshot(after),before,'restore retains retired facts and attributable corrections without revival')
+        const refusal=await restored.api('planning.slot',signed,{...slot(repair,day,'13:00','14:00',{tool:[tool],preview:true}),revision:after.revision})
+        assert.deepEqual(refusal.conflicts.sort(),blocked.conflicts.sort())
+        assert.equal((await restored.api('automation'+'/jobs',signed)).rules.every(r=>r.paused===1),true,'restored automation remains inactive')
+      } finally {await restored.close()}
+    } finally {await empty.remove()}
+
   } finally {await h.close()}
 }
 
@@ -140,6 +239,48 @@ export async function calendarPlanningJourney() {
     await change('planning.slot',slot(old,'2026-10-19','08:00','09:00'))
     if(process.env.PLANNING_SCREENSHOTS) await browserProof(f,'calendar',repairs[0])
   } finally {await h.close()}
+}
+
+async function retirementProof(f,repair,tool) {
+  const {h,owner,cookies}=f
+  const browser=await chromium.launch({headless:true,executablePath:process.env.PLANNING_CHROMIUM||undefined,args:['--no-sandbox']})
+  try {
+    for(const [role,cookie] of [['owner',owner],['lead',cookies.lead]]) {
+      const context=await browser.newContext({ignoreHTTPSErrors:true})
+      await context.addCookies(cookie.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+      const page=await context.newPage()
+      for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:1000})
+        await page.goto(`${h.origin}/app/settings/resources?from=${day}`)
+        await page.getByRole('table',{name:'Qualifications',exact:true}).getByText('Retired',{exact:true}).first().waitFor()
+        if(role==='owner') {
+          await page.locator('summary').filter({hasText:'Resource history'}).click()
+          await page.getByRole('table',{name:'Resource history',exact:true}).getByText('Owner retired superseded training',{exact:false}).waitFor()
+          assert.ok(await page.getByText('Owner-entered reference — not verified by Gasket with the issuing body.',{exact:false}).count())
+        } else {
+          assert.equal(await page.getByRole('button',{name:'Retire record',exact:true}).count(),0)
+          assert.equal(await page.getByText('synthetic-gasket-2',{exact:false}).count(),0)
+          assert.equal(await page.getByText('Unrelated private reference',{exact:false}).count(),0)
+        }
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+        await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/retired-${role}-${width}.png`,fullPage:true})
+        await page.goto(`${h.origin}/app/planning?from=${day}&workOrder=${repair}&starts=${day}T13:00&ends=${day}T14:00&tool=${tool}`)
+        await page.getByRole('heading',{name:'Resolve constraints'}).waitFor()
+        await page.locator('#slot-preview').getByText('qualification required: High voltage',{exact:true}).waitFor()
+        await page.locator('#slot-preview').getByText('tool retired: Insulation tester',{exact:true}).waitFor()
+        assert.equal(await page.getByRole('button',{name:'Confirm slot',exact:true}).count(),0)
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+        await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/retirement-refusal-${role}-${width}.png`,fullPage:true})
+        if(role==='owner') {
+          await page.goto(`${h.origin}/app/notices`)
+          await page.getByRole('link',{name:/Renewal reference.*expired after 2026-10-19/}).waitFor()
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+          await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/renewal-notices-${width}.png`,fullPage:true})
+        }
+      }
+      await context.close()
+    }
+  } finally {await browser.close()}
 }
 
 async function browserProof(f,name,move) {
