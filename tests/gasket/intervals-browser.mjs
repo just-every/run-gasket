@@ -6,6 +6,26 @@ import { saveSnapshot } from './form-save-interruptions.mjs'
 import { conditionalSaves } from './workspace-conditional-saves.mjs'
 import { png } from './fixtures.mjs'
 import { chromium } from '@playwright/test'
+import { harness } from './harness.mjs'
+import { offset, zone } from './clock.mjs'
+
+export async function conditionalWorkspaceJourney() {
+  const h=await harness({formSaveFault:true,clockOffset:offset+86_400_000})
+  let browser
+  try {
+    const cookie={owner:await h.owner()}
+    await h.api('site.configure',cookie.owner,{name:'Synthetic workshop',timezone:zone})
+    for (const [key,role,name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['sam','supervisor','Rosa Alvarez']]) {
+      await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})
+      cookie[key]=await h.signIn(`${key}@example.test`)
+    }
+    const directory=process.env.INTERVAL_SCREENSHOTS || `/tmp/gasket-workspace-conditional-${process.pid}`
+    mkdirSync(directory,{recursive:true})
+    browser=await chromium.launch({headless:true,...(process.env.GASKET_CHROMIUM?{executablePath:process.env.GASKET_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+    await workspaceBrowser(h,cookie,browser,directory,{conditionalOnly:true})
+    console.log('Conditional workspace retained drafts and durable save receipts passed')
+  } finally {await browser?.close();await h.close()}
+}
 export async function intervalBrowser(h,cookie,proposal) {
   const directory = process.env.INTERVAL_SCREENSHOTS || `/tmp/gasket-workspace-${process.pid}`
   mkdirSync(directory,{recursive:true})
@@ -662,7 +682,6 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       await open(`/app/counts/${cycleCount}`,'independent-count-approval')
       await submit(page.locator('form[action="/app/do/count.decide"]').filter({has:page.locator('[name=decision][value=approve]')}))
       assert.equal((await h.api(`parts/${part}`,cookie.lead)).onHand,'3','independent approval posts the counted stock once')
-      await conditionalSaves({h,cookie,page,use,open,submit,proof,day,technician,longName,part})
       const duplicate=(await h.api('part.create',cookie.lead,{number:'ACCESS-GUARD-DUPLICATE',name:'Duplicate guard fastener for the west packaging mezzanine',unit:'each'})).id
       await use('owner')
       // Enumerate the implemented workspace destinations rather than a representative menu subset.
