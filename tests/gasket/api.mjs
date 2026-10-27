@@ -20,6 +20,22 @@ export async function apiJourney() {
       return { result, replayed: response.headers.get('idempotency-replayed') }
     }
     const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
+    const documented = (name, value) => {
+      const validate = (schema, actual, path) => {
+        if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
+        if (schema.type) {
+          const types = [schema.type].flat()
+          assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')
+        }
+        if (schema.enum) assert.ok(schema.enum.includes(actual), path + ' matches its published choices')
+        if (actual && !Array.isArray(actual) && typeof actual === 'object') {
+          for (const key of schema.required ?? []) assert.ok(Object.hasOwn(actual, key), path + '.' + key + ' is present')
+          for (const [key, child] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(actual, key)) validate(child, actual[key], path + '.' + key)
+        }
+        if (Array.isArray(actual) && schema.items) for (const [index, child] of actual.entries()) validate(schema.items, child, path + '[' + index + ']')
+      }
+      validate(specification.components.schemas[name], value, name)
+    }
     const example = action => structuredClone(specification.paths['/' + action].post.requestBody.content[['application', 'json'].join('/')].example)
     const repeat = async (action, body, key, cookie = owner) => {
       const first = await write(action, body, key, cookie)
@@ -40,6 +56,7 @@ export async function apiJourney() {
     assert.equal(changed.result.revision, 2)
     assert.deepEqual((await write('asset.update', { ...assetBody, asset, revision: 1, name: 'Synthetic updated pump' }, 'synthetic-gasket-update')).result, changed.result)
     const detail = await h.api(`/v1/assets/${asset}`, owner)
+    documented('AssetDetail', detail)
     assert.equal(detail.name, 'Synthetic updated pump'); assert.equal(detail.versions.length, 1)
     assert.equal(detail.versions[0].revision, 1)
     assert.deepEqual(await h.api(`assets/${asset}`, owner), detail)
@@ -109,6 +126,7 @@ export async function apiJourney() {
     assert.equal((await h.api(`/v1/parts/${part}`, owner)).category, 'Synthetic electrical')
     await repeat('customfield.retire', { ...example('customfield.retire'), id: custom.id, revision: renamed.revision }, 'synthetic-gasket-custom-retire', lead)
     stockDetail = await h.api(`/v1/parts/${part}`, owner)
+    documented('PartDetail', stockDetail)
     assert.deepEqual(stockDetail.customFields.map(row => [row.id, row.name, row.value, row.archived, row.history.length]), [[custom.id, 'Synthetic rated voltage', 240, true, 1]])
     assert.ok((await h.api('/v1/custom-fields', owner)).some(row => row.id === custom.id && row.retired === 1))
     await write('customvalue.set', customValue, 'synthetic-gasket-retired-value', lead, 400)
@@ -202,6 +220,7 @@ export async function apiJourney() {
     await repeat('workorder.review', { ...reviewBody, version: current.version }, 'synthetic-gasket-review', owner)
     current = await order(owner)
     assert.equal(current.status, 'closed')
+    documented('WorkDetail', current)
     assert.deepEqual(current.reviews.map(row => [row.decision, row.reviewer]), [['approved', 'Olive Owner']])
     for (const action of ['workorder.evidence', 'workorder.annotate', 'workorder.time', 'workorder.readings', 'workorder.sign', 'finding.record', 'downtime.start', 'downtime.end']) {
       const entries = (await h.api(`audit?action=${action}`, owner)).rows
@@ -306,6 +325,7 @@ export async function apiJourney() {
     assert.ok(auditCsv.includes(`Owner, service credential ${issued.id}`))
     assert.ok(!auditCsv.includes(issued.token))
     const credentialList = await h.api('service-credentials', owner)
+    for (const entry of credentialList) documented('CredentialMetadata', entry)
     assert.ok(credentialList.some(row => row.id === issued.id))
     assert.ok(!JSON.stringify(credentialList).includes(issued.token), 'a credential secret is shown once')
     assert.ok(!JSON.stringify(credentialList).includes('token_hash'), 'metadata never includes bearer verifiers')
