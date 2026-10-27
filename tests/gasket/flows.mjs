@@ -50,7 +50,7 @@ const independent = new Map([
   [qualificationPlanningJourney,'reports'], [calendarPlanningJourney,'reports'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'reports'], [agentFollowUpJourney, 'reports'],
+  [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'

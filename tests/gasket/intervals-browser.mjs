@@ -41,7 +41,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
   }
   const page = await context.newPage()
   const snapshots = []
-  const linked = new Map()
+  const linked = new Map(), visibleActions = new Set(), exercisedActions = new Set()
   const day = (await h.api('me',cookie.owner)).today
   const technician = (await h.api('me',cookie.max)).id
   const longName = 'Production compressor with extended guarding and remote isolation at the west packaging mezzanine — '+ 'COMPRESSOR'.repeat(4)
@@ -59,6 +59,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.equal(await page.getByRole('main').count(),1,`${name} main landmark`)
     assert.equal(await page.getByRole('heading',{level:1}).count(),1,`${name} page heading`)
     assert.equal(await page.evaluate(()=>document.documentElement.lang),'en-US')
+    for (const action of await page.locator('form[method=post]').evaluateAll(forms=>forms.map(form=>new URL(form.action).pathname))) visibleActions.add(action)
     const issues = await page.locator('input:not([type=hidden]),select,textarea,button,a[href]').evaluateAll(elements=>elements.filter(el=>el.getClientRects().length && !el.closest('[aria-hidden=true]')).flatMap(el=>{
       const label = el.getAttribute('aria-label') || el.getAttribute('aria-labelledby')?.split(' ').map(id=>document.getElementById(id)?.textContent).join(' ') || [...(el.labels||[])].map(l=>l.textContent).join(' ') || (el.matches('button,a')?el.textContent:'')
       return label?.trim()?[]:[el.outerHTML.slice(0,160)]
@@ -82,6 +83,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
   const open = async(path,name)=>{assert.equal((await page.goto(h.origin+path)).status(),200,`${name} ${path} opens`);await inspect(name)}
   const submit = async (form, notice = /Saved/) => {
     const action = await form.getAttribute('action')
+    exercisedActions.add(action)
     console.log('workspace save proof',action)
     const before = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     const reads = {
@@ -662,6 +664,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
         inspected.add(path)
         await open(destination, `linked-record-${inspected.size}`)
       }
+      console.log('workspace action inventory unexercised='+JSON.stringify([...visibleActions].filter(action=>!exercisedActions.has(action)).sort()))
       console.log(`workspace pages proof fixed=${fixed} linked=${inspected.size-fixed} assistive-names=present keyboard=usable`)
 
     }
