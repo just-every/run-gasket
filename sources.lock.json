@@ -712,7 +712,7 @@
       "executable": false
     },
     "openapi.json": {
-      "sha256": "f898d580427f338eaa5e3df51f0cc0460e82933c405ae44573a4cfaeb401d72e",
+      "sha256": "1af3a243686d8e3a8ed5aecc904effecfe7ec0f0429d48992d143a05bf4a81df",
       "executable": false
     },
     "OPERATIONS.json": {
@@ -1340,7 +1340,7 @@
       "executable": false
     },
     "src/gasket/api-contract.ts": {
-      "sha256": "101be471fca9e7eb3c1a0a93176c7c9e19b87c38bd5798febbd5f36f6da356c1",
+      "sha256": "7614df7ab88647b789389d79e98e2b9f0312a0d616b3ecbecd873cce49e26ca1",
       "executable": false
     },
     "src/gasket/assets.ts": {
@@ -1516,7 +1516,7 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "1c19c17d627e8a210b1f7b34bde3ccaedc60606af980a4d0efb8c2fe3ec0db23",
+      "sha256": "6826ac1222411d17c855e32598628d3bd7c5757f251a1f024c905c3a74267a48",
       "executable": false
     },
     "src/gasket/input.ts": {
@@ -4116,7 +4116,7 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "8fb33ce53d9b2cc5c74639946d423bfd75d54d4c7763a32e31e43946b1725c8c",
+      "sha256": "f425fceeeb063fc78382cbb274ccbff52d5d5d51b718016831843b905da6d7a7",
       "executable": false
     },
     "tests/gasket/automation.mjs": {
