@@ -109,7 +109,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].filter(([key])=>key!=='__gk_save').map(([key,value])=>[key,typeof value==='string'?value:value.name])),before.filter(([key])=>key!=='__gk_save'),`${action} failed draft retains all fields`)
     const failedPath = new URL(await refusal.getByRole('link').getAttribute('href'),h.origin).pathname
     // The displayed failed receipt must refer to the attempted id, even after preparing a new retry id.
-    const failedReceipt = await (await context.request.get(h.origin+failedPath,{headers:{accept:['application','json'].join('/')}})).json()
+    const failedReceipt = await (await h.raw(failedPath,{cookie:who,headers:{accept:['application','json'].join('/')}})).json()
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
@@ -124,8 +124,8 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.equal(await form.getByRole('button',{name:/./}).last().isDisabled(),true,`${action} cannot repeat an uncertain save`)
     assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name])),retryDraft,`${action} retains every submitted field`)
     const receiptPath = new URL(await error.getByRole('link').getAttribute('href'),h.origin).pathname
-    const response = await context.request.get(h.origin+receiptPath,{headers:{accept:['application','json'].join('/')}})
-    assert.equal(response.status(),200)
+    const response = await h.raw(receiptPath,{cookie:who,headers:{accept:['application','json'].join('/')}})
+    assert.equal(response.status,200)
     const receipt = await response.json()
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
