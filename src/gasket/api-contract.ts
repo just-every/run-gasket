@@ -22,6 +22,7 @@ const RETRYABLE: Record<string, Capability> = {
   'workorder.results': 'work.do', 'workorder.issue': 'work.do', 'workorder.return': 'work.do',
   'workorder.submit': 'work.do', 'workorder.review': 'work.review',
   'meter.create': 'register.manage', 'schedule.create': 'work.assign',
+  'customfield.save': 'register.manage', 'customfield.retire': 'register.manage', 'customvalue.set': 'register.manage', 'part.category': 'register.manage',
   'workorder.evidence': 'work.do', 'workorder.annotate': 'work.do',
   'workorder.time': 'work.do', 'workorder.readings': 'work.do',
   'workorder.tool': 'work.do', 'workorder.sign': 'work.do',
