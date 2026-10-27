@@ -87,6 +87,11 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     await context.addCookies(cookie[who].split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
   }
   const page = await context.newPage()
+  if (process.env.GASKET_BROWSER_CPU_RATE) {
+    const cdp = await context.newCDPSession(page)
+    await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.GASKET_BROWSER_CPU_RATE) })
+  }
+  page.on('pageerror', error => console.error('Workspace browser error:', error))
   const snapshots = []
   const linked = new Map(), visibleActions = new Set(), exercisedActions = new Set()
   const day = (await h.api('me',cookie.owner)).today
