@@ -375,7 +375,7 @@ These primary references establish the source formats, not Gasket implementation
 
 ## Status
 
-Judged from the code and tests at commit `373753c528b7b97e7c653a71234727ba4c5d3db1` (27 October 2026). REPORT-006 is rejudged on this implementation; other rows preserve main evidence and scope.
+Judged from the code and tests at commit `68440d432156b2451cfa3bd961c566e2379ea48f` (27 October 2026). REPORT-006 is rejudged on this implementation; other rows preserve main evidence and scope.
 
 INT-001 evidence is updated by sx-gasket-c-i942, preserving sx-gasket-c-f2, on the exact candidate identified in its landing report. Its status remains partial; the prior review pin above continues to describe the other rows.
 

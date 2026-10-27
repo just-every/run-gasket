@@ -116,7 +116,11 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     let confirmation, intercepted = false, interceptionError
     await page.route('**'+action,async route=>{
       intercepted = true
-      try { confirmation = await (await route.fetch({timeout:15000})).json() }
+      try {
+        const request=route.request()
+        const response=await h.raw(action,{cookie:who,form:request.postDataBuffer(),headers:{'content-type':request.headers()['content-type'],accept:['application','json'].join('/')}})
+        confirmation=await response.json()
+      }
       catch (error) { interceptionError = error }
       finally { await route.abort('failed') }
     },{times:1})
