@@ -59,7 +59,10 @@ export async function failedForm(source: Response, action: string, input: Input,
     if (values(selectName)[selectPosition] === (element.getAttribute('value') || '')) element.setAttribute('selected', '')
     else element.removeAttribute('selected')
   } }).on(`${selector} noscript a`, { element(element) {
-    if (active === chosen && element.getAttribute('href')?.startsWith('/app/save-receipts/')) element.setAttribute('href', `/app/save-receipts/${nextId}`)
+    if (active !== chosen) return
+    const href = element.getAttribute('href') || ''
+    if (href.startsWith('/app/save-receipts/')) element.setAttribute('href', `/app/save-receipts/${nextId}`)
+    else if (action.startsWith('/request/') && href.startsWith(`${action}/received/`)) element.setAttribute('href', receipt)
   } }).on(`${selector} button[type="submit"]`, { element(element) {
     if (active === chosen && !retry) element.setAttribute('disabled', '')
   } })
