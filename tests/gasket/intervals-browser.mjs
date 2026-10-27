@@ -8,7 +8,7 @@ import { chromium } from '@playwright/test'
 export async function intervalBrowser(h,cookie,proposal) {
   const directory = process.env.INTERVAL_SCREENSHOTS || `/tmp/gasket-workspace-${process.pid}`
   mkdirSync(directory,{recursive:true})
-  const browser=await chromium.launch({headless:true,...(process.env.GASKET_CHROMIUM?{executablePath:process.env.GASKET_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  const browser=await chromium.launch({headless:true,...(process.env.GASKET_CHROMIUM?{executablePath:process.env.GASKET_CHROMIUM}:{}),args:['--no-sandbox','--disable-http2','--use-mock-keychain','--password-store=basic']})
   try {
     const context=await browser.newContext({ignoreHTTPSErrors:true})
     await context.addCookies(cookie.lead.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
@@ -113,22 +113,22 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
-    let confirmation, intercepted = false, interceptionError
+    let confirmation, intercepted = false, interceptionError, interceptionPhase = 'waiting'
     await page.route('**'+action,async route=>{
-      intercepted = true
+      intercepted = true; interceptionPhase = 'forwarding'
       try {
         const request=route.request()
         const response=await h.raw(action,{cookie:who,form:request.postDataBuffer(),headers:{'content-type':request.headers()['content-type'],accept:['application','json'].join('/')}})
-        confirmation=await response.json()
+        confirmation=await response.json(); interceptionPhase = 'confirmed'
       }
       catch (error) { interceptionError = error }
-      finally { await route.abort('failed') }
+      finally { await route.abort('failed'); interceptionPhase = 'aborted' }
     },{times:1})
     await form.getByRole('button',{name:/./}).last().press('Enter')
     const error = form.getByRole('alert')
     await error.waitFor().catch(async failure=>{
       const state=await form.evaluate(el=>({busy:el.dataset.saving||null,focused:el.contains(document.activeElement),valid:el.checkValidity()}))
-      throw new Error(`${action} retry: ${JSON.stringify({intercepted,state,error:interceptionError?.message})}`,{cause:failure})
+      throw new Error(`${action} retry: ${JSON.stringify({intercepted,interceptionPhase,state,error:interceptionError?.message})}`,{cause:failure})
     })
     assert.equal(intercepted,true,`${action} keyboard retry reaches the server`)
     if(interceptionError)throw interceptionError
