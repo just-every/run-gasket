@@ -80,6 +80,7 @@ import { annotate } from './annotations'
 import { sign } from './signatures'
 import { createSchedule, evaluateMeter, generateDue } from './schedules'
 import { configureSite, endAccess, giveAccess, setRole, setTechnicianWork } from './site'
+import { previewGeneric, applyGeneric, genericAction } from './movein/generic'
 import { retireField, saveField, saveStatus, setFieldValue, setWaiting } from './work-fields'
 import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd, downtimeStart, giveBack, issue, doorOf, recordFinding, recordReadings, recordResults, recordTime } from './work'
 
@@ -247,4 +248,7 @@ export const actions: Record<string, Handler> = {
   'import.preview': (env, actor, input) => previewImport(env, actor, input),
   'import.apply': (env, actor, input) => applyImport(env, actor, input),
   'import.job': (env, actor, input) => importAction(env, actor, input),
+  'spreadsheet.preview': (env, actor, input) => previewGeneric(env, actor, input),
+  'spreadsheet.apply': (env, actor, input) => applyGeneric(env, actor, input),
+  'spreadsheet.job': (env, actor, input) => genericAction(env, actor, input),
 }

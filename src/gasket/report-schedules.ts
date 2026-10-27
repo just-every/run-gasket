@@ -13,7 +13,7 @@ async function author(env:Bindings,actor:Actor,row?:Row|null){
 async function member(env:Bindings,id:string,zone:string):Promise<Actor|null>{
   const r=await one(env,`SELECT m.*,o.status AS operator_status,o.role AS operator_role FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=?`,id)
   if(!r||r.status!=='active'||r.operator_status!=='active'||(r.role==='owner'&&r.operator_role!=='owner'))return null
-  const actor:Actor={id:r.id,name:r.name,email:r.email,role:r.role,sessionId:'',zone,today:today(zone,now())}
+  const actor:Actor={id:r.id,name:r.name,email:r.email,role:r.operator_role==='owner'?'owner':r.role,sessionId:'',zone,today:today(zone,now())}
   return can(actor,'board.read')&&can(actor,'history.export')?actor:null
 }
 export async function saveReportSchedule(env:Bindings,actor:Actor,input:Input){

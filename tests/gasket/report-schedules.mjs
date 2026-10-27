@@ -3,8 +3,9 @@ import { pathToFileURL } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { chromium } from '@playwright/test'
-import { harness } from './harness.mjs'
+import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
+import { scheduleRiders } from './report-schedule-riders.mjs'
 
 function readCsv(text){
   const rows=[];let row=[],value='',quoted=false
@@ -31,7 +32,7 @@ export async function reportSchedulesJourney(){
   const store=await installation();await store.migrate()
   const vars={OWNER_EMAIL:'owner@example.test',SESSION_SECRET:'synthetic-gasket-session-secret-123456789',SETUP_TOKEN:'synthetic-gasket-setup-token-123456789'}
   const before=Date.parse('2027-03-07T13:59:00Z'),first=Date.parse('2027-03-07T14:00:00Z'),after=Date.parse('2027-03-14T13:00:00Z')
-  let h=await harness({installation:store,vars,clockInstant:before})
+  let h=await harness({installation:store,vars,clockInstant:before,generationGate:true})
   try{
     const cookie={owner:await h.owner()},ids={}
     await h.api('site.configure',cookie.owner,{name:'Great Lakes report plant',timezone:'America/New_York'})
@@ -45,6 +46,13 @@ export async function reportSchedulesJourney(){
     await h.api('downtime.start',cookie.tech,{workOrder:work,startedOn:'2027-03-06T12:00',reason:'Synthetic conveyor stop'})
     await h.api('downtime.end',cookie.tech,{workOrder:work,endedOn:'2027-03-06T13:00'})
     await h.api('work.cost',cookie.owner,{workOrder:work,category:'labor',amount:'123.45',note:'synthetic-gasket-private-rate-1'})
+    await h.api('labor.rate',cookie.owner,{person:ids.tech,amount:'9876.54',overtimeAfterMinutes:60,overtimeMultiplier:175})
+    const evidence='synthetic-gasket-original-content-1'
+    const attached=await h.api('document.add',cookie.lead,{asset,kind:'manual',title:'Private original',source:'OEM',file:file('synthetic-gasket-original-1.pdf',`%PDF-1.4 ${evidence}`,['application','pdf'].join('/'))})
+    const original=(await h.api(`assets/${asset}`,cookie.owner)).documents.documents.find(d=>d.id===attached.document).revisions[0]
+    const originalDownload=await h.raw(`/app/documents/${original.id}`,{cookie:cookie.supervisor})
+    assert.equal(originalDownload.status,200);assert.ok((await originalDownload.text()).includes(evidence))
+    assert.equal((await h.api(`work/${work}`,cookie.owner)).labor.rates[0].cents_per_hour,987654)
     const body={team,name:'Weekly supervisor pack',report:'performance',revision:0,weekday:0,clock:'09:00',firstDay:'2027-03-07',recipients:[ids.supervisor,ids.lead],consent:true}
     for(const role of ['lead','supervisor','tech','agent'])await h.api('report.schedule',cookie[role],body,403)
     await h.api('report.schedule',cookie.owner,{...body,consent:false},400)
@@ -70,6 +78,7 @@ export async function reportSchedulesJourney(){
     const task=getDocument({data:new Uint8Array(pdfBytes),isEvalSupported:false,disableFontFace:true}),pdf=await task.promise
     let text='';for(let page=1;page<=pdf.numPages;page++)text+=(await(await pdf.getPage(page)).getTextContent()).items.map(i=>i.str??'').join(' ')
     await task.destroy();assert.ok(text.includes('Repair conveyor motor'));assert.ok(text.includes('2027-03-06'));assert.ok(text.includes('PM on-time compliance'))
+    for(const secret of [evidence,'987654','cents_per_hour']){assert.equal(csv.includes(secret),false);assert.equal(text.includes(secret),false)}
     const dashboard=await h.api(`performance?from=2027-02-28&to=2027-03-06&team=${team}`,cookie.supervisor)
     assert.deepEqual(dataset(csv).data,dashboard,'every exported dataset value reconciles to the dashboard');assert.equal(csv.includes('synthetic-gasket-private-rate-1'),false);assert.equal(dashboard.backlog.count,1);assert.equal(dashboard.backlog.hours,2)
     assert.match(csv,/backlog/);assert.match(csv,/count/)
@@ -79,7 +88,7 @@ export async function reportSchedulesJourney(){
     assert.equal((await h.api('report-schedules',cookie.owner)).schedules[0].next_day,'2027-03-14')
     await h.scheduled('*/15 * * * *',first+60_000);assert.equal(packs().length,1)
     const varsSaved=h.vars;await h.stop()
-    h=await harness({installation:store,vars:varsSaved,clockInstant:before})
+    h=await harness({installation:store,vars:varsSaved,clockInstant:before,generationGate:true})
     await h.scheduled('*/15 * * * *',Date.parse('2027-03-14T12:59:00Z'));assert.equal(packs().length,0)
     await h.scheduled('*/15 * * * *',after);assert.equal(packs().length,1,'09:00 site time moves one hour in UTC after daylight saving')
     await h.scheduled('*/15 * * * *',after+60_000);assert.equal(packs().length,1,'restart cannot replay a claimed occurrence')
@@ -126,6 +135,7 @@ export async function reportSchedulesJourney(){
       const expected=await h.api(`${kind}?from=2027-02-28&to=2027-03-06&asset=${asset}`,cookie.owner)
       assert.deepEqual(pack.data,expected,`${kind} retains every source value with saved asset scope`)
       assert.ok(pack.metadata.definitions.length>0)
+      for(const secret of [evidence,'synthetic-gasket-original-1.pdf',`/app/documents/${original.id}`,'987654','cents_per_hour'])assert.equal(JSON.stringify(pack).includes(secret),false,`no private original or individual rate: ${secret}`)
       assert.equal(JSON.stringify(pack).includes('synthetic-gasket-private-rate-1'),false)
     }
     // History and valuation preserve nonempty, independently checked source values.
@@ -138,6 +148,7 @@ export async function reportSchedulesJourney(){
       const response=await h.raw(`/app/report-packs/${familyIds[kind]}.csv`,{cookie:cookie.owner})
       assert.equal(response.status,200)
       const csv2=await response.text(),pack=dataset(csv2)
+      for(const secret of [evidence,'synthetic-gasket-original-1.pdf',`/app/documents/${original.id}`,'987654','cents_per_hour'])assert.equal(csv2.includes(secret),false,`${kind} excludes original files and individual rates`)
       const expected=await h.api(`${kind}?from=2027-03-07&to=2027-03-13${kind==='history'?`&asset=${asset}`:''}`,cookie.owner)
       assert.deepEqual(pack.data,expected,`${kind} complete dataset matches its public read door`)
       assert.ok(pack.metadata.definitions.length>0)
@@ -158,6 +169,7 @@ export async function reportSchedulesJourney(){
       const task2=getDocument({data:new Uint8Array(await pdfResponse.arrayBuffer()),isEvalSupported:false,disableFontFace:true}),pdf2=await task2.promise
       let text2='';for(let page=1;page<=pdf2.numPages;page++)text2+=(await(await pdf2.getPage(page)).getTextContent()).items.map(i=>i.str??'').join(' ')
       await task2.destroy();assert.ok(text2.includes(kind==='history'?'Work order created':'2175'))
+      for(const secret of [evidence,'987654','cents_per_hour'])assert.equal(text2.includes(secret),false)
       await h.api('report.schedule',cookie.owner,{...body2,schedule:familyIds[kind],revision:1,paused:false})
     }
     await h.api('report.schedule',cookie.owner,{...failure,report:'history',team:'',asset:''},400)
@@ -177,6 +189,7 @@ export async function reportSchedulesJourney(){
     await h.api('report.schedule',cookie.owner,{...delegatedBody,editor:ids.tech},403)
     const own=await h.api('report-schedules',cookie.delegate)
     assert.deepEqual(own.schedules.map(s=>s.id),[delegatedId]);assert.deepEqual(own.deliveries,[])
+    await h.api('report.schedule',cookie.delegate,{...delegatedBody,schedule:'',revision:0},403)
     await h.api('report.schedule',cookie.other,{...delegatedBody,schedule:delegatedId,revision:1},403)
     assert.equal((await h.raw(`/app/report-packs/${schedule}.csv`,{cookie:cookie.delegate})).status,403)
     const draft={...delegatedBody,schedule:delegatedId,revision:1,name:'Delegated revised',paused:false,editor:ids.other}
@@ -193,11 +206,22 @@ export async function reportSchedulesJourney(){
     await h.api('access.role',cookie.owner,{member:ids.delegate,role:'maintainer'})
     await h.api('report-schedules',cookie.delegate,undefined,403)
     assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,403)
+    // Typed CSV retains empty collections and neutralizes spreadsheet formulas in real source cells.
+    const formulas=['=1+2','+SUM(1,2)','-1+3','@SUM(1,2)']
+    for(const [index,title]of formulas.entries())await h.api('workorder.create',cookie.owner,{asset,title,due:'2027-03-01',team,assignee:ids.tech})
+    const safe=(await h.api('report.schedule',cookie.owner,{...failure,name:'Formula safe preview',team:'',paused:true})).id
+    const safeCsv=await(await h.raw(`/app/report-packs/${safe}.csv`,{cookie:cookie.owner})).text()
+    const safeRows=readCsv(safeCsv)
+    for(const value of formulas)assert.ok(safeRows.some(row=>row[1]==='string'&&row[2]===`'${value}`),`formula safe ${value}`)
+    assert.ok(safeRows.some(row=>row[1]==='array'&&row[2]===''),'empty arrays are explicit')
+    assert.ok(safeRows.some(row=>row[1]==='object'&&row[2]===''),'empty objects are explicit')
+    assert.deepEqual(dataset(safeCsv).data,await h.api('performance?from=2027-02-28&to=2027-03-06',cookie.owner))
     await h.api('report.schedule',cookie.delegate,{...draft,revision:3},403)
     await h.api('access.role',cookie.owner,{member:ids.delegate,role:'lead'})
     await h.api('report.schedule',cookie.owner,{...draft,revision:3,editor:ids.other,paused:true})
     await h.api('report-schedules',cookie.delegate,undefined,403)
     assert.equal((await h.raw(`/app/report-packs/${delegatedId}.csv`,{cookie:cookie.delegate})).status,403)
+    await scheduleRiders(h,cookie,ids,body,dataset)
     if(process.env.REPORT_SCREENSHOTS){
       await mkdir(process.env.REPORT_SCREENSHOTS,{recursive:true})
       const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||undefined,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})

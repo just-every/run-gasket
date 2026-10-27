@@ -61,7 +61,7 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
   const money = (cents: number | null) => cents === null ? null : `$${(cents / 100).toFixed(2)}`
   for (const row of await all(env, 'SELECT * FROM gk_work_history WHERE asset_id = ? ORDER BY completed_on, id', id)) {
     const costs = [['parts', money(row.parts_cents)], ['labor', money(row.labor_cents)], ['other', money(row.other_cents)]].filter(([, amount]) => amount).map(([label, amount]) => `${label} ${amount}`)
-    push(zonedInstant(actor.zone, row.completed_on), 'history', null, `Completed in MaintainX (#${row.source_ref}, ${row.kind}): ${row.title}${row.categories ? ` · ${row.categories}` : ''}${row.recurrence ? ` · repeats ${row.recurrence}` : ''}${costs.length ? ` · ${costs.join(', ')}` : ''} (moved in)`, row.completed_by)
+    push(zonedInstant(actor.zone, row.completed_on), 'history', null, `Completed in ${row.source_system} (#${row.source_ref}, ${row.kind}): ${row.title}${row.categories ? ` · ${row.categories}` : ''}${row.recurrence ? ` · repeats ${row.recurrence}` : ''}${costs.length ? ` · ${costs.join(', ')}` : ''} (moved in)`, row.completed_by)
   }
   events.sort((a, b) => a.at - b.at)
   const downtimeMinutes = (await one<{ n: number | null }>(env, 'SELECT SUM(minutes) AS n FROM gk_downtime WHERE asset_id = ?', id))!.n ?? 0

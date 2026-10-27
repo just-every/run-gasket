@@ -8,12 +8,12 @@ import { emittedWorker } from '../emitted-worker.mjs'
 import { offset } from './clock.mjs'
 import { installation as newInstallation } from './installation.mjs'
 
-export async function harness({ vars, installation, clockOffset = offset, clockInstant, outbound } = {}) {
+export async function harness({ vars, installation, clockOffset = offset, clockInstant, outbound, generationGate } = {}) {
   const secret = () => randomBytes(32).toString('base64url')
   vars ??= { OWNER_EMAIL: 'owner@example.test', SESSION_SECRET: secret(), SETUP_TOKEN: secret() }
   const owned = !installation
   if (owned) { installation = await newInstallation(); await installation.migrate() }
-  const worker = await emittedWorker(vars, { installation: installation.root, offset: clockOffset, instant: clockInstant, outbound }), origin = worker.origin
+  const worker = await emittedWorker(vars, { installation: installation.root, offset: clockOffset, instant: clockInstant, outbound, generationGate }), origin = worker.origin
   /** Stops the Worker and keeps the installation's data; close also removes an installation made here. */
   let stopped = false
   const stop = async () => { if (!stopped) { stopped = true; await worker.close() } }
@@ -61,7 +61,7 @@ export async function harness({ vars, installation, clockOffset = offset, clockI
     return cookie
   }
 
-  return { origin, vars, installation, raw, api, submit, signIn, owner, stop, close, scheduled: worker.scheduled, mails: worker.mails, setMailOutcome: worker.setMailOutcome }
+  return { origin, vars, installation, raw, api, submit, signIn, owner, stop, close, scheduled: worker.scheduled, mails: worker.mails, setMailOutcome: worker.setMailOutcome, setGenerationHook: worker.setGenerationHook }
 }
 
 export const file = (filename, content, type = 'application/octet-stream') => ({ filename, base64: Buffer.from(content).toString('base64'), type })

@@ -11,7 +11,7 @@ interface Kind {
   read(db: D1Database, id: string): Promise<{ value: Record<string, Json>; revision: string } | undefined>
   matches(value: Record<string, any>, id: string, revision: string): D1Sql
   absent(id: string): D1Sql
-  write(value: Record<string, any>, id: string, revision: string): D1Sql[]
+  write(value: Record<string, any>, id: string, revision: string, source?: string): D1Sql[]
   remove(id: string): D1Sql[]
   ids(db: D1Database): Promise<string[]>
   count: string
@@ -97,9 +97,9 @@ const part: Kind = {
     return sql(`EXISTS(SELECT 1 FROM gk_parts WHERE id = ? AND origin = 'import' AND ${main.text}) AND (SELECT quantity_milli FROM gk_part_moves WHERE id = ?) IS ? AND ${rest.text}`, id, ...main.params, `${id}:opening`, value.openingMilli, ...rest.params)
   },
   absent: id => sql('NOT EXISTS(SELECT 1 FROM gk_parts WHERE id = ?) AND NOT EXISTS(SELECT 1 FROM gk_part_moves WHERE id = ?)', id, `${id}:opening`),
-  write: (value, id, revision) => [
-    sql("INSERT INTO gk_parts (id, number, name, unit, minimum_milli, location, origin, import_revision, created_at) VALUES (?, ?, ?, ?, ?, ?, 'import', ?, ?)", id, value.number, value.name, value.unit, value.minimumMilli, value.location, revision, Date.now()),
-    sql("INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, note, actor, at, origin) VALUES (?, ?, 'opening', ?, 'Opening stock from MaintainX', 'import', ?, 'import')", `${id}:opening`, id, value.openingMilli, Date.now()),
+  write: (value, id, revision, source='MaintainX') => [
+    sql("INSERT INTO gk_parts (id, number, name, unit, minimum_milli, location, category, origin, import_revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'import', ?, ?)", id, value.number, value.name, value.unit, value.minimumMilli, value.location, value.category??null, revision, Date.now()),
+    sql("INSERT INTO gk_part_moves (id, part_id, kind, quantity_milli, note, actor, at, origin) VALUES (?, ?, 'opening', ?, ?, 'import', ?, 'import')", `${id}:opening`, id, value.openingMilli, `Opening stock from ${source}`, Date.now()),
   ],
   remove: id => [sql("DELETE FROM gk_part_aliases WHERE part_id=? AND kind='part' AND EXISTS(SELECT 1 FROM gk_parts WHERE id=? AND origin='import')",id,id),sql("DELETE FROM gk_part_moves WHERE id = ? AND origin = 'import'", `${id}:opening`), sql("DELETE FROM gk_parts WHERE id = ? AND origin = 'import'", id)],
   ids: db => idsOf(db, 'gk_parts'),
@@ -119,8 +119,8 @@ const work: Kind = {
     return sql(`EXISTS(SELECT 1 FROM gk_work_history WHERE id = ? AND ${main.text})`, id, ...main.params)
   },
   absent: id => sql('NOT EXISTS(SELECT 1 FROM gk_work_history WHERE id = ?)', id),
-  write: (value, id, revision) => [sql(`INSERT INTO gk_work_history (id, ${WORK_FIELDS.map(([, column]) => column).join(', ')}, import_revision, created_at) VALUES (?, ${WORK_FIELDS.map(() => '?').join(', ')}, ?, ?)`,
-    id, ...WORK_FIELDS.map(([key]) => value[key] ?? null), revision, Date.now())],
+  write: (value, id, revision) => [sql(`INSERT INTO gk_work_history (id, ${WORK_FIELDS.map(([, column]) => column).join(', ')}, import_revision, created_at,source_system,details_json) VALUES (?, ${WORK_FIELDS.map(() => '?').join(', ')}, ?, ?,?,?)`,
+    id, ...WORK_FIELDS.map(([key]) => value[key] ?? null), revision, Date.now(),value.sourceSystem??'MaintainX',value.details===undefined?null:JSON.stringify(value.details))],
   remove: id => [sql('DELETE FROM gk_work_history WHERE id = ?', id)],
   ids: db => idsOf(db, 'gk_work_history'),
   count: '(SELECT COUNT(*) FROM gk_work_history)',

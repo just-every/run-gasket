@@ -55,6 +55,7 @@ import { GasketError, insist, one } from './core'
 import { API_DOORS, match } from './doors'
 import { assetHistory } from './history'
 import { importJobs } from './movein/maintainx'
+import { genericJobs, genericReconciliation } from './movein/generic'
 import { partDetail, partList } from './parts'
 import { reconciliation } from './valuation'
 import { countDetail, countList } from './counts'
@@ -137,6 +138,8 @@ export const views: Record<string, View> = {
   board: (env, actor) => board(env, actor),
   proposals: (env, actor) => proposalList(env, actor),
   imports: (env, actor) => importJobs(env, actor),
+  spreadsheetImports: (env,actor)=>genericJobs(env,actor),
+  spreadsheetReconciliation: (env,actor,id,url)=>genericReconciliation(env,actor,id,url),
   audit: (env, actor, _id, url) => audit(env, actor, url),
   codes: env => codeList(env),
   closures: env => closures(env),

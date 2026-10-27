@@ -58,6 +58,9 @@ import { boardPage } from './ui/board'
 import { h } from './ui/html'
 import { page } from './ui/shell'
 import { moveInPage, previewPage } from './ui/movein'
+import { genericPreviewPage, reconciliationPage } from './ui/generic-movein'
+import { HEADERS, type SheetKind } from './movein/generic-mapping'
+import { spreadsheetTemplate } from './movein/spreadsheet'
 import { partPage, partsPage } from './ui/parts'
 import { countPage } from './ui/counts'
 import { automationPage } from './ui/automation'
@@ -163,6 +166,7 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
   if (request.method === 'POST') {
     if (path === '/app/parts/catalog-preview') return await catalogPreviewPage(env,actor,await Input.from(request),url)
     if (path === '/app/move-in/preview') return await previewPage(env, actor, await Input.from(request), url)
+    if (path === '/app/move-in/spreadsheet-preview') return await genericPreviewPage(env,actor,await Input.from(request),url)
     const name = path.match(/^\/app\/do\/([\w.]+)$/)?.[1]
     const action = name ? actions[name] : undefined
     if (!action) throw new GasketError('not_found', 404)
@@ -199,6 +203,13 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  spreadsheetReconciliation: reconciliationPage,
+  spreadsheetTemplate: guarded(actor=>can(actor,'import.run'),async(_env,_actor,_url,id)=>{
+    const [kind,format]=id.split('.') as [SheetKind,'csv'|'xls'|'xlsx']
+    const bytes=await spreadsheetTemplate(format,kind,[...HEADERS[kind]])
+    const type=format==='csv'?['text','csv'].join('/'):format==='xls'?['application','vnd.ms-excel'].join('/'):['application','vnd.openxmlformats-officedocument.spreadsheetml.sheet'].join('/')
+    return new Response(bytes as BodyInit,{headers:{'content-type':type,'cache-control':'private, no-store','content-disposition':`attachment; filename="${id}"`}})
+  }),
   reportSchedules: (env,actor,url)=>reportSchedulesPage(env,actor,url),
   reportPackPdf: async(env,actor,_url,id)=>new Response(await packPdf(await previewReportPack(env,actor,id)) as BodyInit,{headers:{'content-type':['application','pdf'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=report.pdf'}}),
   reportPackCsv: async(env,actor,_url,id)=>new Response(packCsv(await previewReportPack(env,actor,id)),{headers:{'content-type':['text','csv'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=dataset.csv'}}),

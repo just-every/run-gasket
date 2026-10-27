@@ -46,7 +46,8 @@
     "pdf-lib": "1.17.1",
     "qrcode": "1.5.4",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.54.5",

@@ -12,8 +12,8 @@ export interface CustomMapping {
 
 const applies = (field: CustomField, category: string | null) => field.scope !== 'category' || field.category?.toLowerCase() === category?.toLowerCase()
 
-export async function assetCustomMapping(env: Bindings, input: Input, header: string[]) {
-  const fields = await customFields(env, 'asset')
+export async function assetCustomMapping(env: Bindings, input: Input, header: string[], entityType = 'asset') {
+  const fields = await customFields(env, entityType)
   let supplied: unknown = input.has('customMapping') ? input.json('customMapping') : {}
   if (typeof supplied === 'string') {
     insist(supplied.length <= 500_000, 'invalid_custom_mapping')

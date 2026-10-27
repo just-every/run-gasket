@@ -43,3 +43,17 @@ The journal lists every move-in. **Undo** removes everything that move-in create
 ## Not carried
 
 Asset hierarchy, teams, vendors, depreciation, attachments, custom fields, procedures, PM schedules, open work orders, procedure answers, time entries and IoT meter summaries. Write checklists and schedules in Gasket, count the shelves after moving in, and keep MaintainX read-only until a lead has run one full preventive cycle in Gasket.
+
+## Generic spreadsheets
+
+**Move in → Import a spreadsheet** publishes CSV, XLS and XLSX templates for assets, parts, locations, preventive schedules and open or completed work. Choose the record type for a single-sheet file. Multi-sheet workbooks use the sheet names `assets`, `parts`, `locations`, `pms` and `work`. Import register records before PMs that reference them; PMs use existing checklists. Source IDs are stable text identifiers. A duplicate ID is rejected rather than merged into a second native record.
+
+Preview writes nothing. It shows accepted native values, rejected rows and retained historical people. Correct the file or expand **Source mapping** to select existing assets, assignees, teams and custom fields, then review again. Applying is bound to that reviewed fingerprint. The journal saves large imports in bounded batches; **Continue import** resumes its checkpoint. **Reconcile rows** pages through every current native record together with its exact retained source row. Repeating an apply adds no duplicate work. An unchanged import can be undone; edits or subsequent dependent records refuse removal.
+
+- Open work uses `open` or `in_progress`; completed, closed or done rows become historical work. Open work requires a creation time, due date, current assignable person when named, and current team membership. Unknown people must be mapped before open work is accepted. Historical people and team names remain source text and create no accounts or grants.
+- ISO dates, ISO timestamps and slash dates are accepted. Choose month-first or day-first for slash dates. Dates without an offset use the site's clock; offset-bearing timestamps are converted to it. Native history timestamps have minute precision; the exact original cell remains in the reconciliation. Excel date cells are decoded explicitly. Invalid dates and spreadsheet formulas are refused.
+- Text identifiers and displayed numeric codes retain leading zeros. Parts require their explicit unit, including US or SI units; no conversion is inferred. Quantities allow three decimal places. Costs are USD cents, with blank costs retained as unknown.
+- Existing asset, part and location fields use ASSET-009 validation and category rules. Exact, unique column-name matches are selected automatically; source mapping can select another column. Open work fields use their current names, optionally prefixed with `Custom: `. Required fields and invalid choices are refused. Historical work retains typed custom values with its history details. Unmapped columns remain in the retained source row.
+- Locations require a named enabled authenticated portal. Public portals are refused. PMs use the ordinary calendar and crew validators and an explicit `Active` value of yes or no. Importing a schedule does not generate work. Historical consumption is retained as source text: it never issues stock, creates work, or sends a notification.
+
+Original spreadsheets remain in the import kit's private journal. The import, templates and reconciliation require current move-in permission at every door. No delivery provider is used.
