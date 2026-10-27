@@ -19,6 +19,7 @@ export async function failedForm(source: Response, action: string, input: Input,
   if (chosen < 0) return null
   index = -1; active = -1
   const positions = new Map<string, number>(), files = await draftFiles(input)
+  const nextId = retry ? newId() : String(values('__gk_save')[0] || '')
   const error = h`<div id="save-error" class="gk-flash gk-error" role="alert" tabindex="-1" autofocus><p>${message}</p><p>Your entries are still in this form. <a href="${receipt}" target="_blank" rel="noopener">Check save receipt</a>.</p>${retry ? '' : h`<p>Do not repeat this submission. Inspect its saved steps first.</p>`}</div>`
   let selectName = '', selectPosition = 0
   const rewriter = new HTMLRewriter().on(selector, { element(element) {
@@ -30,7 +31,7 @@ export async function failedForm(source: Response, action: string, input: Input,
   } }).on(`${selector} input`, { element(element) {
     if (active !== chosen) return
     const name = element.getAttribute('name') || '', type = element.getAttribute('type') || 'text'
-    if (name === '__gk_save') { element.setAttribute('value', retry ? newId() : String(values(name)[0] || '')); return }
+    if (name === '__gk_save') { element.setAttribute('value', nextId); return }
     if (type === 'file') {
       const kept = files.filter(file => file.name === name)
       if (kept.length) { element.removeAttribute('required'); element.after(`<p class="gk-hint">Kept attachment: ${kept.map(file => esc(file.filename)).join(', ')}. Choose a file to replace it.</p>`, { html: true }) }
@@ -57,6 +58,8 @@ export async function failedForm(source: Response, action: string, input: Input,
     if (active !== chosen || !selectName) return
     if (values(selectName)[selectPosition] === (element.getAttribute('value') || '')) element.setAttribute('selected', '')
     else element.removeAttribute('selected')
+  } }).on(`${selector} noscript a`, { element(element) {
+    if (active === chosen && element.getAttribute('href')?.startsWith('/app/save-receipts/')) element.setAttribute('href', `/app/save-receipts/${nextId}`)
   } }).on(`${selector} button[type="submit"]`, { element(element) {
     if (active === chosen && !retry) element.setAttribute('disabled', '')
   } })
@@ -82,7 +85,7 @@ export async function retainedForm(action: string, input: Input, message: string
   return h`<div id="save-error" class="gk-flash gk-error" role="alert" tabindex="-1" autofocus>${message}</div>
     <p>Your submitted draft is kept below. <a href="/signin" target="_blank" rel="noopener">Sign in in a new tab</a> before retrying.${receipt ? h` <a href="${receipt}" target="_blank" rel="noopener">Check save receipt</a>.` : ''}</p>
     <form method="post" action="${action}" class="gk-form" enctype="${['multipart', 'form-data'].join('/')}">
-      ${input.entries().filter(([, value]) => typeof value === 'string').map(([name, value]) => /^(?:__|returnTo$|version$|revision$|base64$|.*[Ii]d$)/.test(name) ? hidden(name, value) : field(label(name), name, { value, required: false }))}
+      ${input.entries().filter(([, value]) => typeof value === 'string').map(([name, value]) => /^(?:__|returnTo$|version$|revision$|base64$|.*[Ii]d$)/.test(name) ? hidden(name, name === '__gk_save' && retry ? newId() : value) : field(label(name), name, { value, required: false }))}
       ${files.length ? hidden('__gk_files', JSON.stringify(files)) : ''}
       ${[...new Set(files.map(file => file.name))].map(name => h`<p>Kept attachment: ${files.filter(file => file.name === name).map(file => file.filename).join(', ')}</p>${fileField(label(name), name)}`)}
       <button type="submit"${retry ? '' : h` disabled`}>Retry retained draft</button>
