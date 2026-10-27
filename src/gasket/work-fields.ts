@@ -48,7 +48,7 @@ export async function retireField(env: Bindings, actor: Actor, input: Input) {
 
 /** The active fields a template names as required, checked when the template is saved. */
 export async function requiredFieldsOf(env: Bindings, input: Input) {
-  const ids = [...new Set(input.has('requiredField') ? input.list('requiredField').filter(Boolean) : [])]
+  const ids = [...new Set([...input.list('requiredField'), ...input.list('requiredFields')])]
   for (const id of ids) {
     const field = await one(env, 'SELECT retired_at FROM gk_work_fields WHERE id = ?', id)
     insist(field, 'field_not_found', 404)

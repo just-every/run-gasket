@@ -101,9 +101,13 @@ export async function apiJourney() {
     const procedure = await h.api(`/v1/checklists/${checklist.id}`, owner)
     assert.deepEqual(procedure.revisions.map(row => row.number), [2, 1])
     assert.equal(revised.number, 2)
-    const template = await repeat('template.save', { ...example('template.save'), checklist: checklist.id }, 'synthetic-gasket-template', lead)
-    const templateUpdate = { ...example('template.save'), template: template.id, revision: 1, checklist: checklist.id, title: 'Synthetic revised procedure job' }
+    const requiredField = (await h.api('/v1/workfield.save', lead, { label: 'Synthetic release reading', kind: 'text' })).id
+    const template = await repeat('template.save', { ...example('template.save'), checklist: checklist.id, requiredFields: [requiredField] }, 'synthetic-gasket-template', lead)
+    const templateUpdate = { ...example('template.save'), template: template.id, revision: 1, checklist: checklist.id, requiredFields: [requiredField], title: 'Synthetic revised procedure job' }
     assert.equal((await repeat('template.save', templateUpdate, 'synthetic-gasket-template-revision', lead)).revision, 2)
+    assert.deepEqual((await h.api('/v1/templates', lead)).find(row => row.id === template.id).requiredFields, [requiredField], 'documented template requirement must be retained')
+    await h.api('/v1/template.save', lead, { ...example('template.save'), name: 'Synthetic invalid requirement', checklist: checklist.id, requiredFields: ['synthetic-gasket-missing-field'] }, 404)
+    await h.api('/v1/template.save', lead, { ...example('template.save'), name: 'Synthetic malformed requirement', checklist: checklist.id, requiredFields: requiredField }, 400)
     const job = (await write('workorder.create', { asset, template: template.id, due: '2026-10-27', unassigned: true }, 'synthetic-gasket-procedure-job', lead)).result.id
     const order = cookie => h.api(`/v1/work/${job}`, cookie)
     await repeat('workorder.assign', { ...example('workorder.assign'), workOrder: job, assignee: member }, 'synthetic-gasket-assignment', lead)
@@ -116,6 +120,12 @@ export async function apiJourney() {
     await write('workorder.results', answers, 'synthetic-gasket-wrong-assignee', owner, 403)
     await write('workorder.submit', { workOrder: job, version: current.version }, 'synthetic-gasket-incomplete-submit', lead, 409)
     await repeat('workorder.results', answers, 'synthetic-gasket-results', lead)
+    const missingField = await write('workorder.submit', { workOrder: job, version: (await order(lead)).version }, 'synthetic-gasket-required-field', lead, 409)
+    assert.equal(missingField.result.error, 'not_ready_for_review')
+    assert.deepEqual(missingField.result.detail.missing, ['the required field Synthetic release reading has no value'])
+    assert.equal((await order(lead)).status, 'in_progress')
+    if (process.env.API_SCREENSHOTS) await browserProof(h, lead, asset, job, part, undefined, [[`work/${job}`, 'Before review: the required field Synthetic release reading has no value.']], 'required-')
+    await h.api('/v1/workorder.field', lead, { workOrder: job, field: requiredField, value: 'Released after inspection' })
     assert.deepEqual((await order(lead)).items.map(row => row.result.outcome), ['pass', 'pass'])
     await repeat('workorder.issue', { ...example('workorder.issue'), workOrder: job, part }, 'synthetic-gasket-issue', lead)
     assert.equal((await h.api(`/v1/parts/${part}`, owner)).onHand, '1')
@@ -183,8 +193,34 @@ export async function apiJourney() {
     assert.equal((await scoped(complete.token, 'part.count', serviceCount, 'synthetic-gasket-complete-count')).variance, '-1')
     await scoped(complete.token, 'part.count', serviceCount, 'synthetic-gasket-complete-count')
     assert.equal((await scoped(complete.token, `parts/${servicePart.id}`)).onHand, '4')
+    const ruleAuthor = (await h.api('access.give', owner, { name: 'Synthetic rule lead', email: 'synthetic-gasket-rule@example.test', role: 'lead' })).id
+    const ruleLead = await h.signIn('synthetic-gasket-rule@example.test')
+    const standingRule = await h.api('/v1/rules.save', ruleLead, { name: 'Synthetic service intake priority', trigger: 'work.created', priority: 1, conditions: [{ field: 'asset', op: 'eq', value: serviceAsset.id }], actions: [{ type: 'priority', value: 'high' }], reason: 'Lead authorized maintenance intake' })
+    await h.api('/v1/rules.control', ruleLead, { rule: standingRule.id, revision: standingRule.revision, paused: false, reason: 'Enable reviewed intake' })
+    const ownerRule = await h.api('/v1/rules.save', owner, { name: 'Synthetic owner intake due date', trigger: 'work.created', priority: 2, conditions: [{ field: 'asset', op: 'eq', value: serviceAsset.id }], actions: [{ type: 'due', days: 2 }], reason: 'Owner authorized standing due date' })
+    await h.api('/v1/rules.control', owner, { rule: ownerRule.id, revision: ownerRule.revision, paused: false, reason: 'Enable standing owner rule' })
     const serviceWork = await scoped(complete.token, 'workorder.create', { ...workBody, asset: serviceAsset.id }, 'synthetic-gasket-complete-work')
     assert.equal((await scoped(complete.token, `work/${serviceWork.id}`)).asset_id, serviceAsset.id)
+    assert.equal((await scoped(complete.token, `work/${serviceWork.id}`)).priority, 'high')
+    const allRuleEvents = (await h.api('audit?action=rules.action', owner)).rows.filter(row => row.subject === serviceWork.id)
+    assert.equal(allRuleEvents.length, 2, 'both standing grants execute')
+    const ruleEvents = allRuleEvents.filter(row => JSON.parse(row.detail).rule === standingRule.id)
+    assert.equal(ruleEvents.length, 1, 'standing rule runs once')
+    assert.equal(ruleEvents[0].actor, ruleAuthor, 'standing rule uses its author authority')
+    assert.equal(ruleEvents[0].authority, 'Maintenance lead', 'standing rule does not borrow the triggering credential')
+    const ruleDetail = JSON.parse(ruleEvents[0].detail)
+    assert.equal(ruleDetail.serviceCredential, undefined, 'trigger credential is not executing authority')
+    assert.equal(ruleDetail.rule, standingRule.id)
+    const ownerRuleEvent = allRuleEvents.find(row => JSON.parse(row.detail).rule === ownerRule.id)
+    assert.equal(ownerRuleEvent.actor, (await h.api('me', owner)).id)
+    assert.equal(ownerRuleEvent.authority, 'Owner', 'same-owner standing authority is separate from the bearer')
+    assert.equal(JSON.parse(ownerRuleEvent.detail).serviceCredential, undefined)
+    assert.equal((await scoped(complete.token, `work/${serviceWork.id}`)).due_date, '2026-10-28')
+    const sourceEvent = (await h.api('rules', ruleLead)).events.find(row => row.id === ruleDetail.event)
+    const creationEvent = (await h.api('audit?action=workorder.create', owner)).rows.find(row => row.subject === serviceWork.id)
+    assert.equal(sourceEvent.source_id, `audit:${creationEvent.seq}:0`, 'triggering provenance points to the separately attributed source event')
+    assert.equal(creationEvent.actor, (await h.api('me', owner)).id)
+    assert.equal(JSON.parse(creationEvent.detail).serviceCredential, complete.id)
     assert.equal((await scoped(complete.token, `assets/${serviceAsset.id}`)).name, 'Synthetic service update')
     for (const path of ['assets', 'parts', 'work']) assert.ok((await scoped(complete.token, path + '?limit=2')).rows.length > 0)
     assert.ok((await scoped(complete.token, `assets/${serviceAsset.id}/history`)).events.length > 0)
@@ -296,7 +332,7 @@ export async function apiJourney() {
   } finally { await resumed?.close(); await h.close() }
 }
 
-async function browserProof(h, owner, asset, work, part, credential) {
+async function browserProof(h, owner, asset, work, part, credential, screens, prefix = '') {
   const { chromium } = await import('@playwright/test'), { mkdir } = await import('node:fs/promises')
   await mkdir(process.env.API_SCREENSHOTS, { recursive: true })
   const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
@@ -304,7 +340,7 @@ async function browserProof(h, owner, asset, work, part, credential) {
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
     await context.addCookies(owner.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
     const page = await context.newPage()
-    for (const [path, expected] of [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`]]) for (const width of [1440, 390]) {
+    for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead']])) for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
       const response = await page.goto(h.origin + '/app/' + path)
       await page.getByText(expected, { exact: true }).first().waitFor()
@@ -312,12 +348,13 @@ async function browserProof(h, owner, asset, work, part, credential) {
       if (width === (path.startsWith('audit') ? 390 : 1440)) {
         assert.equal(response.status(), 200)
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+        if (prefix === 'required-') assert.equal(await page.getByRole('button', { name: 'Submit for review', exact: true }).isDisabled(), true)
         if (path.startsWith('audit')) {
           const overflow = await page.locator('.gk-audit-authority').evaluateAll(nodes => nodes.filter(node => node.scrollWidth > node.clientWidth).map(node => ({ width: node.clientWidth, scroll: node.scrollWidth, display: getComputedStyle(node).display, wrap: getComputedStyle(node).overflowWrap, whitespace: getComputedStyle(node).whiteSpace })))
           assert.deepEqual(overflow, [], 'service authority fits the phone audit rows')
         }
       }
-      await page.screenshot({ path: `${process.env.API_SCREENSHOTS}/${path.split(/[/?]/)[0]}-${width}.png`, fullPage: true })
+      await page.screenshot({ path: `${process.env.API_SCREENSHOTS}/${prefix}${path.replace(/[^a-z0-9-]/gi, '_')}-${width}.png`, fullPage: true })
     }
     await context.close()
   } finally { await browser.close() }

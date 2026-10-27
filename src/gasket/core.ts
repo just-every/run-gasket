@@ -1,4 +1,4 @@
-import { serviceAuthority } from './service-context'
+import { serviceAuthority, withServiceAuthority } from './service-context'
 // Shared primitives: typed errors, ids, D1 helpers, audited atomic commits and
 // in-batch preconditions (gk_guard rows abort the whole batch when false).
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -56,7 +56,7 @@ export async function commit(env: Bindings, statements: D1PreparedStatement[], a
       ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority || credential ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), ...(authority ? { automation: authority } : {}), ...(credential ? { serviceCredential: credential } : {}) } : event.detail ?? {}))),
     ])
     const relevant = events.some(event => /^(request\.submit|workorder\.(create|generate|schedule|trigger|submit|approve|return|cancel|reopen|merged|merge|readings|results|evidence|time|annotate)|asset\.(state|retire)|downtime\.(start|end)|meter\.feed|part\.(create|receive|count|issue|return|disposition)|finding\.record)$/.test(event.action))
-    if (relevant) { const { dispatchRuleEvents } = await import('./rule-events'); await dispatchRuleEvents(env, events, results.slice(results.length-events.length).map(result => result.meta.last_row_id)) }
+    if (relevant) { const { dispatchRuleEvents } = await import('./rule-events'); await withServiceAuthority(undefined, () => dispatchRuleEvents(env, events, results.slice(results.length-events.length).map(result => result.meta.last_row_id))) }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     const code = message.match(/gasket_guard_(\w+)/)?.[1]

@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-const context = new AsyncLocalStorage<string>()
+const context = new AsyncLocalStorage<string | undefined>()
 export const serviceAuthority = () => context.getStore()
-export const withServiceAuthority = <T>(id: string | undefined, run: () => Promise<T>) => id ? context.run(id, run) : run()
+// An absent credential explicitly clears inherited request authority for a standing grant.
+export const withServiceAuthority = <T>(id: string | undefined, run: () => Promise<T>) => context.run(id, run)

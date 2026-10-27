@@ -1399,6 +1399,7 @@
                     "type": "boolean"
                   },
                   "requiredFields": {
+                    "description": "Active work-field ids required by this template revision. The legacy requiredField list is also accepted; supplying both requires their union.",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -1419,7 +1420,8 @@
               "example": {
                 "name": "Synthetic API job template",
                 "title": "Synthetic procedure job",
-                "checklist": "CHECKLIST_ID"
+                "checklist": "CHECKLIST_ID",
+                "requiredFields": ["WORK_FIELD_ID"]
               }
             }
           }
