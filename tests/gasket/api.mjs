@@ -261,7 +261,10 @@ export async function apiJourney() {
     }
     const handedOff = (await h.api('/v1/workorder.create', owner, { asset, title: 'Synthetic receipt authority', due: '2026-10-27', assignee: member })).id
     await repeat('workorder.issue', { workOrder: handedOff, part, quantity: '1' }, 'synthetic-gasket-former-assignee', lead)
+    const keptFinding = { ...example('finding.record'), workOrder: handedOff }
+    await repeat('finding.record', keptFinding, 'synthetic-gasket-finding-authority', lead)
     await h.api('/v1/workorder.assign', owner, { workOrder: handedOff, assignee: (await h.api('me', owner)).id })
+    await write('finding.record', keptFinding, 'synthetic-gasket-finding-authority', lead, 403)
     await write('workorder.issue', { workOrder: handedOff, part, quantity: '1' }, 'synthetic-gasket-former-assignee', lead, 403)
     assert.equal((await h.api(`/v1/parts/${part}`, owner)).onHand, '1')
     const former = { ...example('finding.record'), workOrder: handedOff }
@@ -479,7 +482,8 @@ async function browserProof(h, owner, asset, work, part, credential, screens, pr
     for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead'], ['audit?action=service.invalidate', 'Invalidated a service credential']])) for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
       const response = await page.goto(h.origin + '/app/' + path)
-      await page.getByText(expected, { exact: true }).first().waitFor()
+      if (path === 'audit?action=service.invalidate') await page.getByRole('cell', { name: expected, exact: true }).first().waitFor()
+      else await page.getByText(expected, { exact: true }).first().waitFor()
       await page.evaluate(() => document.fonts.ready)
       if (width === (path.startsWith('audit') ? 390 : 1440)) {
         assert.equal(response.status(), 200)
