@@ -49,16 +49,17 @@ export async function commit(env: Bindings, statements: D1PreparedStatement[], a
   const events = Array.isArray(audit) ? audit : [audit]
   const authority = automationAuthority(), credential = serviceAuthority()
   try {
+    const contextual = events.some(event => ['access.role', 'access.end'].includes(event.action))
     const [before, after] = authorityStatements(env.DB, { actor: events[0].actor, action: events[0].action, at: now() })
     const results = (await env.DB.batch([
-      before,
+      ...(contextual ? [before] : []),
       ...(authority ? [guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_automation_rules WHERE id=? AND revision=? AND paused=0)', authority.rule, authority.revision)] : []),
       ...(serviceAuthority() ? [guard(env, 'service_authority_ended', `EXISTS(SELECT 1 FROM gk_api_credentials c JOIN gk_members m ON m.id=c.member_id JOIN oa_operators o ON o.id=m.operator_id WHERE c.id=? AND c.revoked_at IS NULL AND c.expires_at>? AND m.status='active' AND o.status='active' AND o.role='owner')`, serviceAuthority(), now())] : []),
       ...statements,
       stmt(env, 'DELETE FROM gk_guard'),
       ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority || credential ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), ...(authority ? { automation: authority } : {}), ...(credential ? { serviceCredential: credential } : {}) } : event.detail ?? {}))),
-      after,
-    ])).slice(1, -1)
+      ...(contextual ? [after] : []),
+    ])).slice(contextual ? 1 : 0, contextual ? -1 : undefined)
     const relevant = events.some(event => /^(request\.submit|workorder\.(create|generate|schedule|trigger|submit|approve|return|cancel|reopen|merged|merge|readings|results|evidence|time|annotate)|asset\.(state|retire)|downtime\.(start|end)|meter\.feed|part\.(create|receive|count|issue|return|disposition)|finding\.record)$/.test(event.action))
     if (relevant) { const { dispatchRuleEvents } = await import('./rule-events'); await dispatchRuleEvents(env, events, results.slice(results.length-events.length).map(result => result.meta.last_row_id)) }
   } catch (error) {
