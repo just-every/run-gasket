@@ -20,6 +20,7 @@ export async function failedForm(source: Response, action: string, input: Input,
   index = -1; active = -1
   const positions = new Map<string, number>(), files = await draftFiles(input)
   const nextId = retry ? newId() : String(values('__gk_save')[0] || '')
+  const nextReceipt = receipt.startsWith('/app/save-receipts/') ? `/app/save-receipts/${nextId}` : receipt
   const error = h`<div id="save-error" class="gk-flash gk-error" role="alert" tabindex="-1" autofocus><p>${message}</p><p>Your entries are still in this form. <a href="${receipt}" target="_blank" rel="noopener">Check save receipt</a>.</p>${retry ? '' : h`<p>Do not repeat this submission. Inspect its saved steps first.</p>`}</div>`
   let selectName = '', selectPosition = 0
   const rewriter = new HTMLRewriter().on(selector, { element(element) {
@@ -58,8 +59,11 @@ export async function failedForm(source: Response, action: string, input: Input,
     if (active !== chosen || !selectName) return
     if (values(selectName)[selectPosition] === (element.getAttribute('value') || '')) element.setAttribute('selected', '')
     else element.removeAttribute('selected')
-  } }).on(`${selector} noscript a`, { element(element) {
-    if (active === chosen && element.getAttribute('href')?.startsWith('/app/save-receipts/')) element.setAttribute('href', `/app/save-receipts/${nextId}`)
+  } }).on(`${selector} noscript`, { element(element) {
+    // The rewriter treats noscript content as text; descendant handlers never see its link.
+    if (active === chosen) element.setInnerContent(h`<p>Save results open in a new tab. Keep this draft until confirmation. If the connection fails, <a href="${nextReceipt}" target="_blank" rel="noopener">check save receipt</a> before submitting again.</p>`.html, { html: true })
+  } }).on(`${selector} a[data-request-receipt]`, { element(element) {
+    if (active === chosen) element.setAttribute('href', nextReceipt)
   } }).on(`${selector} button[type="submit"]`, { element(element) {
     if (active === chosen && !retry) element.setAttribute('disabled', '')
   } })

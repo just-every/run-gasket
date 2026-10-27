@@ -8,7 +8,9 @@
   const generation=()=>document.cookie.split(';').map(value=>value.trim()).find(value=>value.startsWith(cookie))?.slice(cookie.length) || '';
   const openedGeneration=generation();
   let db,ready=false,timer,submitting=false,invalidated=false;
-  function clearForm(){clearTimeout(timer);form.reset();form.elements.namedItem('saveOnDevice').checked=false;form.elements.namedItem('submissionKey').value=crypto.randomUUID();}
+  const receiptLink=form.querySelector('[data-request-receipt]');
+  function updateReceipt(){receiptLink.href=`${form.action}/received/${encodeURIComponent(form.elements.namedItem('submissionKey').value)}`;}
+  function clearForm(){clearTimeout(timer);form.reset();form.elements.namedItem('saveOnDevice').checked=false;form.elements.namedItem('submissionKey').value=crypto.randomUUID();updateReceipt();}
   function invalidate(){if(invalidated)return;invalidated=true;clearForm();const connection=db;db=null;
     if(connection){void fence(connection,generation()).catch(()=>{/* Clear-Site-Data may already have closed this connection. */});connection.close();}
     status.textContent='Draft cleared from this device. Reload before starting a new draft.';
@@ -30,10 +32,10 @@
     // Old private drafts predate the sign-out fence and are unsafe to restore.
     // Clearing the store also removes dormant drafts from other portal scopes.
     if(draft.generation!==openedGeneration){await transact('readwrite',s=>{s.clear();s.put(openedGeneration,'$generation');});return;}
-    if(draft.receipt){status.textContent='Your previous request is saved. ';const link=document.createElement('a');link.href=draft.receipt;link.textContent='Open confirmation';status.append(link);form.elements.namedItem('submissionKey').value=crypto.randomUUID();return;}
+    if(draft.receipt){status.textContent='Your previous request is saved. ';const link=document.createElement('a');link.href=draft.receipt;link.textContent='Open confirmation';status.append(link);form.elements.namedItem('submissionKey').value=crypto.randomUUID();updateReceipt();return;}
     for(const [name,value] of draft.entries){const control=form.elements.namedItem(name);if(!control)continue;if(name==='target'&&initialTarget&&value!==initialTarget)continue;
       if(control.type==='checkbox'){control.checked=value==='yes';continue;}if(value instanceof File){if(value.size){const transfer=new DataTransfer();transfer.items.add(value);control.files=transfer.files;}}else control.value=value;
-    }status.textContent='Saved draft restored, including photos. Check the fault before sending.';
+    }updateReceipt();status.textContent='Saved draft restored, including photos. Check the fault before sending.';
   }
   open.onsuccess=async()=>{if(!current()){open.result.close();return;}db=open.result;db.onversionchange=()=>invalidate();db.onclose=()=>invalidate();try{await restore();ready=!invalidated;}catch{if(current()){status.textContent='Saved draft unavailable. Keep this page open.';ready=true;}}};
   open.onerror=()=>{ready=true;status.textContent='Device storage is unavailable. Keep this page open until the request is confirmed.';};

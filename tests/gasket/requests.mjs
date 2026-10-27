@@ -193,6 +193,8 @@ export async function requestDraftJourney() {
     await page.getByRole('status').filter({hasText:'Saved draft restored'}).waitFor()
     assert.equal(await page.locator('[name=description]').inputValue(),'Leak around the pump seal')
     assert.equal(await page.locator('[name=submissionKey]').inputValue(),submissionKey)
+    const restoredReceipt = new URL(await page.locator('[data-request-receipt]').getAttribute('href'),h.origin).pathname
+    assert.equal(new URL(restoredReceipt,h.origin).pathname,`/request/${portal}/received/${submissionKey}`,'restored portal advertises the retained submission identity')
     assert.equal(await page.locator('[name=target]').inputValue(),target)
     assert.equal(await page.locator('[name=photo]').evaluate(n=>n.files[0].name),'leak.png')
     // The server accepts the request but its response is lost before the phone
@@ -201,6 +203,7 @@ export async function requestDraftJourney() {
     await page.route(`**/request/${portal}`,async route=>{if(route.request().method()==='POST'&&!lost){lost=true;const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed')}else await route.continue()})
     await page.getByRole('button',{name:'Send request',exact:true}).click();await page.getByRole('alert').filter({hasText:'Not confirmed'}).waitFor()
     assert.equal((await h.api('requests',cookie.lead)).length,1,'the response was lost after persistence')
+    assert.equal((await h.raw(restoredReceipt)).status,200,'the advertised restored receipt confirms a lost response')
     await Promise.all([page.waitForURL(`**/received/${submissionKey}`),page.getByRole('button',{name:'Send request',exact:true}).click()])
     await page.reload();assert.match(await page.getByRole('status').textContent(),/R-1 is saved/)
     const rows=await h.api('requests',cookie.lead);assert.equal(rows.length,1);assert.equal(rows[0].asset_id,asset)
@@ -209,7 +212,16 @@ export async function requestDraftJourney() {
     if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,new URL(page.url()).pathname,'phone-confirmation')
     await page.goto(scanned);await page.getByRole('link',{name:'Open confirmation',exact:true}).waitFor()
     assert.equal(await page.locator('[name=contact]').inputValue(),'','confirmed drafts retain no private contact')
+    const freshKey = await page.locator('[name=submissionKey]').inputValue()
+    assert.notEqual(freshKey,submissionKey,'a confirmed draft starts a separate submission')
+    assert.equal(new URL(await page.locator('[data-request-receipt]').getAttribute('href'),h.origin).pathname,`/request/${portal}/received/${freshKey}`,'a new draft advertises its own receipt')
     await draftPrivacy(f,context,page,scanned,process.env.REQUEST_SCREENSHOTS?capture:null)
+    const beforeClearKey = await page.locator('[name=submissionKey]').inputValue()
+    await page.getByRole('button',{name:'Clear draft',exact:true}).click()
+    await page.getByRole('status').filter({hasText:'Draft cleared from this device.'}).waitFor()
+    const clearedKey = await page.locator('[name=submissionKey]').inputValue()
+    assert.notEqual(clearedKey,beforeClearKey,'explicit clearing starts a new submission identity')
+    assert.equal(new URL(await page.locator('[data-request-receipt]').getAttribute('href'),h.origin).pathname,`/request/${portal}/received/${clearedKey}`,'clearing updates the advertised receipt')
     console.log('REQ-002 decoded QR, camera photo, durable offline draft, lost-response retry, one original-mapped request and durable confirmation passed')
   } finally {await context?.close();await browser?.close();await h.close()}
 }
