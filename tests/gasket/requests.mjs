@@ -193,6 +193,8 @@ export async function requestDraftJourney() {
     await page.getByRole('status').filter({hasText:'Saved draft restored'}).waitFor()
     assert.equal(await page.locator('[name=description]').inputValue(),'Leak around the pump seal')
     assert.equal(await page.locator('[name=submissionKey]').inputValue(),submissionKey)
+    const restoredReceipt = await page.locator('[data-request-receipt]').getAttribute('href')
+    assert.equal(new URL(restoredReceipt,h.origin).pathname,`/request/${portal}/received/${submissionKey}`,'restored portal advertises the retained submission identity')
     assert.equal(await page.locator('[name=target]').inputValue(),target)
     assert.equal(await page.locator('[name=photo]').evaluate(n=>n.files[0].name),'leak.png')
     // The server accepts the request but its response is lost before the phone
@@ -201,6 +203,7 @@ export async function requestDraftJourney() {
     await page.route(`**/request/${portal}`,async route=>{if(route.request().method()==='POST'&&!lost){lost=true;const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed')}else await route.continue()})
     await page.getByRole('button',{name:'Send request',exact:true}).click();await page.getByRole('alert').filter({hasText:'Not confirmed'}).waitFor()
     assert.equal((await h.api('requests',cookie.lead)).length,1,'the response was lost after persistence')
+    assert.equal((await h.raw(restoredReceipt)).status,200,'the advertised restored receipt confirms a lost response')
     await Promise.all([page.waitForURL(`**/received/${submissionKey}`),page.getByRole('button',{name:'Send request',exact:true}).click()])
     await page.reload();assert.match(await page.getByRole('status').textContent(),/R-1 is saved/)
     const rows=await h.api('requests',cookie.lead);assert.equal(rows.length,1);assert.equal(rows[0].asset_id,asset)
