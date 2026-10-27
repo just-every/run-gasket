@@ -13,12 +13,30 @@ export class Input {
       return new Input(body as Record<string, unknown>, null)
     }
     insist(type.startsWith('multipart/form-data') || type.startsWith('application/x-www-form-urlencoded'), 'unsupported_content_type', 415)
-    return new Input({}, await request.formData())
+    const form = await request.formData()
+    const kept = form.get('__gk_files')
+    if (typeof kept === 'string') {
+      insist(kept.length <= 24_000_000, 'file_size')
+      let files: { name: string; filename: string; type: string; base64: string }[]
+      try { files = JSON.parse(kept) } catch { throw new GasketError('invalid_draft_files') }
+      insist(Array.isArray(files) && files.length <= 50, 'invalid_draft_files')
+      insist(files.every(file => file && typeof file.name === 'string'), 'invalid_draft_files')
+      const replacements = new Set(files.map(file => file.name).filter(name => form.getAll(name).some(value => value instanceof File && value.size > 0)))
+      for (const name of new Set(files.map(file => file.name))) if (!replacements.has(name)) form.delete(name)
+      for (const file of files) {
+        insist(file && typeof file.name === 'string' && typeof file.filename === 'string' && typeof file.type === 'string' && typeof file.base64 === 'string' && /^[A-Za-z0-9+/]*={0,2}$/.test(file.base64), 'invalid_draft_files')
+        if (!replacements.has(file.name)) form.append(file.name, new File([Uint8Array.from(atob(file.base64), c => c.charCodeAt(0))], file.filename, { type: file.type }))
+      }
+      form.delete('__gk_files')
+    }
+    return new Input({}, form)
   }
 
   static of(values: Record<string, unknown>) {
     return new Input(values, null)
   }
+
+  entries(): [string, FormDataEntryValue][] { return this.form ? [...this.form.entries()] : [] }
 
   private raw(name: string): unknown {
     if (this.form) {
@@ -30,7 +48,7 @@ export class Input {
 
   only(names: string[]) {
     const keys = this.form ? [...this.form.keys()] : Object.keys(this.values)
-    insist(keys.every(key => names.includes(key)), 'unexpected_input')
+    insist(keys.every(key => ['__gk_save', '__gk_source'].includes(key) || names.includes(key)), 'unexpected_input')
   }
 
   present(name: string) { return this.raw(name) !== undefined && this.raw(name) !== null }
