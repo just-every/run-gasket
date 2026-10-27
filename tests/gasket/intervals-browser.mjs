@@ -239,6 +239,22 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await page.getByRole('alert').waitFor()
       assert.match(await page.getByRole('alert').innerText(),/Nothing was saved/)
       assert.equal(await page.getByRole('alert').evaluate(el=>el===document.activeElement),true)
+      // A later device-storage completion must not replace the failed-send alert.
+      await page.evaluate(async()=>{
+        document.querySelector('#request-form').dispatchEvent(new Event('change',{bubbles:true}))
+        await new Promise((resolve,reject)=>{
+          const open=indexedDB.open('gasket-request-drafts',1)
+          open.onerror=()=>reject(open.error)
+          open.onsuccess=()=>{
+            const db=open.result,tx=db.transaction('drafts','readwrite')
+            tx.objectStore('drafts').getAll()
+            tx.oncomplete=()=>{db.close();resolve()}
+            tx.onerror=()=>{db.close();reject(tx.error)}
+          }
+        })
+      })
+      assert.match(await page.getByRole('alert').innerText(),/Nothing was saved/)
+      assert.equal(await page.getByRole('alert').evaluate(el=>el===document.activeElement),true)
       assert.equal(await page.getByLabel('What is wrong?').inputValue(),fault)
       await proof('intake-refused')
       await page.getByLabel('Your name and contact').fill('Synthetic maintenance operator')
