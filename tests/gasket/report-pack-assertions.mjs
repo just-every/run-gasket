@@ -13,6 +13,7 @@ export async function assertPack(h, cookie, pack, expected, pdfText) {
   assert.equal(pack.metadata.report, kind)
   assert.equal(pack.metadata.generatedAt, at)
   assert.equal(pack.metadata.zone, 'America/New_York')
+  if (!Object.keys(filters).length) assert.deepEqual(pack.metadata.scope.filters, {}, 'unfiltered packs preserve the explicit empty filter object')
   assert.deepEqual(pack.metadata.scope, {
     site: 'Great Lakes report plant', filters, role, recipient,
     policy: 'Current report access only. No original files or individual labor rates.',
