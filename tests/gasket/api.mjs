@@ -390,7 +390,6 @@ export async function apiJourney() {
     await service(`assets/${asset}`, undefined, 401)
     await service('asset.create', { ...assetBody, tag: 'synthetic-gasket-scoped' }, 401, 'synthetic-gasket-1')
     const expiring = await h.api('service.create', owner, { name: 'Synthetic expiring service', scopes: ['parts:read'], expiresAt: Date.UTC(2026, 9, 26, 16, 1), consent: true })
-    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     // Losing owner authority is permanent for a bearer, even after reinstatement.
     const ownerSession = await (await h.raw('/auth/session', { cookie: owner })).json()
     assert.equal((await h.raw('/auth/invite', { cookie: owner, body: { email: 'synthetic-gasket-owner@example.test', displayName: 'Synthetic second owner', role: 'owner' } })).status, 202)
@@ -452,6 +451,7 @@ export async function apiJourney() {
     owner = await h.signIn(h.vars.OWNER_EMAIL)
     assert.equal((await h.api(`/v1/assets/${asset}`, owner)).name, 'Synthetic updated pump')
     assert.equal((await h.api(`/v1/work/${job}`, owner)).status, 'closed')
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     // Receipt and stock survive a complete Worker restart, without replaying writes.
     await h.stop()
     resumed = await harness({ vars: h.vars, installation: h.installation, clockInstant: Date.UTC(2026, 9, 26, 16) })
