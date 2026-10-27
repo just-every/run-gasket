@@ -21,6 +21,7 @@ const RETRYABLE: Record<string, Capability> = {
   'template.save': 'work.assign', 'workorder.assign': 'work.assign',
   'workorder.results': 'work.do', 'workorder.issue': 'work.do', 'workorder.return': 'work.do',
   'workorder.submit': 'work.do', 'workorder.review': 'work.review',
+  'document.add': 'register.manage', 'document.revise': 'register.manage', 'document.expiry': 'register.manage', 'document.link': 'work.assign',
   'meter.create': 'register.manage', 'schedule.create': 'work.assign',
   'customfield.save': 'register.manage', 'customfield.retire': 'register.manage', 'customvalue.set': 'register.manage', 'part.category': 'register.manage',
   'workorder.evidence': 'work.do', 'workorder.annotate': 'work.do',
@@ -60,7 +61,7 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   // Receipt access must not outlive the record authority that made it.
   // State and version checks stay in the handler for new effects; a completed
   // receipt remains replayable after its own successful state transition.
-  if ((action.startsWith('workorder.') && action !== 'workorder.create') || action === 'finding.record' || action.startsWith('downtime.')) {
+  if ((action.startsWith('workorder.') && action !== 'workorder.create') || action === 'document.link' || action === 'finding.record' || action.startsWith('downtime.')) {
     const order = await workOrder(env, input.text('workOrder', { max: 100 }))
     if (capability === 'work.do') {
       insist(order.assignee_id === actor.id || (action !== 'workorder.submit' && await isCollaborator(env, order.id, actor.id)), 'not_your_work', 403)
