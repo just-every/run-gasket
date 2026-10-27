@@ -381,7 +381,9 @@ fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .gk-roles strong { color: var(--rer-text); }
 /* A person's role and access controls sit on their row; the column heads name them. */
 td .gk-split { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
-td .gk-inline { flex-wrap: nowrap; align-items: center; }
+td .gk-inline { flex-wrap: wrap; align-items: center; }
+td .gk-inline > noscript, td .gk-inline > .gk-flash { flex-basis: 100%; }
+td .gk-inline:has(> .gk-flash) { width: 100%; }
 td .gk-inline .gk-field label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 td .gk-inline select, td .gk-role { min-width: 180px; }
 /* Padding must not enlarge the role column's intrinsic width. */
