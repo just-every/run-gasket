@@ -9,8 +9,8 @@ export async function failedForm(source: Response, action: string, input: Input,
   const html = await source.text()
   // A page may have several forms for one action; identify the submitted hidden record and verb.
   let index = -1, active = -1
-  const scores: number[] = []
-  await new HTMLRewriter().on(selector, { element(element) { active = ++index; scores[active] = 0; element.onEndTag(() => { active = -1 }) } })
+  const scores: number[] = [], formIds: string[] = []
+  await new HTMLRewriter().on(selector, { element(element) { active = ++index; scores[active] = 0; formIds[active] = element.getAttribute('id') || ''; element.onEndTag(() => { active = -1 }) } })
     .on(`${selector} input[type="hidden"]`, { element(element) {
       const name = element.getAttribute('name') || ''
       if (active >= 0 && !['returnTo', '__gk_save'].includes(name)) scores[active] += values(name).includes(element.getAttribute('value') || '') ? 1 : -1
@@ -63,6 +63,18 @@ export async function failedForm(source: Response, action: string, input: Input,
   } }).on(`${selector} button[type="submit"]`, { element(element) {
     if (active === chosen && !retry) element.setAttribute('disabled', '')
   } })
+  // A role selector can belong to its row form while appearing in another table cell.
+  const associated = formIds[chosen]
+  if (associated && /^[a-z0-9_-]+$/i.test(associated)) {
+    let name = ''
+    rewriter.on(`select[form="${associated}"]`, { element(element) {
+      name = element.getAttribute('name') || ''
+      element.onEndTag(() => { name = '' })
+    } }).on(`select[form="${associated}"] option`, { element(element) {
+      if (values(name).includes(element.getAttribute('value') || '')) element.setAttribute('selected', '')
+      else element.removeAttribute('selected')
+    } })
+  }
   const response = rewriter.transform(new Response(html, { headers: source.headers, status }))
   response.headers.set('cache-control', 'no-store')
   return response
