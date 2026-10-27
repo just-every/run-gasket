@@ -390,7 +390,6 @@ export async function apiJourney() {
     await service(`assets/${asset}`, undefined, 401)
     await service('asset.create', { ...assetBody, tag: 'synthetic-gasket-scoped' }, 401, 'synthetic-gasket-1')
     const expiring = await h.api('service.create', owner, { name: 'Synthetic expiring service', scopes: ['parts:read'], expiresAt: Date.UTC(2026, 9, 26, 16, 1), consent: true })
-    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     // Losing owner authority is permanent for a bearer, even after reinstatement.
     const ownerSession = await (await h.raw('/auth/session', { cookie: owner })).json()
     assert.equal((await h.raw('/auth/invite', { cookie: owner, body: { email: 'synthetic-gasket-owner@example.test', displayName: 'Synthetic second owner', role: 'owner' } })).status, 202)
@@ -452,6 +451,7 @@ export async function apiJourney() {
     owner = await h.signIn(h.vars.OWNER_EMAIL)
     assert.equal((await h.api(`/v1/assets/${asset}`, owner)).name, 'Synthetic updated pump')
     assert.equal((await h.api(`/v1/work/${job}`, owner)).status, 'closed')
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     // Receipt and stock survive a complete Worker restart, without replaying writes.
     await h.stop()
     resumed = await harness({ vars: h.vars, installation: h.installation, clockInstant: Date.UTC(2026, 9, 26, 16) })
@@ -476,7 +476,7 @@ async function browserProof(h, owner, asset, work, part, credential, screens, pr
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
     await context.addCookies(owner.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
     const page = await context.newPage()
-    for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead']])) for (const width of [1440, 390]) {
+    for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead'], ['audit?action=service.invalidate', 'Invalidated a service credential']])) for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
       const response = await page.goto(h.origin + '/app/' + path)
       await page.getByText(expected, { exact: true }).first().waitFor()
