@@ -91,7 +91,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     h.setSaveFault('before')
     await form.getByRole('button',{name:/./}).last().click()
     const refusal = form.getByRole('alert');await refusal.waitFor()
-    assert.match(await refusal.innerText(),/Nothing was saved/,`${action} refuses before commit`)
+    assert.match(await refusal.innerText(),/internal error.*Nothing was saved/s,`${action} refuses at the database boundary before commit`)
     assert.equal(await refusal.evaluate(el=>el===document.activeElement),true)
     assert.deepEqual(await h.api(view,who),unchanged,`${action} independent read confirms no effects`)
     assert.deepEqual(await form.evaluate(el=>[...new FormData(el)].filter(([key])=>key!=='__gk_save').map(([key,value])=>[key,typeof value==='string'?value:value.name])),before.filter(([key])=>key!=='__gk_save'),`${action} failed draft retains all fields`)
@@ -101,7 +101,8 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
-    await page.route('**'+action,async route=>{await route.fetch();await route.abort('failed')},{times:1})
+    let confirmation
+    await page.route('**'+action,async route=>{confirmation=await (await route.fetch()).json();await route.abort('failed')},{times:1})
     await form.getByRole('button',{name:/./}).last().focus()
     await page.keyboard.press('Enter')
     const error = form.getByRole('alert')
@@ -116,11 +117,13 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     const receipt = await response.json()
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
+    assert.equal(confirmation.saved,true)
+    assert.match(confirmation.notice,notice,`${action} retains its original success outcome`)
     receiptActions.add(action.slice('/app/do/'.length))
-    const destination = new URL(receipt.destination,h.origin);destination.searchParams.set('notice','Saved.')
+    const destination = new URL(receipt.destination,h.origin);destination.searchParams.set('notice',confirmation.notice)
     await page.goto(destination.href)
     // The server response was deliberately lost; the receipt supplies the navigation.
-    assert.match(await page.getByRole('status').first().innerText(),/Saved/)
+    assert.match(await page.getByRole('status').first().innerText(),notice)
   }
   async function noScriptDrafts(work) {
     const native = await browser.newContext({ignoreHTTPSErrors:true,javaScriptEnabled:false,viewport:{width:1440,height:1100}})
@@ -277,6 +280,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await submit(give)
       const relief = (await h.api('members',cookie.owner)).find(row=>row.email==='synthetic-gasket-relief@example.test')
       assert.equal(relief.role,'maintainer')
+      await h.signIn('synthetic-gasket-relief@example.test')
       await page.getByLabel('Role for Synthetic maintenance relief technician',{exact:true}).selectOption('supervisor')
       await submit(page.locator(`#role-form-${relief.id}`))
       assert.equal((await h.api('members',cookie.owner)).find(row=>row.id===relief.id).role,'supervisor')
