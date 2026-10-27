@@ -71,12 +71,12 @@ export async function genericMigrationJourney(){
     const beforeStock=await h.api(`parts/${part}`,owner),beforeNotices=await h.api('notices',owner)
     const header=['Source ID','Status','Asset ID','Title','Work type','Created on','Due date','Completed on','Completed by','Assignee','Team','Priority','Estimate hours','Parts cost USD','Labor cost USD','Other cost USD','Historical consumption','Custom: Inspection type']
     const count=Number(process.env.GASKET_MIGRATION_ROWS??8)
-    const rows=Array.from({length:count},(_,n)=>[String(n+1).padStart(6,'0'),n%2?'completed':'open','00017',`Inspect chiller ${n+1}`,'corrective',n%3?'03/01/2027':'2027-03-01','03/15/2027',n%2?'2027-03-02T11:45':'',n%2?'Former technician':'',n%2?'Retired person':'legacy-user',n%2?'Legacy team':'legacy-crew','normal','1.5',n%2?'12.34':'',n%2?'56.78':'',n%2?'9.00':'',n%2?'00021: 2 each':'','Mechanical'])
+    const rows=Array.from({length:count},(_,n)=>[String(n+1).padStart(6,'0'),n%2?'completed':'open','00317',`Inspect chiller ${n+1}`,'corrective',n%3?'03/01/2027':'2027-03-01','03/15/2027',n%2?'2027-03-02T11:45':'',n%2?'Former technician':'',n%2?'Retired person':'legacy-user',n%2?'Legacy team':'legacy-crew','normal','1.5',n%2?'12.34':'',n%2?'56.78':'',n%2?'9.00':'',n%2?'00021: 2 each':'','Mechanical'])
     const broken=rows.map(r=>[...r]);broken[0][6]='not a date';broken[1][17]='Invalid choice'
-    const bad=await preview('work',[header,...broken],'xlsx')
+    const bad=await preview('work',[header,...broken],'xlsx',{assetMapping:{'00317':asset}})
     assert.ok(bad.rejected.some(r=>r.reason.includes('assignee')))
     assert.ok(bad.rejected.some(r=>r.reason.includes('choice')))
-    const mappings={userMapping:{'legacy-user':techId},teamMapping:{'legacy-crew':team}}
+    const mappings={assetMapping:{'00317':asset},userMapping:{'legacy-user':techId},teamMapping:{'legacy-crew':team}}
     const mappedBad=await preview('work',[header,...broken],'xlsx',mappings)
     assert.ok(mappedBad.rejected.some(r=>r.reason.includes('due date')))
     const fixed=await preview('work',[header,...rows],'xlsx',mappings)
@@ -133,13 +133,14 @@ export async function genericMigrationJourney(){
           await page.goto(h.origin+'/app/move-in');await page.getByText('Templates and upload',{exact:true}).click()
           await page.getByLabel('Spreadsheet',{exact:true}).setInputFiles({name:'synthetic-gasket-1.xlsx',mimeType:['application','octet-stream'].join('/'),buffer:workbook([header,...broken])})
           await page.getByRole('button',{name:'Preview spreadsheet',exact:true}).click();await page.getByRole('heading',{name:'Spreadsheet preview',exact:true}).waitFor()
-          assert.ok((await page.getByRole('table',{name:'Spreadsheet errors'}).innerText()).includes('Invalid choice'))
+          assert.ok((await page.getByRole('table',{name:'Spreadsheet errors'}).innerText()).includes('Unknown or ambiguous asset'))
           assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
           await page.screenshot({path:`${process.env.MIGRATION_SCREENSHOTS}/migration-errors-${width}.png`,fullPage:true})
           await page.goto(h.origin+'/app/move-in');await page.getByText('Templates and upload',{exact:true}).click()
           await page.getByLabel('Spreadsheet',{exact:true}).setInputFiles({name:'synthetic-gasket-1.xlsx',mimeType:['application','octet-stream'].join('/'),buffer:workbook([header,...rows])})
           await page.getByRole('button',{name:'Preview spreadsheet',exact:true}).click();await page.getByRole('heading',{name:'Spreadsheet preview',exact:true}).waitFor()
           await page.getByText('Map assets, assignees and teams',{exact:true}).click()
+          await page.getByLabel('Asset: 00317',{exact:true}).selectOption(asset)
           await page.getByLabel('Assignee: legacy-user',{exact:true}).selectOption(techId)
           await page.getByLabel('Team: legacy-crew',{exact:true}).selectOption(team)
           await page.getByRole('button',{name:'Review mappings',exact:true}).click()
