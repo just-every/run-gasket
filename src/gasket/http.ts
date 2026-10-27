@@ -43,7 +43,9 @@ import { runtimeBindings, type Bindings } from '../auth.server'
 import { AuthError, safeReturnTo } from '../modules/operator-auth/index.mjs'
 import { actions } from './actions'
 import { can, currentActor, type Actor } from './actor'
-import { GasketError } from './core'
+import { GasketError, newId } from './core'
+import { beginSave, finishSave, readSave, saveBindings, saveId, saveMessage } from './form-saves'
+import { failedForm, retainedForm } from './ui/failed-form'
 import { PAGE_DOORS, match } from './doors'
 import { auditCsv } from './audit'
 import { assetHistoryCsv } from './history'
@@ -120,13 +122,34 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
       const [,id,key]=publicRequest
       if(request.method==='POST') {
         if(key) throw new GasketError('not_found',404)
-        const result=await submitRequest(env,actor,id,await requestIntakeInput(request),request)
-        if(request.headers.get('accept')?.includes(['application', 'json'].join('/'))) return json(result)
-        return new Response(null,{status:303,headers:{location:result.receipt,'cache-control':'no-store'}})
+        const input = await requestIntakeInput(request)
+        try {
+          const result=await submitRequest(env,actor,id,input,request)
+          if(request.headers.get('accept')?.includes(['application', 'json'].join('/'))) return json(result)
+          return new Response(null,{status:303,headers:{location:result.receipt,'cache-control':'no-store'}})
+        } catch (error) {
+          const { code, status } = failure(error)
+          // Intake's single atomic insert either returns its existing keyed receipt or refuses.
+          if(request.headers.get('accept')?.includes(['application', 'json'].join('/'))) return json({error:code,persistence:status < 500 ? 'none' : 'unconfirmed'},status)
+          const source = new URL(url); source.searchParams.set('target',input.text('target',{optional:true,max:100}))
+          const original = await requestPortalPage(env,actor,source,id)
+          const receipt = `/request/${id}/received/${encodeURIComponent(input.text('submissionKey',{optional:true,max:100}))}`
+          const message = `Save failed: ${describeError(code)} ${status < 500 ? 'Nothing was saved by this submission.' : 'Check the receipt before retrying.'}`
+          const recovered = await failedForm(original,url.pathname,input,message,receipt,status < 500,status)
+          if (recovered) return recovered
+          throw error
+        }
       }
       return key ? await requestReceiptPage(env,url,id,key) : await requestPortalPage(env,actor,url,id)
     }
-    if (!actor) return api ? json({ error: 'authentication_required' }, 401) : new Response(null, { status: 303, headers: { location: `/signin?returnTo=${encodeURIComponent(url.pathname)}`, 'cache-control': 'no-store' } })
+    if (!actor) {
+      if (api) return json({ error: 'authentication_required' }, 401)
+      if (request.method === 'POST') {
+        const input = await Input.from(request)
+        return page(env, 'Sign in to save', null, h`<h1>Sign in to save</h1>${await retainedForm(url.pathname, input, 'Your session ended. Nothing was saved by this request.')}`, { status: 401 })
+      }
+      return new Response(null, { status: 303, headers: { location: `/signin?returnTo=${encodeURIComponent(url.pathname)}`, 'cache-control': 'no-store' } })
+    }
     if (api) return await withSiteAuthority(actor, () => withServiceAuthority(actor!.service?.id, () => apiResponse(env, actor!, request, url)))
     return await withSiteAuthority(actor, () => pageResponse(env, actor!, request, url))
   } catch (error) {
@@ -170,27 +193,53 @@ async function apiResponse(env: Bindings, actor: Actor, request: Request, url: U
 
 async function pageResponse(env: Bindings, actor: Actor, request: Request, url: URL): Promise<Response> {
   const path = url.pathname
+  const receiptId = path.match(/^\/app\/save-receipts\/([a-f0-9-]{36})$/i)?.[1]
+  if (receiptId && request.method === 'GET') {
+    const receipt = await readSave(env, actor, receiptId)
+    if (request.headers.get('accept') === ['application', 'json'].join('/')) return json({ ...receipt, message: saveMessage(receipt) })
+    return page(env, 'Save receipt', actor, h`<h1>Save receipt</h1><p role="status">${saveMessage(receipt)}</p><p>Action: ${receipt.action}</p><p><a href="${receipt.destination || '/app'}">Inspect saved records</a></p>`, { url })
+  }
   if (request.method === 'POST') {
-    if (path === '/app/parts/catalog-preview') return await catalogPreviewPage(env,actor,await Input.from(request),url)
-    if (path === '/app/move-in/preview') return await previewPage(env, actor, await Input.from(request), url)
-    if (path === '/app/move-in/spreadsheet-preview') return await genericPreviewPage(env,actor,await Input.from(request),url)
-    const name = path.match(/^\/app\/do\/([\w.]+)$/)?.[1]
-    const action = name ? actions[name] : undefined
+    const previews: Record<string, { name: string; run: (bindings: Bindings, member: Actor, input: Input) => Promise<Response> }> = {
+      '/app/parts/catalog-preview': { name: 'catalog.review', run: (bindings,member,input) => catalogPreviewPage(bindings,member,input,url) },
+      '/app/move-in/preview': { name: 'movein.review', run: (bindings,member,input) => previewPage(bindings,member,input,url) },
+      '/app/move-in/spreadsheet-preview': { name: 'spreadsheet.review', run: (bindings,member,input) => genericPreviewPage(bindings,member,input,url) },
+    }
+    const preview = previews[path]
+    const name = preview?.name || path.match(/^\/app\/do\/([\w.]+)$/)?.[1]
+    const action: typeof actions[string] | undefined = preview ? (bindings, member, input) => preview.run(bindings, member, input) : name ? actions[name] : undefined
     if (!action) throw new GasketError('not_found', 404)
     const enhanced = request.headers.get('accept') === ['application', 'json'].join('/')
     const input = await Input.from(request)
     const returnTo = safeReturnTo(input.text('returnTo', { optional: true, max: 300 }) || '/app', '/app')
+    const id = saveId(input.text('__gk_save', { optional: true, max: 100 }))
+    const receipt = `/app/save-receipts/${id}`
+    const claimed = await beginSave(env, actor, id, name!)
     try {
-      const result = await action(env, actor, input, request) as { id?: string; job?: string } | null
+      if (!claimed) throw new GasketError('save_already_attempted', 409)
+      const result = await action(saveBindings(env, id), actor, input, request) as { id?: string; job?: string } | Response | null
+      if (result instanceof Response) { await finishSave(env, id, 'saved'); return result }
       const destination = returnTo.replace('{id}', encodeURIComponent(result?.id ?? ''))
       const notice = name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.'
-      if (enhanced) return json({ saved: true, destination, notice })
+      await finishSave(env, id, 'saved', destination)
+      if (enhanced) return json({ saved: true, destination, notice, receipt })
       return redirect(destination, 'notice', notice)
     } catch (error) {
       const { code, status } = failure(error)
-      if (enhanced) return new Response(JSON.stringify({ saved: false, error: describeError(code), persistence: 'unconfirmed' }), { status, headers: { 'content-type': ['application', 'json'].join('/'), 'cache-control': 'no-store' } })
-      if (status >= 500) throw error
-      return redirect(returnTo.replace('/{id}', ''), 'error', code)
+      if (claimed) await finishSave(env, id, 'failed')
+      const outcome = await readSave(env, actor, id)
+      const message = `Save failed: ${describeError(code)} ${saveMessage(outcome)}`
+      const retry = outcome.state === 'failed' && outcome.batches === 0
+      if (enhanced) return json({ saved: false, error: message, receipt, retry, nextSaveId: retry ? newId() : null }, status)
+      if (!input.has('__gk_save') && !request.headers.has('referer') && status < 500) return redirect(returnTo.replace('/{id}', ''), 'error', code)
+      const referer = new URL(input.text('__gk_source', { optional: true, max: 8000 }) || request.headers.get('referer') || returnTo.replace('/{id}', ''), url.origin)
+      const source = referer.origin === url.origin && (referer.pathname === '/app' || referer.pathname.startsWith('/app/')) ? referer : new URL('/app', url.origin)
+      try {
+        const original = await pageResponse(env, actor, new Request(source), source)
+        const recovered = await failedForm(original, path, input, message, receipt, retry, status)
+        if (recovered) return recovered
+      } catch { /* A changed permission must not render a now-forbidden source page. */ }
+      return page(env, 'Save failed', actor, h`<h1>Save failed</h1>${await retainedForm(path,input,message,receipt,retry)}`, { status })
     }
   }
   // The owner names the site before anything else.

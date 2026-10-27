@@ -112,7 +112,7 @@ export async function requestPortalJourney() {
   } finally {await h.close()}
 }
 async function browserContext(h,cookie) {
-  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const browser=await chromium.launch({headless:true,...(process.env.GASKET_CHROMIUM?{executablePath:process.env.GASKET_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const context=await browser.newContext({ignoreHTTPSErrors:true,deviceScaleFactor:3})
   if(cookie)await context.addCookies(cookie.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
   return {browser,context,page:await context.newPage()}
@@ -186,7 +186,7 @@ export async function requestDraftJourney() {
     if(process.env.REQUEST_SCREENSHOTS){await mkdir(process.env.REQUEST_SCREENSHOTS,{recursive:true});await capture(page,h,`/request/${portal}?target=${target}`,'phone-draft')}
     await context.setOffline(true)
     await page.getByRole('button',{name:'Send request',exact:true}).click()
-    await page.getByRole('status').filter({hasText:'Not confirmed'}).waitFor()
+    await page.getByRole('alert').filter({hasText:'Not confirmed'}).waitFor()
     assert.equal((await h.api('requests',cookie.lead)).length,0,'offline send stores no request')
     // Close/reopen the tab, restoring original File bytes and the immutable key.
     await page.close();await context.setOffline(false);page=await context.newPage();await page.setViewportSize({width:390,height:1100});await page.goto(scanned)
@@ -199,7 +199,7 @@ export async function requestDraftJourney() {
     // receives it. This is an edge failure, never a product test bypass.
     let lost=false
     await page.route(`**/request/${portal}`,async route=>{if(route.request().method()==='POST'&&!lost){lost=true;const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed')}else await route.continue()})
-    await page.getByRole('button',{name:'Send request',exact:true}).click();await page.getByRole('status').filter({hasText:'Not confirmed'}).waitFor()
+    await page.getByRole('button',{name:'Send request',exact:true}).click();await page.getByRole('alert').filter({hasText:'Not confirmed'}).waitFor()
     assert.equal((await h.api('requests',cookie.lead)).length,1,'the response was lost after persistence')
     await Promise.all([page.waitForURL(`**/received/${submissionKey}`),page.getByRole('button',{name:'Send request',exact:true}).click()])
     await page.reload();assert.match(await page.getByRole('status').textContent(),/R-1 is saved/)

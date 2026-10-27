@@ -9,8 +9,9 @@ import { ICONS } from '../../icon-head'
 import { ROLE_LABELS, can, type Actor } from '../actor'
 import { site } from '../site'
 import { railCounts } from '../today'
-import { describeError, h, initials, raw, type Html } from './html'
+import { describeError, esc, h, initials, raw, type Html } from './html'
 import { ICON } from './icons'
+import { newId } from '../core'
 
 type Destination = { href: string; label: string; detail: string; icon: Html; show: (actor: Actor) => boolean; count?: 'work' | 'proposals' }
 
@@ -90,5 +91,6 @@ export async function page(env: Bindings, title: string, actor: Actor | null, bo
   const nav = actor ? await rail(env, actor, url ? current(url.pathname) : '') : ''
   const document = h`<!doctype html><html lang="en-US"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · ${branding.name}</title>${raw(ICONS)}<link rel="preload" href="/fonts/inter/inter-variable-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/rer-theme.css"><link rel="stylesheet" href="/gasket.css"></head><body>
 <a class="gk-skip" href="#main-content">Skip to content</a><div class="gk-app${actor ? '' : ' gk-app-bare'}">${nav}<main id="main-content" tabindex="-1" class="gk-main${bar ? ' gk-has-bar' : ''}">${notice ? h`<p class="gk-flash" role="status">${notice}</p>` : ''}${error ? h`<p class="gk-flash gk-error" role="alert">That did not work: ${describeError(error)}</p>` : ''}${body}</main></div>${bar ? h`<div class="gk-bar"><div class="gk-bar-inner">${bar}</div></div>` : ''}<script src="/workspace-forms.js" defer></script>${script ? h`<script src="${script}" defer></script>` : ''}</body></html>`
-  return new Response(bindIds(document.html, '<g-id>'), { status, headers: {...headers, 'content-security-policy': headers['content-security-policy'] + "; script-src 'self'; connect-src 'self'"} })
+  const withReceipts = bindIds(document.html, '<g-id>').replace(/(<form\b(?=[^>]*method="post")[^>]*action="\/app\/[^"]+"[^>]*>)/g, opening => opening + `<input type="hidden" name="__gk_save" value="${newId()}"><input type="hidden" name="__gk_source" value="${esc(url ? url.pathname + url.search : '/app')}">`)
+  return new Response(withReceipts, { status, headers: {...headers, 'content-security-policy': headers['content-security-policy'] + "; script-src 'self'; connect-src 'self'"} })
 }

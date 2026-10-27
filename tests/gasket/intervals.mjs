@@ -45,7 +45,7 @@ export async function intervalJourney() {
     assert.equal(issued.created.length,3,'AGENT-003 pending issued orders exercise preservation')
     const issuedBefore = await Promise.all(issued.created.map(w=>h.api(`work/${w.id}`,cookie.lead)))
     await h.stop()
-    h = await harness({installation:initial.installation,vars:initial.vars,clockOffset:offset+86_400_000})
+    h = await harness({installation:initial.installation,vars:initial.vars,clockOffset:offset+86_400_000,formSaveFault:true})
     cookie.owner=await h.signIn(initial.vars.OWNER_EMAIL)
     for(const key of ['lead','max','sam','agent']) cookie[key]=await h.signIn(`${key}@example.test`)
     const payload={schedule:schedules[0],everyDays:'14',everyUnits:'50',from,to,peers:assets.slice(1).join(','),rollbackPlan:'If failure rate worsens, pause further rollout and submit a human-reviewed return to the original 30 days / 100 h cadence.'}
