@@ -10,11 +10,12 @@ const workChildren: Record<string, string> = {
   gk_comment_photos: 'comment_id IN (SELECT id FROM gk_comments WHERE work_order_id=?)',
   gk_comment_mentions: 'comment_id IN (SELECT id FROM gk_comments WHERE work_order_id=?)',
   gk_comment_revisions: 'comment_id IN (SELECT id FROM gk_comments WHERE work_order_id=?)',
+  gk_notices: 'work_order_id=?',
   gk_comments: 'work_order_id=?', gk_results: 'work_order_id=?', gk_result_log: 'work_order_id=?',
   gk_evidence: 'work_order_id=?', gk_chase_responses: 'work_order_id=?', gk_blockers: 'work_order_id=?',
   gk_collaborators: 'work_order_id=?', gk_handoffs: 'work_order_id=?', gk_reservations: 'work_order_id=?',
   gk_work_field_values: 'work_order_id=?', gk_step_exceptions: 'work_order_id=?',
-  gk_work_tools: 'work_order_id=?', gk_work_documents: 'work_order_id=?', gk_notices: 'work_order_id=?',
+  gk_work_tools: 'work_order_id=?', gk_work_documents: 'work_order_id=?',
   gk_planning_bookings: 'work_order_id=?', gk_planning_slots: 'work_order_id=?',
   gk_work_requirements: 'work_order_id=?', gk_time_entries: 'work_order_id=?',
 }
@@ -56,7 +57,13 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
     if (evidence || commentFiles) blockers.push('Required, certificate or retained original')
     const holds = await count(`gk_retention_scope_holds h WHERE h.held=1 AND ((h.kind='attachment' AND h.record_id IN (SELECT id FROM gk_evidence WHERE work_order_id=?)) OR (h.kind='user' AND h.record_id IN (SELECT uploaded_by FROM gk_evidence WHERE work_order_id=?)))`, [id,id])
     const contributorHolds=await count("gk_retention_scope_holds WHERE kind='user' AND held=1 AND (record_id IN (SELECT created_by FROM gk_work_orders WHERE id=?) OR record_id IN (SELECT assignee_id FROM gk_work_orders WHERE id=?) OR record_id IN (SELECT author_id FROM gk_comments WHERE work_order_id=?))",[id,id,id])
-    if (holds || contributorHolds) blockers.push('Original or contributor hold')
+    let heldChildren=0
+    for (const [table,where] of Object.entries(workChildren)) {
+      const columns=await all(env, `PRAGMA table_info(${quote(table)})`)
+      const text=joinText(columns.filter(c=>/TEXT/i.test(c.type)).map(c=>`COALESCE(CAST(${quote(table)}.${quote(c.name)} AS TEXT),'')`))
+      heldChildren+=await count(`${quote(table)} WHERE ${where} AND EXISTS(SELECT 1 FROM gk_retention_scope_holds h WHERE h.kind='user' AND h.held=1 AND instr(${text},h.record_id)>0)`,[id])
+    }
+    if (holds || contributorHolds || heldChildren) blockers.push('Original or contributor hold')
   } else {
     const operator=await one(env,'SELECT status,role,version FROM oa_operators WHERE id=?',record.operator_id)
     if (record.role === 'owner' || record.status !== 'ended' || !operator || operator.status !== 'inactive' || operator.role === 'owner') blockers.push('End non-owner access first')
@@ -79,6 +86,8 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
     const related = await count('gk_work_orders WHERE id<>? AND (follow_up_of=? OR merged_into=?)', [id,id,id])
     if (related) blockers.push('Related work')
   }
+  const otherAudit=await count('gk_audit WHERE subject<>? AND (actor=? OR instr(detail,?)>0)',[id,id,id])
+  if(otherAudit) blockers.push('Retained audit for another record')
   if(kind==='user') {
     const unclassifiedAudit=await count("gk_audit WHERE actor<>? AND subject<>? AND instr(detail,?)=0 AND (instr(lower(detail),lower(?))>0 OR instr(lower(detail),lower(?))>0)",[id,id,id,record.email,record.name])
     if(unclassifiedAudit) blockers.push('Other records contain identity details in retained audit')
@@ -108,7 +117,7 @@ export async function eraseRecord(env: Bindings, actor: Actor, input: Input) {
     ...await redactionStatements(env.DB),...await invalidateTransfersStatements(env.DB),
     stmt(env,"INSERT INTO gk_guard(code,ok) VALUES('record_erasure',1)"),
     ...Object.entries(children).map(([table,where])=>stmt(env,`DELETE FROM ${quote(table)} WHERE ${where}`,key)),
-    stmt(env,"UPDATE gk_audit SET detail='{}' WHERE subject=? OR actor=? OR instr(detail,?)>0",id,id,id),
+    stmt(env,"UPDATE gk_audit SET detail='{}' WHERE subject=?",id),
     ...(kind==='work'?[stmt(env,'DELETE FROM gk_work_orders WHERE id=?',id)]:[
       stmt(env,"UPDATE oa_auth_audit SET value='{}' WHERE actor_id=? OR instr(value,?)>0 OR instr(lower(value),lower(?))>0 OR instr(lower(value),lower(?))>0",record.operator_id,record.operator_id,record.email,record.name),
       stmt(env,"UPDATE gk_retention_scope_holds SET reason='Erased identity' WHERE kind='user' AND record_id=? AND held=0",id),

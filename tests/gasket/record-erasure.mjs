@@ -9,7 +9,7 @@ export async function erasureFixture(h, owner, asset) {
   const cookie = await h.signIn('synthetic-gasket-erased@example.test')
   const work = (await h.api('workorder.create',owner,{asset,title:'synthetic-gasket-erased-work',description:'synthetic-gasket-erased-description',due:(await h.api('me',owner)).today,assignee:(await h.api('me',owner)).id})).id
   const photo = (await h.api('workorder.evidence',owner,{workOrder:work,version:1,file:file('synthetic-gasket-erased-original.png',png,imageType)})).evidence
-  await h.api('comment.post',owner,{workOrder:work,body:'synthetic-gasket-erased-comment'})
+  await h.api('comment.post',owner,{workOrder:work,body:'synthetic-gasket-erased-comment',mention:[person.id]})
   return {person:person.id,cookie,work,photo}
 }
 const preview = (h,owner,kind,id) => h.api(`record-erasure-preview?kind=${kind}&id=${id}`,owner)
@@ -77,6 +77,65 @@ export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
   assert.ok([401,403].includes((await h.raw('/api/gasket/me',{cookie})).status))
   if(screens) {await erasureScreens(h,owner,work,'erased');await erasureScreens(h,owner,person,'erased-user','user')}
 }
+
+// These refusals protect retained contributions and history through the same door.
+export async function erasureGuards(h, owner, asset, cases=['contributor','audit','mention']) {
+  const today=(await h.api('me',owner)).today, ownerId=(await h.api('me',owner)).id
+  const create=async title=>(await h.api('workorder.create',owner,{asset,title,due:today,assignee:ownerId})).id
+  if(cases.includes('contributor')) {
+    const member=(await h.api('access.give',owner,{name:'synthetic-gasket-held-contributor',email:'synthetic-gasket-held-contributor@example.test',role:'maintainer'})).id
+    const cookie=await h.signIn('synthetic-gasket-held-contributor@example.test')
+    const work=await create('synthetic-gasket-held-time')
+    await h.api('workorder.collaborate',owner,{workOrder:work,member})
+    await h.api('workorder.time',cookie,{workOrder:work,version:(await h.api(`work/${work}`,owner)).version,workedOn:today,minutes:25,note:'synthetic-gasket-retained-minutes'})
+    await h.api('workorder.collaborate',owner,{workOrder:work,member,remove:true})
+    const before=await h.api(`work/${work}`,owner)
+    assert.equal(before.timeEntries.length,1);assert.equal(before.timeEntries[0].minutes,25)
+    const hold=await h.api('retention.hold',owner,{kind:'user',id:member,held:true,revision:0,reason:'synthetic-gasket-contributor-hold'})
+    const held=await preview(h,owner,'work',work)
+    assert.equal(held.eligible,false,'a held former contributor retains their time entry and work')
+    await h.api('record.erase',owner,{kind:'work',id:work,token:held.token,confirm:true},409)
+    assert.deepEqual(await h.api(`work/${work}`,owner),before,'refusal leaves all 25 minutes and the work unchanged')
+    await h.api('retention.hold',owner,{kind:'user',id:member,held:false,revision:hold.revision,reason:'synthetic-gasket-contributor-release'})
+    const ready=await preview(h,owner,'work',work)
+    assert.equal(ready.eligible,true,JSON.stringify(ready.blockers))
+    const erased=await h.api('record.erase',owner,{kind:'work',id:work,token:ready.token,confirm:true})
+    assert.equal(erased.result.removed.gk_time_entries,1)
+    await h.api(`work/${work}`,owner,undefined,404)
+  }
+  if(cases.includes('audit')) {
+    const member=(await h.api('access.give',owner,{name:'synthetic-gasket-ended-lead',email:'synthetic-gasket-ended-lead@example.test',role:'lead'})).id
+    const cookie=await h.signIn('synthetic-gasket-ended-lead@example.test')
+    const work=await create('synthetic-gasket-held-reschedule'), due='2027-01-02'
+    const changed=await h.api('workorders.bulk',cookie,{workOrder:[work],version:[String((await h.api(`work/${work}`,owner)).version)],action:'reschedule',due})
+    assert.equal(changed.rows[0].outcome,'changed')
+    await h.api('retention.hold',owner,{kind:'work',id:work,held:true,revision:0,reason:'synthetic-gasket-audit-hold'})
+    await h.api('access.end',owner,{member})
+    const audit=async ()=>(await h.api('audit?action=workorder.reschedule',owner)).rows.filter(row=>row.subject===work)
+    const before=await audit(), record=await h.api(`work/${work}`,owner)
+    assert.equal(before.length,1)
+    const detail=JSON.parse(before[0].detail)
+    assert.deepEqual(detail,{from:today,to:due,bulk:changed.batch})
+    const held=await preview(h,owner,'user',member)
+    assert.equal(held.eligible,false,'an ended lead cannot erase another retained record audit')
+    await h.api('record.erase',owner,{kind:'user',id:member,token:held.token,confirm:true},409)
+    assert.deepEqual(await audit(),before,'old and new due dates and audit attribution survive refused erasure')
+    assert.deepEqual(await h.api(`work/${work}`,owner),record)
+  }
+  if(cases.includes('mention')) {
+    const member=(await h.api('access.give',owner,{name:'synthetic-gasket-mentioned',email:'synthetic-gasket-mentioned@example.test',role:'maintainer'})).id
+    const cookie=await h.signIn('synthetic-gasket-mentioned@example.test'),work=await create('synthetic-gasket-mention-erasure')
+    await h.api('comment.post',owner,{workOrder:work,body:'synthetic-gasket-mentioned-comment',mention:[member]})
+    const ready=await preview(h,owner,'work',work)
+    assert.equal(ready.eligible,true,JSON.stringify(ready.blockers))
+    assert.equal(ready.dependencies.gk_comments,1);assert.equal(ready.dependencies.gk_notices,1)
+    const erased=await h.api('record.erase',owner,{kind:'work',id:work,token:ready.token,confirm:true})
+    assert.equal(erased.result.removed.gk_comments,1);assert.equal(erased.result.removed.gk_notices,1)
+    await h.api(`work/${work}`,owner,undefined,404)
+    assert.equal((await h.raw('/app/notices',{cookie})).status,200)
+  }
+}
+
 export async function erasureScreens(h,owner,work,label,kind='work') {
   const {chromium}=await import('@playwright/test'),{mkdir}=await import('node:fs/promises')
   const directory=process.env.RETENTION_SCREENSHOTS??'/tmp/gasket-record-erasure'

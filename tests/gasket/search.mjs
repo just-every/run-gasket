@@ -1,4 +1,4 @@
-import { erasureFixture, eraseFixture } from './record-erasure.mjs'
+import { erasureFixture, eraseFixture, erasureGuards } from './record-erasure.mjs'
 // Complete search exports go through the authenticated HTTP door, including
 // fixtures. Scale mode runs separately on the committed landing candidate.
 import assert from 'node:assert/strict'
@@ -259,6 +259,7 @@ export async function retentionJourney() {
     assert.deepEqual(await h.api(`work/${protectedWork}`,owner),before,'full-record refusal preserves protected work')
     assert.deepEqual(Buffer.from(await (await h.raw(`/app/evidence/${original}`,{cookie:owner})).arrayBuffer()),bytes,'full-record refusal preserves original bytes')
   }
+  await erasureGuards(h,owner,ids[0])
   await eraseFixture(h,owner,await erasureFixture(h,owner,ids[0]),{screens:true})
   const technician=(await h.api('me',tech)).id
   await h.api('access.role',owner,{member:technician,role:'lead'})
