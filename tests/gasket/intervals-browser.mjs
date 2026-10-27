@@ -53,6 +53,32 @@ export async function intervalBrowser(h,cookie,proposal) {
   } finally {await browser.close()}
 }
 
+// Lose only the browser's reply. Forward its original HTTP method, multipart
+// bytes and identity to the built Worker through the harness's public transport.
+// Playwright's second HTTPS client can disconnect before forwarding to workerd.
+async function loseSaveReply(h, router, path, committed = true) {
+  const handled = Promise.withResolvers()
+  await router.route('**' + path, async route => {
+    try {
+      let response
+      if (committed) {
+        const request = route.request(), headers = await request.allHeaders()
+        assert.equal(request.method(), 'POST')
+        response = await h.raw(path, {
+          cookie: headers.cookie, method: request.method(), form: request.postDataBuffer(),
+          headers: { accept: headers.accept, 'content-type': headers['content-type'], referer: headers.referer },
+        })
+      }
+      await route.abort('failed')
+      handled.resolve(response)
+    } catch (error) {
+      await route.abort('failed').catch(() => {})
+      handled.reject(error)
+    }
+  }, { times: 1 })
+  return { completed: handled.promise }
+}
+
 // ADMIN-011: all six implemented core doors, with actual edits and independent reads.
 export async function workspaceBrowser(h, cookie, browser, directory, {conditionalOnly=false}={}) {
   const context = await browser.newContext({ignoreHTTPSErrors:true})
@@ -138,18 +164,19 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     await proof('refused-'+action.slice('/app/do/'.length))
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
-    let confirmation
-    await page.route('**'+action,async route=>{confirmation=await (await route.fetch()).json();await route.abort('failed')},{times:1})
+    const lost = await loseSaveReply(h, page, action)
     // Captures change the viewport and scroll position. Target the keyboard event at
     // the submitter, and observe this submission leaving the browser before its feedback.
     const submitter = form.getByRole('button',{name:/./}).last()
     await submitter.scrollIntoViewIfNeeded()
     assert.deepEqual(await form.evaluate(el=>el.noValidate?[]:[...el.elements].filter(control=>control.validity&&!control.validity.valid).map(control=>({name:control.name,error:control.validationMessage}))),[],`${action} retained retry is valid`)
     const retryId = retryDraft.find(([key])=>key==='__gk_save')[1]
-    await Promise.all([
+    const [reply] = await Promise.all([
+      lost.completed,
       page.waitForRequest(request=>request.method()==='POST'&&new URL(request.url()).pathname===action&&request.postData()?.includes(retryId)),
       submitter.press('Enter'),
     ])
+    const confirmation = await reply.json()
     const error = form.getByRole('alert')
     await error.waitFor()
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
@@ -267,10 +294,9 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       const nativeReceipt = await offline.locator('noscript a').getAttribute('href')
       const lose = async (form, path, committed) => {
         const retained = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
-        await native.route('**'+path,async route=>{if(committed) await route.fetch();await route.abort('failed')},{times:1})
+        const lost = await loseSaveReply(h, native, path, committed)
         const opened = native.waitForEvent('page')
-        await form.getByRole('button',{name:/./}).last().click()
-        const result = await opened
+        const [result] = await Promise.all([opened, lost.completed, form.getByRole('button',{name:/./}).last().click()])
         await result.waitForLoadState('domcontentloaded').catch(()=>{})
         await result.close()
         assert.equal(draft.url(),originalURL,'native transport error leaves the source page intact')
@@ -544,8 +570,8 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       // Lose the response after a real write: the UI must not claim it was unsaved or retry it automatically.
       const again=page.locator('form[action="/app/do/workorder.time"]')
       await again.getByLabel('Minutes worked').fill('3');await again.getByLabel('Time note').fill(`Uncertain confirmation ${width}`)
-      await page.route('**/app/do/workorder.time',async route=>{await route.fetch();await route.abort('failed')},{times:1})
-      await again.getByRole('button',{name:'Record time'}).click()
+      const lost = await loseSaveReply(h, page, '/app/do/workorder.time')
+      await Promise.all([lost.completed, again.getByRole('button',{name:'Record time'}).click()])
       await again.getByRole('alert').waitFor()
       assert.match(await again.getByRole('alert').innerText(),new RegExp('connection ended.*Saved. The server confirmed','s'))
       assert.equal(await again.getByLabel('Time note').inputValue(),`Uncertain confirmation ${width}`)
