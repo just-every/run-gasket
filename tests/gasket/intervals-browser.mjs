@@ -111,6 +111,8 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     const failedPath = new URL(await refusal.getByRole('link').getAttribute('href'),h.origin).pathname
     // The displayed failed receipt must refer to the attempted id, even after preparing a new retry id.
     const failedReceipt = await (await h.raw(failedPath,{cookie:who,headers:{accept:['application','json'].join('/')}})).json()
+    assert.equal(failedReceipt.id,before.find(([key])=>key==='__gk_save')[1],`${action} refusal identifies this submission`)
+    assert.equal(failedReceipt.action,action.slice('/app/do/'.length),`${action} refusal identifies this action`)
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
     await proof('refused-'+action.slice('/app/do/'.length))
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
@@ -129,6 +131,8 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     const response = await h.raw(receiptPath,{cookie:who,headers:{accept:['application','json'].join('/')}})
     assert.equal(response.status,200)
     const receipt = await response.json()
+    assert.equal(receipt.id,retryDraft.find(([key])=>key==='__gk_save')[1],`${action} confirmation identifies this submission`)
+    assert.equal(receipt.action,action.slice('/app/do/'.length),`${action} confirmation identifies this action`)
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
     await proof('confirmed-'+action.slice('/app/do/'.length))
@@ -676,6 +680,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
         await open(destination, `linked-record-${inspected.size}`)
       }
       console.log('workspace action inventory unexercised='+JSON.stringify([...visibleActions].filter(action=>!exercisedActions.has(action)).sort()))
+      console.log('workspace save coverage distinct='+exercisedActions.size+' actions='+JSON.stringify([...exercisedActions].sort()))
       console.log(`workspace pages proof fixed=${fixed} linked=${inspected.size-fixed} assistive-names=present keyboard=usable`)
 
     }
