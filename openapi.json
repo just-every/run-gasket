@@ -2611,6 +2611,1881 @@
           }
         }
       }
+    },
+    "/meter.create": {
+      "post": {
+        "summary": "meter.create",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "asset": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "unit": {
+                    "type": "string",
+                    "maxLength": 30
+                  },
+                  "kind": {
+                    "enum": [
+                      "counter",
+                      "gauge",
+                      "condition"
+                    ]
+                  },
+                  "feedWindowHours": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 168
+                  }
+                },
+                "required": [
+                  "asset",
+                  "name",
+                  "unit",
+                  "kind"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "asset": "ASSET_ID",
+                "name": "Run hours",
+                "unit": "h",
+                "kind": "counter"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/schedule.create": {
+      "post": {
+        "summary": "schedule.create",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "asset": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "checklist": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "title": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "everyDays": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3660
+                  },
+                  "firstDue": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "tool": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 120
+                    }
+                  }
+                },
+                "required": [
+                  "asset",
+                  "checklist",
+                  "title",
+                  "everyDays",
+                  "firstDue"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "asset": "ASSET_ID",
+                "checklist": "CHECKLIST_ID",
+                "title": "Synthetic tool inspection",
+                "everyDays": 30,
+                "firstDue": "2026-10-26",
+                "tool": [
+                  "Synthetic torque wrench"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.evidence": {
+      "post": {
+        "summary": "workorder.evidence",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation. Keyed uploads retain the 64000-byte JSON ceiling. Larger originals use the existing unkeyed evidence door with its own file limit.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "file": {
+                    "type": "object",
+                    "properties": {
+                      "filename": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "base64": {
+                        "type": "string",
+                        "description": "Base64 original bytes; the entire keyed JSON body is limited to 64000 bytes."
+                      },
+                      "type": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "required": [
+                      "filename",
+                      "base64"
+                    ],
+                    "additionalProperties": true
+                  },
+                  "item": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "phase": {
+                    "enum": [
+                      "before",
+                      "after"
+                    ]
+                  },
+                  "takenOn": {
+                    "type": "string",
+                    "maxLength": 16
+                  },
+                  "certificate": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "file"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "file": {
+                  "filename": "synthetic-gasket-photo.png",
+                  "base64": "PHOTO_BASE64"
+                },
+                "phase": "before",
+                "takenOn": "2026-10-26T14:00"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "evidence": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "evidence"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.annotate": {
+      "post": {
+        "summary": "workorder.annotate",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "evidence": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "shape": {
+                    "enum": [
+                      "box",
+                      "ellipse",
+                      "arrow"
+                    ]
+                  },
+                  "x1": {
+                    "type": "string",
+                    "pattern": "^\\d{1,3}(\\.\\d{1,2})?$",
+                    "description": "Percentage from 0 through 100."
+                  },
+                  "y1": {
+                    "type": "string",
+                    "pattern": "^\\d{1,3}(\\.\\d{1,2})?$",
+                    "description": "Percentage from 0 through 100."
+                  },
+                  "x2": {
+                    "type": "string",
+                    "pattern": "^\\d{1,3}(\\.\\d{1,2})?$",
+                    "description": "Percentage from 0 through 100."
+                  },
+                  "y2": {
+                    "type": "string",
+                    "pattern": "^\\d{1,3}(\\.\\d{1,2})?$",
+                    "description": "Percentage from 0 through 100."
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "evidence",
+                  "shape",
+                  "x1",
+                  "y1",
+                  "x2",
+                  "y2",
+                  "note"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "evidence": "EVIDENCE_ID",
+                "shape": "box",
+                "x1": "10",
+                "y1": "10",
+                "x2": "90",
+                "y2": "90",
+                "note": "Seal inspected"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "annotation": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "annotation"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.time": {
+      "post": {
+        "summary": "workorder.time",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "workedOn": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "version",
+                  "workedOn",
+                  "minutes",
+                  "note"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "version": 1,
+                "workedOn": "2026-10-26",
+                "minutes": 25,
+                "note": "Inspected guard and seal"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "timeEntry": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "timeEntry"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.readings": {
+      "post": {
+        "summary": "workorder.readings",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "takenOn": {
+                    "type": "string",
+                    "maxLength": 16
+                  },
+                  "meter": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "value": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 100
+                    }
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "takenOn",
+                  "meter",
+                  "value"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "takenOn": "2026-10-26T14:00",
+                "meter": [
+                  "METER_ID"
+                ],
+                "value": [
+                  "42"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "meters": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      }
+                    },
+                    "created": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "meters",
+                    "created"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.tool": {
+      "post": {
+        "summary": "workorder.tool",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "tool": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 19
+                  },
+                  "identifier": {
+                    "type": "string",
+                    "maxLength": 120
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "tool",
+                  "identifier"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "tool": 0,
+                "identifier": "synthetic-gasket-tool-1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.sign": {
+      "post": {
+        "summary": "workorder.sign",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation. Technician and customer signatures require assigned execution authority; supervisor signatures require independent review authority. Customer names are entered references, not verified identities.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "role": {
+                    "enum": [
+                      "technician",
+                      "customer",
+                      "supervisor"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "mark": {
+                    "type": "object",
+                    "properties": {
+                      "filename": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "base64": {
+                        "type": "string",
+                        "description": "Base64 original bytes; the entire keyed JSON body is limited to 64000 bytes."
+                      },
+                      "type": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "required": [
+                      "filename",
+                      "base64"
+                    ],
+                    "additionalProperties": true
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "version",
+                  "role"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "version": 1,
+                "role": "technician"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "signature": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "signature"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/finding.record": {
+      "post": {
+        "summary": "finding.record",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "severity": {
+                    "enum": [
+                      "low",
+                      "medium",
+                      "high"
+                    ]
+                  },
+                  "text": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "item": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "followUp": {
+                    "type": "boolean"
+                  },
+                  "followUpDue": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "failureMode": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "cause": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "remedy": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "risk": {
+                    "type": "string",
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "severity",
+                  "text"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "severity": "low",
+                "text": "Guard inspected; no repair required",
+                "followUp": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "finding": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "followUp": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "finding",
+                    "followUp"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/downtime.start": {
+      "post": {
+        "summary": "downtime.start",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "startedOn": {
+                    "type": "string",
+                    "maxLength": 16
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  "planned": {
+                    "type": "boolean"
+                  },
+                  "degraded": {
+                    "type": "boolean"
+                  },
+                  "failureMode": {
+                    "type": "string",
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "startedOn",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "startedOn": "2026-10-26T14:00",
+                "reason": "Inspection stop",
+                "planned": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "downtime": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "downtime"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/downtime.end": {
+      "post": {
+        "summary": "downtime.end",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "endedOn": {
+                    "type": "string",
+                    "maxLength": 16
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "endedOn"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "endedOn": "2026-10-26T14:30"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "minutes": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "minutes"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.cancel": {
+      "post": {
+        "summary": "workorder.cancel",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "reason": "Duplicate inspection request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/workorder.reopen": {
+      "post": {
+        "summary": "workorder.reopen",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application\u002fjson": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workOrder": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "workOrder",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "workOrder": "WORK_ID",
+                "reason": "Reinspection required"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application\u002fjson": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "status": {
+                      "enum": [
+                        "open",
+                        "returned"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
     }
   },
   "components": {
