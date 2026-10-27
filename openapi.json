@@ -2895,7 +2895,7 @@
     "/workorder.evidence": {
       "post": {
         "summary": "workorder.evidence",
-        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation. Keyed uploads retain the 64000-byte JSON ceiling. Larger originals use the existing unkeyed evidence door with its own file limit. Keyed JSON bodies permit up to 2064000 bytes including encoded original content and metadata; decoded file limits remain unchanged. Results remain limited to 64000 bytes.",
+        "description": "Ordinary member authority only. New effects use the same handler as the workspace form. A completed receipt rechecks current capability and work authority, and may be replayed after its own state transition. Service credentials cannot call this operation. Keyed JSON bodies permit up to 2064000 bytes including encoded original content and metadata; decoded file limits remain unchanged. Results remain limited to 64000 bytes.",
         "security": [
           {
             "memberSession": []
@@ -5819,7 +5819,7 @@
     "/documents/{id}/file": {
       "get": {
         "summary": "Download authorized original bytes",
-        "description": "Uses the same private-file authorization as the workspace download. No service scope grants this door. Document ids here identify an immutable revision, not its master. Keyed JSON uploads retain the smaller 64000-byte request ceiling.",
+        "description": "Uses the same private-file authorization as the workspace download. No service scope grants this door. Document ids here identify an immutable revision, not its master. Keyed uploads retain each native decoded file limit and an action-specific streamed JSON ceiling.",
         "security": [
           {
             "memberSession": []
@@ -5864,7 +5864,7 @@
     "/evidence/{id}/file": {
       "get": {
         "summary": "Download authorized original bytes",
-        "description": "Uses the same private-file authorization as the workspace download. No service scope grants this door. Document ids here identify an immutable revision, not its master. Keyed JSON uploads retain the smaller 64000-byte request ceiling.",
+        "description": "Uses the same private-file authorization as the workspace download. No service scope grants this door. Document ids here identify an immutable revision, not its master. Keyed uploads retain each native decoded file limit and an action-specific streamed JSON ceiling.",
         "security": [
           {
             "memberSession": []
@@ -5909,7 +5909,7 @@
     "/signature-marks/{id}/file": {
       "get": {
         "summary": "Download authorized original bytes",
-        "description": "Uses the same private-file authorization as the workspace download. No service scope grants this door. Document ids here identify an immutable revision, not its master. Keyed JSON uploads retain the smaller 64000-byte request ceiling.",
+        "description": "Uses the same private-file authorization as the workspace download. No service scope grants this door. Document ids here identify an immutable revision, not its master. Keyed uploads retain each native decoded file limit and an action-specific streamed JSON ceiling.",
         "security": [
           {
             "memberSession": []
