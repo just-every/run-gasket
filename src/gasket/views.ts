@@ -1,3 +1,4 @@
+import { publicRecordErasurePreview } from './record-erasure'
 import { historyReport } from './history-report'
 import { reportSchedules } from './report-schedules'
 import { serviceCredentials } from './service-auth'
@@ -85,6 +86,7 @@ export const views: Record<string, View> = {
   pmStrategies:(env,actor)=>strategyView(env,actor),
   requestResponse:(env,actor)=>responseSettings(env,actor),
   requestReport:(env,actor,_id,url)=>requestReport(env,actor,url),
+  recordErasurePreview: (env,actor,_id,url) => publicRecordErasurePreview(env,actor,url),
   retentionSettings: (env, actor) => retentionSettings(env, actor),
   retentionPreview: (env, actor, _id, url) => retentionPreview(env, actor, url),
   search: (env, actor, _id, url) => searchEstate(env, actor, url),

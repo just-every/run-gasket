@@ -1,3 +1,4 @@
+import { recordErasurePage } from './ui/record-erasure'
 import { describeError } from './ui/html'
 import { reportSchedulesPage } from './ui/report-schedules'
 import { previewReportPack } from './report-schedules'
@@ -216,6 +217,7 @@ const pages: Record<string, Page> = {
     const type=format==='csv'?['text','csv'].join('/'):format==='xls'?['application','vnd.ms-excel'].join('/'):['application','vnd.openxmlformats-officedocument.spreadsheetml.sheet'].join('/')
     return new Response(bytes as BodyInit,{headers:{'content-type':type,'cache-control':'private, no-store','content-disposition':`attachment; filename="${id}"`}})
   }),
+  recordErasure: (env,actor,url)=>recordErasurePage(env,actor,url),
   reportSchedules: (env,actor,url)=>reportSchedulesPage(env,actor,url),
   reportPackPdf: async(env,actor,_url,id)=>new Response(await packPdf(await previewReportPack(env,actor,id)) as BodyInit,{headers:{'content-type':['application','pdf'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=report.pdf'}}),
   reportPackCsv: async(env,actor,_url,id)=>new Response(packCsv(await previewReportPack(env,actor,id)),{headers:{'content-type':['text','csv'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=dataset.csv'}}),
