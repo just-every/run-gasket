@@ -103,7 +103,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
   const pendingRequests = new Set()
   page.on('request', request => pendingRequests.add(request))
   page.on('requestfinished', request => pendingRequests.delete(request))
-  page.on('requestfailed', request => { pendingRequests.delete(request); console.error('Workspace request failed:', new URL(request.url()).pathname, request.failure()?.errorText) })
+  page.on('requestfailed', request => pendingRequests.delete(request))
   const snapshots = []
   const linked = new Map(), visibleActions = new Set(), exercisedActions = new Set()
   const day = (await h.api('me',cookie.owner)).today
