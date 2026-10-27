@@ -558,3 +558,10 @@ td .gk-inline .gk-actions { margin: 0; }
 
 .gk-digest, #operator-reports { overflow-wrap: anywhere; }
 .gk-prompt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 20px; max-height: 360px; overflow: auto; margin: 0 0 12px; }
+
+/* Workspace access: long records wrap without hiding their text. */
+.gk-main, .gk-band-text, .gk-col-main, .gk-col-side, .gk-card { min-width: 0; overflow-wrap: anywhere; }
+.gk-flash:focus, [tabindex]:focus-visible { outline: 3px solid var(--rer-focus); outline-offset: 2px; }
+.gk-skip { position: fixed; top: 8px; left: 8px; z-index: 20; padding: 12px; background: var(--rer-surface); transform: translateY(-200%); }
+.gk-skip:focus { transform: none; }
+@media (min-width: 901px) { .gk-menu-toggle { display: none; } }

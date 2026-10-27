@@ -1,3 +1,4 @@
+import { describeError } from './ui/html'
 import { reportSchedulesPage } from './ui/report-schedules'
 import { previewReportPack } from './report-schedules'
 import { packCsv, packPdf } from './report-packs'
@@ -112,7 +113,7 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
       if(request.method==='POST') {
         if(key) throw new GasketError('not_found',404)
         const result=await submitRequest(env,actor,id,await requestIntakeInput(request),request)
-        if(request.headers.get('accept')?.includes('application/json')) return json(result)
+        if(request.headers.get('accept')?.includes(['application', 'json'].join('/'))) return json(result)
         return new Response(null,{status:303,headers:{location:result.receipt,'cache-control':'no-store'}})
       }
       return key ? await requestReceiptPage(env,url,id,key) : await requestPortalPage(env,actor,url,id)
@@ -122,7 +123,7 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
     return await pageResponse(env, actor, request, url)
   } catch (error) {
     const { code, status, detail } = failure(error)
-    if (api || (publicRequest && request.headers.get('accept')?.includes('application/json'))) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
+    if (api || (publicRequest && request.headers.get('accept')?.includes(['application', 'json'].join('/')))) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
     if (status === 404) return page(env, 'Not found', actor, h`<h1>Not found</h1><p>There is nothing here you can open.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status: 404 })
     return page(env, 'That did not work', actor, h`<h1>That did not work</h1><p>${code.replace(/_/g, ' ')}.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status })
   }
@@ -166,13 +167,18 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
     const name = path.match(/^\/app\/do\/([\w.]+)$/)?.[1]
     const action = name ? actions[name] : undefined
     if (!action) throw new GasketError('not_found', 404)
+    const enhanced = request.headers.get('accept') === ['application', 'json'].join('/')
     const input = await Input.from(request)
     const returnTo = safeReturnTo(input.text('returnTo', { optional: true, max: 300 }) || '/app', '/app')
     try {
       const result = await action(env, actor, input, request) as { id?: string; job?: string } | null
-      return redirect(returnTo.replace('{id}', encodeURIComponent(result?.id ?? '')), 'notice', name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.')
+      const destination = returnTo.replace('{id}', encodeURIComponent(result?.id ?? ''))
+      const notice = name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.'
+      if (enhanced) return json({ saved: true, destination, notice })
+      return redirect(destination, 'notice', notice)
     } catch (error) {
       const { code, status } = failure(error)
+      if (enhanced) return new Response(JSON.stringify({ saved: false, error: describeError(code), persistence: 'unconfirmed' }), { status, headers: { 'content-type': ['application', 'json'].join('/'), 'cache-control': 'no-store' } })
       if (status >= 500) throw error
       return redirect(returnTo.replace('/{id}', ''), 'error', code)
     }

@@ -6,6 +6,11 @@ import { harness, file } from './harness.mjs'
 import { png } from './fixtures.mjs'
 
 export async function partCatalogJourney(h,cookie,onReady) {
+  if(onReady) return catalogJourney(h,cookie,onReady)
+  const browser=await (await import('./part-catalog-browser.mjs')).catalogBrowser(h,cookie)
+  try {return await catalogJourney(h,cookie,browser.run)} finally {await browser.close()}
+}
+async function catalogJourney(h,cookie,onReady) {
   const supplier=async(name,email)=> (await h.api('supplier.save',cookie.owner,{name,contact:'Dina Morris',email,phone:'+1 216 555 0164',street:'4100 Lakeside Avenue',city:'Cleveland',state:'OH',zip:'44114',taxTreatment:'sales_tax',paymentTerms:'Net 30',leadDays:6,active:true})).id
   const first=await supplier('Lake Erie Bearings','catalog@erie.example.test'),second=await supplier('Midwest Industrial Supply','catalog@midwest.example.test')
   const header='number,name,unit,manufacturer,manufacturerNumber,vendorNumber,packUnit,packQuantity,price\n'

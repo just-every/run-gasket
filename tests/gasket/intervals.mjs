@@ -99,10 +99,10 @@ export async function intervalJourney() {
     const own=await h.api('proposal.prepare',cookie.lead,{kind:'interval',payload,reasoning:'Lead-authored change still needs another human'})
     await decide(own,'lead','approve',403)
     const approved=await prepare()
-    if(process.env.INTERVAL_SCREENSHOTS) {
+    {
       const { intervalBrowser }=await import('./intervals-browser.mjs')
       await intervalBrowser(h,cookie,approved)
-    } else await decide(approved)
+    }
     const changed=(await h.api('schedules',cookie.lead)).find(s=>s.id===schedules[0])
     assert.deepEqual([changed.every_days,changed.every_units],[14,'50'])
     await decide(approved,'owner','approve',409)

@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "e102a32c9a8c9b0de109b6a30307e007854a776a83c776be3b2c2d42475a610b",
+      "sha256": "377ef2481d793e4fef379d4aa7a530cf106fac019daa92be1ac785b53af8a556",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1951a002b8bb51679317749c4d2a830c82c794cf395803a7093cd143aa4db900",
+      "sha256": "2018dfbe6a1fc7e885e60b18ac5e027f3c8446f22c6d34db451150e80d95be35",
       "executable": false
     },
     "DEMO.md": {
@@ -788,7 +788,7 @@
       "executable": false
     },
     "public/gasket.css": {
-      "sha256": "be0baaf4b68f0a57bfa03e63aabcd5216af1686ea787c28eaccc9d136e6b7169",
+      "sha256": "1509185ac2d89ad9ebaf0a3a379fa5f02713fce6d9755cdf253405f28995d153",
       "executable": false
     },
     "public/label-scan.js": {
@@ -933,6 +933,10 @@
     },
     "public/site/share.jpg": {
       "sha256": "90ba7c5f8e0cbbd79065f6c0cdd275d6e14e1a2f20da4dfafb2756cadc602281",
+      "executable": false
+    },
+    "public/workspace-forms.js": {
+      "sha256": "6c680db2b094d6b411a58ae1ddc5311cbc1f8750f79c0d3e5c7b0ceedf36818e",
       "executable": false
     },
     "README.md": {
@@ -1484,7 +1488,7 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "4f00bf89b160d1183f29390e837f9375a436591c42af0b57fcace0a731807dff",
+      "sha256": "2c47afc5db73cda24de59f7aff46de8eda217141e386a68aeaab7afeb37aa56d",
       "executable": false
     },
     "src/gasket/input.ts": {
@@ -2052,7 +2056,7 @@
       "executable": false
     },
     "src/gasket/ui/shell.ts": {
-      "sha256": "1ec183c6a2b6a6726e786de3409a1d0984ae6c228687fb331db306e68caf18c4",
+      "sha256": "fcede62e3fdff53720e8bdf799dad665f1e75244cb89b9d9f79438e780804879",
       "executable": false
     },
     "src/gasket/ui/spend-policy.ts": {
@@ -4064,11 +4068,11 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "62032ea3dbb1c2b8bb851e808ecae346070a6540bdd66896326284cd7b654966",
+      "sha256": "5d8b543808af48fe1b6189d3761e89f5cc1fffdb1f8ddf38fe43d7308b36b14b",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
-      "sha256": "ae2eda09ef231e687f867a0ac9755d423d220677c1467e7ddc7b7f10ac5d3a5d",
+      "sha256": "7e9563f038887c1faeb2bd88b3174e8fae8fad0ef551e4b27c216a73cc19c09c",
       "executable": false
     },
     "tests/gasket/labor-costs-browser.mjs": {
@@ -4096,11 +4100,11 @@
       "executable": false
     },
     "tests/gasket/part-catalog-browser.mjs": {
-      "sha256": "900277c1cbe3b61ebc6b43c4bae242c5926e91b06695f1e48e73357b4fed3638",
+      "sha256": "28e617e5872d44838ef3fb741ac24beed384b868d3bdab071621da8cac8cd3e8",
       "executable": false
     },
     "tests/gasket/part-catalog.mjs": {
-      "sha256": "f7e222fc0b8eb37c1e709e90087c8a867f4335654c89cd22153f523a27cfd275",
+      "sha256": "4523c64e3cf2efef186ec33b0f13ed1d6c5fd4aef0280c5c5899c56b3d91bb8a",
       "executable": false
     },
     "tests/gasket/planning.mjs": {
