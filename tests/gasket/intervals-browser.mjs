@@ -77,7 +77,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     const action = await form.getAttribute('action')
     const before = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     const reads = {
-      'site.configure':'site', 'asset.create':'assets', 'meter.create':`assets/${asset}`,
+      'site.configure':'site', 'access.give':'members', 'access.role':'members', 'access.end':'members', 'asset.create':'assets', 'meter.create':`assets/${asset}`,
       'checklist.create':'checklists', 'schedule.create':'schedules', 'workorders.generate':'work',
       'part.create':'parts', 'part.receive':'parts', 'part.count':'parts',
       'request.triage':'requests', 'request.convert':'work', 'planning.slot':'planning',
@@ -268,6 +268,18 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       }
       await use('owner')
       await open('/app/access','people-and-roles')
+      const give = page.locator('form[action="/app/do/access.give"]')
+      await give.getByLabel('Name',{exact:true}).fill('Synthetic maintenance relief technician')
+      await give.getByLabel('Email',{exact:true}).fill('synthetic-gasket-relief@example.test')
+      await submit(give)
+      const relief = (await h.api('members',cookie.owner)).find(row=>row.email==='synthetic-gasket-relief@example.test')
+      assert.equal(relief.role,'maintainer')
+      await page.getByLabel('Role for Synthetic maintenance relief technician',{exact:true}).selectOption('supervisor')
+      await submit(page.locator(`#role-form-${relief.id}`))
+      assert.equal((await h.api('members',cookie.owner)).find(row=>row.id===relief.id).role,'supervisor')
+      await submit(page.locator('form[action="/app/do/access.end"]').filter({has:page.locator(`[name=member][value="${relief.id}"]`)}))
+      assert.equal((await h.api('members',cookie.owner)).find(row=>row.id===relief.id).status,'ended')
+
       await use('lead')
       await open('/app/assets','asset-register')
       const register = page.locator('form[action="/app/do/asset.create"]')
@@ -485,6 +497,6 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       assert.equal((await h.api(`work/${work}`,cookie.sam)).status,'closed')
       await open(`/app/work/${work}`,'reviewed-record')
     }
-    assert.deepEqual([...receiptActions].sort(),['site.configure','asset.create','meter.create','checklist.create','schedule.create','workorders.generate','workorder.results','workorder.submit','workorder.review','part.create','part.receive','part.count','request.triage','request.convert','workorder.assign','planning.slot','workorder.readings','workorder.issue','workorder.return','workorder.time'].sort(),'each core save action has a lost-reply receipt and an independent record read')
+    assert.deepEqual([...receiptActions].sort(),['site.configure','access.give','access.role','access.end','asset.create','meter.create','checklist.create','schedule.create','workorders.generate','workorder.results','workorder.submit','workorder.review','part.create','part.receive','part.count','request.triage','request.convert','workorder.assign','planning.slot','workorder.readings','workorder.issue','workorder.return','workorder.time'].sort(),'each core save action has a lost-reply receipt and an independent record read')
   } finally {await context.close()}
 }
