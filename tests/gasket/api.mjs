@@ -648,7 +648,7 @@ export async function apiJourney() {
     assert.equal((await h.api('closures', owner)).find(row => row.id === closure.id).label, closureBody.label)
     await repeat('closure.remove', { closure: closure.id }, 'synthetic-gasket-closure-remove', lead)
     assert.equal((await h.api('closures', owner)).some(row => row.id === closure.id), false)
-    const pause = { ...example('automation.schedule'), schedule, revision: scheduled.revision }
+    const pause = { ...example('automation.schedule'), schedule, revision: (await h.api('schedules', owner)).find(row => row.id === schedule).revision }
     await write('automation.schedule', pause, 'synthetic-gasket-pause-forbidden', lead, 403)
     await repeat('automation.schedule', pause, 'synthetic-gasket-pause')
     assert.equal((await h.api('schedules', owner)).find(row => row.id === schedule).active, 0)
