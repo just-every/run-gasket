@@ -4092,7 +4092,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "29943b1a9c2ed270fee51344a703362d627898137af591a874263f6921c77f6b",
+      "sha256": "99188dd8a80f9c0190e4a681febbb4550dbc5b3aaeb9a98b3bd035bf95ad9753",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {

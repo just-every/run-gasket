@@ -29,7 +29,17 @@ async function freePort() {
  * With `offset` (ms), the Worker's clock runs that far from the machine's: an entry module replaces Date before the
  * built Worker loads, so the test, not the hour it happens to run at, decides what day it is.
  */
-export async function emittedWorker(vars, { installation, offset, instant, outbound, generationGate = false, formSaveFault = false } = {}) {
+export async function emittedWorker(vars, options = {}) {
+  for (let attempt = 1; ; attempt++) {
+    try { return await startWorker(vars, options) }
+    catch (error) {
+      if (error.code !== 'ERR_ADDRESS_IN_USE' || attempt === 3) throw error
+      console.log('Worker startup port was claimed; retrying with a fresh port.')
+    }
+  }
+}
+
+async function startWorker(vars, { installation, offset, instant, outbound, generationGate = false, formSaveFault = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   const port = await freePort(), origin = `https://127.0.0.1:${port}`
