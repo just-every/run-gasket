@@ -7,10 +7,10 @@ import { conditionalSaves } from './workspace-conditional-saves.mjs'
 import { png } from './fixtures.mjs'
 import { chromium } from '@playwright/test'
 import { harness } from './harness.mjs'
-import { offset, zone } from './clock.mjs'
+import { now, zone } from './clock.mjs'
 
 export async function conditionalWorkspaceJourney() {
-  const h=await harness({formSaveFault:true,clockOffset:offset+86_400_000})
+  const h=await harness({formSaveFault:true,clockInstant:now()+86_400_000})
   let browser
   try {
     const cookie={owner:await h.owner()}
