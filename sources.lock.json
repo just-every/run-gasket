@@ -4116,7 +4116,7 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "052019d3e2ae72b84d632486da2b86b578e37289b55148750e4552d91a936d0f",
+      "sha256": "d8064016215bf1e7fc6f937a3961ed5f9f78b43c17118ef5db648a025d841a18",
       "executable": false
     },
     "tests/gasket/automation.mjs": {

@@ -655,10 +655,10 @@ export async function apiJourney() {
     const expiry = (await h.api('automation', owner)).rules.find(row => row.id === 'expiry')
     const catchup = { ...example('automation.catchup'), revision: expiry.revision }
     await write('automation.catchup', catchup, 'synthetic-gasket-catchup-forbidden', lead, 403)
-    const jobsBefore = (await h.api('automation/jobs', owner)).jobs.length
+    const jobsBefore = (await h.api('/automation/jobs', owner)).jobs.length
     const caught = await repeat('automation.catchup', catchup, 'synthetic-gasket-catchup')
     assert.equal(caught.state, 'completed')
-    const jobsAfter = (await h.api('automation/jobs', owner)).jobs
+    const jobsAfter = (await h.api('/automation/jobs', owner)).jobs
     assert.equal(jobsAfter.length, jobsBefore + 1)
     assert.equal(jobsAfter.find(row => row.id === caught.job).state, 'completed')
     const laborWork = (await h.api('workorder.create', lead, { asset, title: 'Synthetic API reviewed labor', due: '2026-10-26', assignee: member })).id
