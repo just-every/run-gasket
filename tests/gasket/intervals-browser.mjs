@@ -253,6 +253,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       await native.clearCookies()
       await native.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
       const member = (await h.api('access.give',cookie.owner,{name:'Synthetic native role correction',email:'synthetic-gasket-native-role@example.test',role:'maintainer'})).id
+      await draft.setViewportSize({width:1440,height:1100})
       await draft.goto(h.origin+'/app/access')
       await draft.getByLabel('Role for Synthetic native role correction',{exact:true}).selectOption('supervisor')
       h.setSaveFault('before')
@@ -260,6 +261,8 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
       assert.match(await draft.getByRole('alert').innerText(),/internal error.*Nothing was saved/s)
       assert.equal(await draft.getByLabel('Role for Synthetic native role correction',{exact:true}).inputValue(),'supervisor','native failed role save retains its associated selector')
       assert.equal((await h.api('members',cookie.owner)).find(row=>row.id===member).role,'maintainer','failed role save leaves authority unchanged')
+      assert.equal(await draft.getByRole('alert').evaluate(el=>el.getBoundingClientRect().width>=el.parentElement.getBoundingClientRect().width-2),true,'native role error uses the available row width')
+      assert.equal(await draft.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'native role refusal has no horizontal clipping')
       for(const width of [1440,390]) {await draft.setViewportSize({width,height:1100});await draft.screenshot({path:`${directory}/workspace-native-role-failure-${width}.png`,fullPage:true})}
       await nativeSubmit(draft.locator(`#role-form-${member}`),/notice=/)
       assert.equal((await h.api('members',cookie.owner)).find(row=>row.id===member).role,'supervisor','corrected native role save applies the retained selection')

@@ -804,7 +804,7 @@
       "executable": false
     },
     "public/gasket.css": {
-      "sha256": "b25c2fb4dc44d696d64cecdd8e353bb88e09de625d1cf317763bebdc3fb354b5",
+      "sha256": "bb11b9e8367a52d16864c2795f31454248a5d45821cb7523db0a0d2ba898d478",
       "executable": false
     },
     "public/label-scan.js": {
@@ -4136,7 +4136,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "af61cbd4b525277e2b53967ec4f9ab4ebd5fe0df4609339700319a5d31133091",
+      "sha256": "0961e097a1588929deb9d792d564844e1ad435638bbe7a6bd822d32793a3a66a",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
