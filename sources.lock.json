@@ -1988,7 +1988,7 @@
       "executable": false
     },
     "src/gasket/ui/failed-form.ts": {
-      "sha256": "3ca3a3df3b933df1955c8b075fe0f0eebdf993e5b3b315521891fcc7b4495122",
+      "sha256": "294123f4219e10edd46498f1dbdecb17f54f3a3bdccc07c40f744a11622acf62",
       "executable": false
     },
     "src/gasket/ui/generic-movein.ts": {
@@ -2116,7 +2116,7 @@
       "executable": false
     },
     "src/gasket/ui/shell.ts": {
-      "sha256": "2d53a7d7b47479fe40645d83c63aff00e0388751acbcdba57fa03d40a324b05c",
+      "sha256": "d6e1e7bce627e722e3e49a35ad8061ba7cec5b35d568566908275f731dc0845d",
       "executable": false
     },
     "src/gasket/ui/spend-policy.ts": {
@@ -4136,7 +4136,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "16ba8ac3b2ce51d1ec07cb0517d1e0ebd6f11c314bddc39d0bb77c951920afe9",
+      "sha256": "f0e3e7adbefd2eb33591b9b2e920b505a5d72bba16acfc6fef10d41fe3e0fd97",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {

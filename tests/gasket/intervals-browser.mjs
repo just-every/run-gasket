@@ -127,6 +127,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     let draft = await native.newPage()
     const nativeSubmit = async (form, expected) => {
       const original = draft
+      assert.deepEqual(await form.evaluate(el=>el.noValidate?[]:[...el.elements].filter(control=>control.validity&&!control.validity.valid).map(control=>({name:control.name,value:control.value,error:control.validationMessage}))),[],'corrected native form can be submitted')
       const result = native.waitForEvent('page')
       await form.getByRole('button',{name:/./}).last().click()
       draft = await result
