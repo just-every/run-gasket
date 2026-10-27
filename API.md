@@ -532,13 +532,29 @@ work assignment right gates this read and both `/app/planning` and
 `/app/settings/resources`. The calendar preserves original due dates,
 PM cadence and work estimates. Assignee changes release the old slot and tool
 bookings as part of the existing handoff; rescheduling does not reassign work.
+Qualification dates and provenance support planning; owner-held reference text
+and retired evidence are omitted from non-owner planning responses. Recorded
+expiry and calculated expiry state are separate from issuing-body verification.
 
 Planning mutations use the ordinary authenticated action and form doors:
 
 - `planning.qualification`: owner-only `member`, `name`, inclusive `expires`
   date and `reference`. A renewal retains the former value in the audit.
+  Explicit `remind: true` with `remindDays` from 0 to 365 opts into owner-only
+  in-app notices before expiry and after the inclusive expiry date. The existing
+  expiry automation grant controls these notices. Each evidence revision gets
+  at most one due and one expired notice per owner; renewal starts a new occasion.
+  Retired or replaced evidence no longer contributes active notices. No external
+  delivery or automatic qualification renewal is performed.
 - `planning.tool`: owner-only `name`, `identifier`, inclusive `calibrationDue`,
   optional existing `id`, and current planning `revision`. Names are immutable.
+- `planning.retire`: owner-only `kind` (`qualification` or `tool`), `reason`
+  and current `revision`; a qualification names `member` and `name`, while a
+  tool names its `id`. Retirement stores an immutable attributed snapshot,
+  removes eligibility and releases tool bookings. Retired evidence is returned
+  only to the owner in the planning view. Retirement is not erasure. A new
+  record with the same name is separate evidence; it never revives a retired
+  sign-off or the old tool id. Corrections retain prior values in the audit.
 - `planning.window`: work assignment right; `member`, `kind` (`available` or
   `absent`), site-local `starts` and `ends`, `reason` and `revision`. Windows
   cover one day and may not overlap another window of the same kind for that

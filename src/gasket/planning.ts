@@ -1,6 +1,7 @@
 import type { Bindings } from '../auth.server'
-import { requireCapability, type Actor } from './actor'
-import { all, commit, guard, insist, newId, one, stmt, type Row } from './core'
+import { capabilitySql, requireCapability, type Actor } from './actor'
+import { all, commit, guard, insist, newId, now, one, stmt, type Row } from './core'
+import { QUALIFICATION_PROVENANCE } from './safety'
 import { addDays, isDate, isLocalTime, minutesBetween, zonedInstant } from './dates'
 import { assigneeFits } from './crew'
 import { fits } from './bom'
@@ -12,6 +13,10 @@ const OPEN = "('open','in_progress','returned')"
 const revision = async (env: Bindings) => (await one(env, 'SELECT revision FROM gk_planning_state WHERE singleton=1')).revision as number
 const lock = (env: Bindings, seen: number) => guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_planning_state WHERE singleton=1 AND revision=?)', seen)
 const bump = (env: Bindings) => stmt(env, 'UPDATE gk_planning_state SET revision=revision+1 WHERE singleton=1')
+const custody = (env: Bindings, actor: Actor) => {
+  const authority=capabilitySql(actor.sessionId,'site.manage')
+  return guard(env,'forbidden',authority.sql,...authority.params)
+}
 const active = (env: Bindings, member: string) => one(env, "SELECT id FROM gk_members WHERE id=? AND status='active' AND role IN ('owner','lead','maintainer')", member)
 const overlap = (a: Row, b: Row) => a.starts < b.ends && a.ends > b.starts
 const span = (input: Input) => {
@@ -26,9 +31,11 @@ export async function saveQualification(env: Bindings, actor: Actor, input: Inpu
   const member = input.text('member'), name = input.text('name', {max:80}), expires = input.text('expires'), reference = input.text('reference', {max:200})
   insist(await active(env, member), 'member_not_assignable', 409)
   insist(isDate(expires), 'invalid_expiry')
+  const remindDays=input.flag('remind')?input.integer('remindDays',{max:365}):null
   const seen = await revision(env)
-  await commit(env, [lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference) VALUES(?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference', member,name,expires,reference), bump(env)],
-    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference}})
+  const previous=await one(env,'SELECT * FROM gk_qualifications WHERE member_id=? AND name=?',member,name)
+  await commit(env, [custody(env,actor),lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference,record_id,recorded_at,recorded_by,remind_days) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference,record_id=excluded.record_id,recorded_at=excluded.recorded_at,recorded_by=excluded.recorded_by,remind_days=excluded.remind_days', member,name,expires,reference,newId(),now(),actor.id,remindDays), bump(env)],
+    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,remindDays,previous}})
   return {id:member}
 }
 
@@ -38,10 +45,31 @@ export async function savePlanningTool(env: Bindings, actor: Actor, input: Input
   insist(isDate(due), 'invalid_calibration_due')
   const seen = input.integer('revision',{min:1})!
   const existing = await one(env,'SELECT * FROM gk_planning_tools WHERE id=?',id)
+  insist(!input.has('id') || existing, 'tool_not_found',404)
   insist(!existing || existing.name===name, 'tool_name_immutable',409)
   insist(!await one(env,'SELECT 1 FROM gk_planning_tools WHERE name=? COLLATE NOCASE AND id<>?',name,id), 'tool_name_taken',409)
-  await commit(env,[lock(env,seen),stmt(env,'INSERT INTO gk_planning_tools(id,name,identifier,calibration_due) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET identifier=excluded.identifier,calibration_due=excluded.calibration_due',id,name,identifier,due),bump(env)],
-    {actor:actor.id,action:'planning.tool',subject:id,detail:{name,identifier,due}})
+  await commit(env,[custody(env,actor),lock(env,seen),stmt(env,'INSERT INTO gk_planning_tools(id,name,identifier,calibration_due) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET identifier=excluded.identifier,calibration_due=excluded.calibration_due',id,name,identifier,due),bump(env)],
+    {actor:actor.id,action:'planning.tool',subject:id,detail:{name,identifier,due,previous:existing}})
+  return {id}
+}
+
+/** Retirement removes eligibility, retaining the complete record and released bookings. */
+export async function retirePlanningResource(env: Bindings, actor: Actor, input: Input) {
+  requireCapability(actor,'site.manage')
+  const kind=input.text('kind'), reason=input.text('reason',{max:500}), seen=input.integer('revision',{min:1})!
+  insist(['qualification','tool'].includes(kind),'invalid_resource_kind')
+  const member=kind==='qualification'?input.text('member'):'', name=kind==='qualification'?input.text('name'):''
+  const record=kind==='qualification'
+    ?await one(env,'SELECT * FROM gk_qualifications WHERE member_id=? AND name=?',member,name)
+    :await one(env,'SELECT * FROM gk_planning_tools WHERE id=?',input.text('id'))
+  insist(record,'resource_not_found',404)
+  const bookings=kind==='tool'?await all(env,'SELECT * FROM gk_planning_bookings WHERE tool_id=?',record.id):[]
+  const id=newId(), snapshot={...record,...(kind==='tool'?{bookings}:{})}
+  await commit(env,[custody(env,actor),lock(env,seen),
+    stmt(env,'INSERT INTO gk_retired_resources VALUES(?,?,?,?,?,?,?)',id,kind,kind==='tool'?record.id:record.record_id,JSON.stringify(snapshot),now(),actor.id,reason),
+    ...(kind==='tool'?[stmt(env,'DELETE FROM gk_planning_bookings WHERE tool_id=?',record.id),stmt(env,'DELETE FROM gk_planning_tools WHERE id=?',record.id)]
+      :[stmt(env,'DELETE FROM gk_qualifications WHERE member_id=? AND name=?',member,name)]),bump(env)],
+    {actor:actor.id,action:'planning.retire',subject:id,detail:{kind,reason,snapshot}})
   return {id}
 }
 
@@ -165,8 +193,13 @@ export async function planningView(env: Bindings, actor: Actor, url: URL) {
   const people=await all(env,"SELECT id,name FROM gk_members WHERE status='active' AND role IN ('owner','lead','maintainer') ORDER BY name")
   const windows=await all(env,'SELECT * FROM gk_planning_windows WHERE starts<? AND ends>? ORDER BY starts',finish,start)
   const tools=await all(env,'SELECT * FROM gk_planning_tools ORDER BY name')
-  const qualifications=await all(env,'SELECT * FROM gk_qualifications ORDER BY name,member_id')
-  const work=await all(env,`SELECT w.id,w.number,w.title,w.assignee_id,w.team_id,w.trade,w.due_date,w.status,w.estimate_minutes,s.starts,s.ends,r.qualifications FROM gk_work_orders w LEFT JOIN gk_planning_slots s ON s.work_order_id=w.id LEFT JOIN gk_work_requirements r ON r.work_order_id=w.id WHERE w.status IN ${OPEN} ORDER BY w.due_date,w.number`)
+  const qualifications=(await all(env,'SELECT * FROM gk_qualifications ORDER BY name,member_id')).map(q=>({
+    member_id:q.member_id,name:q.name,expires_on:q.expires_on,recorded_at:q.recorded_at,
+    provenance:QUALIFICATION_PROVENANCE,expired:q.expires_on<actor.today,
+    ...(actor.role==='owner'?{reference:q.reference,record_id:q.record_id,recorded_by:q.recorded_by,remind_days:q.remind_days}:{})
+  }))
+  const retired=actor.role==='owner'?(await all(env,'SELECT r.*,m.name AS retired_by_name FROM gk_retired_resources r JOIN gk_members m ON m.id=r.retired_by ORDER BY r.retired_at,r.rowid')).map(r=>({...r,snapshot:JSON.parse(r.snapshot)})):[]
+  const work=await all(env,`SELECT w.id,w.asset_id,w.number,w.title,w.assignee_id,w.team_id,w.trade,w.due_date,w.status,w.estimate_minutes,s.starts,s.ends,r.qualifications FROM gk_work_orders w LEFT JOIN gk_planning_slots s ON s.work_order_id=w.id LEFT JOIN gk_work_requirements r ON r.work_order_id=w.id WHERE w.status IN ${OPEN} ORDER BY w.due_date,w.number`)
   const bookings=await all(env,'SELECT * FROM gk_planning_bookings')
   const rows: Row[]=[]
   for(const w of work) {
@@ -185,5 +218,5 @@ export async function planningView(env: Bindings, actor: Actor, url: URL) {
   const teams=await all(env,'SELECT id,name FROM gk_teams ORDER BY name'), members=await all(env,'SELECT team_id,member_id FROM gk_team_members')
   const utilization=totals.map(p=>({...p,legacyRecordedMinutes:legacy.find(t=>t.member===p.id)?.minutes??0,productiveMinutes:productive.filter(t=>t.member===p.id).reduce((n,t)=>n+t.minutes,0),assignedRatio:p.capacityMinutes?p.assignedMinutes/p.capacityMinutes:null}))
   const aggregate=(group: typeof utilization)=>({availableMinutes:group.reduce((n,p)=>n+p.availableMinutes,0),unavailableMinutes:group.reduce((n,p)=>n+p.unavailableMinutes,0),capacityMinutes:group.reduce((n,p)=>n+p.capacityMinutes,0),assignedMinutes:group.reduce((n,p)=>n+p.assignedMinutes,0),productiveMinutes:group.reduce((n,p)=>n+p.productiveMinutes,0)})
-  return {revision:await revision(env),from,end,days,people,windows,tools,qualifications,work:rows,utilization,site:aggregate(utilization),teams:teams.map(t=>({...t,...aggregate(utilization.filter(p=>members.some(m=>m.team_id===t.id&&m.member_id===p.id))),assignedMinutes:rows.filter(w=>w.team_id===t.id&&w.starts&&w.starts<finish&&w.ends>start).reduce((n,w)=>n+minutesBetween(w.starts<start?start:w.starts,w.ends>finish?finish:w.ends),0),productiveMinutes:productive.filter(p=>p.team_id===t.id).reduce((n,p)=>n+p.minutes,0)}))}
+  return {revision:await revision(env),from,end,days,people,windows,tools,qualifications,retired,work:rows,utilization,site:aggregate(utilization),teams:teams.map(t=>({...t,...aggregate(utilization.filter(p=>members.some(m=>m.team_id===t.id&&m.member_id===p.id))),assignedMinutes:rows.filter(w=>w.team_id===t.id&&w.starts&&w.starts<finish&&w.ends>start).reduce((n,w)=>n+minutesBetween(w.starts<start?start:w.starts,w.ends>finish?finish:w.ends),0),productiveMinutes:productive.filter(p=>p.team_id===t.id).reduce((n,p)=>n+p.minutes,0)}))}
 }

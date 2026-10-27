@@ -1,7 +1,7 @@
 import { saveReportSchedule } from './report-schedules'
 import { createServiceCredential, revokeServiceCredential } from './service-auth'
 import { publishSafety, attestSafety } from './safety'
-import { saveQualification, savePlanningTool, savePlanningWindow, removePlanningWindow, saveRequirements, planSlot } from './planning'
+import { saveQualification, savePlanningTool, retirePlanningResource, savePlanningWindow, removePlanningWindow, saveRequirements, planSlot } from './planning'
 import { saveRule, controlRule, previewRule } from './rules'
 import { saveCustomField, retireCustomField, setCustomValues, setPartCategory } from './custom-fields'
 import { eraseAttachment } from './attachment-erasure'
@@ -91,7 +91,7 @@ export const actions: Record<string, Handler> = {
   'service.create': createServiceCredential, 'service.revoke': revokeServiceCredential,
   'safety.publish': (env,actor,input) => publishSafety(env,actor,input),
   'safety.attest': (env,actor,input) => attestSafety(env,actor,input),
-  'planning.qualification':saveQualification, 'planning.tool':savePlanningTool, 'planning.window':savePlanningWindow, 'planning.window.remove':removePlanningWindow, 'planning.requirements':saveRequirements, 'planning.slot':planSlot,
+  'planning.qualification':saveQualification, 'planning.tool':savePlanningTool, 'planning.retire':retirePlanningResource, 'planning.window':savePlanningWindow, 'planning.window.remove':removePlanningWindow, 'planning.requirements':saveRequirements, 'planning.slot':planSlot,
   'rules.save': saveRule, 'rules.control': controlRule, 'rules.preview': previewRule,
   'part.category': setPartCategory, 'customfield.save': saveCustomField, 'customfield.retire': retireCustomField, 'customvalue.set': setCustomValues,
   'attachment.erase': (env, actor, input) => eraseAttachment(env, actor, input),

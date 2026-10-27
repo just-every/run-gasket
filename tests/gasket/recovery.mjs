@@ -22,6 +22,13 @@ export async function recoveryJourney() {
     const asset = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-recovery', name: 'Recovery pump', location: 'Plant' })).id
     const checklist = (await h.api('checklist.create', owner, { name: 'Recovery inspection', items: ['Listen for noise'] })).id
     const today = (await h.api('me', owner)).today
+    const member=(await h.api('me',owner)).id
+    const qualification={member,name:'Recovery training',expires:'2099-12-31',reference:'synthetic-gasket-retired-reference'}
+    await h.api('planning.qualification',owner,qualification)
+    await h.api('planning.retire',owner,{kind:'qualification',member,name:qualification.name,reason:'Reference withdrawn before backup',revision:(await h.api('planning',owner)).revision})
+    const resourceTool=(await h.api('planning.tool',owner,{name:'Recovery gauge',identifier:'synthetic-gasket-retired-tool',calibrationDue:'2099-12-31',revision:(await h.api('planning',owner)).revision})).id
+    await h.api('planning.retire',owner,{kind:'tool',id:resourceTool,reason:'Gauge withdrawn before backup',revision:(await h.api('planning',owner)).revision})
+    const retiredResources=(await h.api('planning',owner)).retired
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
     const credential = await h.api('service.create', owner, { name: 'Synthetic recovery service', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
@@ -60,6 +67,12 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
+      const restoredPlanning=await restored.api('planning',signed)
+      assert.deepEqual(restoredPlanning.retired,retiredResources,'retired evidence and attribution reconcile after empty restore')
+      assert.deepEqual(restoredPlanning.qualifications,[],'retired qualification is not restored into eligibility')
+      assert.deepEqual(restoredPlanning.tools,[],'retired tool is not restored into eligibility')
+      assert.equal((await restored.api('audit?action=planning.retire',signed)).rows.length,2)
+      await restored.api('planning.tool',signed,{id:resourceTool,name:'Recovery gauge',identifier:'synthetic-gasket-retired-tool',calibrationDue:'2099-12-31',revision:restoredPlanning.revision},404)
       const recovery = await restored.api('recovery', signed)
       assert.equal(recovery.restore.kind, 'restore')
       assert.equal(recovery.restore.recovery_point, records[0].exportedAt)

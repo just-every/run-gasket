@@ -606,6 +606,24 @@
       "name": "0096_report_schedules.sql",
       "sha256": "3d13d048d7e133e32b58e5a6a87ae78337f46eee2b460cf2c072279c340df02a",
       "sql": "CREATE TABLE gk_report_schedules (\n id TEXT PRIMARY KEY, owner_id TEXT NOT NULL REFERENCES gk_members(id), name TEXT NOT NULL,\n report TEXT NOT NULL, filters_json TEXT NOT NULL, recipients_json TEXT NOT NULL,\n weekday INTEGER NOT NULL CHECK(weekday BETWEEN 0 AND 6), clock TEXT NOT NULL,\n zone TEXT NOT NULL, next_day TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,\n paused INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL\n);\nCREATE TABLE gk_report_deliveries (\n id TEXT PRIMARY KEY, schedule_id TEXT NOT NULL REFERENCES gk_report_schedules(id),\n revision INTEGER NOT NULL, occasion TEXT NOT NULL, recipient_id TEXT NOT NULL REFERENCES gk_members(id),\n state TEXT NOT NULL, error TEXT, claimed_at INTEGER NOT NULL, finished_at INTEGER,\n provider TEXT, provider_message_id TEXT, fingerprint TEXT, scope_json TEXT,\n UNIQUE(schedule_id,occasion,recipient_id)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0097_report_authors.sql",
+      "sha256": "061f89094cdcdce303d6952d7bcdc0c6aad89b28ee6c2664f63674e309fc5971",
+      "sql": "ALTER TABLE gk_report_schedules ADD COLUMN editor_id TEXT REFERENCES gk_members(id);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0098_generic_migration.sql",
+      "sha256": "5ececb4185f2957bff99fe5609c0727178d8600025c5c65f692fac5bb736dd15",
+      "sql": "-- Source custody complements the kit journal; native state is read from the\n-- ordinary register and work tables, never substituted by this record.\nCREATE TABLE gk_spreadsheet_rows (\n id TEXT PRIMARY KEY, kind TEXT NOT NULL, source_id TEXT NOT NULL,\n source_json TEXT NOT NULL, import_revision TEXT NOT NULL,\n UNIQUE(kind,source_id)\n);\nALTER TABLE gk_work_history ADD COLUMN source_system TEXT NOT NULL DEFAULT 'MaintainX';\nALTER TABLE gk_work_history ADD COLUMN details_json TEXT;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0099_resource_retirement.sql",
+      "sha256": "362169038c5095ab6cc663679dccc0b039e15e846e6b2a2998cdae3d968f4170",
+      "sql": "-- The active register is separate from immutable retired evidence.\nALTER TABLE gk_qualifications ADD COLUMN record_id TEXT NOT NULL DEFAULT 'legacy';\nALTER TABLE gk_qualifications ADD COLUMN recorded_at INTEGER;\nALTER TABLE gk_qualifications ADD COLUMN recorded_by TEXT;\nALTER TABLE gk_qualifications ADD COLUMN remind_days INTEGER CHECK(remind_days BETWEEN 0 AND 365);\nCREATE TABLE gk_qualification_reminders (\n id TEXT PRIMARY KEY,\n record_id TEXT NOT NULL,\n recipient_id TEXT NOT NULL REFERENCES gk_members(id),\n stage TEXT NOT NULL CHECK(stage IN ('due','expired')),\n text TEXT NOT NULL,\n created_at INTEGER NOT NULL,\n automation_job_id TEXT REFERENCES gk_automation_jobs(id),\n UNIQUE(record_id,recipient_id,stage)\n);\nCREATE TABLE gk_retired_resources (\n id TEXT PRIMARY KEY,\n kind TEXT NOT NULL CHECK(kind IN ('qualification','tool')),\n record_id TEXT NOT NULL,\n snapshot TEXT NOT NULL,\n retired_at INTEGER NOT NULL,\n retired_by TEXT NOT NULL REFERENCES gk_members(id),\n reason TEXT NOT NULL\n);\nCREATE TRIGGER gk_retired_resources_update BEFORE UPDATE ON gk_retired_resources\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_retired_resources_delete BEFORE DELETE ON gk_retired_resources\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

@@ -27,7 +27,7 @@ export async function safetyState(env: Bindings, actor: Actor, order: Row) {
   const attestations=[]
   for(const row of rows) {
     const qualification=JSON.parse(row.qualification_json)
-    const current=await one(env,'SELECT name,expires_on,reference FROM gk_qualifications WHERE member_id=? AND name=?',row.signer,requirement.qualification)
+    const current=await one(env,'SELECT name,expires_on,reference,record_id FROM gk_qualifications WHERE member_id=? AND name=?',row.signer,requirement.qualification)
     const reasons=[]
     if(row.requirement_id!==requirement.id||row.procedure_revision!==procedure.latest||row.work_version!==version)reasons.push('Changed evidence requires reapproval')
     if(row.expires_on<=actor.today)reasons.push('Permit expired')
@@ -54,13 +54,13 @@ export async function attestSafety(env: Bindings,actor: Actor,input:Input) {
   const state=await safetyState(env,actor,order), r=state.requirement
   insist(r,'no_safety_prerequisite',409)
   insist(input.flag('isolated'),'isolation_attestation_required')
-  const qualification=await one(env,'SELECT name,expires_on,reference FROM gk_qualifications WHERE member_id=? AND name=?',actor.id,r.qualification)
+  const qualification=await one(env,'SELECT name,expires_on,reference,record_id FROM gk_qualifications WHERE member_id=? AND name=?',actor.id,r.qualification)
   insist(qualification&&qualification.expires_on>actor.today,'qualification_missing_or_expired',409)
   const permit=input.text('permit',{max:200}),expires=input.text('expires')
   insist(isDate(expires)&&expires>actor.today,'permit_expired',409)
   const file=(await input.file('file',{maxBytes:1_500_000}))!, id=newId(), sha=await sha256Hex(file.bytes)
   const statements=[guard(env,'stale',`EXISTS(SELECT 1 FROM gk_work_orders WHERE id=? AND version=? AND status IN ${OPEN})`,order.id,version),
-    guard(env,'qualification_changed','EXISTS(SELECT 1 FROM gk_qualifications WHERE member_id=? AND name=? AND expires_on=? AND reference=?)',actor.id,qualification.name,qualification.expires_on,qualification.reference),
+    guard(env,'qualification_changed','EXISTS(SELECT 1 FROM gk_qualifications WHERE member_id=? AND name=? AND expires_on=? AND reference=? AND record_id=?)',actor.id,qualification.name,qualification.expires_on,qualification.reference,qualification.record_id),
     guard(env,'safety_changed','(SELECT id FROM gk_safety_requirements WHERE checklist_id=? ORDER BY revision DESC LIMIT 1)=?',r.checklist_id,r.id),
     guard(env,'procedure_changed','(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?',r.checklist_id,state.procedure.latest),
     stmt(env,'INSERT INTO gk_safety_attestations VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',id,order.id,r.id,state.procedure.latest,version+1,actor.id,JSON.stringify(qualification),permit,expires,file.filename,file.bytes,sha,now()),
@@ -75,7 +75,7 @@ export async function safetyGuards(env: Bindings,actor: Actor,order: Row) {
   insist(!state.missing.length,'safety_evidence_required',409,{missing:state.missing})
   if(!state.requirement)return [guard(env,'safety_changed','NOT EXISTS(SELECT 1 FROM gk_safety_requirements WHERE checklist_id=(SELECT checklist_id FROM gk_checklist_revisions WHERE id=?))',order.checklist_revision_id)]
   const r=state.requirement,a=state.attestations.at(-1)!,q=JSON.parse((await one(env,'SELECT qualification_json FROM gk_safety_attestations WHERE id=?',a.id)).qualification_json)
-  return [guard(env,'safety_changed','(SELECT id FROM gk_safety_requirements WHERE checklist_id=? ORDER BY revision DESC LIMIT 1)=?',r.checklist_id,r.id),guard(env,'procedure_changed','(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?',r.checklist_id,state.procedure.latest),guard(env,'qualification_changed',"EXISTS(SELECT 1 FROM gk_qualifications q JOIN gk_members m ON m.id=q.member_id WHERE m.id=? AND m.status='active' AND q.name=? AND q.expires_on=? AND q.reference=?)",a.signer,q.name,q.expires_on,q.reference)]
+  return [guard(env,'safety_changed','(SELECT id FROM gk_safety_requirements WHERE checklist_id=? ORDER BY revision DESC LIMIT 1)=?',r.checklist_id,r.id),guard(env,'procedure_changed','(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?',r.checklist_id,state.procedure.latest),guard(env,'qualification_changed',"EXISTS(SELECT 1 FROM gk_qualifications q JOIN gk_members m ON m.id=q.member_id WHERE m.id=? AND m.status='active' AND q.name=? AND q.expires_on=? AND q.reference=? AND q.record_id=?)",a.signer,q.name,q.expires_on,q.reference,q.record_id)]
 }
 
 /** Required inspection library: existing procedure revisions and their published intervals. */
