@@ -1,3 +1,4 @@
+import { qualificationErasurePreview } from './qualification-erasure'
 import { attachmentErasurePreview } from './attachment-erasure'
 // Conservative retention default: retain indefinitely, with no automatic erasure.
 // Holds protect request intake and any copied fault on linked maintenance work.
@@ -10,16 +11,16 @@ const ownerOnly = (actor: Actor) => insist(actor.role === 'owner', 'forbidden', 
 export async function holdRecord(env: Bindings, actor: Actor, input: Input) {
   ownerOnly(actor)
   const kind = input.text('kind'), id = input.text('id'), reason = input.text('reason', { max: 500 }), held = input.flag('held')
-  insist(['work','request','attachment','user'].includes(kind), 'invalid_hold_kind')
-  const table = kind === 'work' ? 'gk_work_orders' : kind === 'request' ? 'gk_requests' : kind === 'user' ? 'gk_members' : 'gk_evidence'
-  const exists = await one(env, `SELECT 1 FROM ${table} WHERE id=?`, id)
+  insist(['work','request','attachment','user','qualification'].includes(kind), 'invalid_hold_kind')
+  const table = kind === 'work' ? 'gk_work_orders' : kind === 'request' ? 'gk_requests' : kind === 'user' ? 'gk_members' : kind === 'qualification' ? 'gk_retired_resources' : 'gk_evidence'
+  const exists = await one(env, `SELECT 1 FROM ${table} WHERE id=?${kind === 'qualification' ? " AND kind='qualification'" : ''}`, id)
   insist(exists || (kind === 'attachment' && await one(env, 'SELECT 1 FROM gk_request_files WHERE id=?', id)), 'record_not_found', 404)
-  const holds = ['attachment','user'].includes(kind) ? 'gk_retention_scope_holds' : 'gk_retention_holds'
+  const holds = ['attachment','user','qualification'].includes(kind) ? 'gk_retention_scope_holds' : 'gk_retention_holds'
   const old = await one(env, `SELECT revision FROM ${holds} WHERE kind=? AND record_id=?`, kind, id)
   const revision = input.integer('revision', { min: 0 })
   insist(revision === (old?.revision ?? 0), 'stale', 409)
   await commit(env, [
-    guard(env, 'stale', kind === 'attachment' ? 'EXISTS(SELECT 1 FROM gk_evidence WHERE id=?) OR EXISTS(SELECT 1 FROM gk_request_files WHERE id=?)' : `EXISTS(SELECT 1 FROM ${table} WHERE id=?${kind === 'request' && held ? ' AND erased_at IS NULL' : ''})`, ... (kind === 'attachment' ? [id,id] : [id])),
+    guard(env, 'stale', kind === 'attachment' ? 'EXISTS(SELECT 1 FROM gk_evidence WHERE id=?) OR EXISTS(SELECT 1 FROM gk_request_files WHERE id=?)' : `EXISTS(SELECT 1 FROM ${table} WHERE id=?${kind === 'request' && held ? ' AND erased_at IS NULL' : kind === 'qualification' ? " AND kind='qualification'" : ''})`, ... (kind === 'attachment' ? [id,id] : [id])),
     guard(env, 'stale', `(SELECT COALESCE((SELECT revision FROM ${holds} WHERE kind=? AND record_id=?),0))=?`, kind, id, revision),
     stmt(env, `INSERT INTO ${holds}(kind,record_id,held,reason,revision,changed_by,changed_at) VALUES(?,?,?,?,1,?,?)
       ON CONFLICT(kind,record_id) DO UPDATE SET held=excluded.held,reason=excluded.reason,revision=${holds}.revision+1,changed_by=excluded.changed_by,changed_at=excluded.changed_at`, kind, id, Number(held), reason, actor.id, now()),
@@ -40,6 +41,7 @@ export const REQUEST_EVIDENCE_RETAINED = `EXISTS(SELECT 1 FROM gk_requests r JOI
 export async function retentionPreview(env: Bindings, actor: Actor, url: URL) {
   ownerOnly(actor)
   if (url.searchParams.get('kind') === 'attachment') return attachmentErasurePreview(env, actor, url.searchParams.get('id') ?? '')
+  if (url.searchParams.get('kind') === 'qualification') return qualificationErasurePreview(env, actor, url.searchParams.get('id') ?? '')
   const id = url.searchParams.get('request') ?? ''
   const request = await one(env, 'SELECT id,version,erased_at,work_order_id,created_at FROM gk_requests WHERE id=?', id)
   insist(request, 'request_not_found', 404)
