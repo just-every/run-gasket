@@ -1,6 +1,6 @@
 <!-- Generated from CONTRACT.md by contract-docs. Edit CONTRACT.md, then regenerate. -->
 
-# Accept a Gasket product installation
+# Accept a Gasket installation
 
 The requirements, evidence and remaining gaps below come from CONTRACT.md.
 
