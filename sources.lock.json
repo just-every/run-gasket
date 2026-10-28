@@ -735,6 +735,10 @@
       "sha256": "d87619f697527f742dac8c80dcc9a866363553d3306c1b331f9ff170ca9d362b",
       "executable": false
     },
+    "migrations/core/0105_display_languages.sql": {
+      "sha256": "217d17ccee2d75a88c2ba127688200c70c8bb5171821b4a6416d3aceeb3d8843",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "5d20f1bd0c24def0cd6c1165d1a58d0472ad0f02f2b60047014bda962eaf4274",
       "executable": false
@@ -856,7 +860,7 @@
       "executable": false
     },
     "public/request-drafts.js": {
-      "sha256": "796f97a895bcb703474a53d5282ea8b2c2ce5c26eac3779b59b7c2cd77c7f29f",
+      "sha256": "d641962bc4e0adad9eaf0841109676b807c71b7790fcb87f10a43acb77740a2f",
       "executable": false
     },
     "public/rer-theme.css": {
@@ -1340,7 +1344,7 @@
       "executable": false
     },
     "src/gasket/actions.ts": {
-      "sha256": "8ff1d6da39c4e7442896164e28727e17c7b95670125e7b55bedfb2800b6681ad",
+      "sha256": "3ca179760bf4dd138428f1fe8ad6352fe6c893eb2796ffbf5f14943979cba9df",
       "executable": false
     },
     "src/gasket/actor.ts": {
@@ -1528,7 +1532,7 @@
       "executable": false
     },
     "src/gasket/doors.ts": {
-      "sha256": "b5bae1bd04186f0f1d36924d5e3649cbb6a76ddb8d87aa95469388925a26cad6",
+      "sha256": "30da6ca5e130aaa15877c670cd02cc16239bcaa53f26290ddff8d41bb6a46a9c",
       "executable": false
     },
     "src/gasket/exceptions.ts": {
@@ -1552,11 +1556,15 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "f87a8b1af5118c812aa1b03a1a39d1f386ba9dfcf1997a8422d68bdc36a2903b",
+      "sha256": "67c8cb2de70fa8fe6ae29574203171f4182d83cc605d1a5ad09dc1b154de7225",
       "executable": false
     },
     "src/gasket/input.ts": {
       "sha256": "9148faa2e6521adea99529f7079c969b3deb1e0b164eb7d8ca7294d882e32dcf",
+      "executable": false
+    },
+    "src/gasket/intake-catalog.ts": {
+      "sha256": "5a5bbc5d17affaf8329e32fc7477f861ea18075bcd85acf5c7588dd99840cedc",
       "executable": false
     },
     "src/gasket/interval-evidence.ts": {
@@ -1593,6 +1601,10 @@
     },
     "src/gasket/labor.ts": {
       "sha256": "112d156c921861e34320a2c2a482672aa979cf5ebf0be7ee01f7a73d5f69c845",
+      "executable": false
+    },
+    "src/gasket/languages.ts": {
+      "sha256": "cd27641aa470274d1dfbcf11d68049ae6c34f74c9a82510b32668c7add838d19",
       "executable": false
     },
     "src/gasket/lifecycle.ts": {
@@ -2064,7 +2076,7 @@
       "executable": false
     },
     "src/gasket/ui/failed-form.ts": {
-      "sha256": "90eb3c74131e34305f50b67993f0a8606f35f9c6a2e8798d3bddd4b06205bb0f",
+      "sha256": "3881b4f5ca5aac039aa6b43b3128c10cfe2fd3766f303808873b3c658b644bc3",
       "executable": false
     },
     "src/gasket/ui/generic-movein.ts": {
@@ -2180,7 +2192,7 @@
       "executable": false
     },
     "src/gasket/ui/requests.ts": {
-      "sha256": "396d6e03666018ce844c001f071f4f075fc674369eac20a222536588165728a8",
+      "sha256": "d038a279750b252a58cd3ac3e69ce31533d147a3c1c24f52fafd154138a3d9bf",
       "executable": false
     },
     "src/gasket/ui/rules.ts": {
@@ -2196,11 +2208,11 @@
       "executable": false
     },
     "src/gasket/ui/settings.ts": {
-      "sha256": "f19950a6f983b37dc830c056baa604457703cbc982d945e52c7cc75d69c0ce47",
+      "sha256": "d58ce8baa1820e0b8ab566668a893dd290cb619fabe2d6c6d38e2eefb2dc239a",
       "executable": false
     },
     "src/gasket/ui/shell.ts": {
-      "sha256": "3e3ff6d17eb744c399fe8649e50491a4339aeb8e78e5dae82ed8c4d4de464775",
+      "sha256": "cf0fa106e420feafb8b53acd6a819b5ee5169a7ec8aad8c1747a81512908071c",
       "executable": false
     },
     "src/gasket/ui/spend-policy.ts": {
@@ -2240,7 +2252,7 @@
       "executable": false
     },
     "src/gasket/views.ts": {
-      "sha256": "22e5d75f7b9eba40fb70b3fe16d50f3af22e64fa68b16fd1bda495d4a2883a27",
+      "sha256": "82fac194d45fea93293d7da7db42cf55c24f80b2e67764fe3708341faf0d82c1",
       "executable": false
     },
     "src/gasket/webhook-signing.ts": {
@@ -4200,7 +4212,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "b12b46c2ec94a6770495c8732c37963e56f2732ed108f06dfcb7162b4a4c79d9",
+      "sha256": "7d876ffa9da4325c317d09306af26eb5aba3a5e4e9c108a9b33b6642aa4bb168",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4237,6 +4249,10 @@
     },
     "tests/gasket/labor-costs.mjs": {
       "sha256": "093372df488cba35a7623e22410e86ca6db3bb86a5070483ad2194cda22bfcb8",
+      "executable": false
+    },
+    "tests/gasket/languages.mjs": {
+      "sha256": "9985444478a998dc996111f39bd6aac44e0142a6455fd06a116c2750ffe7eab0",
       "executable": false
     },
     "tests/gasket/messages.mjs": {
@@ -4348,7 +4364,7 @@
       "executable": false
     },
     "tests/gasket/requests.mjs": {
-      "sha256": "0c6fec3eafe06fbe3b82af0c5d351ff2b72e2f8ceb27ab41c5e3644eedc76afa",
+      "sha256": "46a2c8897940d6903fe640e350773b529e2896f8b6ee53e0cdc1132fcc4331e6",
       "executable": false
     },
     "tests/gasket/rule-sources.mjs": {
