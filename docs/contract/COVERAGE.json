@@ -267,7 +267,25 @@
     {
       "file": "CONTRACT.md",
       "line": 45,
-      "text": "**GAS-11 \u2014 Read and keep the history.** Members read asset work, results, readings, part movements, downtime, findings and reviews with actors and dates; leads and supervisors download the same history as CSV. The owner exports the whole installation with rer export and restores it into a fresh installation with rer import without losing domain history. **Acceptance evidence:** Read the full asset history and authorized CSV through public doors, compare events and attribution, export a populated installation using rer export, restore into an empty installation using rer import and compare domain records and attachment digests.",
+      "text": "**GAS-11 \u2014 Read and keep the history.** Members read asset work, results, readings, part movements, downtime, findings and reviews with actors and dates; leads and supervisors download the same history as CSV.",
+      "to": "clause",
+      "ids": [
+        "GAS-11"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 45,
+      "text": "The owner exports the whole installation with rer export and restores it into a fresh installation with rer import without losing domain history.",
+      "to": "base",
+      "ids": [
+        "BASE-DATA-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 45,
+      "text": "**Acceptance evidence:** Read the full asset history and authorized CSV through public doors, compare events and attribution, export a populated installation using rer export, restore into an empty installation using rer import and compare domain records and attachment digests.",
       "to": "clause",
       "ids": [
         "GAS-11"
@@ -366,7 +384,25 @@
     {
       "file": "CONTRACT.md",
       "line": 71,
-      "text": "**ADMIN-008 \u2014 Protected credentials and private attachments.** Provider tokens, sensor certificates and mobile credentials are encrypted under installation authority, narrowly scoped, rotatable and revocable. Private file access rechecks current record rights; original attachments use Cloudflare R2 or owner object storage with resumable uploads, declared limits, malware handling and safe rendering. Telemetry aggregation runs in bounded background jobs rather than long request-time database scans. Logs, exports and AI context redact secrets; disconnecting a provider stops new sends. **Acceptance evidence:** Connect/rotate/revoke a provider, upload a private manual and hostile file, then use unauthorized, expired and cross-site download links. Export and inspect logs/context for planted secrets; revoked connectors produce no new outbound requests.",
+      "text": "**ADMIN-008 \u2014 Protected credentials and private attachments.** Provider tokens, sensor certificates and mobile credentials are encrypted under installation authority, narrowly scoped, rotatable and revocable.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-008"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 71,
+      "text": "Private file access rechecks current record rights;",
+      "to": "base",
+      "ids": [
+        "BASE-ROLE-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 71,
+      "text": "original attachments use Cloudflare R2 or owner object storage with resumable uploads, declared limits, malware handling and safe rendering. Telemetry aggregation runs in bounded background jobs rather than long request-time database scans. Logs, exports and AI context redact secrets; disconnecting a provider stops new sends. **Acceptance evidence:** Connect/rotate/revoke a provider, upload a private manual and hostile file, then use unauthorized, expired and cross-site download links. Export and inspect logs/context for planted secrets; revoked connectors produce no new outbound requests.",
       "to": "clause",
       "ids": [
         "ADMIN-008"
@@ -1313,7 +1349,25 @@
     {
       "file": "CONTRACT.md",
       "line": 265,
-      "text": "**INT-001 \u2014 Documented maintenance REST API.** A documented versioned REST API covers maintenance records, procedures, assignments, execution and approvals using the same server authorization as screens. Pagination, scoped service credentials, idempotent write keys, error contracts, limits and OpenAPI examples let a buyer operate the complete job without browser automation. **Acceptance evidence:** Use API documentation to create/read/update and page an asset/work/stock estate, retry a timed-out write with the same key and attempt forbidden site and approval operations. Compare API results with UI/history.",
+      "text": "**INT-001 \u2014 Documented maintenance REST API.** A documented versioned REST API covers maintenance records, procedures, assignments, execution and approvals",
+      "to": "clause",
+      "ids": [
+        "INT-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 265,
+      "text": "using the same server authorization as screens",
+      "to": "base",
+      "ids": [
+        "BASE-ROLE-001"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 265,
+      "text": ". Pagination, scoped service credentials, idempotent write keys, error contracts, limits and OpenAPI examples let a buyer operate the complete job without browser automation. **Acceptance evidence:** Use API documentation to create/read/update and page an asset/work/stock estate, retry a timed-out write with the same key and attempt forbidden site and approval operations. Compare API results with UI/history.",
       "to": "clause",
       "ids": [
         "INT-001"

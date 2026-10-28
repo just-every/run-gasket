@@ -178,7 +178,7 @@ Core · published · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 
 Core · published · **done** · Cites BASE-DATA-001
 
-**Requirement.** Members read asset work, results, readings, part movements, downtime, findings and reviews with actors and dates; leads and supervisors download the same history as CSV. The owner exports the whole installation with rer export and restores it into a fresh installation with rer import without losing domain history.
+**Requirement.** Members read asset work, results, readings, part movements, downtime, findings and reviews with actors and dates; leads and supervisors download the same history as CSV.
 
 **Acceptance.**
 1. Read the full asset history and authorized CSV through public doors, compare events and attribution, export a populated installation using rer export, restore into an empty installation using rer import and compare domain records and attachment digests.
@@ -328,7 +328,7 @@ Core · target · **partial** · Cites BASE-DATA-002, BASE-DATA-003, BASE-DATA-0
 
 Core · target · **partial** · Cites BASE-SECRET-001, BASE-INPUT-003, BASE-ROLE-001, BASE-DATA-004
 
-**Requirement.** Provider tokens, sensor certificates and mobile credentials are encrypted under installation authority, narrowly scoped, rotatable and revocable. Private file access rechecks current record rights; original attachments use Cloudflare R2 or owner object storage with resumable uploads, declared limits, malware handling and safe rendering. Telemetry aggregation runs in bounded background jobs rather than long request-time database scans. Logs, exports and AI context redact secrets; disconnecting a provider stops new sends.
+**Requirement.** Provider tokens, sensor certificates and mobile credentials are encrypted under installation authority, narrowly scoped, rotatable and revocable. Original attachments use Cloudflare R2 or owner object storage with resumable uploads, declared limits, malware handling and safe rendering. Telemetry aggregation runs in bounded background jobs rather than long request-time database scans. Logs, exports and AI context redact secrets; disconnecting a provider stops new sends.
 
 **Acceptance.**
 1. Connect/rotate/revoke a provider, upload a private manual and hostile file, then use unauthorized, expired and cross-site download links.
@@ -1451,7 +1451,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 
 Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 
-**Requirement.** A documented versioned REST API covers maintenance records, procedures, assignments, execution and approvals using the same server authorization as screens. Pagination, scoped service credentials, idempotent write keys, error contracts, limits and OpenAPI examples let a buyer operate the complete job without browser automation. RL-103 retains the credential policy in RL-2: owner-bound explicit scopes and expiry, no privileged scopes, transactional authority checks and irreversible revocation, one-time secret custody, attributable credential use, reconciliation on rotation and restoration with all credentials inactive. These restrictions on service credentials do not reduce the complete maintenance API target.
+**Requirement.** A documented versioned REST API covers maintenance records, procedures, assignments, execution and approvals. Pagination, scoped service credentials, idempotent write keys, error contracts, limits and OpenAPI examples let a buyer operate the complete job without browser automation. RL-103 retains the credential policy in RL-2: owner-bound explicit scopes and expiry, no privileged scopes, transactional authority checks and irreversible revocation, one-time secret custody, attributable credential use, reconciliation on rotation and restoration with all credentials inactive. These restrictions on service credentials do not reduce the complete maintenance API target.
 
 **Acceptance.**
 1. Use API documentation to create/read/update and page an asset/work/stock estate, retry a timed-out write with the same key and attempt forbidden site and approval operations.
