@@ -40,6 +40,7 @@ export async function accessPage(env: Bindings, actor: Actor, url: URL) {
 
 /** Each audit action in plain words. */
 export const ACTIONS: Record<string, string> = {
+  'service.create': 'Issued a service credential', 'service.revoke': 'Revoked a service credential', 'service.invalidate': 'Invalidated a service credential',
   'automation.control': 'Changed an automation grant', 'automation.schedule': 'Enabled or paused a PM rule',
   'supplier.create': 'Added a supplier', 'supplier.update': 'Changed supplier details', 'supplier.catalog': 'Updated a supplier catalog', 'costcenter.save': 'Saved a cost center', 'requisition.request': 'Requested a maintenance purchase',
   'site.create': 'Added a planned site', 'site.update': 'Changed site metadata', 'site.membership': 'Changed planned site access',
@@ -67,6 +68,7 @@ export async function auditRecords(env: Bindings) {
   return new Map<string, Html>([
     ['site', link('/app/site', 'The site')],
     ...sites.map(row => [row.id, h`${row.name}`] as const),
+    ...(await all(env, 'SELECT id,name FROM gk_api_credentials')).map(row => [row.id, h`Service client: ${row.name}`] as const),
     ...['pm','routes','chase','expiry'].map(id => [id, link('/app/automation', 'Automation')] as const),
     ...suppliers.map(row => [row.id, link(`/app/suppliers/${row.id}`, row.name)] as const),
     ...requisitions.map(row => [row.id, link(`/app/requisitions/${row.id}`, `REQ-${row.number}`)] as const),

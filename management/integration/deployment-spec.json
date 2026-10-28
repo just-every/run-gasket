@@ -663,9 +663,21 @@
     },
     {
       "binding": "DB",
+      "name": "0100_service_lifecycle_audit.sql",
+      "sha256": "2e039dedb93d520d75e98415479d78c7b551314b04a90210d242168a57539fe9",
+      "sql": "-- Only a live mutation batch supplies this context; no authority survives it.\nCREATE TABLE gk_authority_actor (\n  singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n  actor TEXT NOT NULL,\n  action TEXT NOT NULL,\n  at INTEGER NOT NULL\n);\n\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,\n    (SELECT CASE WHEN o.role='owner' THEN 'owner' ELSE m.role END\n      FROM gk_members m LEFT JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=a.actor),\n    'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
+    },
+    {
+      "binding": "DB",
       "name": "0101_erasure_audit.sql",
-      "sha256": "db500d6d96ddd407764298a6ad5123d1712b123f3316638c0143acf07ae838dc",
-      "sql": "-- Preserve both record and qualification erasure after their independent migrations.\nDROP TRIGGER gk_audit_no_update;\nCREATE TRIGGER gk_audit_no_update BEFORE UPDATE ON gk_audit\nWHEN NOT (\n NEW.detail='{}' AND NEW.seq=OLD.seq AND NEW.at=OLD.at AND NEW.actor=OLD.actor\n AND NEW.action=OLD.action AND NEW.subject=OLD.subject AND NEW.role IS OLD.role\n AND (\n  (EXISTS(SELECT 1 FROM gk_guard WHERE code='request_erasure' AND ok=1)\n   AND OLD.action IN ('request.submit','request.triage','request.reply','request.convert','workorder.create','request.clock','request.escalation'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='record_erasure' AND ok=1))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='qualification_erasure' AND ok=1)\n   AND OLD.action IN ('planning.qualification','planning.retire'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='attachment_erasure' AND ok=1)\n   AND OLD.action IN ('workorder.evidence','workorder.annotate'))\n )\n)\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n\n"
+      "sha256": "cd2a711028e946edf63d6d6110fb9595fd580fc3e7a8ca76fcbba0a35b4f6b96",
+      "sql": "-- Preserve both record and qualification erasure after their independent migrations.\nDROP TRIGGER gk_audit_no_update;\nCREATE TRIGGER gk_audit_no_update BEFORE UPDATE ON gk_audit\nWHEN NOT (\n NEW.detail='{}' AND NEW.seq=OLD.seq AND NEW.at=OLD.at AND NEW.actor=OLD.actor\n AND NEW.action=OLD.action AND NEW.subject=OLD.subject AND NEW.role IS OLD.role\n AND (\n  (EXISTS(SELECT 1 FROM gk_guard WHERE code='request_erasure' AND ok=1)\n   AND OLD.action IN ('request.submit','request.triage','request.reply','request.convert','workorder.create','request.clock','request.escalation'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='record_erasure' AND ok=1))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='qualification_erasure' AND ok=1)\n   AND OLD.action IN ('planning.qualification','planning.retire'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='attachment_erasure' AND ok=1)\n   AND OLD.action IN ('workorder.evidence','workorder.annotate'))\n )\n)\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0101_service_authority_snapshot.sql",
+      "sha256": "9f7665ced012b523e6440f7b79be2d6db113cb8bb0fb9d21a6a42f3f1360f1cb",
+      "sql": "-- Preserve the authority that authorized the batch before a self-demotion.\nALTER TABLE gk_authority_actor ADD COLUMN role TEXT;\n\nDROP TRIGGER gk_service_invalidation_audit;\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,a.role,'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

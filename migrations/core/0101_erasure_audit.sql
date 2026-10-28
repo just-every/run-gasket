@@ -15,4 +15,3 @@ WHEN NOT (
  )
 )
 BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;
-
