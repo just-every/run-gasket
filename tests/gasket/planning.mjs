@@ -211,7 +211,8 @@ export async function qualificationPlanningJourney() {
     }
     let deletion=await previewErasure()
     assert.equal(deletion.eligible,true)
-    assert.deepEqual((({reminderInputs,...counts})=>counts)(deletion.dependencies),{retiredQualifications:1,auditDetails:3,reminders:2,safetySignoffs:0})
+    assert.deepEqual(deletion.qualification,{name:'Unused training',person:'Luis Ortega'})
+    assert.deepEqual((({reminderInputs,...counts})=>counts)(deletion.dependencies),{retiredQualifications:1,auditDetails:3,reminders:2,safetySignoffs:0,stewardship:0})
     assert.ok(deletion.dependencies.reminderInputs>0,'preview identifies retained reminder captures')
     assert.equal((await h.raw('/api/gasket/qualification.erase',{body:{id:resource,confirm:true,revision:deletion.revision}})).status,401)
     await erase({revision:deletion.revision-1},409)
@@ -220,7 +221,7 @@ export async function qualificationPlanningJourney() {
     assert.equal((await previewErasure()).eligible,false)
     assert.equal((await erase({revision:deletion.revision},409)).error,'qualification_retained')
     await h.api('retention.policy',owner,{kind:'maintenance_records',minimumDays:0,revision:minimum.revision,reason:'Release minimum age'})
-    for(const [kind,id] of [['user',people.luis],['qualification',resource]]) {
+    for(const [kind,id] of [['user',people.luis],['user',(await h.api('me',owner)).id],['qualification',resource]]) {
       const held=await h.api('retention.hold',owner,{kind,id,revision:0,held:true,reason:'Preserve qualification evidence'})
       assert.equal((await previewErasure()).eligible,false)
       await erase({revision:deletion.revision},409)
@@ -273,6 +274,79 @@ export async function qualificationPlanningJourney() {
       await h.api('qualification.erase',owner,{id:raceResource,revision:(await view()).revision,confirm:true})
     } else assert.equal(racePreview.erased,true)
     if(process.env.PLANNING_SCREENSHOTS) await browserProof(f,'resources')
+    // Named stewardship is independent of planning and private-document access.
+    const grantInput={grantee:people.luis,site:'primary',kind:'qualification',target:people.maya,name:'Stewarded voltage',revision:0,enabled:true,consent:true,reason:'Maintain this training reference'}
+    for(const cookie of [cookies.lead,cookies.maya,cookies.luis,cookies.supervisor,cookies.agent]) await h.api('planning.grant',cookie,grantInput,403)
+    await h.api('planning.grant',owner,{...grantInput,consent:false},400)
+    const plannedSite=(await h.api('site.create',owner,{name:'Planned workshop',timezone:'UTC'})).id
+    await h.api('planning.grant',owner,{...grantInput,site:plannedSite},409)
+    const grant=(await h.api('planning.grant',owner,grantInput)).id
+    await h.api('planning.grant',owner,grantInput,409)
+    const stewarded={member:people.maya,name:grantInput.name,expires:'2026-12-31',reference:'synthetic-gasket-stewarded-reference'}
+    await h.api('planning.qualification',cookies.luis,stewarded)
+    await h.api('planning.qualification',cookies.luis,{...stewarded,expires:'2027-01-31',reference:'synthetic-gasket-stewarded-correction'})
+    await h.api('planning.qualification',cookies.luis,{...stewarded,member:people.luis},403)
+    await h.api('planning.qualification',cookies.luis,{...stewarded,remind:true,remindDays:1},403)
+    await h.api('planning.qualification',cookies.luis,{...stewarded,name:'Other voltage'},403)
+    await h.api('planning',cookies.luis,undefined,403)
+    await h.api('members',cookies.luis,undefined,403)
+    await h.api('retention.policy',cookies.luis,{kind:'users',revision:0,minimumDays:0,reason:'Forbidden'},403)
+    const scoped=await h.api('resource-records',cookies.luis)
+    assert.deepEqual(scoped.people.map(p=>p.id),[people.maya])
+    assert.deepEqual(scoped.qualifications.map(q=>q.name),[grantInput.name])
+    assert.ok(!JSON.stringify(scoped).includes('@'))
+    assert.equal(scoped.qualifications[0].reference,undefined,'upkeep does not grant private original references')
+    assert.deepEqual(scoped.work,[],'upkeep does not grant work planning')
+    const retiredBySteward=await h.submit('planning.retire',cookies.luis,{kind:'qualification',member:people.maya,name:grantInput.name,reason:'Withdraw stewarded evidence',revision:(await view()).revision},'/app/settings/resources')
+    assert.equal(retiredBySteward.searchParams.has('error'),false)
+    const stewardHistory=(await view()).retired.find(r=>r.snapshot.name===grantInput.name)
+    assert.equal(stewardHistory.retired_by,people.luis)
+    await h.api(`retention-preview?kind=qualification&id=${stewardHistory.id}`,cookies.luis,undefined,403)
+    await h.api('qualification.erase',cookies.luis,{id:stewardHistory.id,confirm:true,revision:(await view()).revision},403)
+    await h.api('planning.qualification',cookies.luis,stewarded)
+    const toolGrant=(await h.api('planning.grant',owner,{...grantInput,kind:'tool',target:'',name:'Stewarded gauge'})).id
+    const scopedTool={name:'Stewarded gauge',identifier:'synthetic-gasket-stewarded-tool',calibrationDue:'2027-01-31',revision:(await view()).revision}
+    const stewardsTool=(await h.api('planning.tool',cookies.luis,scopedTool)).id
+    await h.api('planning.tool',cookies.luis,{...scopedTool,id:stewardsTool,identifier:'synthetic-gasket-corrected-tool',revision:(await view()).revision})
+    await h.api('planning.tool',cookies.luis,{...scopedTool,name:'Other gauge',revision:(await view()).revision},403)
+    await h.api('planning.retire',cookies.luis,{kind:'tool',id:stewardsTool,reason:'Withdraw gauge',revision:(await view()).revision})
+    const grantAudit=(await h.api('audit?action=planning.qualification',owner)).rows.filter(a=>a.actor===people.luis)
+    assert.equal(grantAudit.length,3)
+    assert.ok(grantAudit.every(a=>a.role==='maintainer'&&a.site==='Lake Erie Works'))
+    if(process.env.PLANNING_SCREENSHOTS) await stewardBrowserProof(f)
+    const revoke=await h.submit('planning.grant',owner,{id:grant,revision:1,reason:'Stewardship ended'},'/app/settings/resources')
+    assert.equal(revoke.searchParams.has('error'),false)
+    await h.api('planning.qualification',cookies.luis,stewarded,403)
+    await h.api('planning.retire',cookies.luis,{kind:'qualification',member:people.maya,name:grantInput.name,reason:'Forbidden',revision:(await view()).revision},403)
+    const beforeRevoked=(await view()).qualifications
+    const failedRegrant=await h.api('planning.grant',owner,{id:grant,revision:2,enabled:true,reason:'Cannot revive an old grant'},409)
+    assert.equal(failedRegrant.error,'new_grant_required')
+    assert.deepEqual((await view()).qualifications,beforeRevoked)
+    await h.api('planning.grant',owner,{id:toolGrant,revision:1,enabled:false,reason:'Tool stewardship ended'})
+    assert.equal((await h.raw('/app/settings/resources',{cookie:cookies.luis})).status,403,'revocation removes the steward settings door in the same session')
+    await change('planning.retire',{kind:'qualification',member:people.maya,name:grantInput.name,reason:'Retired after stewardship'})
+    const scopedRetired=(await view()).retired.find(r=>r.snapshot.name===grantInput.name)
+    const scopedPreview=await h.api(`retention-preview?kind=qualification&id=${scopedRetired.id}`,owner)
+    assert.equal(scopedPreview.eligible,true)
+    assert.equal(scopedPreview.dependencies.stewardship,1)
+    const stewardHold=await h.api('retention.hold',owner,{kind:'user',id:people.luis,revision:2,held:true,reason:'Preserve steward evidence'})
+    assert.equal((await h.api(`retention-preview?kind=qualification&id=${scopedRetired.id}`,owner)).eligible,false,'a steward hold protects attributed qualification evidence')
+    await h.api('qualification.erase',owner,{id:scopedRetired.id,revision:scopedPreview.revision,confirm:true},409)
+    await h.api('retention.hold',owner,{kind:'user',id:people.luis,revision:stewardHold.revision,held:false,reason:'Release steward evidence'})
+    const scopedErasure=await h.api('qualification.erase',owner,{id:scopedRetired.id,revision:scopedPreview.revision,confirm:true})
+    assert.equal(scopedErasure.result.anonymized.stewardship,1)
+    assert.ok(!JSON.stringify(await h.api('resource-records',owner)).includes(grantInput.name),'erasure removes the qualification scope from retained grants')
+    assert.ok(!JSON.stringify((await h.api('audit',owner)).rows).includes(grantInput.name),'erasure anonymizes grant and stewardship audit copies')
+    // A membership lifecycle cannot revive a previously issued record grant.
+    await h.api('planning.grant',owner,{...grantInput,name:'Membership-bound training'})
+    await h.api('access.end',owner,{member:people.luis})
+    await h.api('access.give',owner,{name:'Luis Ortega',email:(await h.api('members',owner)).find(p=>p.id===people.luis).email,role:'maintainer'})
+    const reinstated=await h.signIn((await h.api('members',owner)).find(p=>p.id===people.luis).email)
+    await h.api('planning.qualification',reinstated,{...stewarded,name:'Membership-bound training'},403)
+    const endedGrant=(await h.api('resource-records',owner)).grants.find(g=>g.name==='Membership-bound training')
+    assert.equal(endedGrant.effective,0)
+
+
   } finally {await h.close()}
 }
 
@@ -426,6 +500,17 @@ async function browserProof(f,name,move) {
         await page.getByRole('table',{name:'Retired resources',exact:true}).getByRole('row').filter({hasText:browserTool}).waitFor()
         if(width===1440)assert.ok(!(await view()).tools.some(t=>t.name===browserTool),'browser tool retirement removes eligibility')
         await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/resource-controls-${width}.png`,fullPage:true})
+        const erasedRow=page.getByRole('table',{name:'Retired resources',exact:true}).getByRole('row').filter({hasText:browserName})
+        await erasedRow.getByRole('link',{name:'Preview erasure',exact:true}).click()
+        await page.getByRole('heading',{name:'Qualification dependency preview',exact:true}).waitFor()
+        if(width===1440) assert.ok((await page.locator('main').textContent()).includes('Eligible for owner-confirmed erasure'))
+        await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/qualification-erasure-preview-${width}.png`,fullPage:true})
+        await page.getByRole('checkbox',{name:'I confirm permanent erasure of this previewed qualification family and its eligible copies.',exact:true}).check()
+        await page.getByRole('button',{name:'Erase qualification',exact:true}).click()
+        await page.getByText('Already erased',{exact:true}).waitFor()
+        if(width===1440) assert.ok(!(await view()).retired.some(r=>r.snapshot.name===browserName))
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+        await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/qualification-erasure-result-${width}.png`,fullPage:true})
       }
       if(move) {
         const target=width===1440?'2026-10-22':'2026-10-23'
@@ -452,4 +537,58 @@ async function browserProof(f,name,move) {
     await context.close()
   } finally {await browser.close()}
 }
+async function stewardBrowserProof(f) {
+  const {h,owner,people,cookies,view}=f
+  const browser=await chromium.launch({headless:true,executablePath:process.env.PLANNING_CHROMIUM||undefined,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+  try {
+    for(const width of [1440,390]) {
+      const context=await browser.newContext({ignoreHTTPSErrors:true,viewport:{width,height:1000}})
+      const cookie=async value=>context.addCookies(value.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+      await cookie(owner)
+      const page=await context.newPage(),recordName=`Browser steward ${width}`
+      await page.goto(h.origin+'/app/settings/resources')
+      const grantForm=page.locator('form[action="/app/do/planning.grant"]').filter({has:page.getByRole('button',{name:'Grant stewardship',exact:true})})
+      await grantForm.getByLabel('Steward',{exact:true}).selectOption(people.luis)
+      await grantForm.getByLabel('Record kind',{exact:true}).selectOption('qualification')
+      await grantForm.getByLabel('Person for qualification',{exact:true}).selectOption(people.maya)
+      await grantForm.getByLabel('Record name',{exact:true}).fill(recordName)
+      await grantForm.getByLabel('Reason',{exact:true}).fill('Maintain this entered training reference')
+      await grantForm.getByLabel('I authorize this exact record scope',{exact:true}).check()
+      await grantForm.getByRole('button',{name:'Grant stewardship',exact:true}).click()
+      const grantRow=page.getByRole('table',{name:'Resource stewardship',exact:true}).getByRole('row').filter({hasText:recordName})
+      await grantRow.getByText('Active',{exact:true}).waitFor()
+      await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/steward-grant-${width}.png`,fullPage:true})
+      await context.clearCookies();await cookie(cookies.luis)
+      await page.goto(h.origin+'/app')
+      if(width===390) await page.locator('label[for="gk-menu"]').click()
+      await page.getByRole('link',{name:'Resource settings',exact:true}).click()
+      const qualificationForm=page.locator('form[action="/app/do/planning.qualification"]').filter({has:page.locator(`input[name="name"][value="${recordName}"]`)})
+      await qualificationForm.getByLabel('Valid through',{exact:true}).fill('2027-01-31')
+      await qualificationForm.getByLabel('Evidence reference',{exact:true}).fill('synthetic-gasket-browser-steward')
+      await qualificationForm.getByRole('button',{name:'Save qualification',exact:true}).click()
+      const row=page.getByRole('table',{name:'Qualifications',exact:true}).getByRole('row').filter({hasText:recordName})
+      await row.waitFor()
+      if(width===1440) {
+        assert.ok((await row.textContent()).includes('Jan 31, 2027'))
+        assert.ok(!(await page.locator('main').textContent()).includes('synthetic-gasket-browser-steward'))
+        assert.equal(await page.getByRole('heading',{name:'Availability and absence',exact:true}).count(),0)
+        assert.equal(await page.getByRole('heading',{name:'Resource stewards',exact:true}).count(),0)
+      }
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+      await page.screenshot({path:`${process.env.PLANNING_SCREENSHOTS}/steward-records-${width}.png`,fullPage:true})
+      await row.getByLabel('Retirement reason',{exact:true}).fill('Withdraw entered training reference')
+      await row.getByRole('button',{name:'Retire record',exact:true}).click()
+      await row.waitFor({state:'detached'})
+      if(width===1440) assert.equal((await view()).retired.find(r=>r.snapshot.name===recordName).retired_by,people.luis)
+      await context.clearCookies();await cookie(owner)
+      await page.goto(h.origin+'/app/settings/resources')
+      await grantRow.getByLabel('Revocation reason',{exact:true}).fill('Stewardship completed')
+      await grantRow.getByRole('button',{name:'Revoke stewardship',exact:true}).click()
+      await grantRow.getByText('Revoked',{exact:true}).waitFor()
+      await h.api('planning.qualification',cookies.luis,{member:people.maya,name:recordName,expires:'2027-01-31',reference:'synthetic-gasket-denied'},403)
+      await context.close()
+    }
+  } finally {await browser.close()}
+}
+
 if(process.argv[1]&&import.meta.url===new URL(`file://${process.argv[1]}`).href){await qualificationPlanningJourney();await calendarPlanningJourney();console.log('Planning journeys passed')}

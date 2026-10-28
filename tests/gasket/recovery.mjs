@@ -37,6 +37,8 @@ export async function recoveryJourney() {
     const resourceTool=(await h.api('planning.tool',owner,{name:'Recovery gauge',identifier:'synthetic-gasket-retired-tool',calibrationDue:'2099-12-31',revision:(await h.api('planning',owner)).revision})).id
     await h.api('planning.retire',owner,{kind:'tool',id:resourceTool,reason:'Gauge withdrawn before backup',revision:(await h.api('planning',owner)).revision})
     const retiredResources=(await h.api('planning',owner)).retired
+    const recoveryLead=(await h.api('members',owner)).find(m=>m.role==='lead').id
+    const stewardship=(await h.api('planning.grant',owner,{grantee:recoveryLead,site:'primary',kind:'tool',target:'',name:'Recovery gauge',revision:0,enabled:true,consent:true,reason:'Maintain the recovery gauge'})).id
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
     const credential = await h.api('service.create', owner, { name: 'Synthetic recovery service', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
@@ -77,6 +79,11 @@ export async function recoveryJourney() {
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
       const restoredPlanning=await restored.api('planning',signed)
+      const restoredGrant=(await restored.api('resource-records',signed)).grants.find(g=>g.id===stewardship)
+      assert.equal(restoredGrant.active,0,'restoring an archive never reactivates stewardship')
+      assert.equal(restoredGrant.effective,0)
+      const restoredLead=await restored.signIn((await restored.api('members',signed)).find(m=>m.id===recoveryLead).email)
+      await restored.api('planning.tool',restoredLead,{name:'Recovery gauge',identifier:'synthetic-gasket-restore-denied',calibrationDue:'2099-12-31',revision:restoredPlanning.revision},403)
       assert.deepEqual(restoredPlanning.retired,retiredResources,'retired evidence and attribution reconcile after empty restore')
       assert.deepEqual((await restored.api(`/automation/jobs?job=${expiryJob.job}`,signed)).input.qualificationReminders,reminderEvidence,'qualification reminder inputs survive retirement and inactive empty restore')
       assert.deepEqual(restoredPlanning.qualifications,[],'retired qualification is not restored into eligibility')

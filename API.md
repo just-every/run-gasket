@@ -743,3 +743,31 @@ CT approved this conservative owner-confirmed qualification erasure default
 with riders on 27 October 2026. It supplies no legal retention period or compliance determination.
 Broader copied-data reconciliation and user identity erasure remain under
 ADMIN-007 and ADMIN-016.
+
+## Named resource stewardship
+
+An ordinary active owner issues `planning.grant` with `grantee`, `site: primary`,
+`kind` (qualification or tool), `target` (the qualification holder, empty for a
+tool), exact `name`, `revision: 0`, `enabled: true`, `consent: true` and `reason`.
+The grant authorizes creation, correction and retirement of that named record
+only. Planned sites are refused. It grants no work planning, personnel directory,
+private original document, reminder consent, erasure, retention or grant authority.
+Only the owner chooses renewal reminder consent; a steward correction preserves
+that existing choice.
+
+`GET /api/gasket/resource-records` returns the existing authorized planning view
+for a planner. A named steward without planning rights receives only people and
+record facts needed for effective scopes, without private references, contacts,
+work, availability or retired evidence. The same view powers Resource settings.
+The qualification, tool and retirement actions apply the exact scope again
+inside their atomic writes. Existing ordinary record and site permissions remain
+independent.
+
+Revoke with `planning.grant` using the grant `id`, current `revision`,
+`enabled: false` and `reason`. The old session immediately loses record upkeep.
+An ended and reinstated membership or changed operator generation cannot revive
+an old grant. A revoked scope requires a fresh deliberate grant; restored
+archives always disable grants. Owner-confirmed qualification erasure also
+redacts matching scope names, targets and reasons, anonymizes their retained
+audit payloads and reports the number of affected grants while retaining actor,
+action, site and time attribution.
