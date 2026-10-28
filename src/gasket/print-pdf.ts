@@ -18,7 +18,7 @@ export async function printPdf(content: PackContent, digest: string) {
     insist([...value].every(c => ['\n','\r','\t'].includes(c) || glyphs.has(c.codePointAt(0)!)), 'pdf_character_not_supported', 422)
     for (const paragraph of value.replace(/\r\n?/g,'\n').split('\n')) {
       let text = ''
-      const draw = () => { if (y < 100) next(); page.drawText(text,{x:42,y,size,font,color:rgb(.12,.13,.15)}); y -= size+7; text='' }
+      const draw = () => { if (y < 115) next(); page.drawText(text,{x:42,y,size,font,color:rgb(.12,.13,.15)}); y -= size+7; text='' }
       for (const c of paragraph.replace(/\t/g,'    ')) { if(text && font.widthOfTextAtSize(text+c,size)>510) draw(); text+=c }
       draw()
     }
@@ -33,9 +33,10 @@ export async function printPdf(content: PackContent, digest: string) {
   line(`${t('performed')}: ___________________________________`)
   const pages=pdf.getPages()
   for(const [i,p] of pages.entries()) {
+    p.drawText(content.checklist,{x:42,y:92,size:13,font})
     p.drawText(`${content.workNumber} | ${t('revision')} ${content.workVersion} | ${t('checklist')} ${content.checklistNumber}`,{x:42,y:72,size:13,font})
     p.drawText(`${content.id} | ${i+1} / ${pages.length}`,{x:42,y:52,size:13,font})
-    p.drawText(digest,{x:42,y:30,size:11,font})
+    p.drawText(digest,{x:42,y:30,size:13,font})
   }
   return pdf.save({objectsPerTick:Infinity})
 }

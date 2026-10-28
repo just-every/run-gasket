@@ -1,6 +1,6 @@
 // Online human authority is checked independently of every opaque printed identifier.
 import type { Bindings } from '../auth.server'
-import { HUMAN_ROLES, humanSessionSql, requireCapability, type Actor } from './actor'
+import { HUMAN_ROLES, humanSessionSql, capabilitySql, requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'
 import { isLocalTime, localNow } from './dates'
 import { isCollaborator } from './crew'
@@ -25,8 +25,8 @@ async function admit(env: Bindings, actor: Actor, work: string) {
   return {order,authority}
 }
 function fence(env: Bindings, actor: Actor, order: Row) {
-  const authority=humanSessionSql(actor)
-  return [guard(env,'access_ended',authority.sql,...authority.params),
+  const authority=humanSessionSql(actor), capability=capabilitySql(actor.sessionId,'work.do')
+  return [guard(env,'forbidden',capability.sql,...capability.params),guard(env,'access_ended',authority.sql,...authority.params),
     guard(env,'not_your_work',`EXISTS(SELECT 1 FROM gk_work_orders w WHERE w.id=? AND
       (w.assignee_id=? OR EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id=w.id AND c.member_id=? AND c.removed_at IS NULL)))`,order.id,actor.id,actor.id)]
 }

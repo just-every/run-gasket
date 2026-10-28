@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "8af6a4b3eb960f46320536cbb49c7840e1230dd57f630d243d533d7b63f21587",
+      "sha256": "b3dfa3f72a8b319a7537927a061dfd23ed5e785ed5b2572f9a94393ff7e5d05f",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "4ed7ec8955d74e61fc09b7f0f3c1aec678e1049548898477e9e3d7184e17b7ab",
+      "sha256": "a967d7e20ed3c095cd4c7557953c94678810a362531b5c3531ab44ce83efe586",
       "executable": false
     },
     "DEMO.md": {
@@ -739,6 +739,10 @@
       "sha256": "217d17ccee2d75a88c2ba127688200c70c8bb5171821b4a6416d3aceeb3d8843",
       "executable": false
     },
+    "migrations/core/0106_controlled_print_packs.sql": {
+      "sha256": "8318cd3aa9cdc2fb6c16d704d0524c09a781dc3363ef456a7d5257f87572d015",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "5d20f1bd0c24def0cd6c1165d1a58d0472ad0f02f2b60047014bda962eaf4274",
       "executable": false
@@ -844,7 +848,7 @@
       "executable": false
     },
     "public/gasket.css": {
-      "sha256": "ccfcbee664c8126ecf3b2082ab7a580b5d4a0b0acfca3fa9d9cf610731486a56",
+      "sha256": "3e1886df43ee16f06b96dae0a348763f460461dc9b2717672db42ee977280d49",
       "executable": false
     },
     "public/label-scan.js": {
@@ -1532,7 +1536,7 @@
       "executable": false
     },
     "src/gasket/doors.ts": {
-      "sha256": "bb571a53d437872d5cae2b558662d9320fc37512efc9fbfcec77246efa94dec7",
+      "sha256": "39130776469f4d8e976924ccef810e3086ec955154be949f04099875d251c098",
       "executable": false
     },
     "src/gasket/exceptions.ts": {
@@ -1556,7 +1560,7 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "1b34466bf1a8a05395d464230f62c71d4055fb9527e557eb18a61742a71380e7",
+      "sha256": "238d25201d6fa331881c5fe1f93aecd91853b5405d3f4177e0f0c08932fac93a",
       "executable": false
     },
     "src/gasket/input.ts": {
@@ -1737,6 +1741,18 @@
     },
     "src/gasket/portability.d.ts": {
       "sha256": "4c0d198ecf968c3693a95befe886a8835d2d5c6db12a639dd27d8ac01a54a032",
+      "executable": false
+    },
+    "src/gasket/print-catalog.ts": {
+      "sha256": "40e24e079f8f3a60ce23911a0e36cdc218ff77064d0b28cc98deb140f29977fa",
+      "executable": false
+    },
+    "src/gasket/print-packs.ts": {
+      "sha256": "58862803447d07b6825a04c22ce859d11849e986a6db3d838df0ad206cc6cf28",
+      "executable": false
+    },
+    "src/gasket/print-pdf.ts": {
+      "sha256": "6678b1b6f9eecb1db8185a5aa04c5b80956d39203a7df6deded10def712f94e8",
       "executable": false
     },
     "src/gasket/proposals.ts": {
@@ -2151,6 +2167,10 @@
       "sha256": "a43284fc7b9f40a655007e0e4f3d2d97713a1720b0ee8ebaf9780bf05a5c2d67",
       "executable": false
     },
+    "src/gasket/ui/print-packs.ts": {
+      "sha256": "0ff057bd34f1318deea1f1c1023a5fa74f42be6d7d056792ba2b751bbfd0340e",
+      "executable": false
+    },
     "src/gasket/ui/proposals.ts": {
       "sha256": "52bf8d2b7ca5ee55f883500d4b029827039e7b33e34192d2950d7a61cfb35e54",
       "executable": false
@@ -2236,7 +2256,7 @@
       "executable": false
     },
     "src/gasket/ui/work.ts": {
-      "sha256": "530c10a984e2092bf5ddc594770668c14b6b58d33b3ff8f8eb03d9d2b2b785fd",
+      "sha256": "d15cb4acbc86886cba799004fffb3fcd0b7f362b31fb642ef0b0654b40b2cb95",
       "executable": false
     },
     "src/gasket/valuation.ts": {
@@ -4216,7 +4236,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "ad94b867e4acea483a959490958e4cbecee96ad1e3b6d2aa64d1014eb34cb081",
+      "sha256": "5f55fc9268e7a11cf1cec5cce84a25490c0801937d20eee33c0972bc8c2b810e",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4316,7 +4336,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "616bb2d3568ba143f334b12bd5bbc996fbdf677e09cc1c8adfb742cf43cc6140",
+      "sha256": "24de0ea802e1e5e12e06054f3528cc9112f79901da4808b4f7bbe430328bcb3d",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {

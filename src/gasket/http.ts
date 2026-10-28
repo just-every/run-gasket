@@ -1,4 +1,4 @@
-import { printPackPage, printPreviewPage } from './ui/print-packs'
+import { printPackPage, printPreviewPage, printSheetPage } from './ui/print-packs'
 import { paperOriginal, printPackPdf } from './print-packs'
 import { printError, printText } from './print-catalog'
 import { messagesPage, conversationPage } from './ui/messages'
@@ -274,7 +274,7 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
       const source = referer.origin === url.origin && (referer.pathname === '/app' || referer.pathname.startsWith('/app/')) ? referer : new URL('/app', url.origin)
       try {
         const original = await pageResponse(env, actor, new Request(source), source)
-        const recovered = await failedForm(original, path, input, message, receipt, retry, status)
+        const recovered = await failedForm(original, path, input, message, receipt, retry, status, printLocale ? await intakeLanguage(env,printLocale) : undefined)
         if (recovered) return recovered
       } catch { /* A changed permission must not render a now-forbidden source page. */ }
       return page(env, 'Save failed', actor, h`<h1>Save failed</h1>${await retainedForm(path,input,message,receipt,retry)}`, { status })
@@ -302,7 +302,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
-  printPack:printPackPage, printPreview:printPreviewPage, printPackPdf:(env,actor,_url,id)=>printPackPdf(env,actor,id), paperOriginal:(env,actor,_url,id)=>paperOriginal(env,actor,id),
+  printSheet:printSheetPage, printPack:printPackPage, printPreview:printPreviewPage, printPackPdf:(env,actor,_url,id)=>printPackPdf(env,actor,id), paperOriginal:(env,actor,_url,id)=>paperOriginal(env,actor,id),
   messages: messagesPage, conversation: conversationPage,
   workCsv: async (env, actor, url) => new Response(await workCsv(env, actor, url), { headers: { 'content-type': ['text', 'csv'].join('/') + '; charset=utf-8', 'content-disposition': 'attachment; filename=work.csv', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   language:languagePage,
