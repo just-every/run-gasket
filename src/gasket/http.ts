@@ -53,7 +53,7 @@ import { ledgerCsv } from './lifecycle'
 import { reconciliationCsv } from './valuation'
 import { Input } from './input'
 import { site } from './site'
-import { evidenceFile } from './work'
+import { evidenceFile, workPageRows, workCsv } from './work'
 import { signatureMark } from './signatures'
 import { commentPhoto } from './comments'
 import { documentFile, jobPack } from './documents'
@@ -187,6 +187,17 @@ async function apiResponse(env: Bindings, actor: Actor, request: Request, url: U
     return json(await action(env, actor, await Input.from(request), request))
   }
   if (versioned && ['assets', 'work', 'parts'].includes(path)) return json(await apiEstate(env, actor, path, url))
+  if (path === 'work') {
+    const result = await workPageRows(env, actor, url)
+    const response = json(result.rows)
+    response.headers.set('x-total-count', String(result.total))
+    if (result.next) {
+      response.headers.set('x-next-cursor', result.next)
+      const next = new URL(url); next.searchParams.set('cursor', result.next)
+      response.headers.set('link', `<${next.pathname}${next.search}>; rel="next"`)
+    }
+    return response
+  }
   const { view, id } = route(path)
   return json(await view(env, actor, id, url))
 }
@@ -264,6 +275,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  workCsv: async (env, actor, url) => new Response(await workCsv(env, actor, url), { headers: { 'content-type': ['text', 'csv'].join('/') + '; charset=utf-8', 'content-disposition': 'attachment; filename=work.csv', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   spreadsheetReconciliation: reconciliationPage,
   spreadsheetTemplate: guarded(actor=>can(actor,'import.run'),async(_env,_actor,_url,id)=>{
     const [kind,format]=id.split('.') as [SheetKind,'csv'|'xls'|'xlsx']
