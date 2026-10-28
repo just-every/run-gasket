@@ -2,6 +2,7 @@
 // lists, so the access proof can crawl every one of them.
 // API patterns are relative to /api/gasket/; page patterns are absolute.
 export const API_DOORS: [string, string][] = [
+  ['^languages$', 'languages'],
   ['^sites$', 'sites'], ['^sites/([\\w-]+)$', 'sites'],
   ['^spreadsheet-imports$', 'spreadsheetImports'],
   ['^spreadsheet-imports/([\\w-]+)/rows$', 'spreadsheetReconciliation'],
@@ -47,6 +48,8 @@ export const API_DOORS: [string, string][] = [
 ]
 
 export const PAGE_DOORS: [string, string][] = [
+  ['^/app/settings/language$', 'language'],
+  ['^/app/settings/language/catalog\\.json$', 'languageCatalog'],
   ['^/app/settings/erasure$', 'recordErasure'],
   ['^/app/move-in/templates/((?:assets|parts|work|locations|pms)\\.(?:csv|xls|xlsx))$', 'spreadsheetTemplate'],
   ['^/app/move-in/reconciliation/([\\w-]+)$', 'spreadsheetReconciliation'],

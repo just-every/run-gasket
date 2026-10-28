@@ -1,3 +1,4 @@
+import { saveLanguage, saveIntakeTranslation } from './languages'
 import { saveResourceGrant } from './resource-authority'
 import { eraseRecord } from './record-erasure'
 import { createSite, updateSite, setSiteMembership } from './site-access'
@@ -91,6 +92,9 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'language.preference':(env,actor,input)=>saveLanguage(env,actor,input),
+  'language.default':(env,actor,input)=>saveLanguage(env,actor,input,true),
+  'language.catalog':saveIntakeTranslation,
   'report.schedule': saveReportSchedule,
   'service.create': createServiceCredential, 'service.revoke': revokeServiceCredential,
   'safety.publish': (env,actor,input) => publishSafety(env,actor,input),

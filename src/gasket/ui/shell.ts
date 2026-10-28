@@ -1,3 +1,4 @@
+import type { IntakeLanguage } from '../languages'
 import { resourceGrants } from '../resource-authority'
 // The app's shell from the owner's pick (desk app look H): a white left rail
 // with the mark and heavy wordmark, the destinations with their counts, the
@@ -31,6 +32,7 @@ export const NAV: Destination[] = [
   { href: '/app/reliability', label: 'Reliability', detail: 'MTBF, MTTR and MTTA with their definitions, failures by failure mode and repeat failures.', icon: ICON.board, show: actor => can(actor, 'board.read') },
 ]
 export const SETTINGS: Destination[] = [
+  { href:'/app/settings/language', label:'Display language', detail:'Your intake language and the organization default.', icon:ICON.site, show:actor=>actor.role!=='agent' },
   { href:'/app/settings/erasure', label:'Record erasure', detail:'Dependency preview and owner-confirmed erasure.', icon:ICON.site, show:actor=>actor.role==='owner' },
   { href:'/app/settings/reports', label:'Scheduled reports', detail:'Weekly report packs and delivery results.', icon:ICON.clock, show:actor=>can(actor,'history.export') },
   { href:'/app/planning', label:'Work calendar', detail:'Capacity, planned slots and conflicts.', icon:ICON.clock, show:actor=>can(actor,'work.assign') },
@@ -88,11 +90,11 @@ async function rail(env: Bindings, actor: Actor, here: string) {
     <p class="gk-clock-note">${ICON.clock}<span>Dates and times in ${zoneName(actor.zone)}, the site's clock</span></p></div></div></aside>`
 }
 
-export async function page(env: Bindings, title: string, actor: Actor | null, body: Html, { url, status = 200, bar, script }: { url?: URL; status?: number; bar?: Html; script?: string } = {}): Promise<Response> {
+export async function page(env: Bindings, title: string, actor: Actor | null, body: Html, { url, status = 200, bar, script, language }: { url?: URL; status?: number; bar?: Html; script?: string; language?: IntakeLanguage } = {}): Promise<Response> {
   const notice = url?.searchParams.get('notice'), error = url?.searchParams.get('error')
   const nav = actor ? await rail(env, actor, url ? current(url.pathname) : '') : ''
-  const document = h`<!doctype html><html lang="en-US"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · ${branding.name}</title>${raw(ICONS)}<link rel="preload" href="/fonts/inter/inter-variable-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/rer-theme.css"><link rel="stylesheet" href="/gasket.css"></head><body>
-<a class="gk-skip" href="#main-content">Skip to content</a><div class="gk-app${actor ? '' : ' gk-app-bare'}">${nav}<main id="main-content" tabindex="-1" class="gk-main${bar ? ' gk-has-bar' : ''}">${notice ? h`<p class="gk-flash" role="status">${notice}</p>` : ''}${error ? h`<p class="gk-flash gk-error" role="alert">That did not work: ${describeError(error)}</p>` : ''}${body}</main></div>${bar ? h`<div class="gk-bar"><div class="gk-bar-inner">${bar}</div></div>` : ''}<script src="/workspace-forms.js" defer></script>${script ? h`<script src="${script}" defer></script>` : ''}</body></html>`
+  const document = h`<!doctype html><html lang="${language?.locale ?? 'en-US'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} · ${branding.name}</title>${raw(ICONS)}<link rel="preload" href="/fonts/inter/inter-variable-latin.woff2" as="font" type="font/woff2" crossorigin="anonymous"><link rel="stylesheet" href="/fonts/fonts.css"><link rel="stylesheet" href="/rer-theme.css"><link rel="stylesheet" href="/gasket.css"></head><body>
+<a class="gk-skip" href="#main-content">${language?.text('skip') ?? 'Skip to content'}</a><div class="gk-app${actor ? '' : ' gk-app-bare'}">${nav}<main id="main-content" tabindex="-1" class="gk-main${bar ? ' gk-has-bar' : ''}">${notice ? h`<p class="gk-flash" role="status">${notice}</p>` : ''}${error ? h`<p class="gk-flash gk-error" role="alert">That did not work: ${describeError(error)}</p>` : ''}${body}</main></div>${bar ? h`<div class="gk-bar"><div class="gk-bar-inner">${bar}</div></div>` : ''}<script src="/workspace-forms.js" defer></script>${script ? h`<script src="${script}" defer></script>` : ''}</body></html>`
   const withReceipts = bindIds(document.html, '<g-id>').replace(/(<form\b(?=[^>]*method="post")[^>]*action="\/app\/[^"]+"[^>]*>)([\s\S]*?)(<\/form>)/g, (_whole, opening: string, fields: string, closing: string) => {
     const existing = fields.match(/name="__gk_save" value="([a-f0-9-]{36})"/i)?.[1]
     const id = existing || newId()

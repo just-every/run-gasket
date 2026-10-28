@@ -90,7 +90,10 @@ export async function requestPortalJourney() {
     const results=await Promise.all(Array.from({length:7},(_,i)=>h.raw(`/request/${portal}`,{body:{...payload,submissionKey:randomUUID(),description:`Another fault ${i}`}})))
     assert.equal(results.filter(r=>r.status===303).length,3)
     assert.ok(results.filter(r=>r.status===429).length===4)
-    for(const result of results.filter(r=>r.status===429))assert.match(await result.text(),/intake rate limited/)
+    for(const result of results.filter(r=>r.status===429)) {
+      const html=await result.text()
+      assert.match(html.match(/<p>Save failed: ([^<]+)<\/p>/)?.[1] || '',/Too many requests from this network.*Nothing was saved/)
+    }
     const refusals=(await h.api('audit?action=request.limit',cookie.owner)).rows
     assert.equal(refusals.length,4)
     for(const entry of refusals)assert.deepEqual(JSON.parse(entry.detail),{code:'intake_rate_limited'})
@@ -111,7 +114,7 @@ export async function requestPortalJourney() {
     console.log('REQ-001 typed authenticated/public intake, required answers, originals, privacy, consent and concurrent abuse limits passed')
   } finally {await h.close()}
 }
-async function browserContext(h,cookie) {
+export async function browserContext(h,cookie) {
   const browser=await chromium.launch({headless:true,...(process.env.GASKET_CHROMIUM?{executablePath:process.env.GASKET_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   const context=await browser.newContext({ignoreHTTPSErrors:true,deviceScaleFactor:3})
   if(cookie)await context.addCookies(cookie.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
@@ -142,7 +145,7 @@ if(process.argv[1]===fileURLToPath(import.meta.url)) {
   for(const journey of task==='all'?Object.values(journeys):[journeys[task]])await journey()
 }
 
-async function decodeSymbol(page,selector,format) {
+export async function decodeSymbol(page,selector,format) {
   const {PNG}=await import('pngjs'),{RGBLuminanceSource,BinaryBitmap,HybridBinarizer,MultiFormatReader,DecodeHintType,BarcodeFormat}=await import('@zxing/library')
   const image=PNG.sync.read(await page.locator(selector).screenshot({scale:'device'}))
   if(format==='QR_CODE') {
