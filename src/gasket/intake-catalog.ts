@@ -75,7 +75,9 @@ export const EN = {
   "error_access": "Sign in with current authorized access before submitting.",
   "error_generic": "The request could not be completed. Check the form and try again.",
   "error_title": "That did not work",
-  "back": "Back to the fault form"
+  "back": "Back to the fault form",
+  "chooseFile": "Choose file",
+  "noFile": "No file chosen"
 } as const
 
 export type IntakeKey = keyof typeof EN
@@ -155,5 +157,7 @@ export const ES: Record<IntakeKey, string> = {
   "error_access": "Inicie sesión con acceso autorizado vigente antes de enviar.",
   "error_generic": "No se pudo completar la solicitud. Revise el formulario e inténtelo de nuevo.",
   "error_title": "No se pudo completar",
-  "back": "Volver al formulario de fallas"
+  "back": "Volver al formulario de fallas",
+  "chooseFile": "Elegir archivo",
+  "noFile": "Ningún archivo seleccionado"
 }

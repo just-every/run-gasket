@@ -4,6 +4,19 @@
   const form=document.querySelector('#request-form');if(!form)return;
   const messages=JSON.parse(form.dataset.messages),t=key=>messages[key];
   const status=document.querySelector('#draft-status'),saveButton=document.querySelector('#save-request-draft'),clearButton=document.querySelector('#clear-request-draft');
+  // Enhance the native picker with catalogued labels; without script the native upload still works.
+  const pickers=new Map();
+  for(const input of form.querySelectorAll('input[type=file]')){
+    const row=document.createElement('div'),button=document.createElement('button'),name=document.createElement('span');
+    row.className='gk-actions';button.type='button';button.className='gk-secondary';button.textContent=t('chooseFile');
+    button.setAttribute('aria-label',t('chooseFile')+': '+(input.labels[0]?.textContent || ''));button.setAttribute('aria-controls',input.id);
+    name.setAttribute('aria-live','polite');name.style.overflowWrap='anywhere';
+    const refresh=()=>{name.textContent=[...input.files].map(file=>file.name).join(', ') || t('noFile');};
+    button.addEventListener('click',()=>input.click());input.addEventListener('change',refresh);
+    row.append(button,name);input.after(row);input.classList.add('gk-visually-hidden');input.tabIndex=-1;
+    pickers.set(input,{button,refresh});refresh();
+  }
+  const refreshFiles=()=>{for(const picker of pickers.values())picker.refresh();};
   const scope=`${form.dataset.portal}:${form.dataset.target}`,initialTarget=form.dataset.target;
   const cookie=`gasket-draft-signout_${location.port || (location.protocol==='https:'?'443':'80')}=`;
   const generation=()=>document.cookie.split(';').map(value=>value.trim()).find(value=>value.startsWith(cookie))?.slice(cookie.length) || '';
@@ -11,7 +24,7 @@
   let db,ready=false,timer,submitting=false,invalidated=false;
   const receiptLink=form.querySelector('[data-request-receipt]');
   function updateReceipt(){receiptLink.href=`${form.action}/received/${encodeURIComponent(form.elements.namedItem('submissionKey').value)}`;}
-  function clearForm(){clearTimeout(timer);form.reset();form.elements.namedItem('saveOnDevice').checked=false;form.elements.namedItem('submissionKey').value=crypto.randomUUID();updateReceipt();}
+  function clearForm(){clearTimeout(timer);form.reset();refreshFiles();form.elements.namedItem('saveOnDevice').checked=false;form.elements.namedItem('submissionKey').value=crypto.randomUUID();updateReceipt();}
   function invalidate(){if(invalidated)return;invalidated=true;clearForm();const connection=db;db=null;
     if(connection){void fence(connection,generation()).catch(()=>{/* Clear-Site-Data may already have closed this connection. */});connection.close();}
     status.textContent=t('invalidated');
@@ -36,11 +49,11 @@
     if(draft.receipt){status.textContent=t('previous');const link=document.createElement('a');link.href=draft.receipt;link.textContent=t('openConfirmation');status.append(link);form.elements.namedItem('submissionKey').value=crypto.randomUUID();updateReceipt();return;}
     for(const [name,value] of draft.entries){const control=form.elements.namedItem(name);if(!control)continue;if(name==='target'&&initialTarget&&value!==initialTarget)continue;
       if(control.type==='checkbox'){control.checked=value==='yes';continue;}if(value instanceof File){if(value.size){const transfer=new DataTransfer();transfer.items.add(value);control.files=transfer.files;}}else control.value=value;
-    }updateReceipt();status.textContent=t('restored');
+    }updateReceipt();refreshFiles();status.textContent=t('restored');
   }
   open.onsuccess=async()=>{if(!current()){open.result.close();return;}db=open.result;db.onversionchange=()=>invalidate();db.onclose=()=>invalidate();try{await restore();ready=!invalidated;}catch{if(current()){status.textContent=t('draftUnavailable');ready=true;}}};
   open.onerror=()=>{ready=true;status.textContent=t('unavailable');};
-  form.addEventListener('invalid',event=>{const control=event.target;control.setCustomValidity(t(control.validity.valueMissing?'required':'invalid'));},true);
+  form.addEventListener('invalid',event=>{const control=event.target;control.setCustomValidity(t(control.validity.valueMissing?'required':'invalid'));if(pickers.has(control)){event.preventDefault();status.setAttribute('role','alert');status.textContent=control.validationMessage;pickers.get(control).button.focus();}},true);
   form.addEventListener('input',event=>{event.target.setCustomValidity?.('');});
   form.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(save,250);});form.addEventListener('change',save);
   saveButton.addEventListener('click',save);
