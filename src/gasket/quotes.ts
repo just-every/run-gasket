@@ -51,7 +51,7 @@ export async function purchaseLinks(env: Bindings, input: Input) {
 
 export async function purchaseFiles(env: Bindings, actor: Actor, input: Input, parent: { order?: string; quote?: string }) {
   const files = await input.files('attachments', { max: 5, maxBytes: 1_500_000 })
-  const types: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', txt: 'text/plain' }
+  const types: Record<string, string> = Object.assign(Object.create(null), { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', txt: 'text/plain' })
   const records = await Promise.all(files.map(async file => {
     const mediaType = types[file.filename.split('.').pop()?.toLowerCase() ?? '']; insist(mediaType, 'unsupported_file_type')
     return { id: newId(), filename: file.filename, mediaType, size: file.bytes.length, sha256: await sha256Hex(file.bytes), bytes: file.bytes }

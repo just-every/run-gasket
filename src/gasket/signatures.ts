@@ -15,7 +15,7 @@ import { didWork } from './review'
 import { OPEN, workOrder, type Door } from './work'
 
 export const ROLES = ['technician', 'customer', 'supervisor'] as const
-const MARK_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' }
+const MARK_TYPES: Record<string, string> = Object.assign(Object.create(null), { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg' })
 
 export async function sign(env: Bindings, actor: Actor, input: Input, door: Door) {
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))

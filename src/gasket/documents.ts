@@ -20,7 +20,7 @@ import { zip } from './zip'
 export const KINDS = ['manual', 'diagram', 'warranty', 'authorization', 'other'] as const
 export const CONTACT_ROLES = ['supplier', 'manufacturer', 'service', 'other'] as const
 export const DOCUMENT_BYTES = 1_500_000
-const TYPES: Record<string, string> = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', txt: 'text/plain' }
+const TYPES: Record<string, string> = Object.assign(Object.create(null), { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', txt: 'text/plain' })
 
 const liveAsset = async (env: Bindings, id: string) => {
   const row = await one(env, 'SELECT id, tag, name, retired_at FROM gk_assets WHERE id = ?', id)
