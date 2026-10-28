@@ -4148,7 +4148,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "b9eaff05aea9aeb023c8495128880ac6073627241e24d00a0428792c03952798",
+      "sha256": "e13ef35cf3c74225da5c6b9d4373440d2e9dc4a0a02454be7b60c48729c69fa5",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
@@ -4224,7 +4224,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "2d21b652b1d42add33f6a52d4504374fc1ecf065ae9bd83e10ea7867b15659fb",
+      "sha256": "3c2b39469b4d972339a2550a340a4154dbe6ca98b8e7dd8859e4cd16fe191929",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
