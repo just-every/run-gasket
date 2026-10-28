@@ -1,6 +1,6 @@
 import type { Locale } from './languages'
 const en = {
-  title: 'Controlled print packs', issue: 'Issue print pack', open: 'Open print pack', download: 'Download printable PDF',
+  printView:'Browser print view', title: 'Controlled print packs', issue: 'Issue print pack', open: 'Open print pack', download: 'Download printable PDF',
   entry: 'Enter paper results', preview: 'Preview paper entry', confirm: 'Accept paper entry', back: 'Back to work',
   warning: 'A printed identifier grants no access. Enter results online while assigned to this work. Ordinary completion, safety and independent review still apply.',
   paper: 'Paper original', performed: 'Work performed at (site time)', performedHint: 'Declare when the work was performed, separately from this online entry.',
@@ -21,7 +21,7 @@ const en = {
   page: 'Page', instructions: 'Instructions', notes: 'Results and notes',
 } as const
 const es: Record<keyof typeof en, string> = {
-  title:'Paquetes de impresión controlados',issue:'Emitir paquete impreso',open:'Abrir paquete impreso',download:'Descargar PDF imprimible',
+  printView:'Vista de impresión del navegador',title:'Paquetes de impresión controlados',issue:'Emitir paquete impreso',open:'Abrir paquete impreso',download:'Descargar PDF imprimible',
   entry:'Ingresar resultados en papel',preview:'Vista previa de la entrada',confirm:'Aceptar entrada en papel',back:'Volver al trabajo',
   warning:'El identificador impreso no concede acceso. Ingrese los resultados en línea mientras esté asignado a este trabajo. Se mantienen los requisitos de finalización, seguridad y revisión independiente.',
   paper:'Original en papel',performed:'Trabajo realizado a las (hora del sitio)',performedHint:'Declare cuándo se realizó el trabajo, por separado de esta entrada en línea.',

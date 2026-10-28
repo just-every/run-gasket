@@ -50,6 +50,7 @@ export const API_DOORS: [string, string][] = [
 ]
 
 export const PAGE_DOORS: [string, string][] = [
+  ['^/app/print-packs/([\\w-]+)/print$','printSheet'],
   ['^/app/print-packs/([\\w-]+)$','printPack'], ['^/app/print-packs/([\\w-]+)/pack\\.pdf$','printPackPdf'],
   ['^/app/print-previews/([\\w-]+)$','printPreview'], ['^/app/print-previews/([\\w-]+)/original$','paperOriginal'],
   ['^/app/messages$', 'messages'], ['^/app/messages/([\\w-]+)$', 'conversation'],
