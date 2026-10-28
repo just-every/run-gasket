@@ -8,16 +8,10 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-<<<<<<< HEAD
-| Core | 50 | 54 | 40 | 144 |
+| Core | 50 | 55 | 39 | 144 |
 | Agent surface | 0 | 0 | 7 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 50 | 54 | 47 | 151 |
-=======
-| Published | 14 | 0 | 0 | 14 |
-| Target and push further | 54 | 32 | 38 | 124 |
-| All | 68 | 32 | 38 | 138 |
->>>>>>> origin/main
+| Full target | 50 | 55 | 46 | 151 |
 
 Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
@@ -826,11 +820,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 
 #### PLAN-008 — Team, group and direct messaging
 
-<<<<<<< HEAD
-Core · target · **missing**
-=======
-target · **partial**
->>>>>>> origin/main
+Core · target · **partial**
 
 **Requirement.** Members hold one-to-one, ad-hoc group and team conversations plus a site-wide All team conversation in the web workspace and the iOS and Android app, with no Slack or Teams subscription required. Creating a team creates its conversation; joining a team grants it and leaving or removal ends access to every message sent afterwards. Messages carry text, photos, files, record links and mentions, with unread counts, read state, deep links and push/email notices under each person's preferences (PM-005). A person with work-creation rights (technicians by default, ADMIN-003 and FIELD-009) turns a message into a request or corrective work that links back to the message and keeps its photos as original, attributed evidence. Messages written offline queue on the device and send exactly once after reconnecting. Requesters and contractors never see internal conversations. Edits and deletions keep history, owners can apply retention and legal hold (ADMIN-007), and conversations are included in audit export (ADMIN-006) and the portable archive (ADMIN-009).
 
@@ -841,14 +831,8 @@ target · **partial**
 4. Queue a message offline, reconnect twice and see it delivered once.
 5. Remove a member and verify app and API refuse messages sent after removal; a requester and a contractor are refused internal conversations by URL and API.
 
-<<<<<<< HEAD
-**Evidence.** None.
-**Gap.** No conversations, team or All team chat, direct/group messages, unread state, offline message queue or message-to-work conversion.
-=======
 **Evidence.** `tests/gasket/messages.mjs` messagesJourney: public JSON and form doors prove fixed-pair creation, original text and attribution, stable duplicate and changed-payload retries, independent unread and read state, restart durability, participant-only authority, ended and revoked refusal, planned-site refusal, audit privacy and retained identity dependencies; messagesBrowser proves list, reading and sending at 1440 with screen proof at 1440 and 390. `tests/gasket/recovery.mjs` recoveryJourney: original messages, retry identities and per-person read markers reconcile after empty inactive restore and another Worker restart. The journey is loaded by `tests/gasket/flows.mjs` in Verify; recovery has its required Verify job.
-
 **Gap.** Online operational-primary-site one-to-one text is implemented; PLAN-008 remains partial. Conservative current defaults are active existing human participants only, no owner content-reading bypass, fixed participant pairs, append-only indefinite retention, metadata-only audit and no automatic outbound delivery; adopted under the standing conservative-default rule, with policy approval and broader scoped delegation still open. Missing: team and site-wide All team conversations, ad-hoc groups and join or leave boundaries; photos, files, record links and mentions; message-to-request and corrective-work conversion with original attributed evidence; edits and deletion history; conversation-specific owner retention, legal hold and eligible erasure with complete audit and archive reconciliation. Held: native iOS and Android messaging and deep links, APNs and FCM plus email delivery under preferences, offline queuing and exactly-once reconnect proof on devices; SMS sender qualification and phone-only identities retain ADMIN-004 and ADMIN-014. Requester and contractor identities receive no internal conversation access and remain unbuilt prerequisites. Additional operational sites retain ADMIN-002. No native-device, provider-delivery, complete messaging or legal-retention qualification is claimed.
->>>>>>> origin/main
 
 #### PLAN-009 — No-code automation rules
 

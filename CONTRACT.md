@@ -1883,8 +1883,8 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 4 | 0 | 16 |
-| Target and push further | 38 | 50 | 47 | 135 |
-| All | 50 | 54 | 47 | 151 |
+| Target and push further | 38 | 51 | 46 | 135 |
+| All | 50 | 55 | 46 | 151 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
