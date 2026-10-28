@@ -4160,7 +4160,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "b9eaff05aea9aeb023c8495128880ac6073627241e24d00a0428792c03952798",
+      "sha256": "e13ef35cf3c74225da5c6b9d4373440d2e9dc4a0a02454be7b60c48729c69fa5",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
