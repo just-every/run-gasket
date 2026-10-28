@@ -16,7 +16,7 @@ const unzip=buffer=>{const b=Buffer.from(buffer),out={};for(let at=0;b.readUInt3
 // Build the actual pre-identity schema, retain an old-format sign-off, then apply the upgrade.
 async function upgradeQualificationProof() {
  const old=await installation(), run=promisify(execFile)
- const migrations=['0099_resource_retirement.sql','0100_qualification_identity.sql']
+ const migrations=['0099_resource_retirement.sql','0100_qualification_identity.sql','0101_qualification_erasure.sql']
  const sql=async command=>JSON.parse((await run(join(old.root,'node_modules/.bin/wrangler'),
   ['d1','execute','foundation','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--json','--command',command],
   {cwd:old.root,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:4*1024*1024})).stdout)
@@ -52,6 +52,8 @@ async function upgradeQualificationProof() {
   await copyFile(new URL('../../migrations/core/'+migrations[1],import.meta.url),join(old.root,'./migrations/core',migrations[1]))
   await old.migrate()
   assert.deepEqual((await sql(readSnapshots)).flatMap(r=>r.results),original,'upgrade preserves immutable saved evidence bytes')
+  await copyFile(new URL('../../migrations/core/'+migrations[2],import.meta.url),join(old.root,'./migrations/core',migrations[2]))
+  await old.migrate()
   after=await harness({installation:old,vars:before.vars,clockInstant:Date.parse('2026-10-26T16:00:00Z')})
   const upgradedOwner=owner,upgradedTech=who
   const state=()=>after.api(`work/${work}/safety`,upgradedTech)
@@ -145,6 +147,13 @@ export async function safetyJourney() {
   await sign()
   const previousQualification=(await state()).attestations.at(-1).qualification
   await h.api('planning.retire',owner,{kind:'qualification',member:tech,name:q.name,reason:'Reference withdrawn',revision:(await h.api('planning',owner)).revision})
+  const retired=(await h.api('planning',owner)).retired.find(r=>r.kind==='qualification')
+  const protectedPreview=await h.api(`retention-preview?kind=qualification&id=${retired.id}`,owner)
+  assert.equal(protectedPreview.eligible,false,'retained sign-offs protect retired qualification evidence')
+  assert.equal(protectedPreview.dependencies.safetySignoffs,3)
+  const signedBefore=await state()
+  assert.equal((await h.api('qualification.erase',owner,{id:retired.id,revision:protectedPreview.revision,confirm:true},409)).error,'qualification_retained')
+  assert.deepEqual(await state(),signedBefore,'refused erasure preserves every signed snapshot and permit')
   assert.ok((await state()).missing.includes('Qualification missing, expired or changed'))
   assert.equal((await sign({},409)).error,'qualification_missing_or_expired')
   await h.api('planning.qualification',owner,{...q,expires:'2027-01-01'})

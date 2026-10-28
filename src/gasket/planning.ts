@@ -37,7 +37,7 @@ export async function saveQualification(env: Bindings, actor: Actor, input: Inpu
   const unchanged=previous && previous.expires_on===expires && previous.reference===reference
   const identity=unchanged?previous.record_id:newId()
   await commit(env, [custody(env,actor),lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference,record_id,recorded_at,recorded_by,remind_days) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference,record_id=excluded.record_id,recorded_at=excluded.recorded_at,recorded_by=excluded.recorded_by,remind_days=excluded.remind_days', member,name,expires,reference,identity,unchanged?previous.recorded_at:now(),unchanged?previous.recorded_by:actor.id,remindDays), bump(env)],
-    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,remindDays,previous}})
+    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,remindDays,recordId:identity,previous}})
   return {id:member}
 }
 

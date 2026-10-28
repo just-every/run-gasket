@@ -711,3 +711,35 @@ Site-scoped estate records, cross-site transfers with meter history, organizatio
 rollups, operational per-site dates and technician rights, native app coverage,
 background-job membership revocation and complete multi-site archive reconciliation remain unimplemented. Preparing
 site metadata does not establish those acceptance points.
+
+## Retired qualification retention
+
+The owner reads `GET /api/gasket/retention-preview?kind=qualification&id=ID`,
+using the retired resource id from `planning`. The preview reports the current
+planning revision, eligibility, retained safety sign-offs, retired record count,
+reminder count and audit details to anonymize. A qualification hold uses
+`retention.hold` with `kind: qualification` and that retired id. A user hold
+protects all that person's retired qualifications. Existing user and maintenance
+minimum ages both apply, measured conservatively from retirement.
+
+`POST /api/gasket/qualification.erase` requires an ordinary owner session, the
+retired `id`, the preview's `revision` and explicit `confirm: true`. The same
+handler serves the ordinary form action. It refuses any active replacement,
+hold, unmet minimum age or retained safety sign-off for that person's named
+qualification. A hold racing erasure cannot also succeed. Nothing deletes
+automatically. Tool history and unrelated qualifications are preserved.
+
+An eligible operation removes every retired version of the same qualification
+for that person, its renewal notices and private correction and retirement
+audit payloads. Audit actor, role, action, record, site and time remain; user
+identity erasure is separate. The result reports removed and anonymized counts,
+is stored without reference text and is returned unchanged on a retry. Earlier
+exports are invalidated in the erasure transaction. A later archive supplied
+with `rer import --journal LATER_ARCHIVE` refuses an older archive before
+publication; restoring the later archive keeps the erasure result and does not
+restore the reference. Prior downloads remain outside local erasure.
+
+CT approved this conservative owner-confirmed qualification erasure default
+with riders on 27 October 2026. It supplies no legal retention period or compliance determination.
+Broader copied-data reconciliation and user identity erasure remain under
+ADMIN-007 and ADMIN-016.

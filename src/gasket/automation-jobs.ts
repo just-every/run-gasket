@@ -1,3 +1,4 @@
+import { qualificationInputSql } from './qualification-copies'
 // PM-008: each attempted execution keeps its inputs, governing revision and outcome.
 import type { Bindings } from '../auth.server'
 import { withAutomation } from './automation-context'
@@ -13,7 +14,7 @@ export async function runJob<T>(env: Bindings, rule: AutomationRule, source: Sou
   insist(grant, 'automation_not_found', 404)
   const job = newId(), stale = revision !== undefined && revision !== grant.revision
   const state = stale ? 'failed' : grant.paused ? 'paused' : 'running'
-  await env.DB.batch([stmt(env, 'INSERT INTO gk_automation_jobs (id,rule_id,rule_revision,source,started_at,finished_at,state,input,error) VALUES (?,?,?,?,?,?,?,?,?)', job, rule, revision ?? grant.revision, source, instant, state === 'running' ? null : now(), state, JSON.stringify(input), stale ? 'automation_changed' : null)])
+  await env.DB.batch([stmt(env, `INSERT INTO gk_automation_jobs (id,rule_id,rule_revision,source,started_at,finished_at,state,input,error) SELECT ?,?,?,?,?,?,?,${qualificationInputSql('payload')},? FROM (SELECT ? AS payload)`, job, rule, revision ?? grant.revision, source, instant, state === 'running' ? null : now(), state, stale ? 'automation_changed' : null, JSON.stringify(input))])
   if (stale) throw new GasketError('automation_changed', 409)
   if (grant.paused) return { job, state: 'paused' as const, output: null }
   try {
