@@ -124,6 +124,12 @@
           "label": "Changelog",
           "file": "CHANGELOG.md",
           "summary": "Dated implementation and contract history."
+        },
+        {
+          "slug": "qualification-custody",
+          "label": "Qualification custody",
+          "file": "docs/qualification-custody.md",
+          "summary": "Qualification families, scoped upkeep, retained copies and confirmed erasure."
         }
       ]
     }

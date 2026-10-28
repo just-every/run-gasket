@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "old": "7ae119cf2fab9d1fd82482dc018d5712565b73ed",
+  "old": "493a71bbec740c941d1e0aeb760b0eb827efda18",
   "ids": {
     "GAS-01": {
       "how": "kept",
@@ -306,9 +306,11 @@
       ]
     },
     "PLAN-004": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "PLAN-004"
+        "PLAN-004",
+        "PLAN-010",
+        "PLAN-011"
       ]
     },
     "PLAN-005": {

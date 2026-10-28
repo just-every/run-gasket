@@ -2,7 +2,7 @@
 
 | Approved scope item | Named clauses |
 | --- | --- |
-| Complete mobile CMMS, asset hierarchy, multi-site maintenance and operator intake | GAS-01 through GAS-15; ADMIN-002 through ADMIN-004; ADMIN-013 through ADMIN-015; ASSET-001 through ASSET-010; REQ-001 through REQ-007; PLAN-001 through PLAN-009 |
+| Complete mobile CMMS, asset hierarchy, multi-site maintenance and operator intake | GAS-01 through GAS-15; ADMIN-002 through ADMIN-004; ADMIN-013 through ADMIN-015; ASSET-001 through ASSET-010; REQ-001 through REQ-007; PLAN-001 through PLAN-011 |
 | Automatic calendar/meter PMs, push/email and Slack/Teams notices, escalation | PM-001 through PM-009; PLAN-008; PLAN-009; INT-004 through INT-007 |
 | Offline technician app, checklists, photos, signatures, readings and wrench time | FIELD-001 through FIELD-010; ASSET-005 |
 | Reorder points, vendor POs, receiving, multi-site/location stock | PART-001 through PART-009; BUY-001 through BUY-008 |

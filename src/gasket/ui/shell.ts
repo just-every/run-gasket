@@ -1,3 +1,4 @@
+import { resourceGrants } from '../resource-authority'
 // The app's shell from the owner's pick (desk app look H): a white left rail
 // with the mark and heavy wordmark, the destinations with their counts, the
 // site chip and the signed-in person at its foot; the page on the pale ground
@@ -77,7 +78,8 @@ async function rail(env: Bindings, actor: Actor, here: string) {
     const count = item.count ? counts[item.count] : 0
     return h`<li><a href="${item.href}"${item.href === here ? raw(' aria-current="page"') : ''}>${item.icon}<span class="gk-nav-label">${item.label}</span>${count ? h`<b class="gk-nav-count${item.count === 'proposals' ? ' gk-nav-count-accent' : ''}">${count}</b>` : ''}</a></li>`
   }
-  const settings = SETTINGS.filter(item => item.show(actor))
+  const steward=!can(actor,'work.assign')&&actor.role!=='agent'&&(await resourceGrants(env,actor)).some(g=>g.effective)
+  const settings = SETTINGS.filter(item => item.show(actor)||(steward&&item.href==='/app/settings/resources'))
   return h`<aside class="gk-rail"><div class="gk-rail-head"><a class="gk-brand" href="/app"><img src="/brand/mark.svg" alt="" width="40" height="40"><span data-rer-name>${branding.name}</span></a>
     <input type="checkbox" id="gk-menu" class="gk-menu-toggle"><label for="gk-menu" class="gk-menu-button">${ICON.menu}<span>Menu</span></label></div>
     <div class="gk-rail-body"><nav class="gk-nav" aria-label="Main"><ul>${NAV.filter(item => item.show(actor)).map(link)}</ul>${settings.length ? h`<ul class="gk-nav-settings">${settings.map(link)}</ul>` : ''}</nav>

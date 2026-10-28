@@ -1,5 +1,6 @@
+import { resourceAuthority } from './resource-authority'
 import type { Bindings } from '../auth.server'
-import { capabilitySql, requireCapability, type Actor } from './actor'
+import { requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, newId, now, one, stmt, type Row } from './core'
 import { QUALIFICATION_PROVENANCE } from './safety'
 import { addDays, isDate, isLocalTime, minutesBetween, zonedInstant } from './dates'
@@ -13,10 +14,6 @@ const OPEN = "('open','in_progress','returned')"
 const revision = async (env: Bindings) => (await one(env, 'SELECT revision FROM gk_planning_state WHERE singleton=1')).revision as number
 const lock = (env: Bindings, seen: number) => guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_planning_state WHERE singleton=1 AND revision=?)', seen)
 const bump = (env: Bindings) => stmt(env, 'UPDATE gk_planning_state SET revision=revision+1 WHERE singleton=1')
-const custody = (env: Bindings, actor: Actor) => {
-  const authority=capabilitySql(actor.sessionId,'site.manage')
-  return guard(env,'forbidden',authority.sql,...authority.params)
-}
 const active = (env: Bindings, member: string) => one(env, "SELECT id FROM gk_members WHERE id=? AND status='active' AND role IN ('owner','lead','maintainer')", member)
 const overlap = (a: Row, b: Row) => a.starts < b.ends && a.ends > b.starts
 const span = (input: Input) => {
@@ -25,39 +22,39 @@ const span = (input: Input) => {
   return { starts, ends }
 }
 
-/** Owner-only credential records: these are entered references, never certification by Gasket. */
+/** Entered qualification references, never issuing-body verification by Gasket. */
 export async function saveQualification(env: Bindings, actor: Actor, input: Input) {
-  requireCapability(actor, 'site.manage')
   const member = input.text('member'), name = input.text('name', {max:80}), expires = input.text('expires'), reference = input.text('reference', {max:200})
+  const authority=await resourceAuthority(env,actor,'qualification',member,name)
   insist(await active(env, member), 'member_not_assignable', 409)
   insist(isDate(expires), 'invalid_expiry')
-  const remindDays=input.flag('remind')?input.integer('remindDays',{max:365}):null
+  insist(actor.role==='owner'||(!input.present('remind')&&!input.present('remindDays')),'reminder_consent_owner_only',403)
   const seen = await revision(env)
   const previous=await one(env,'SELECT * FROM gk_qualifications WHERE member_id=? AND name=?',member,name)
+  const remindDays=actor.role==='owner'?(input.flag('remind')?input.integer('remindDays',{max:365}):null):(previous?.remind_days??null)
   const unchanged=previous && previous.expires_on===expires && previous.reference===reference
   const identity=unchanged?previous.record_id:newId()
-  await commit(env, [custody(env,actor),lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference,record_id,recorded_at,recorded_by,remind_days) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference,record_id=excluded.record_id,recorded_at=excluded.recorded_at,recorded_by=excluded.recorded_by,remind_days=excluded.remind_days', member,name,expires,reference,identity,unchanged?previous.recorded_at:now(),unchanged?previous.recorded_by:actor.id,remindDays), bump(env)],
-    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,remindDays,previous}})
+  await commit(env, [authority,lock(env,seen), stmt(env, 'INSERT INTO gk_qualifications(member_id,name,expires_on,reference,record_id,recorded_at,recorded_by,remind_days) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(member_id,name) DO UPDATE SET expires_on=excluded.expires_on,reference=excluded.reference,record_id=excluded.record_id,recorded_at=excluded.recorded_at,recorded_by=excluded.recorded_by,remind_days=excluded.remind_days', member,name,expires,reference,identity,unchanged?previous.recorded_at:now(),unchanged?previous.recorded_by:actor.id,remindDays), bump(env)],
+    {actor:actor.id, action:'planning.qualification',subject:member,detail:{name,expires,reference,remindDays,recordId:identity,previous}})
   return {id:member}
 }
 
 export async function savePlanningTool(env: Bindings, actor: Actor, input: Input) {
-  requireCapability(actor, 'site.manage')
   const id = input.text('id',{optional:true}) || newId(), name = input.text('name',{max:120}), identifier = input.text('identifier',{max:120}), due = input.text('calibrationDue')
+  const authority=await resourceAuthority(env,actor,'tool','',name)
   insist(isDate(due), 'invalid_calibration_due')
   const seen = input.integer('revision',{min:1})!
   const existing = await one(env,'SELECT * FROM gk_planning_tools WHERE id=?',id)
   insist(!input.has('id') || existing, 'tool_not_found',404)
   insist(!existing || existing.name===name, 'tool_name_immutable',409)
   insist(!await one(env,'SELECT 1 FROM gk_planning_tools WHERE name=? COLLATE NOCASE AND id<>?',name,id), 'tool_name_taken',409)
-  await commit(env,[custody(env,actor),lock(env,seen),stmt(env,'INSERT INTO gk_planning_tools(id,name,identifier,calibration_due) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET identifier=excluded.identifier,calibration_due=excluded.calibration_due',id,name,identifier,due),bump(env)],
+  await commit(env,[authority,lock(env,seen),stmt(env,'INSERT INTO gk_planning_tools(id,name,identifier,calibration_due) VALUES(?,?,?,?) ON CONFLICT(id) DO UPDATE SET identifier=excluded.identifier,calibration_due=excluded.calibration_due',id,name,identifier,due),bump(env)],
     {actor:actor.id,action:'planning.tool',subject:id,detail:{name,identifier,due,previous:existing}})
   return {id}
 }
 
 /** Retirement removes eligibility, retaining the complete record and released bookings. */
 export async function retirePlanningResource(env: Bindings, actor: Actor, input: Input) {
-  requireCapability(actor,'site.manage')
   const kind=input.text('kind'), reason=input.text('reason',{max:500}), seen=input.integer('revision',{min:1})!
   insist(['qualification','tool'].includes(kind),'invalid_resource_kind')
   const member=kind==='qualification'?input.text('member'):'', name=kind==='qualification'?input.text('name'):''
@@ -65,9 +62,10 @@ export async function retirePlanningResource(env: Bindings, actor: Actor, input:
     ?await one(env,'SELECT * FROM gk_qualifications WHERE member_id=? AND name=?',member,name)
     :await one(env,'SELECT * FROM gk_planning_tools WHERE id=?',input.text('id'))
   insist(record,'resource_not_found',404)
+  const authority=await resourceAuthority(env,actor,kind,member,kind==='qualification'?name:record.name)
   const bookings=kind==='tool'?await all(env,'SELECT * FROM gk_planning_bookings WHERE tool_id=?',record.id):[]
   const id=newId(), snapshot={...record,...(kind==='tool'?{bookings}:{})}
-  await commit(env,[custody(env,actor),lock(env,seen),
+  await commit(env,[authority,lock(env,seen),
     stmt(env,'INSERT INTO gk_retired_resources VALUES(?,?,?,?,?,?,?)',id,kind,kind==='tool'?record.id:record.record_id,JSON.stringify(snapshot),now(),actor.id,reason),
     ...(kind==='tool'?[stmt(env,'DELETE FROM gk_planning_bookings WHERE tool_id=?',record.id),stmt(env,'DELETE FROM gk_planning_tools WHERE id=?',record.id)]
       :[stmt(env,'DELETE FROM gk_qualifications WHERE member_id=? AND name=?',member,name)]),bump(env)],

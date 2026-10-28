@@ -10,7 +10,7 @@ export const API_DOORS: [string, string][] = [
   ['^service-credentials$', 'serviceCredentials'],
   ['^compliance-templates$', 'complianceTemplates'],
   ['^work/([\\w-]+)/safety$', 'safety'],
-  ['^planning$', 'planning'],
+  ['^planning$', 'planning'], ['^resource-records$', 'resourceRecords'],
   ['^rules$', 'rules'],
   ['^agent-runs$', 'agentRuns'], ['^agent-runs/([\\w-]+)$', 'agentRun'], ['^agent-grants/([\\w-]+)/preview$', 'agentPreview'],
   ['^custom-fields$', 'customFields'], ['^locations/([\\w-]+)/fields$', 'locationFields'],

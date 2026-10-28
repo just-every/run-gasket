@@ -1,3 +1,4 @@
+import { resourceGrants } from '../resource-authority'
 // Site, people and access, the audit trail and the More page.
 import type { Bindings } from '../../auth.server'
 import { ROLE_LABELS, ROLES, type Actor } from '../actor'
@@ -97,6 +98,7 @@ export async function auditPage(env: Bindings, actor: Actor, url: URL) {
 }
 
 export async function morePage(env: Bindings, actor: Actor, url: URL) {
-  const items = SETTINGS.filter(item => item.show(actor))
+  const steward=actor.role!=='agent'&&(await resourceGrants(env,actor)).some(g=>g.effective)
+  const items = SETTINGS.filter(item => item.show(actor)||(steward&&item.href==='/app/settings/resources'))
   return page(env, 'More', actor, h`<h1>More</h1><ul class="gk-more">${items.map(item => h`<li><a href="${item.href}">${item.label}</a><span class="gk-sub">${item.detail}</span></li>`)}</ul>${items.length ? '' : h`<p class="gk-muted">Nothing else for your role.</p>`}`, { url })
 }

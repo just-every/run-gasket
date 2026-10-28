@@ -39,6 +39,18 @@ Date: 2026-10-26 · Ruled by: ct · Governs: PLAN-004
 
 Ct approved the supported defaults with riders on 26 October 2026 at pin 3187a25e3796509296b1a846b70e3ce9884fe6d1: owner-only creation, editing and retirement of qualification and tool records; planning access under the existing work assignment right without expanded personnel or document access; visibly owner-entered references without issuing-body verification; hard blocks without overrides. This is a policy ruling, not independent implementation proof or completion. Gap: Broader delegated record rights; authorized recorded exceptions with approver, reason, audit, scope and expiry; qualification-specific retention minima, holds, eligible erasure, anonymized audit and erasure-journal restore proof. Current single-site planning access does not establish ADMIN-002 multi-site scope. Retirement retains personal evidence indefinitely and is not erasure. SAFE-001 retains qualified sign-offs, prerequisites and reapproval; SAFE-002 retains qualification links and complete audit packs; ADMIN-002 retains site scope. All existing planning, tool, calibration, reservation and utilization acceptance obligations remain.
 
+Carried policy elaboration from main:
+
+Ct approves these supported defaults with riders: only the owner creates, edits or retires qualification records and tool records, including tool identity and calibration facts. Retirement preserves attributed history and prevents retired records from satisfying new requirements. Planning reads, availability edits and resource use require the existing work assignment right and existing record access; they do not grant record-maintenance rights, unrestricted personnel access, private certificate originals, personal identifiers, private contacts, pay rates or unrelated records. Source documents retain their separate access controls.
+
+A certification or licence reference is information the owner entered, not verification by Gasket with an issuing body. Every reference display identifies it as “Owner-entered reference — not verified by Gasket with the issuing body,” with recorded dates and calculated expiry distinguished from verification. Gasket does not certify competence, physical safety, trade licensing, legal compliance or employment-law compliance. Qualified people choose applicable standards and authorize physical maintenance and equipment release.
+
+A hard block refuses planning confirmation or assignment when a required qualification or tool is missing, expired, unavailable or incompatibly booked. No override is supported. Gap: Broader qualification and tool-record role grants remain required under PLAN-004 and ADMIN-003. Gap: Authorized recorded exceptions remain part of the target and require a separately authorized approver, reason, attributable audit, explicit scope and expiry before shipping. Gap: Automatic qualification expiry and renewal reminders are unproved; existing document expiry reminders remain under ASSET-003 and external notification delivery under PM-005.
+
+Qualification data can be personal data. Corrections and retirement preserve attributed prior evidence under ADMIN-006; retirement is not erasure. Retention, legal holds, eligible erasure, anonymized retained audit and prevention of resurrection on restore remain under ADMIN-007 and ADMIN-016. Complete archive and inactive restore coverage remain under ADMIN-009 and GAS-11. Gap: Qualification-specific audit, erasure, retention and restore coverage is unproved by this policy review.
+
+SAFE-001 inherits qualification references for qualified sign-offs, prerequisites, expiry and changed-evidence reapproval; SAFE-002 inherits training and qualification links, retained certificates and complete portable compliance audit packs. ADMIN-002 inherits site-scoped access at every door before additional sites ship. ASSET-006 and ASSET-008 retain linked tool-register, calibration, booking and tool-use obligations. All unproved obligations remain named Gaps without reducing the complete target.
+
 ### RL-4 — Bounded public maintenance intake
 
 Date: 2026-10-23 · Ruled by: ct · Governs: REQ-001
@@ -207,3 +219,50 @@ Main evidence: `CONTRACT.md:157` at `e5b99032b38770d86a34472087b096be6d62769f`.
 Placement: PLAN-009 owns rule execution/conflict recovery once; integrations cite its rule identity and current scope.
 
 Engineering/proof retained: Outbound channels and estate-wide scope remain owed under INT-004–007 and ADMIN-002; the current in-app-only floor cannot become a permanent target exclusion.
+
+### RL-12 — Qualification erasure and scoped upkeep
+
+Date: 2026-10-27 · Ruled by: ct · Governs: PLAN-004, PLAN-010, PLAN-011, ADMIN-003, ADMIN-007, ADMIN-009, ADMIN-016, GAS-11, SAFE-001, SAFE-002
+
+CT approved ordinary owner-confirmed erasure of unused retired qualification
+families with riders on 27 October 2026 at reviewed SHA
+`2d16c035c2eff1371d08ef6fd4c5608a55c708a9`. This resolves the pending policy
+item only. The synchronized ruling in CONTRACT.md preserves the original
+acceptance text and PLAN-004 remains partial.
+
+The whole correction and replacement family is considered. Active replacements,
+applicable holds, unmet user or maintenance retention minima and retained safety
+sign-offs refuse erasure. Apply rechecks ordinary owner authority, eligibility
+and confirmation revision atomically, preserves attributable anonymized audit
+and durable per-type results, and fences older archives with the later journal.
+Retirement, expiry and reminders never authorize automatic erasure. User identity,
+full maintenance erasure, prior recipient copies, independent archives and
+provider copies remain separate duties and boundaries.
+
+The same ruling retains explicit, revocable delegation to named active people
+for qualification and tool-record creation, correction and retirement within
+authorized sites and records. It grants no planning, private-document, erasure,
+retention or hold-release authority. The current implementation uses ordinary
+owner issuance for an exact named scope within the operational primary site;
+additional operational sites retain ADMIN-002's unmet boundary. Authorized
+recorded exceptions still require their separately authorized approver, reason,
+audit, scope and expiry. No new exception policy or physical-safety approval is
+established here.
+
+CT policy ruling, 27 October 2026, reviewed pin 2d16c035c2eff1371d08ef6fd4c5608a55c708a9: APPROVE WITH RIDERS for ordinary owner-confirmed erasure of unused retired qualification families. This resolves the pending policy decision only. PLAN-004 remains partial.
+
+  An active owner using the ordinary authenticated owner door may explicitly confirm erasure after a dependency preview. Eligibility applies to the whole recorded qualification family, including its corrections and replacements. An active replacement, applicable hold, unmet user or maintenance-record retention minimum, retained safety sign-off or other retained evidence obligation refuses erasure. Apply rechecks current authority, eligibility and the confirmed revision atomically; stale confirmation and conflicting concurrent changes refuse without partial erasure.
+
+  Successful erasure removes eligible retired qualification details, correction copies and associated reminder content, anonymizes retained qualification audit details, and records durable per-type results. Actor attribution, action, site and time remain attributable; the user account and identity remain. Retirement, expiry and reminder automation never authorize automatic erasure. This qualification slice does not establish user identity erasure or complete maintenance-record erasure.
+
+  Later archives preserve the erasure result. A later erasure journal fences older archives before publication; restore must preserve the erasure or refuse without publishing resurrected data.
+
+  Owner-only qualification and tool-record upkeep is an initial authority boundary. PLAN-004 and ADMIN-003 retain explicit, revocable delegation to named active people within authorized sites and records for creation, correction and retirement. Planning access alone grants no record-maintenance, private certificate, erasure, retention or hold-release authority.
+
+  Owner-entered qualification references remain unverified with issuing bodies. Gasket does not establish competence, physical safety, licensing or legal compliance. Prior recipient copies, independently retained archives and provider-held copies remain outside demonstrated local erasure. Applicable retention decisions remain the owner’s responsibility with qualified advice where needed.
+
+  Through JSON and form doors, preview and explicitly erase an eligible unused retired qualification family. Assert exact dependency and per-type results, removal of original and corrected reference details and reminder content, preserved actor attribution, and stable retry results. Refuse signed-out and unauthorized callers, stale and unconfirmed requests, active replacements, each applicable hold, each unmet retention minimum and retained safety sign-offs; assert unchanged protected evidence. Exercise competing hold and erasure operations. Inspect a later archive, restore its durable results without resurrection, and refuse an older archive fenced by the later journal.
+
+  Grant a named person qualification-record maintenance rights within an explicit site and record scope; exercise permitted creation, correction and retirement, refuse operations outside that scope, revoke the grant and refuse further use through existing sessions. The grant supplies no erasure, retention, hold-release or private-document authority. Authorized recorded exceptions remain a separate required journey with a separately authorized approver, reason, attributable audit, explicit scope and expiry.
+
+Policy approval supplies no completion.

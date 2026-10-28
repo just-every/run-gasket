@@ -16,7 +16,7 @@ const unzip=buffer=>{const b=Buffer.from(buffer),out={};for(let at=0;b.readUInt3
 // Build the actual pre-identity schema, retain an old-format sign-off, then apply the upgrade.
 async function upgradeQualificationProof() {
  const old=await installation(), run=promisify(execFile)
- const migrations=['0099_resource_retirement.sql','0100_qualification_identity.sql']
+ const migrations=['0099_resource_retirement.sql','0100_qualification_identity.sql','0101_qualification_erasure.sql','0102_resource_grants.sql','0103_qualification_hold_erasure.sql']
  const sql=async command=>JSON.parse((await run(join(old.root,'node_modules/.bin/wrangler'),
   ['d1','execute','foundation','--local','--persist-to','.wrangler/state','--config','wrangler.jsonc','--json','--command',command],
   {cwd:old.root,env:{...process.env,CI:'true',WRANGLER_SEND_METRICS:'false'},maxBuffer:4*1024*1024})).stdout)
@@ -43,6 +43,10 @@ async function upgradeQualificationProof() {
    INSERT INTO gk_safety_attestations SELECT 'synthetic-gasket-upgrade',w.id,'${prerequisite.requirement}',w.checklist_revision_id,w.version,'${tech}',
     '{"name":"Isolation training","expires_on":"2027-01-01","reference":"synthetic-gasket-upgrade"}',
     'synthetic-gasket-permit','2026-11-01','permit.txt',X'01','${createHash('sha256').update(Buffer.from([1])).digest('hex')}',1 FROM gk_work_orders w WHERE w.id='${work}';`)
+  await sql(`INSERT INTO gk_automation_jobs(id,rule_id,rule_revision,source,started_at,finished_at,state,input,output)
+   VALUES('synthetic-gasket-legacy-expiry','expiry',1,'cron',1,1,'completed',
+    json_object('day','2026-10-26','qualificationReminders',json_object('qualifications',json_array(json_object('member_id','${tech}','name','Other training','record_id','legacy','expires_on','2027-01-01','remind_days',1,'consent',1,'person','Upgrade technician'),json_object('member_id','${tech}','name','Isolation training','record_id','legacy','expires_on','2027-01-01','remind_days',1,'consent',1,'person','Upgrade technician')),'owners',json_array())),
+    '{"created":[],"runs":[],"notices":[]}');`)
   await copyFile(new URL('../../migrations/core/'+migrations[0],import.meta.url),join(old.root,'./migrations/core',migrations[0]))
   await old.migrate()
   // The intermediate release saved the shared legacy marker in new snapshots.
@@ -52,6 +56,8 @@ async function upgradeQualificationProof() {
   await copyFile(new URL('../../migrations/core/'+migrations[1],import.meta.url),join(old.root,'./migrations/core',migrations[1]))
   await old.migrate()
   assert.deepEqual((await sql(readSnapshots)).flatMap(r=>r.results),original,'upgrade preserves immutable saved evidence bytes')
+  for(const name of migrations.slice(2)) await copyFile(new URL('../../migrations/core/'+name,import.meta.url),join(old.root,'./migrations/core',name))
+  await old.migrate()
   after=await harness({installation:old,vars:before.vars,clockInstant:Date.parse('2026-10-26T16:00:00Z')})
   const upgradedOwner=owner,upgradedTech=who
   const state=()=>after.api(`work/${work}/safety`,upgradedTech)
@@ -71,6 +77,29 @@ async function upgradeQualificationProof() {
   await after.api('planning.retire',upgradedOwner,{kind:'qualification',member:tech,name:q.name,reason:'Withdraw old evidence',revision:(await after.api('planning',upgradedOwner)).revision})
   await after.api('planning.qualification',upgradedOwner,q)
   assert.ok((await state()).missing.includes('Qualification missing, expired or changed'),'identical replacement never revives a pre-upgrade sign-off')
+  await after.api('planning.retire',upgradedOwner,{kind:'qualification',member:tech,name:'Other training',reason:'Unused legacy reference withdrawn',revision:(await after.api('planning',upgradedOwner)).revision})
+  const retiredLegacy=(await after.api('planning',upgradedOwner)).retired.find(r=>r.snapshot.name==='Other training')
+  const legacyPreview=await after.api(`retention-preview?kind=qualification&id=${retiredLegacy.id}`,upgradedOwner)
+  assert.equal(legacyPreview.eligible,true)
+  assert.equal(legacyPreview.dependencies.reminderInputs,1)
+  await after.api('qualification.erase',upgradedOwner,{id:retiredLegacy.id,revision:legacyPreview.revision,confirm:true})
+  assert.ok(!JSON.stringify((await after.api('/automation/jobs',upgradedOwner)).jobs).includes('Other training'),'erasure removes pre-identity qualification captures as well as current captures')
+  assert.ok(JSON.stringify((await after.api('/automation/jobs',upgradedOwner)).jobs).includes('Isolation training'),'erasure preserves a different qualification capture and its retained safety history')
+  const unclassified={member:tech,name:'Unclassified notice guard',expires:'2027-01-01',reference:'synthetic-gasket-unclassified-reference'}
+  await after.api('planning.qualification',upgradedOwner,unclassified)
+  await after.api('planning.retire',upgradedOwner,{kind:'qualification',member:tech,name:unclassified.name,reason:'Withdraw unused reference',revision:(await after.api('planning',upgradedOwner)).revision})
+  const protectedRecord=(await after.api('planning',upgradedOwner)).retired.find(r=>r.snapshot.name===unclassified.name)
+  const recipient=(await after.api('me',upgradedOwner)).id
+  await after.stop()
+  await sql(`INSERT INTO gk_qualification_reminders(id,record_id,recipient_id,stage,text,created_at) VALUES('synthetic-gasket-unattributed-notice','legacy','${recipient}','due','synthetic-gasket-unattributed-old-notice',1);`)
+  after=await harness({installation:old,vars:before.vars,clockInstant:Date.parse('2026-10-26T16:00:00Z')})
+  const protectedPreview=await after.api(`retention-preview?kind=qualification&id=${protectedRecord.id}`,upgradedOwner)
+  assert.equal(protectedPreview.eligible,false)
+  assert.equal(protectedPreview.dependencies.legacyNotices,1)
+  assert.ok(protectedPreview.blockers.some(b=>b.code==='legacy_notice'))
+  await after.api('qualification.erase',upgradedOwner,{id:protectedRecord.id,revision:protectedPreview.revision,confirm:true},409)
+  assert.equal((await after.api('planning',upgradedOwner)).retired.find(r=>r.id===protectedRecord.id).snapshot.reference,unclassified.reference)
+  assert.equal((await after.api(`retention-preview?kind=qualification&id=${protectedRecord.id}`,upgradedOwner)).dependencies.legacyNotices,1,'unattributed retained notice survives refusal')
  } finally {await before?.close();await after?.close();await old.remove()}
 }
 
@@ -145,6 +174,13 @@ export async function safetyJourney() {
   await sign()
   const previousQualification=(await state()).attestations.at(-1).qualification
   await h.api('planning.retire',owner,{kind:'qualification',member:tech,name:q.name,reason:'Reference withdrawn',revision:(await h.api('planning',owner)).revision})
+  const retired=(await h.api('planning',owner)).retired.find(r=>r.kind==='qualification')
+  const protectedPreview=await h.api(`retention-preview?kind=qualification&id=${retired.id}`,owner)
+  assert.equal(protectedPreview.eligible,false,'retained sign-offs protect retired qualification evidence')
+  assert.equal(protectedPreview.dependencies.safetySignoffs,3)
+  const signedBefore=await state()
+  assert.equal((await h.api('qualification.erase',owner,{id:retired.id,revision:protectedPreview.revision,confirm:true},409)).error,'qualification_retained')
+  assert.deepEqual(await state(),signedBefore,'refused erasure preserves every signed snapshot and permit')
   assert.ok((await state()).missing.includes('Qualification missing, expired or changed'))
   assert.equal((await sign({},409)).error,'qualification_missing_or_expired')
   await h.api('planning.qualification',owner,{...q,expires:'2027-01-01'})
