@@ -1,9 +1,10 @@
+import type { IntakeLanguage } from '../languages'
 // Return the authorized source page with its exact submitted draft, without device storage.
 import type { Input } from '../input'
 import { newId } from '../core'
 import { esc, field, fileField, h, hidden } from './html'
 
-export async function failedForm(source: Response, action: string, input: Input, message: string, receipt: string, retry: boolean, status = 400) {
+export async function failedForm(source: Response, action: string, input: Input, message: string, receipt: string, retry: boolean, status = 400, language?: IntakeLanguage) {
   const entries = input.entries(), values = (name: string) => entries.filter(([key]) => key === name).map(([, value]) => value)
   const selector = `form[action="${action}"]`
   const html = await source.text()
@@ -21,7 +22,7 @@ export async function failedForm(source: Response, action: string, input: Input,
   const positions = new Map<string, number>(), files = await draftFiles(input)
   const nextId = retry ? newId() : String(values('__gk_save')[0] || '')
   const nextReceipt = receipt.startsWith('/app/save-receipts/') ? `/app/save-receipts/${nextId}` : receipt
-  const error = h`<div id="save-error" class="gk-flash gk-error" role="alert" tabindex="-1" autofocus><p>${message}</p><p>Your entries are still in this form. <a href="${receipt}" target="_blank" rel="noopener">Check save receipt</a>.</p>${retry ? '' : h`<p>Do not repeat this submission. Inspect its saved steps first.</p>`}</div>`
+  const error = h`<div id="save-error" class="gk-flash gk-error" role="alert" tabindex="-1" autofocus><p>${message}</p><p>${language?.text('entriesKept') ?? 'Your entries are still in this form.'} <a href="${receipt}" target="_blank" rel="noopener">${language?.text('checkSave') ?? 'Check save receipt'}</a>.</p>${retry ? '' : h`<p>${language?.text('noRepeat') ?? 'Do not repeat this submission. Inspect its saved steps first.'}</p>`}</div>`
   let selectName = '', selectPosition = 0
   const rewriter = new HTMLRewriter().on(selector, { element(element) {
     active = ++index
@@ -35,7 +36,7 @@ export async function failedForm(source: Response, action: string, input: Input,
     if (name === '__gk_save') { element.setAttribute('value', nextId); return }
     if (type === 'file') {
       const kept = files.filter(file => file.name === name)
-      if (kept.length) { element.removeAttribute('required'); element.after(`<p class="gk-hint">Kept attachment: ${kept.map(file => esc(file.filename)).join(', ')}. Choose a file to replace it.</p>`, { html: true }) }
+      if (kept.length) { element.removeAttribute('required'); element.after(`<p class="gk-hint">${esc(language ? language.text('keptFile',{name:kept.map(file=>file.filename).join(', ')}) : 'Kept attachment: '+kept.map(file=>file.filename).join(', ')+'. Choose a file to replace it.')}</p>`, { html: true }) }
       return
     }
     const submitted = values(name).filter(value => typeof value === 'string') as string[]
@@ -61,7 +62,7 @@ export async function failedForm(source: Response, action: string, input: Input,
     else element.removeAttribute('selected')
   } }).on(`${selector} noscript`, { element(element) {
     // The rewriter treats noscript content as text; descendant handlers never see its link.
-    if (active === chosen) element.setInnerContent(h`<p>Save results open in a new tab. Keep this draft until confirmation. If the connection fails, <a href="${nextReceipt}" target="_blank" rel="noopener">check save receipt</a> before submitting again.</p>`.html, { html: true })
+    if (active === chosen) element.setInnerContent(h`<p>${language?.text('noScript') ?? 'Save results open in a new tab. Keep this draft until confirmation. If the connection fails,'} <a href="${nextReceipt}" target="_blank" rel="noopener">${language?.text('checkReceipt') ?? 'check save receipt'}</a> ${language?.text('beforeAgain') ?? 'before submitting again.'}</p>`.html, { html: true })
   } }).on(`${selector} a[data-request-receipt]`, { element(element) {
     if (active === chosen) element.setAttribute('href', nextReceipt)
   } }).on(`${selector} button[type="submit"]`, { element(element) {

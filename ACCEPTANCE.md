@@ -8,10 +8,10 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 50 | 56 | 38 | 144 |
+| Core | 50 | 57 | 37 | 144 |
 | Agent surface | 0 | 0 | 7 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 50 | 56 | 45 | 151 |
+| Full target | 50 | 57 | 44 | 151 |
 
 Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
@@ -392,7 +392,7 @@ Core · target · **partial** · Cites BASE-ROLE-001
 
 #### ADMIN-013 — Per-person display language
 
-Core · target · **missing**
+Core · target · **partial**
 
 **Requirement.** Owners set the organization's default display language and every person (owner, lead, technician, supervisor, stores, purchasing, requester, contractor) chooses their own. US English and US Spanish ship complete at launch; the published catalog covers at least 30 display languages, including French, Portuguese, Vietnamese, Simplified and Traditional Chinese, Korean, Tagalog, Polish and right-to-left Arabic. The chosen language applies to the web workspace, the iOS and Android app (FIELD-001), the requester portal and QR fault form (REQ-001, REQ-002), email and push notices (PM-005, INT-004), printed work packs (FIELD-008) and PDF reports (REPORT-006). Signed-out requesters get the portal's site default or their browser preference and can switch. Dates and numbers follow the person's locale while stored values, units, USD amounts and timestamps are unchanged. User-entered text (asset names, checklist steps, notes, readings, comments) is shown exactly as authored, and translated procedures come only from AGENT-007’s source-linked translations under the company’s policy for commitment. A missing translation shows the English string with a visible untranslated marker, never a blank control, and owners can download a per-language completeness report. The existing operator portal and scoped QR form under REQ-001/REQ-002 inherit this full obligation: complete language catalogs, person/site/browser preference, locale formatting and visible fallback must be asserted at both current intake doors by this clause before its language support ships. Localized scheduled report packs inherited from REPORT-006 follow this per-person language and locale duty while preserving stored source values and authored text.
 
@@ -402,8 +402,8 @@ Core · target · **missing**
 3. Remove one Spanish catalog string and show the visible English fallback marker, not a blank control, plus the completeness report naming it.
 4. Switch a user to Arabic and check right-to-left layout at 390 width without clipping.
 
-**Evidence.** None.
-**Gap.** Interface text is hard-coded US English (pages declare en-US); no message catalog, per-person or organization language, locale formatting, translated notices, print packs or fallback marker. Localized scheduled packs inherited from REPORT-006 remain unbuilt.
+**Evidence.** `migrations/core/0105_display_languages.sql`; `tests/gasket/languages.mjs` — languageJourney: owner organization default and independent self-only preferences for existing human members, signed-out browser and site defaults and explicit switching without identity, forbidden member and default changes and revoked-session refusal, complete primary-site English and Spanish portal and decoded QR intake strings, localized validation and retained-form recovery, opted-in isolated drafts and lost-response exactly-once retry, unchanged authored answers and values, original photo digests and human attribution, visible English fallback after an owner removes a Spanish string and matching owner-only completeness download. Browser proof covers intake, draft recovery, retry, confirmation, fallback and Settings at 1440 and 390. `tests/gasket/requests.mjs` — requestPortalJourney and requestDraftJourney retain intake consent, private-file access, erasure and sign-out draft fencing.
+**Gap.** Primary-site intake foundation only. Remaining: complete workspace and all-role localization; requester, contractor, stores and purchasing identities not yet built; the full catalog of at least 30 languages, including Arabic right-to-left qualification; locale date and number formatting; localized email and APNs and FCM push delivery; native iOS and Android app under FIELD-001; printed work packs under FIELD-008; completed-work PDFs and scheduled report packs under REPORT-010 and REPORT-006; reviewed authored procedure translations under AGENT-007; operational multi-site language defaults and authorization under ADMIN-002. Owner-only interface-catalog maintenance grants no delegated access. REQ-001 and REQ-002 retain the full language and locale obligation beyond this initial English and Spanish interface slice. No device, provider, role or site prerequisite is released.
 
 #### ADMIN-014 — Phone-number invites and SMS sign-in
 

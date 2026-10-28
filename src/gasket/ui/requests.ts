@@ -1,3 +1,4 @@
+import { displayLocale, intakeLanguage, languageCookie, type IntakeLanguage } from '../languages'
 import { customInputs } from './custom-fields'
 import { responseNotices, responseSettings } from '../request-response'
 // The existing Gasket cards/forms, with no new visual identity.
@@ -9,13 +10,15 @@ import { confirmation, getPortal, intake, portalSettings, requestDetail, request
 import { area, backLink, card, checkbox, field, fileField, form, h, hidden, raw, select, table, tag } from './html'
 import { page } from './shell'
 
-function customField(f:RequestField) {
+function customField(f:RequestField, language:IntakeLanguage) {
+  const t=language.text
   const name=`field_${f.key}`
-  if(f.type==='photo') return fileField(f.label,name,{required:f.required,accept:'image/png,image/jpeg',hint:'PNG or JPEG, up to 1.5 MB.'})
-  if(f.type==='choice') return select(f.label,name,f.options!.map(value=>({value,label:value})),'',{required:f.required,blank:'Choose…'})
+  if(f.type==='photo') return fileField(f.label,name,{required:f.required,accept:'image/png,image/jpeg',hint:t('customPhotoHint')})
+  if(f.type==='choice') return select(f.label,name,f.options!.map(value=>({value,label:value})),'',{required:f.required,blank:t('choose')})
   return field(f.label,name,{type:f.type==='number'?'text':f.type,required:f.required,attrs:f.type==='number'?'inputmode="decimal"':''})
 }
-export async function requestPortalPage(env:Bindings,actor:Actor|null,url:URL,id:string) {
+export async function requestPortalPage(env:Bindings,actor:Actor|null,url:URL,id:string,request:Request) {
+  const language=await intakeLanguage(env,await displayLocale(env,actor,request)),t=language.text
   const p=await getPortal(env,id)
   insist(p.enabled,'portal_closed',404)
   insist(actor?.role!=='agent','forbidden',403)
@@ -25,23 +28,27 @@ export async function requestPortalPage(env:Bindings,actor:Actor|null,url:URL,id
   const targets=actor?await all(env,`SELECT t.id,t.name FROM gk_request_targets t LEFT JOIN gk_assets a ON a.id=t.asset_id WHERE portal_id=? AND t.retired_at IS NULL AND a.retired_at IS NULL ORDER BY t.name`,id):[]
   const submissionKey=newId()
   const body=h`<p><img src="/brand/mark.svg" width="40" height="40" alt="Gasket"></p><h1>${p.name}</h1>
-    <p class="gk-lede">Report an equipment fault</p><p>For immediate danger, follow your site's emergency procedure. This form does not summon emergency services.</p>
-    ${target?h`<h2>${target.name}</h2>`:h`<p>Scan a site label or choose its published code. Private maintenance records are never available here.</p>`}
-    ${card('Fault details',h`<form method="post" enctype="multipart/form-data" action="/request/${id}" class="gk-form" id="request-form" target="_blank" rel="noopener" data-portal="${id}" data-target="${targetId}">
-      ${hidden('submissionKey',submissionKey)}<noscript><p>Save results open in a new tab. Keep this draft until confirmation. If the connection fails, <a href="/request/${id}/received/${submissionKey}" target="_blank" rel="noopener">check request receipt</a> before submitting again.</p></noscript><p><a data-request-receipt href="/request/${id}/received/${submissionKey}" target="_blank" rel="noopener">Check request receipt</a> before repeating an unconfirmed send.</p>${target?hidden('target',target.id):actor?select('Asset or location','target',targets.map(t=>({value:t.id,label:t.name})),'',{blank:'Choose…'}):field('Label code','target',{hint:'The code printed below the QR label.'})}
-      ${area('What is wrong?','description')}${select('Urgency','urgency',[{value:'normal',label:'Normal'},{value:'high',label:'High'},{value:'emergency',label:'Emergency'}],'normal')}
-      ${field('Your name and contact','contact',{hint:'Contact details are kept for the maintenance team. They do not create or verify an account.'})}
-      ${raw(fileField('Photo (optional)','photo',{accept:'image/png,image/jpeg',hint:'Use your camera or choose a PNG/JPEG, up to 1.5 MB.'}).html.replace('type="file"','type="file" capture="environment"'))}
-      ${p.fields.map(customField)}<div class="gk-visually-hidden" aria-hidden="true">${field('Leave empty','website',{required:false,attrs:'tabindex="-1" autocomplete="off"'})}</div>
-      ${checkbox('Save this draft and photos on this private device','saveOnDevice')}
-      <p role="status" id="draft-status">Your draft can be saved on this device. Use a private device for contact details and photos.</p>
-      <div class="gk-actions"><button type="submit">Send request</button><button type="button" class="gk-secondary" id="save-request-draft">Save draft</button><button type="button" class="gk-secondary" id="clear-request-draft">Clear draft</button></div>
-    </form>`)}<p><a href="/signin">Maintenance team sign in</a></p>`
-  return page(env,p.name,null,body,{url,script:'/request-drafts.js'})
+    <nav aria-label="${t('language')}">${actor?h`<a href="/app/settings/language">${t('languageSettings')}</a>`:h`<a href="${languageLink(url,'en-US')}" lang="en-US">English (US)</a> · <a href="${languageLink(url,'es-US')}" lang="es-US">Español (EE. UU.)</a>`}</nav><p class="gk-lede">${t('report')}</p><p>${t('emergency')}</p>
+    ${target?h`<h2>${target.name}</h2>`:h`<p>${t('published')}</p>`}
+    ${card(t('details'),h`<form method="post" enctype="multipart/form-data" action="/request/${id}" class="gk-form" id="request-form" target="_blank" rel="noopener" data-portal="${id}" data-target="${targetId}" data-messages="${JSON.stringify(language.messages)}">
+      ${hidden('submissionKey',submissionKey)}<noscript><p>${t('noScript')} <a href="/request/${id}/received/${submissionKey}" target="_blank" rel="noopener">${t('checkReceipt')}</a> ${t('beforeAgain')}</p></noscript><p><a data-request-receipt href="/request/${id}/received/${submissionKey}" target="_blank" rel="noopener">${t('checkReceipt')}</a> ${t('beforeRepeat')}</p>${target?hidden('target',target.id):actor?select(t('asset'),'target',targets.map(t=>({value:t.id,label:t.name})),'',{blank:t('choose')}):field(t('code'),'target',{hint:t('codeHint')})}
+      ${area(t('description'),'description')}${select(t('urgency'),'urgency',[{value:'normal',label:t('normal')},{value:'high',label:t('high')},{value:'emergency',label:t('urgent')}],'normal')}
+      ${field(t('contact'),'contact',{hint:t('contactHint')})}
+      ${raw(fileField(t('photo'),'photo',{accept:'image/png,image/jpeg',hint:t('photoHint')}).html.replace('type="file"','type="file" capture="environment"'))}
+      ${p.fields.map((f:RequestField)=>customField(f,language))}<div class="gk-visually-hidden" aria-hidden="true">${field(t('empty'),'website',{required:false,attrs:'tabindex="-1" autocomplete="off"'})}</div>
+      ${checkbox(t('consent'),'saveOnDevice')}
+      <p role="status" id="draft-status">${t('draftIntro')}</p>
+      <div class="gk-actions"><button type="submit">${t('send')}</button><button type="button" class="gk-secondary" id="save-request-draft">${t('saveDraft')}</button><button type="button" class="gk-secondary" id="clear-request-draft">${t('clearDraft')}</button></div>
+    </form>`)}<p><a href="/signin">${t('signIn')}</a></p>`
+  return languageCookie(await page(env,p.name,null,body,{url,script:'/request-drafts.js',language}),request,actor)
 }
-export async function requestReceiptPage(env:Bindings,url:URL,id:string,key:string) {
+export async function requestReceiptPage(env:Bindings,url:URL,id:string,key:string,request:Request,actor:Actor|null) {
+  const language=await intakeLanguage(env,await displayLocale(env,actor,request)),t=language.text
   const number=await confirmation(env,id,key)
-  return page(env,'Request received',null,h`<h1>Request received</h1><p role="status">Request R-${number} is saved. Keep this confirmation link.</p><p>The maintenance team will triage it. Sending this form does not authorize work or spending.</p><p><a href="/request/${id}">Report another fault</a></p>`,{url})
+  return languageCookie(await page(env,t('received'),null,h`<h1>${t('received')}</h1><p role="status">${t('confirmation',{number})}</p><p>${t('triage')}</p><p><a href="/request/${id}">${t('another')}</a></p>`,{url,language}),request,actor)
+}
+function languageLink(url:URL,locale:string) {
+  const copy=new URL(url);copy.searchParams.set('language',locale);return copy.pathname+copy.search
 }
 export async function requestSettingsPage(env:Bindings,actor:Actor,url:URL) {
   const data=await portalSettings(env,actor)
