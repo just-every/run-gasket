@@ -717,7 +717,7 @@ site metadata does not establish those acceptance points.
 The owner reads `GET /api/gasket/retention-preview?kind=qualification&id=ID`,
 using the retired resource id from `planning`. The preview reports the current
 planning revision, eligibility, retained safety sign-offs, retired record count,
-reminder count and audit details to anonymize. A qualification hold uses
+reminder count, exact refusal reasons and audit details to anonymize. A qualification hold uses
 `retention.hold` with `kind: qualification` and that retired id. A user hold
 protects all that person's retired qualifications. Existing user and maintenance
 minimum ages both apply, measured conservatively from retirement.
@@ -771,3 +771,7 @@ archives always disable grants. Owner-confirmed qualification erasure also
 redacts matching scope names, targets and reasons, anonymizes their retained
 audit payloads and reports the number of affected grants while retaining actor,
 action, site and time attribution.
+
+Qualification erasure redacts released qualification-hold reasons and their audit
+payloads as well as qualification and stewardship copies. Active holds on the
+holder, recorded contributors or a named steward refuse erasure atomically.

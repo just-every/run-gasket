@@ -46,8 +46,8 @@ import { now, zone } from './clock.mjs'
 const independent = new Map([
   [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [genericMigrationJourney,'inventory'],
-  [safetyJourney,'reports'],
-  [qualificationPlanningJourney,'reports'], [calendarPlanningJourney,'reports'],
+  [safetyJourney,'inventory'],
+  [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
   [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
