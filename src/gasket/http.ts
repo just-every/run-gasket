@@ -176,7 +176,7 @@ async function apiResponse(env: Bindings, actor: Actor, request: Request, url: U
   authorizeService(actor, request, path)
   if (/^v[0-9]+(?:\/|$)/.test(path)) throw new GasketError('unsupported_api_version', 404)
   if (request.method === 'POST') {
-    const action = actions[path]
+    const action = Object.hasOwn(actions, path) ? actions[path] : undefined
     if (!action) throw new GasketError('not_found', 404)
     if (request.headers.has('idempotency-key')) {
       const kept = await keyedWrite(env, actor, request, path, input => action(env, actor, input, request))
@@ -209,9 +209,9 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
       '/app/move-in/preview': { name: 'movein.review', run: (bindings,member,input) => previewPage(bindings,member,input,url) },
       '/app/move-in/spreadsheet-preview': { name: 'spreadsheet.review', run: (bindings,member,input) => genericPreviewPage(bindings,member,input,url) },
     }
-    const preview = previews[path]
+    const preview = Object.hasOwn(previews, path) ? previews[path] : undefined
     const name = preview?.name || path.match(/^\/app\/do\/([\w.]+)$/)?.[1]
-    const action: typeof actions[string] | undefined = preview ? (bindings, member, input) => preview.run(bindings, member, input) : name ? actions[name] : undefined
+    const action: typeof actions[string] | undefined = preview ? (bindings, member, input) => preview.run(bindings, member, input) : name && Object.hasOwn(actions, name) ? actions[name] : undefined
     if (!action) throw new GasketError('not_found', 404)
     const enhanced = request.headers.get('accept') === ['application', 'json'].join('/')
     const input = await Input.from(request)
@@ -271,6 +271,7 @@ const pages: Record<string, Page> = {
   spreadsheetReconciliation: reconciliationPage,
   spreadsheetTemplate: guarded(actor=>can(actor,'import.run'),async(_env,_actor,_url,id)=>{
     const [kind,format]=id.split('.') as [SheetKind,'csv'|'xls'|'xlsx']
+    if (!Object.hasOwn(HEADERS, kind)) throw new GasketError('not_found', 404)
     const bytes=await spreadsheetTemplate(format,kind,[...HEADERS[kind]])
     const type=format==='csv'?['text','csv'].join('/'):format==='xls'?['application','vnd.ms-excel'].join('/'):['application','vnd.openxmlformats-officedocument.spreadsheetml.sheet'].join('/')
     return new Response(bytes as BodyInit,{headers:{'content-type':type,'cache-control':'private, no-store','content-disposition':`attachment; filename="${id}"`}})

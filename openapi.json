@@ -2350,32 +2350,7 @@
                           "items": {
                             "type": "array",
                             "items": {
-                              "type": "object",
-                              "properties": {
-                                "text": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 300
-                                },
-                                "key": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 100
-                                },
-                                "kind": {
-                                  "enum": [
-                                    "check",
-                                    "number",
-                                    "text",
-                                    "option",
-                                    "photo"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "text"
-                              ],
-                              "additionalProperties": true
+                              "$ref": "#/components/schemas/ChecklistItem"
                             }
                           },
                           "note": {
@@ -2475,32 +2450,7 @@
                           "items": {
                             "type": "array",
                             "items": {
-                              "type": "object",
-                              "properties": {
-                                "text": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 300
-                                },
-                                "key": {
-                                  "type": "string",
-                                  "minLength": 1,
-                                  "maxLength": 100
-                                },
-                                "kind": {
-                                  "enum": [
-                                    "check",
-                                    "number",
-                                    "text",
-                                    "option",
-                                    "photo"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "text"
-                              ],
-                              "additionalProperties": true
+                              "$ref": "#/components/schemas/ChecklistItem"
                             }
                           },
                           "note": {
@@ -34090,8 +34040,7 @@
           "items": {
             "type": "array",
             "items": {
-              "type": "object",
-              "additionalProperties": true
+              "$ref": "#/components/schemas/WorkItem"
             }
           },
           "missing": {
@@ -59880,8 +59829,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                        "$ref": "#/components/schemas/ChecklistItem"
                       }
                     },
                     "everyDays": {
@@ -59903,8 +59851,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                        "$ref": "#/components/schemas/ChecklistItem"
                       }
                     },
                     "everyDays": {
@@ -59926,8 +59873,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                        "$ref": "#/components/schemas/ChecklistItem"
                       }
                     },
                     "everyDays": {
@@ -59949,8 +59895,7 @@
                     "items": {
                       "type": "array",
                       "items": {
-                        "type": "object",
-                        "additionalProperties": true
+                        "$ref": "#/components/schemas/ChecklistItem"
                       }
                     },
                     "everyDays": {
@@ -60180,6 +60125,166 @@
           "to",
           "limit",
           "rows"
+        ],
+        "additionalProperties": true
+      },
+      "ChecklistItem": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "kind": {
+            "enum": [
+              "check",
+              "number",
+              "text",
+              "option",
+              "photo"
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "min": {
+            "type": "string"
+          },
+          "max": {
+            "type": "string"
+          },
+          "meter": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "when": {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "string"
+              },
+              "is": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "step",
+              "is"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": true
+      },
+      "WorkItem": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "kind": {
+            "enum": [
+              "check",
+              "number",
+              "text",
+              "option",
+              "photo"
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "min": {
+            "type": "string"
+          },
+          "max": {
+            "type": "string"
+          },
+          "meter": {
+            "type": "string"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failOn": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "when": {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "string"
+              },
+              "is": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "step",
+              "is"
+            ],
+            "additionalProperties": false
+          },
+          "result": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "outcome": {
+                "type": "string"
+              },
+              "value": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "text"
         ],
         "additionalProperties": true
       }

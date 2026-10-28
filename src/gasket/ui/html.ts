@@ -68,7 +68,7 @@ const ERRORS: Record<string, string> = {
   active_children: 'move or retire the assets under this one first.',
   parent_retired: 'the parent is retired.',
 }
-export const describeError = (code: string) => ERRORS[code] ?? code.replace(/_/g, ' ') + '.'
+export const describeError = (code: string) => Object.hasOwn(ERRORS, code) ? ERRORS[code] : code.replace(/_/g, ' ') + '.'
 
 export const hidden = (name: string, value: unknown) => h`<input type="hidden" name="${name}" value="${value}">`
 
@@ -116,7 +116,7 @@ const TONES: Record<string, 'ok' | 'warn' | 'bad' | 'info'> = {
   open: 'warn', pending: 'warn', 'due today': 'warn', 'needs attention': 'warn', returned: 'warn', 'found elsewhere': 'warn', 'below minimum': 'warn', due: 'warn', suspect: 'warn', 'stale (late)': 'warn', degraded: 'warn', 'evidence disagrees': 'warn',
   fail: 'bad', down: 'bad', overdue: 'bad', missing: 'bad', high: 'bad', cancelled: 'bad', rejected: 'bad', retired: 'bad', ended: 'bad', 'out of service': 'bad',
 }
-export const tag = (text: unknown) => { const tone = TONES[String(text ?? '').toLowerCase()]; return h`<span class="gk-tag${tone ? ` gk-tone-${tone}` : ''}">${text}</span>` }
+export const tag = (text: unknown) => { const key = String(text ?? '').toLowerCase(), tone = Object.hasOwn(TONES, key) ? TONES[key] : undefined; return h`<span class="gk-tag${tone ? ` gk-tone-${tone}` : ''}">${text}</span>` }
 
 export function card(heading: string, body: unknown, { id = '', extra = '' as unknown } = {}) {
   const key = id || uid('card')

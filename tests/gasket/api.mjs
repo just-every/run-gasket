@@ -19,6 +19,20 @@ export async function apiJourney() {
     for (const person of await h.api('/v1/members', owner)) documented('Member', person)
     for (const site of await h.api('/v1/sites', owner)) documented('SiteSummary', site)
     documented('SiteDetail', await h.api('/v1/sites/primary', owner))
+    // Inherited action names must behave exactly like an unknown action. Keep
+    // response bodies out of assertion output, including when a binding leaks.
+    const dispatch = []
+    for (const name of ['synthetic.unknown', 'constructor', '__proto__', 'hasOwnProperty']) {
+      const response = await h.raw(`/api/gasket/${name}`, { cookie: lead, body: {} })
+      const text = await response.text()
+      dispatch.push({ name, status: response.status, unknown: text === '{"error":"not_found"}',
+        private: ![...Object.values(h.vars), h.origin, 'test-only-key', 'SESSION_SECRET', 'SETUP_TOKEN', 'MAIL_API_KEY', 'DB'].some(value => text.includes(value)) })
+    }
+    const registered = await h.raw('/api/gasket/checklist.create', { cookie: lead, body: { name: 'Synthetic dispatch sanity', items: ['Inspect guard'] } })
+    const registeredResult = await registered.json()
+    assert.equal(registered.status, 200, 'registered action remains available to a signed-in member')
+    assert.ok(typeof registeredResult.id === 'string' && registeredResult.number === 1, 'registered action creates its record')
+    assert.deepEqual(dispatch, ['synthetic.unknown', 'constructor', '__proto__', 'hasOwnProperty'].map(name => ({ name, status: 404, unknown: true, private: true })))
     const write = async (action, body, key, cookie = owner, status = 200, legacy = false) => {
       const response = await h.raw(`/api/gasket/${legacy ? '' : 'v1/'}${action}`, { cookie, body, headers: { 'idempotency-key': key } })
       const result = await response.json()

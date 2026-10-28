@@ -13,7 +13,8 @@ export async function erasureFixture(h, owner, asset) {
   const operator = (await (await h.raw('/auth/session', { cookie })).json()).operator.id
   assert.equal((await h.raw('/auth/operator/role', { cookie: owner, body: { operatorId: operator, role: 'owner' } })).status, 200)
   const issuingOwner = await h.signIn(accessBody.email)
-  const credential = await h.api('service.create', issuingOwner, { name: 'synthetic-gasket-erased-credential', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
+  const issuanceDay = (await h.api('me', issuingOwner)).today
+  const credential = await h.api('service.create', issuingOwner, { name: 'synthetic-gasket-erased-credential', scopes: ['assets:read'], expiresAt: Date.parse(issuanceDay+'T12:00:00Z') + 30 * 86400_000, consent: true })
   const credentialRead = () => h.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })
   assert.equal((await credentialRead()).status, 200)
   assert.equal((await h.raw('/auth/operator/role', { cookie: owner, body: { operatorId: operator, role: 'member' } })).status, 200)
