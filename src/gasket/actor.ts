@@ -88,7 +88,7 @@ export function capabilitySql(sessionId: string, capability: Capability) {
 export const HUMAN_ROLES: Role[] = ['owner', 'lead', 'maintainer', 'supervisor']
 export function humanMemberSql(alias: string) {
   return `${alias}.status='active' AND EXISTS(SELECT 1 FROM oa_operators ho WHERE ho.id=${alias}.operator_id AND ho.status='active'
-    AND ((ho.role='owner' AND ${alias}.role='owner') OR (ho.role!='owner' AND ${alias}.role IN ('lead','maintainer','supervisor'))))
+    AND (ho.role='owner' OR (ho.role!='owner' AND ${alias}.role IN ('lead','maintainer','supervisor'))))
     AND EXISTS(SELECT 1 FROM gk_site_memberships hs JOIN gk_sites hp ON hp.id=hs.site_id
       WHERE hs.member_id=${alias}.id AND hs.site_id='primary' AND hs.status='active' AND hp.state='active')`
 }

@@ -45,7 +45,7 @@ export async function serviceActor(env: Bindings, request: Request): Promise<Act
 
 export function authorizeService(actor: Actor, request: Request, path: string) {
   if (!actor.service) return
-  const read = path.match(/^(assets|parts|work)(?:\/[\w-]+(?:\/history)?)?$/)
+  const read = (path === 'work-page' ? 'work' : path).match(/^(assets|parts|work)(?:\/[\w-]+(?:\/history)?)?$/)
   const scope = request.method === 'POST' ? path : read ? `${read[1]}:read` : ''
   // Neither site administration nor approvals can ever be delegated here.
   insist(SCOPES.includes(scope) && actor.service.scopes.includes(scope), 'service_scope_forbidden', 403)

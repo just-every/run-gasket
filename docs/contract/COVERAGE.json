@@ -2,7 +2,7 @@
   "schema": 1,
   "seed": "gasket-product",
   "old": {
-    "commit": "a62a04135c77202b90b2d26b339fea5f2fee0be5",
+    "commit": "346671e193ba65e710cbdf285dcbbe6dd960cdfa",
     "files": [
       "CONTRACT.md"
     ]
@@ -2813,16 +2813,6 @@
     },
     {
       "file": "CONTRACT.md",
-      "line": 543,
-      "cell": "gap",
-      "text": "No declared/verified target capacity or limit-aware complete exports; work lists currently cap returned rows.",
-      "to": "gap",
-      "ids": [
-        "SAFE-003"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
       "line": 544,
       "cell": "gap",
       "text": "No live reliability analysis, predictive fault proposal, confidence or evidence-coverage engine.",
@@ -2982,6 +2972,16 @@
       "line": 571,
       "text": "PLAN-004 gate correction, 27 October 2026: unchanged qualification facts preserve their evidence identity when reminder preferences change. Original qualification records receive distinct migrated identities; pre-identity immutable snapshots remain valid only for the original unchanged record. Retirement, replacement and factual corrections still require fresh sign-off. Expiry jobs retain qualification identity, expiry, explicit reminder consent, selected lead window and intended owner recipients before execution; the worker consumes those facts and rechecks live qualification and recipient authority in its write. Qualification reminder inputs and outputs remain owner-held; private evidence references are excluded from these job inputs. Automation health includes stored qualification notices for the owner. The existing planning, safety and recovery journeys cited in the rows prove this correction. PLAN-004 remains partial and PM-008 remains done. The historical judged-at pin is a baseline; this update concerns only the named planning and reminder behavior and does not rejudge other rows.",
       "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 543,
+      "cell": "gap",
+      "text": "This proves only operational primary-site work-list completeness at the demonstrated fixture size, not declared or qualified target capacity. Gap: ADMIN-002 operational multi-site authorization; qualification at 10,000 assets, 100,000 parts and one million historical work orders with complete estate-wide search and export performance; the seven-day offline pack containing at least 200 work orders with procedures, asset histories, linked manuals and up to 2 GB of attachments; real-phone airplane-mode proof and the held SMS sender and APNs and FCM delivery dependencies; comprehensive visible storage, connector and notification limits before use and failure handling that preserves all accepted evidence. ADMIN-009 retains its resumable rer-export dependency, and br retains Work-table bulk-selection custody.",
+      "to": "gap",
+      "ids": [
+        "SAFE-003"
+      ]
     }
   ]
 }

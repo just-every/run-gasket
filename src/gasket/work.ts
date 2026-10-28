@@ -1,3 +1,5 @@
+import { pageRows, WORK_EXPORT_LIMIT, type PageSource } from './pagination'
+import { cell } from './audit'
 import { laborView } from './labor'
 import { requestSources } from './request-sources'
 // Clauses 6–8: work orders, assignment and the assigned person's record of the
@@ -450,17 +452,54 @@ export function submitBlockers({ items, findings, downtime, unacknowledged = fal
 }
 
 /** Work lists: everything open, one team's (`team`), or one person's own: assigned to them or collaborating on it (PLAN-002). */
-export async function workList(env: Bindings, actor: Actor, url: URL) {
+export function workSource(actor: Actor, url: URL): PageSource {
   const mine = url.searchParams.get('mine') === '1' || (!can(actor, 'work.assign') && !can(actor, 'work.review') && actor.role !== 'agent')
   const team = url.searchParams.get('team')
   const state = url.searchParams.get('state') ?? 'open'
   const filter = state === 'closed' ? "w.status IN ('closed', 'cancelled')" : "w.status NOT IN ('closed', 'cancelled')"
   const collaborating = 'EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id = w.id AND c.member_id = ? AND c.removed_at IS NULL)'
-  return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.priority, w.status, w.due_date, w.version, w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location, m.name AS assignee, w.assignee_id,
+  return { sql: `SELECT w.closed_at AS closed_sort, w.id, w.number, w.title, w.kind, w.priority, w.status, w.due_date, w.version, w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location, m.name AS assignee, w.assignee_id,
     t.name AS team, w.trade, w.shift, (SELECT label FROM gk_work_statuses WHERE id = w.waiting_status) AS waiting, CASE WHEN w.assignee_id = ? THEN 'assignee' WHEN ${collaborating} THEN 'collaborator' END AS my_part
     FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_teams t ON t.id = w.team_id
-    WHERE ${filter} ${mine ? `AND (w.assignee_id = ? OR ${collaborating})` : ''} ${team ? 'AND w.team_id = ?' : ''} ORDER BY ${state === 'closed' ? 'w.closed_at DESC' : 'w.due_date, w.number'} LIMIT 500`,
-  actor.id, actor.id, ...(mine ? [actor.id, actor.id] : []), ...(team ? [team] : []))
+    WHERE ${filter} ${mine ? `AND (w.assignee_id = ? OR ${collaborating})` : ''} ${team ? 'AND w.team_id = ?' : ''}`,
+    args: [actor.id, actor.id, ...(mine ? [actor.id, actor.id] : []), ...(team ? [team] : [])],
+    order: state === 'closed' ? 'closed_sort DESC, number, id' : 'due_date, number, id', filters: { list: 'work', mine, team, state } }
+}
+
+
+export async function workPageRows(env: Bindings, actor: Actor, url: URL) {
+  const page = await pageRows(env, actor, url, workSource(actor, url))
+  return { ...page, rows: page.rows.map(({ closed_sort, ...row }) => row) }
+}
+
+/** Legacy array callers retain their fields; HTTP adds continuation headers. */
+export async function workList(env: Bindings, actor: Actor, url: URL) {
+  return (await workPageRows(env, actor, url)).rows
+}
+
+/** A CSV is complete or refused before any bytes are served. */
+export async function workCsv(env: Bindings, actor: Actor, url: URL) {
+  const ceiling = url.searchParams.get('exportLimit') ?? String(WORK_EXPORT_LIMIT)
+  insist(/^\d{1,4}$/.test(ceiling) && +ceiling >= 1 && +ceiling <= WORK_EXPORT_LIMIT, 'invalid_export_limit')
+  insist(!url.searchParams.has('cursor'), 'export_requires_start')
+  const selection = new URL(url)
+  selection.searchParams.set('limit', '200')
+  if (url.searchParams.has('snapshot')) selection.searchParams.set('cursor', url.searchParams.get('snapshot')!)
+  let page = await workPageRows(env, actor, selection)
+  insist(page.offset === 0, 'export_requires_start')
+  insist(page.total <= +ceiling, 'work_export_limit_exceeded', 413, { limit: +ceiling, total: page.total, message: 'Narrow the work filters. No partial CSV was returned.' })
+  const rows = [...page.rows], total = page.total
+  const start = page.start
+  while (page.next) {
+    selection.searchParams.set('cursor', page.next)
+    page = await workPageRows(env, actor, selection)
+    rows.push(...page.rows)
+  }
+  selection.searchParams.set('cursor', start)
+  await workPageRows(env, actor, selection)
+  insist(rows.length === total, 'work_snapshot_changed', 409)
+  const fields = ['id', 'number', 'title', 'kind', 'priority', 'status', 'due_date', 'version', 'asset_id', 'asset_tag', 'asset_name', 'asset_location', 'asset_category', 'location', 'assignee', 'assignee_id', 'team', 'trade', 'shift', 'waiting', 'my_part']
+  return [fields, ...rows.map(row => fields.map(field => row[field] ?? ''))].map(row => row.map(cell).join(',')).join('\r\n') + '\r\n'
 }
 
 export async function evidenceFile(env: Bindings, _actor: Actor, id: string) {

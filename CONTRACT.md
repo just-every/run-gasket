@@ -30,97 +30,51 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 ## Shared duties (Base)
 
 | Base duty | Duty | Delta clauses | Base journey |
-
 | --- | --- | --- | --- |
-
 | BASE-ACCESS-001 | Sign-in | GAS-01, ADMIN-014, ADMIN-015 | not run |
-
 | BASE-ACCESS-002 | Sessions | GAS-01, HTTP-001, ADMIN-014, ADMIN-015 | not run |
-
 | BASE-ACCESS-003 | Public endpoints | ASSET-002, REQ-001, REQ-002 | not run |
-
 | BASE-ACCESS-004 | Server-side authorisation | none | not run |
-
 | BASE-INPUT-001 | Validation | GAS-02, GAS-03, GAS-04, GAS-05, GAS-06, GAS-07, GAS-08, GAS-14, GAS-15, GAS-09, GAS-10, GAS-12, ASSET-001, ASSET-002, ASSET-003, ASSET-004, ASSET-005, ASSET-006, ASSET-007, ASSET-008, ASSET-010, ASSET-009, REQ-001, REQ-002, REQ-003, PLAN-001, PLAN-002, PLAN-003, PLAN-004, PLAN-006, PLAN-007, PLAN-009, FIELD-001, FIELD-002, FIELD-003, FIELD-004, FIELD-005, FIELD-006, FIELD-007, FIELD-009, PART-002, PART-003, PART-004, BUY-001, BUY-002, BUY-003, BUY-004, REPORT-001, REPORT-006, REPORT-010, INT-001, MIG-001, MIG-007, SAFE-001, SAFE-002, PLAN-010 | not run |
-
 | BASE-INPUT-002 | HTML | none | not run |
-
 | BASE-INPUT-003 | Uploads | GAS-07, ADMIN-008, ASSET-003, REQ-001, REQ-002, PLAN-006, FIELD-002, FIELD-005, SAFE-001, SAFE-002 | not run |
-
 | BASE-SECRET-001 | No leakage | ADMIN-008, ADMIN-009, ADMIN-014, ADMIN-015 | not run |
-
 | BASE-SECRET-002 | Startup | none | not run |
-
 | BASE-DATA-001 | Export and import | GAS-11, ADMIN-009, MIG-008 | not run |
-
 | BASE-DATA-002 | Retention | ADMIN-007, ADMIN-016 | not run |
-
 | BASE-DATA-003 | Erasure | ADMIN-007, ADMIN-016, PLAN-011 | not run |
-
 | BASE-DATA-004 | Outbound flows | ADMIN-008 | not run |
-
 | BASE-DATA-005 | Independence | HTTP-001 | not run |
-
 | BASE-PUBLIC-001 | Privacy | ASSET-002, REQ-001, REQ-002 | not run |
-
 | BASE-PUBLIC-002 | Origins | none | not run |
-
 | BASE-PUBLIC-003 | Accessibility | ADMIN-011 | not run |
-
 | BASE-OPS-001 | Health | HTTP-001 | not run |
-
 | BASE-OPS-002 | Migrations | none | not run |
-
 | BASE-OPS-003 | Idempotency | ADMIN-010, PLAN-009, PM-001, PM-002, PM-004, PM-006, PM-008, PM-009, PART-005, BUY-006, INT-002 | not run |
-
 | BASE-OPS-004 | Failure is visible | ADMIN-010, PLAN-009, PM-001, PM-002, PM-004, PM-006, PM-008, PM-009, PART-005, BUY-006, INT-002 | not run |
-
 | BASE-OPS-005 | Audit | ADMIN-006 | not run |
-
 | BASE-ROLE-001 | Roles through every door | GAS-01, GAS-02, GAS-03, GAS-04, GAS-05, GAS-06, GAS-07, GAS-08, GAS-14, GAS-15, GAS-09, GAS-10, GAS-12, ADMIN-003, ADMIN-004, ADMIN-005, ADMIN-008, ADMIN-012, ASSET-001, ASSET-002, ASSET-003, ASSET-004, ASSET-005, ASSET-006, ASSET-007, ASSET-008, ASSET-010, ASSET-009, REQ-001, REQ-002, REQ-003, PLAN-001, PLAN-002, PLAN-003, PLAN-004, PLAN-006, PLAN-007, PLAN-009, FIELD-001, FIELD-002, FIELD-003, FIELD-004, FIELD-005, FIELD-006, FIELD-007, FIELD-009, PART-002, PART-003, PART-004, BUY-001, BUY-002, BUY-003, BUY-004, REPORT-001, REPORT-006, REPORT-010, INT-001, MIG-001, MIG-007, SAFE-001, SAFE-002, REQ-008, PLAN-010, PLAN-011 | not run |
-
 | BASE-AUDIT-001 | Searchable, durable audit | ADMIN-006, PLAN-010, PLAN-011 | not run |
-
 | BASE-BACKUP-001 | Independent backup, restore and rollback | ADMIN-009, ADMIN-010 | not run |
-
 | BASE-DATA-006 | Erasure respects retention and legal hold | ADMIN-007, ADMIN-016, PLAN-011 | not run |
-
 | BASE-SIGNIN-001 | Standards-based SSO and lifecycle | GAS-01, ADMIN-005 | not run |
-
 | BASE-SIGNIN-002 | Native multi-factor authentication | ADMIN-005 | not run |
-
 | BASE-INSTALL-001 | Free self-host and removal | HTTP-001 | not run |
-
 | BASE-MAIL-001 | Truthful mail outcomes | ADMIN-014, ADMIN-015, PM-005, BUY-002, BUY-006, REPORT-006, INT-004 | not run |
-
 | BASE-ACCESSIBILITY-001 | One accessibility bar | ADMIN-011 | not run |
-
 | BASE-DOCS-001 | On-site docs from one contract | none | not run |
-
 | BASE-AGENT-001 | One MCP door per seed | SURFACE-007 | not run |
-
 | BASE-AGENT-002 | The seed's jobs are tools, through the UI's own actions | GAS-13, SURFACE-001, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-003 | Records are resources | SURFACE-002, SURFACE-005 | not run |
-
 | BASE-AGENT-004 | Business identity and short-lived, audience-bound tokens | SURFACE-007 | not run |
-
 | BASE-AGENT-005 | An agent acts as a person in a role, never more | GAS-13, SURFACE-004, SURFACE-006, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-006 | Every action declares its risk class | GAS-13, SURFACE-001, SURFACE-002, SURFACE-003, SURFACE-004, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-007 | The company's policy decides, at one chokepoint | GAS-13, SURFACE-002, SURFACE-003, SURFACE-004, SURFACE-007, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-008 | Truthful attribution | GAS-13, SURFACE-003, SURFACE-006, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-009 | Every agent action is audited with its class and decision | GAS-13, ADMIN-006, SURFACE-007, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-010 | Agents can follow changes | SURFACE-005 | not run |
-
 | BASE-AGENT-011 | Limits are policy, and Pause stops everything | GAS-13, SURFACE-004, SURFACE-007, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-012 | Writes are idempotent and conflict-safe | GAS-13, SURFACE-006, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006, AGENT-007, AGENT-008, AGENT-009 | not run |
-
 | BASE-AGENT-013 | Manifest, docs and the conformance journey | SURFACE-001, SURFACE-005, SURFACE-007 | not run |
 
 ## Published clauses
@@ -1883,8 +1837,8 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 4 | 0 | 16 |
-| Target and push further | 38 | 51 | 46 | 135 |
-| All | 50 | 55 | 46 | 151 |
+| Target and push further | 38 | 52 | 45 | 135 |
+| All | 50 | 56 | 45 | 151 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -2022,7 +1976,7 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | `MIG-008` | Reconciled cutover and a complete exit | target | partial | `src/gasket/movein/maintainx.ts`; `src/gasket/history.ts` | Register preview and history CSV exist; no all-entity reconciliation, shadow/delta cutover, activation controls or complete neutral exit pack. |
 | `SAFE-001` | Hazard, isolation and permit evidence | target | done | `tests/gasket/safety.mjs` — "safetyJourney" |  |
 | `SAFE-002` | Compliance templates and calibration evidence | target | done | `tests/gasket/safety.mjs` — "safetyJourney" |  |
-| `SAFE-003` | Capacity, ownership and honest service state | target | missing |  | No declared/verified target capacity or limit-aware complete exports; work lists currently cap returned rows. |
+| `SAFE-003` | Capacity, ownership and honest service state | target | partial | `tests/gasket/work-pagination.mjs` — workPaginationJourney, registered in `tests/gasket/flows.mjs`: imports 1,205 same-day open work orders through public preview and resumable apply, closes a separate cohort through independent review, traverses authorized web and JSON pages exactly once, reconciles legacy arrays, versioned API fields and complete bounded CSV, tests tied sort keys, altered and foreign cursors, changed snapshots, configured export-limit refusal, signed-out and revoked access, forbidden records and planned-site refusal, and preserves accepted records and original attachment digests. Browser navigation assertions run at 1440; proof captures Today, All open, Closed and Done today at 1440 and 390. `API.md` documents current paging, snapshot and CSV limits. | This proves only operational primary-site work-list completeness at the demonstrated fixture size, not declared or qualified target capacity. Gap: ADMIN-002 operational multi-site authorization; qualification at 10,000 assets, 100,000 parts and one million historical work orders with complete estate-wide search and export performance; the seven-day offline pack containing at least 200 work orders with procedures, asset histories, linked manuals and up to 2 GB of attachments; real-phone airplane-mode proof and the held SMS sender and APNs and FCM delivery dependencies; comprehensive visible storage, connector and notification limits before use and failure handling that preserves all accepted evidence. ADMIN-009 retains its resumable rer-export dependency, and br retains Work-table bulk-selection custody. |
 | `SURFACE-001` | Maintenance registry and Core jobs | target | missing |  | No MCP maintenance registry, company-policy classifier or conformance journey implements this surface. |
 | `SURFACE-002` | Internal changes and outside maintenance exposure | target | missing |  | No MCP maintenance registry, company-policy classifier or conformance journey implements this surface. |
 | `SURFACE-003` | Maintenance money and relied-on decisions | target | missing |  | No MCP maintenance registry, company-policy classifier or conformance journey implements this surface. |

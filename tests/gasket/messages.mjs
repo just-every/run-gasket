@@ -116,6 +116,31 @@ export async function messagesJourney() {
     const csv=await (await h.raw('/app/audit.csv',{cookie:owner})).text()
     assert.ok(csv.includes('message.send') && !csv.includes('Pump isolated.') && !csv.includes('Inspection complete.'))
     assert.deepEqual(await h.api(`conversations/${id}`,cookies.tech),protectedSnapshot,'all refused doors leave the conversation unchanged')
+
+    // Promotion changes the account role, retaining the participant's member identity and role.
+    const leadSession=await (await h.raw('/auth/session',{cookie:cookies.lead})).json()
+    assert.equal((await h.raw('/auth/operator/role',{cookie:owner,body:{operatorId:leadSession.operator.id,role:'owner'}})).status,200)
+    cookies.lead=await h.signIn(address('synthetic-gasket-lead'))
+    assert.equal((await h.api('members',owner)).find(person=>person.id===people.lead).role,'lead')
+    const promoted=await h.api('me',cookies.lead)
+    assert.deepEqual([promoted.id,promoted.role],[people.lead,'owner'])
+    assert.ok((await h.api('message-people',cookies.tech)).some(person=>person.id===people.lead),'a promoted participant remains available to peers')
+    assert.ok((await h.api('message-people',cookies.lead)).some(person=>person.id===people.tech))
+    assert.ok((await h.api('conversations',cookies.lead)).some(row=>row.id===id))
+    assert.equal((await h.api('conversation.start',cookies.lead,{member:people.tech})).id,id)
+    assert.equal((await h.api('conversation.start',cookies.tech,{member:people.lead})).id,id)
+    const promotedMessage=await h.api('message.send',cookies.lead,send(id,'synthetic-gasket-promoted: Ready for inspection.'))
+    assert.equal(promotedMessage.message.author_id,people.lead)
+    const peerMessage=await h.api('message.send',cookies.tech,send(id,'synthetic-gasket-peer: Inspection acknowledged.'))
+    const afterPromotion=await h.api(`conversations/${id}`,cookies.lead)
+    assert.deepEqual(afterPromotion.messages.slice(-2).map(message=>message.id),[promotedMessage.message.id,peerMessage.message.id])
+    assert.equal(afterPromotion.canSend,true)
+    await h.api('conversation.read',cookies.lead,{conversation:id,through:peerMessage.message.seq})
+    assert.equal((await h.api(`conversations/${id}`,cookies.lead)).unread,0)
+    for(const path of ['/app/messages',`/app/messages/${id}`])assert.equal((await h.raw(path,{cookie:cookies.lead})).status,200)
+    const forbidden=(await h.api('conversation.start',cookies.tech,{member:people.other})).id
+    await assertNoContent(await h.raw(`/api/gasket/conversations/${forbidden}`,{cookie:cookies.lead}))
+    await assertNoContent(await h.raw(`/app/messages/${forbidden}`,{cookie:cookies.lead}))
     await messagesBrowser(h,cookies,id)
 
     // A process restart retains original messages, timestamps and each read marker.
@@ -127,6 +152,8 @@ export async function messagesJourney() {
     const ownerAgain=await h.signIn(vars.OWNER_EMAIL)
     assert.deepEqual(await h.api(`conversations/${id}`,cookies.lead),beforeRestart)
     assert.deepEqual((await h.api('message.send',cookies.tech,first)).message,accepted.message,'replay remains stable after restart')
+    assert.equal((await h.raw('/auth/operator/role',{cookie:ownerAgain,body:{operatorId:leadSession.operator.id,role:'member'}})).status,200)
+    cookies.lead=await h.signIn(address('synthetic-gasket-lead'))
     // A current role change, sign-out and explicit revocation fence old sessions.
     await h.api('access.role',ownerAgain,{member:people.tech,role:'agent'})
     await assertNoContent(await h.raw(`/api/gasket/conversations/${id}`,{cookie:cookies.tech}))
