@@ -1,6 +1,8 @@
 // Restore imports inert domain data. Source automation is unchanged by export.
 // Direct conversations, original messages and personal read markers restore as retained data;
 // no message delivery or notification automation is activated by restore.
+// Controlled print snapshots, paper originals and durable receipts restore as retained data.
+// Fresh human sessions and current assignment remain mandatory for every paper door.
 // Owners must rotate the webhook signing key and explicitly resume each rule.
 export default {
   includeTables: ['oa_operators', 'oa_bootstrap', 'oa_external_identities', 'oa_invitation_cancellations', 'oa_auth_settings', 'oa_auth_audit', 'oa_domain_rules', 'oa_logout_events', 'oc_owner_claims', 'oc_idp_grants'],
