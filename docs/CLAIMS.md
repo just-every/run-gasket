@@ -1,5 +1,5 @@
 <!-- Generated from CONTRACT.md by contract-docs. Edit CONTRACT.md, then regenerate. -->
 
-# Gasket homepage claims
+# Gasket product homepage claims
 
 No homepage claims are mapped yet.
