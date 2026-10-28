@@ -191,6 +191,7 @@ export async function recoveryJourney() {
       const later = join(h.installation.root, 'exports', 'after-erasure.rer')
       await h.installation.rer('export', '--output', later)
       const afterBytes = await readFile(later)
+      assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-erased-retry-value')), 'later archives exclude erased API result copies')
       for (const text of ['synthetic-gasket-erased-person','synthetic-gasket-erased@example.test','synthetic-gasket-erased-work','synthetic-gasket-erased-description','synthetic-gasket-erased-original.png','synthetic-gasket-erased-second.png','synthetic-gasket-erased-comment']) assert.ok(!afterBytes.includes(Buffer.from(text)),`archive removes ${text}`)
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-fault')), 'anonymous archive contains no erased fault')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-photo.png')), 'work attachment filename is absent from the later archive')

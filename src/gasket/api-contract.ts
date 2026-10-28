@@ -1,6 +1,6 @@
 // Versioned public API adapters retain the existing action and record guards.
 import type { Bindings } from '../auth.server'
-import { requireCapability, type Actor, type Capability } from './actor'
+import { can, requireCapability, type Actor, type Capability } from './actor'
 import { all, GasketError, insist, now, one, sha256Hex, stmt } from './core'
 import { Input } from './input'
 import { searchEstate } from './search'
@@ -14,9 +14,11 @@ import { didWork } from './review'
 import { DOCUMENT_BYTES } from './documents'
 import { EVIDENCE_BYTES } from './work'
 import { exceptionAuthority } from './exceptions'
+import { purchaseOrderDetail } from './purchase-orders'
+import { approvalRoute } from './purchase-authority'
 
 const JSON_TYPE = ['application', 'json'].join('/')
-const RETRYABLE: Record<string, Capability> = {
+const RETRYABLE: Record<string, Capability | null> = {
   'asset.create': 'register.manage', 'asset.update': 'register.manage',
   'asset.move': 'register.manage', 'asset.lifecycle': 'register.manage', 'asset.agreement': 'register.manage',
   'asset.contact': 'register.manage', 'asset.sighting': 'register.manage', 'asset.state': 'register.manage', 'asset.retire': 'register.manage',
@@ -46,6 +48,24 @@ const RETRYABLE: Record<string, Capability> = {
   'supplier.save': 'site.manage', 'supplier.catalog': 'site.manage', 'costcenter.save': 'site.manage', 'requisition.request': 'work.do',
   'schedule.skip': 'work.assign', 'schedule.defer': 'work.assign', 'schedule.exception': 'work.review', 'schedule.edit': 'register.manage',
   'labor.entry': 'work.do', 'labor.timer': 'work.do', 'labor.rate': 'site.manage', 'labor.review': 'site.manage', 'labor.invoice': 'site.manage',
+  'team.create': 'work.assign', 'team.member': 'work.assign', 'workorder.collaborate': 'work.assign',
+  'workorder.acknowledge': 'work.do', 'workorder.decline': 'work.do', 'workorder.respond': 'work.do',
+  'workorder.plan': 'work.assign', 'workorder.priority': 'work.assign', 'workorder.merge': 'work.assign',
+  'workorders.bulk': 'work.assign', 'workorders.fromTemplate': 'work.assign', 'template.retire': 'work.assign',
+  'workfield.save': 'work.assign', 'workfield.retire': 'work.assign', 'workstatus.save': 'work.assign',
+  'route.create': 'register.manage', 'route.issue': 'work.assign', 'route.sign': 'work.review',
+  'rule.set': 'register.manage', 'chase.rule': 'register.manage', 'step.except': 'work.review',
+  'workorder.field': null, 'workorder.waiting': null, 'route.miss': null,
+  'blocker.raise': null, 'blocker.resolve': null,
+  'count.plan': 'register.manage', 'count.submit': null, 'count.decide': 'register.manage',
+  'site.countApproval': 'site.manage', 'part.quarantine.dispose': 'site.manage',
+  'code.set': 'register.manage', 'code.move': 'register.manage', 'code.retire': 'register.manage',
+  'downtime.classify': 'register.manage', 'production.hours.add': 'register.manage', 'production.hours.remove': 'register.manage',
+  'work.cost': 'work.assign', 'loss.rate': 'register.manage',
+  'work.cost_comparison': 'site.manage', 'work.cost_center': 'site.manage',
+  'quote.save': 'site.manage', 'purchase.save': 'site.manage', 'purchase.approve': 'work.review',
+  'purchase.send': 'site.manage', 'purchase.acknowledge': 'site.manage',
+  'receipt.receive': 'register.manage', 'receipt.inspect': 'register.manage',
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -53,7 +73,7 @@ async function body(request: Request, action: string) {
   insist(request.headers.get('content-type')?.startsWith(JSON_TYPE), 'idempotency_requires_json', 415)
   // Base64 originals plus bounded metadata; each handler still enforces its
   // decoded file limit. Only fingerprints and small results enter receipts.
-  const fileBytes = action === 'document.add' || action === 'document.revise' || action === 'safety.attest' ? DOCUMENT_BYTES : action === 'workorder.evidence' || action === 'part.photo' ? EVIDENCE_BYTES : action === 'comment.post' ? EVIDENCE_BYTES * 4 : action === 'workorder.sign' ? 200_000 : 0
+  const fileBytes = action === 'document.add' || action === 'document.revise' || action === 'safety.attest' ? DOCUMENT_BYTES : action === 'workorder.evidence' || action === 'part.photo' || action === 'receipt.receive' ? EVIDENCE_BYTES : action === 'comment.post' ? EVIDENCE_BYTES * 4 : action === 'quote.save' || action === 'purchase.save' ? EVIDENCE_BYTES * 5 : action === 'workorder.sign' ? 200_000 : 0
   const limit = fileBytes ? Math.ceil(fileBytes / 3) * 4 + 64_000 : 64_000
   const reader = request.body?.getReader(), chunks: Uint8Array[] = []
   let size = 0
@@ -78,8 +98,8 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   const bytes = await body(request, action)
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
   const capability = action === 'workorder.sign' && input.text('role', { max: 12 }) === 'supervisor' ? 'work.review' : RETRYABLE[action]
-  requireCapability(actor, capability)
-  if ((action === 'planning.slot' || action === 'schedule.edit') && input.flag('preview')) throw new GasketError('idempotency_preview_not_supported', 400)
+  if (capability) requireCapability(actor, capability)
+  if (['planning.slot', 'schedule.edit', 'workorders.bulk', 'workorders.fromTemplate'].includes(action) && input.flag('preview')) throw new GasketError('idempotency_preview_not_supported', 400)
   if (action === 'schedule.exception') await exceptionAuthority(env, actor, input)
   if (action === 'labor.entry') insist(actor.role === 'owner' || (input.text('person', { optional: true }) || actor.id) === actor.id, 'forbidden', 403)
   if (action === 'labor.entry' || action === 'labor.timer' || action === 'labor.invoice') await workOrder(env, input.text('workOrder', { max: 100 }))
@@ -97,15 +117,54 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
     insist(Boolean(work) !== Boolean(asset), 'invalid_subject')
     insist(await one(env, `SELECT 1 FROM ${work ? 'gk_work_orders' : 'gk_assets'} WHERE id=?`, work || asset), work ? 'work_order_not_found' : 'asset_not_found', 404)
   }
+  if (['workorder.field', 'workorder.waiting', 'route.miss', 'blocker.raise'].includes(action)) {
+    const order = await workOrder(env, input.text('workOrder', { max: 100 }))
+    const planner = can(actor, 'work.assign'), reviewer = action === 'workorder.waiting' && can(actor, 'work.review')
+    insist(planner || reviewer || (can(actor, 'work.do') && (order.assignee_id === actor.id || (action !== 'route.miss' && action !== 'blocker.raise' && await isCollaborator(env, order.id, actor.id)))), action === 'route.miss' ? 'forbidden' : 'not_your_work', 403)
+    if (action === 'workorder.waiting') {
+      const target = input.text('status', { optional: true, max: 100 })
+      for (const id of new Set([order.waiting_status, target].filter(Boolean))) {
+        const status = await one(env, 'SELECT roles FROM gk_work_statuses WHERE id=?', id)
+        insist(status, 'status_not_found', 404)
+        insist(actor.role === 'owner' || JSON.parse(status.roles).includes(actor.role), 'status_not_permitted', 403)
+      }
+    }
+  }
+  if (action === 'blocker.resolve') {
+    const blocker = await one(env, 'SELECT b.owner_id,w.assignee_id FROM gk_blockers b JOIN gk_work_orders w ON w.id=b.work_order_id WHERE b.id=?', input.text('blocker', { max: 100 }))
+    insist(blocker, 'blocker_not_found', 404)
+    insist([blocker.owner_id, blocker.assignee_id].includes(actor.id) || can(actor, 'work.assign'), 'forbidden', 403)
+  }
+  if (action === 'count.submit' || action === 'count.decide') {
+    const count = action === 'count.submit'
+      ? await one(env, 'SELECT counter_id FROM gk_counts WHERE id=?', input.text('count', { max: 100 }))
+      : await one(env, 'SELECT c.counter_id FROM gk_counts c JOIN gk_count_lines l ON l.count_id=c.id WHERE l.id=?', input.text('line', { max: 100 }))
+    insist(count, action === 'count.submit' ? 'count_not_found' : 'count_line_not_found', 404)
+    insist(action === 'count.submit' ? count.counter_id === actor.id : count.counter_id !== actor.id, action === 'count.submit' ? 'not_the_counter' : 'independent_approval_required', 403)
+  }
+  if (action === 'purchase.approve') {
+    const order = await purchaseOrderDetail(env, actor, input.text('order'))
+    insist(order.created_by !== actor.id && order.current.created_by !== actor.id, 'independent_approval_required', 403)
+    const route = await approvalRoute(env, actor, order)
+    if (!route.legacy) {
+      const step = input.text('step', { optional: true })
+      insist(route.required.some(row => (!step || row.id === step) && row.effectiveId === actor.id && row.eligible), 'approval_authority_changed', 403)
+    }
+  }
   // Receipt access must not outlive the record authority that made it.
   // State and version checks stay in the handler for new effects; a completed
   // receipt remains replayable after its own successful state transition.
-  if ((action.startsWith('workorder.') && action !== 'workorder.create') || action === 'document.link' || action === 'finding.record' || action.startsWith('downtime.')) {
+  if ((action.startsWith('workorder.') && action !== 'workorder.create') || action === 'document.link' || action === 'finding.record' || action === 'downtime.start' || action === 'downtime.end' || action === 'step.except') {
     const order = await workOrder(env, input.text('workOrder', { max: 100 }))
     if (capability === 'work.do') {
-      insist(order.assignee_id === actor.id || (action !== 'workorder.submit' && await isCollaborator(env, order.id, actor.id)), 'not_your_work', 403)
+      const assigneeOnly = ['workorder.submit', 'workorder.acknowledge', 'workorder.respond', 'workorder.decline'].includes(action)
+      // Declining releases the assignment itself. Its receipt is still available
+      // while that attributable handoff remains the latest assignment decision.
+      const declined = action === 'workorder.decline' && !order.assignee_id && await one(env, 'SELECT 1 FROM gk_handoffs WHERE work_order_id=? AND from_id=? AND to_id IS NULL AND by_id=? AND rowid=(SELECT MAX(rowid) FROM gk_handoffs WHERE work_order_id=?)', order.id, actor.id, actor.id, order.id)
+      insist(order.assignee_id === actor.id || declined || (!assigneeOnly && await isCollaborator(env, order.id, actor.id)), 'not_your_work', 403)
     }
-    if (action === 'workorder.review' || (action === 'workorder.sign' && capability === 'work.review')) insist(order.assignee_id !== actor.id && !await didWork(env, order.id, actor.id), 'own_work', 403)
+    if (action === 'workorder.review' || action === 'step.except' || (action === 'workorder.sign' && capability === 'work.review')) insist(order.assignee_id !== actor.id && !await didWork(env, order.id, actor.id), 'own_work', 403)
+    if (action === 'workorder.merge') await workOrder(env, input.text('into', { max: 100 }))
   }
   const principal = actor.service ? `${actor.id}:${actor.service.id}` : actor.id
   const keyHash = await sha256Hex(key), fingerprint = await sha256Hex(bytes)
@@ -126,7 +185,10 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
     const result = await run(input)
     const encoded = JSON.stringify(result)
     insist(encoded.length <= 64_000, 'idempotency_result_too_large', 500)
-    await stmt(env, "UPDATE gk_api_writes SET state='completed',result_json=? WHERE actor_id=? AND key_hash=?", encoded, principal, keyHash).run()
+    // An erasure can finish while a response is being retained. Its opaque
+    // journal marker also fences late result storage, without releasing the key.
+    const kept = await stmt(env, "UPDATE gk_api_writes SET state='completed',result_json=? WHERE actor_id=? AND key_hash=? AND state='pending' AND NOT EXISTS(SELECT 1 FROM gk_record_erasure_results e WHERE (e.kind='work' AND instr(?,e.record_id)>0) OR (e.kind='user' AND (e.record_id=? OR substr(?,1,length(e.record_id)+1)=e.record_id||':')))", encoded, principal, keyHash, encoded, principal, principal).run()
+    insist(kept.meta.changes, 'idempotency_result_erased', 409)
     return { result, replayed: false }
   } catch (error) {
     await stmt(env, "UPDATE gk_api_writes SET state='failed' WHERE actor_id=? AND key_hash=?", principal, keyHash).run()

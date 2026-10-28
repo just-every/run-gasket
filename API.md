@@ -595,7 +595,7 @@ For example, send `GET /api/gasket/v1/assets?limit=50`, then `GET /api/gasket/v1
 
 ## Write retry receipts
 
-For the following eighty-three actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and all stored successful results are limited to 64,000 bytes. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Catalog photos also allow 2,064,000 bytes of JSON and retain the 1,500,000-byte decoded photo limit. Comment posts allow 8,064,000 bytes of JSON with at most four photos, each at most 1,500,000 decoded bytes. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
+For the following 131 actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and all stored successful results are limited to 64,000 bytes. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Catalog photos also allow 2,064,000 bytes of JSON and retain the 1,500,000-byte decoded photo limit. Comment posts allow 8,064,000 bytes of JSON with at most four photos, each at most 1,500,000 decoded bytes. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
 
 The receipt allowlist includes the planning, safety, schedule and labor operations listed below, together with `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` `document.link`, `asset.move`, `asset.lifecycle`, `asset.agreement`, `asset.contact`, `asset.sighting`, `asset.state`, `asset.retire`, `meter.feed`, `meter.adjust` `meter.window`, `part.price`, `part.substitute`, `kit.create`, `bom.revise`, `workorder.reserve` `reservation.release`, `part.photo`, `comment.post` and `comment.edit`.
 
@@ -605,7 +605,64 @@ A durable claim is stored before execution. An overlapping request, or a claim i
 
 Example: POST `/api/gasket/v1/asset.create` with the JSON content type, the installation's `Origin`, a member session cookie and `Idempotency-Key: synthetic-gasket-1`. Body: `{"tag":"00042","name":"Pump","location":"Workshop"}`. If the response is lost, repeat those exact bytes with the same key. Read the returned id using the asset detail door and inspect its history or the register page. Errors use the existing `{error,detail?}` contract: 400 invalid input, 401 absent session, 403 forbidden access, 404 absent record or route, 409 conflict, 413 oversized keyed body and 415 unsupported keyed media type.
 
-INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the eighty-three listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the 131 listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+
+### Crew, work control and purchasing retries
+
+The following actions also accept the same durable JSON key: `team.create`,
+`team.member`, `workorder.collaborate`, `workorder.acknowledge`,
+`workorder.decline`, `workorder.respond`, `workorder.plan`,
+`workorder.priority`, `workorder.merge`, `workorders.bulk`,
+`workorders.fromTemplate`, `template.retire`, `workfield.save`,
+`workfield.retire`, `workstatus.save`, `workorder.field`,
+`workorder.waiting`, `route.create`, `route.issue`, `route.sign`, `route.miss`,
+`rule.set`, `chase.rule`, `step.except`, `blocker.raise`, `blocker.resolve`,
+`count.plan`, `count.submit`, `count.decide`, `site.countApproval`,
+`part.quarantine.dispose`, `code.set`, `code.move`, `code.retire`,
+`downtime.classify`, `production.hours.add`, `production.hours.remove`,
+`work.cost`, `loss.rate`, `work.cost_comparison`, `work.cost_center`,
+`quote.save`, `purchase.save`, `purchase.approve`, `purchase.send`,
+`purchase.acknowledge`, `receipt.receive` and `receipt.inspect`.
+Their request fields and examples are in `openapi.json`.
+
+Acknowledgement and reminder responses require the current assignee. Decline
+releases the assignment itself; its receipt remains available only while its
+attributed release is the latest assignment decision and the work remains
+unassigned. A later handoff refuses the former assignee's replay. Collaborators
+retain their ordinary execution boundary. Waiting statuses recheck the current
+and requested status's permitted roles. Resolving a blocker still requires its
+owner, the current assignee or planning authority. Step exceptions and stock
+variance decisions retain their independent-decision rules. Purchase approval
+rechecks independence and the current applicable delegation. No retry grants a
+service credential any of these rights.
+
+Bulk previews and template previews do not take write keys. An applied bulk
+request retains each row's outcome, including refusals. Retrying it never
+repeats rows that succeeded. A pending or failed claim still requires manual
+reconciliation before a new key is chosen. A purchase-send receipt preserves
+the first provider outcome; it never converts an uncertain send into another
+provider request.
+
+Quote and purchase writes permit up to 10,064,000 JSON bytes, with at most five
+new attachments of at most 1,500,000 decoded bytes each. Receiving permits
+2,064,000 JSON bytes and a packing slip of at most 1,500,000 decoded bytes.
+Every handler continues to enforce its file type, quantity, precision and
+business limits. Purchase-original downloads keep their existing authenticated
+workspace door.
+
+### Erasure of retained retry results
+
+Owner-confirmed eligible work and user erasure includes copied API response
+results. The erasure preview discloses the number of results to redact. Holds,
+retention minima and retained evidence continue to refuse erasure. Apply
+rechecks the preview and atomically clears eligible copied results while
+retaining opaque principals, action, role, hashes and a failed claim. An old key
+returns `idempotency_failed` or a current record-access refusal; it cannot
+recreate the erased record or return an erased field value. Late result storage
+also checks the erasure journal. Later archives exclude the cleared result
+bytes, and the existing later-journal fence refuses an incompatible older
+archive before publication. This does not expand eligibility for records with
+other retained dependencies or erase earlier recipient downloads.
 
 ## Scoped owner service credentials
 
@@ -650,7 +707,7 @@ another revision, handoff, result log, movement, submission or review.
 
 Procedure, assignment and execution schemas describe this tested native slice.
 Other maintenance entities, broader write-key coverage
-and the remaining credential custody, retention and erasure riders remain unfinished; the eighty-three-action
+and the remaining credential custody, retention and erasure riders remain unfinished; the 131-action
 receipt allowlist refuses every other keyed action explicitly.
 
 A template saved through JSON retains `requiredFields` in its current revision and

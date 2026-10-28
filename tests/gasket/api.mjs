@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
 import { harness, file, exerciseKeyedActions, assertDocumented as documented } from './harness.mjs'
 import { png } from './fixtures.mjs'
+import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 
 export async function apiJourney() {
   const h = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
@@ -682,6 +683,66 @@ export async function apiJourney() {
     await h.api('labor.timer', lead, { ...example('labor.timer'), workOrder: laborWork })
     assert.equal((await h.api(`v1/work/${laborWork}`, lead)).labor.timer.state, 'running')
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, laborWork, part, issued.id, [[`work/${laborWork}`, 'Synthetic API reviewed labor']], 'labor-')
+    // A maintenance lead can plan a crew handoff entirely from the documented API.
+    const team = await repeat('team.create', { ...example('team.create'), member: [member] }, 'synthetic-gasket-crew-team', lead)
+    const ownerId = (await h.api('me', owner)).id
+    await repeat('team.member', { ...example('team.member'), team: team.id, member: ownerId }, 'synthetic-gasket-crew-member', lead)
+    const crewTemplate = await repeat('template.save', { name: 'Synthetic crew repair', title: 'Synthetic crew maintenance', instructions: 'Keep the handoff accountable' }, 'synthetic-gasket-crew-template', lead)
+    const batchBody = { ...example('workorders.fromTemplate'), template: crewTemplate.id, asset: [asset], assignee: member }
+    await write('workorders.fromTemplate', { ...batchBody, preview: true }, 'synthetic-gasket-crew-preview', lead, 400)
+    const batch = await repeat('workorders.fromTemplate', batchBody, 'synthetic-gasket-crew-work', lead)
+    const crewWork = batch.rows[0].id
+    assert.equal(batch.rows[0].outcome, 'created')
+    await repeat('workorder.assign', { workOrder: crewWork, assignee: member, team: team.id, shift: 'Day' }, 'synthetic-gasket-crew-assign', lead)
+    const acknowledge = { ...example('workorder.acknowledge'), workOrder: crewWork }
+    await write('workorder.acknowledge', acknowledge, 'synthetic-gasket-crew-wrong-person', owner, 403)
+    await repeat('workorder.acknowledge', acknowledge, 'synthetic-gasket-crew-acknowledge', lead)
+    await repeat('workorder.collaborate', { ...example('workorder.collaborate'), workOrder: crewWork, member: ownerId }, 'synthetic-gasket-crew-collaborate', lead)
+    await repeat('workorder.respond', { ...example('workorder.respond'), workOrder: crewWork }, 'synthetic-gasket-crew-response', lead)
+    await repeat('workorder.priority', { ...example('workorder.priority'), workOrder: crewWork }, 'synthetic-gasket-crew-priority', lead)
+    let crewState = await h.api(`v1/work/${crewWork}`, owner)
+    documented('Crew', crewState.crew)
+    assert.equal(crewState.crew.team.name, example('team.create').name)
+    assert.equal(crewState.crew.collaborators.length, 1)
+    assert.equal(crewState.crew.answers.length, 1)
+    assert.equal(crewState.chase.responses.length, 1)
+    assert.equal(crewState.priority, 'high')
+    const decline = { ...example('workorder.decline'), workOrder: crewWork }
+    await repeat('workorder.decline', decline, 'synthetic-gasket-crew-decline', lead)
+    crewState = await h.api(`v1/work/${crewWork}`, owner)
+    assert.equal(crewState.assignee_id, null)
+    assert.equal(crewState.chase.blockers.length, 1)
+    assert.deepEqual(crewState.crew.answers.map(row => row.answer), ['acknowledged', 'declined'])
+    await repeat('workorder.assign', { workOrder: crewWork, assignee: ownerId, team: team.id, shift: 'Night', note: 'Replacement parts secured' }, 'synthetic-gasket-crew-handoff', lead)
+    const afterHandoff = await h.api(`v1/work/${crewWork}`, owner)
+    await write('workorder.decline', decline, 'synthetic-gasket-crew-decline', lead, 403)
+    await write('workorder.acknowledge', acknowledge, 'synthetic-gasket-crew-acknowledge', lead, 403)
+    assert.deepEqual(await h.api(`v1/work/${crewWork}`, owner), afterHandoff, 'former assignee retries change no crew or evidence')
+    assert.equal(afterHandoff.crew.shift, 'Night')
+    assert.equal(afterHandoff.crew.handoffs.at(-1).note, 'Replacement parts secured')
+    const reschedule = { ...example('workorders.bulk'), workOrder: [crewWork], version: [String(afterHandoff.version)] }
+    const rescheduled = await repeat('workorders.bulk', reschedule, 'synthetic-gasket-crew-bulk', lead)
+    assert.deepEqual(rescheduled.rows.map(row => row.outcome), ['changed'])
+    assert.equal((await h.api(`v1/work/${crewWork}`, owner)).due_date, reschedule.due)
+    const duplicate = (await h.api('v1/workorder.create', lead, { asset, title: 'Synthetic duplicate crew fault', due: reschedule.due })).id
+    await repeat('workorder.merge', { ...example('workorder.merge'), workOrder: duplicate, into: crewWork }, 'synthetic-gasket-crew-merge', lead)
+    assert.equal((await h.api(`v1/work/${duplicate}`, owner)).merged_into, crewWork)
+    await repeat('template.retire', { template: crewTemplate.id }, 'synthetic-gasket-crew-template-retire', lead)
+    await h.api('v1/workorder.create', lead, { asset, template: crewTemplate.id, due: reschedule.due }, 409)
+    for (const row of await h.api('v1/teams', owner)) documented('Team', row)
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, crewWork, part, issued.id, [[`work/${crewWork}`, 'Synthetic crew maintenance']], 'crew-')
+    // Eligible erasure has its own installation: the main journey deliberately
+    // retains standing-rule evidence, which correctly prevents that work's erasure.
+    const erasure = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
+    try {
+      const erasureOwner = await erasure.owner()
+      await erasure.api('site.configure', erasureOwner, { name: 'Synthetic retry erasure estate', timezone: 'UTC' })
+      const erasureAsset = (await erasure.api('asset.create', erasureOwner, { ...assetBody, tag: 'synthetic-gasket-erasure-asset' })).id
+      const erasedRetry = await erasureFixture(erasure, erasureOwner, erasureAsset)
+      if (process.env.API_SCREENSHOTS) await browserProof(erasure, erasureOwner, erasureAsset, erasedRetry.work, part, issued.id, [[`settings/erasure?kind=work&id=${erasedRetry.work}`, 'API retry results to redact: 2. Hashed retry claims remain to prevent repeated effects.']], 'retry-preview-')
+      await eraseFixture(erasure, erasureOwner, erasedRetry)
+      if (process.env.API_SCREENSHOTS) await browserProof(erasure, erasureOwner, erasureAsset, erasedRetry.work, part, issued.id, [[`settings/erasure?kind=work&id=${erasedRetry.work}`, 'API retry results redacted: 2. Hashed retry claims remain to prevent repeated effects.']], 'retry-erased-')
+    } finally { await erasure.close() }
     // A sole-owner decision receipt stops being available when independent review becomes possible.
     const sole = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
     try {

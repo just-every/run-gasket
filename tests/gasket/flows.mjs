@@ -26,7 +26,7 @@ import { join } from 'node:path'
 import { crc32 } from 'node:zlib'
 import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
 import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, workCsv } from './fixtures.mjs'
-import { file, harness } from './harness.mjs'
+import { file, harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney, connectorJourney } from './automation.mjs'
 import { replenishmentJourney } from './replenishment.mjs'
@@ -107,6 +107,7 @@ try {
       assert.match(response.headers.get('location'), /^\/signin/)
     }
     cookie.owner = await h.owner()
+    exerciseKeyedActions(h, cookie.owner, ['team.create', 'team.member', 'workorder.collaborate', 'workorder.acknowledge', 'workorder.decline', 'workorder.respond', 'workorder.plan', 'workorder.priority', 'workorder.merge', 'workorders.bulk', 'workorders.fromTemplate', 'template.retire', 'workfield.save', 'workfield.retire', 'workstatus.save', 'route.create', 'route.issue', 'route.sign', 'rule.set', 'chase.rule', 'step.except', 'workorder.field', 'workorder.waiting', 'route.miss', 'blocker.raise', 'blocker.resolve', 'count.plan', 'count.submit', 'count.decide', 'site.countApproval', 'part.quarantine.dispose', 'code.set', 'code.move', 'code.retire', 'downtime.classify', 'production.hours.add', 'production.hours.remove', 'work.cost', 'loss.rate', 'work.cost_comparison', 'work.cost_center', 'quote.save', 'purchase.save', 'purchase.approve', 'purchase.send', 'purchase.acknowledge', 'receipt.receive', 'receipt.inspect'])
     assert.equal((await h.raw('/app', { cookie: cookie.owner })).headers.get('location'), '/app/site')
     await h.api('site.configure', cookie.owner, { name: 'Harbour Kitchen Co', timezone: 'Mars/Olympus' }, 400)
     assert.equal((await h.submit('site.configure', cookie.owner, { name: 'Harbour Kitchen Co', timezone: zone }, '/app/assets')).searchParams.get('notice'), 'Saved.')
@@ -997,6 +998,8 @@ try {
     await h.api('workorder.create', cookie.lead, { ...job, assignee: ids.mo }, 409)
     const id = (await h.api('workorder.create', cookie.lead, { ...job, assignee: ids.max })).id
     let order = await wo('lead', id)
+    assertDocumented('Crew', order.crew)
+    for (const team of await h.api('v1/teams', cookie.lead)) assertDocumented('Team', team)
     assert.deepEqual([order.crew.team.name, order.crew.trade, order.crew.shift, order.acknowledged_at], ['Electrical', 'Electrical', 'Day', null])
     // A collaborator joins through the form door; both queues and the team queue carry the job.
     await h.api('workorder.collaborate', cookie.max, { workOrder: id, member: ids.mo }, 403)
@@ -1766,6 +1769,7 @@ try {
     const lamp = (await h.api('workfield.save', cookie.lead, { label: 'Lamp type', kind: 'choice', option: ['LED', 'Sodium'] })).id
     await h.submit('workfield.save', cookie.lead, { label: 'Fault code', kind: 'text', required: 'yes' }, '/app/templates')
     assert.equal((await h.api('workfield.save', cookie.lead, { label: 'fault CODE', kind: 'number' }, 409)).error, 'field_label_taken')
+    assertDocumented('WorkFields', await h.api('v1/work-fields', cookie.max))
     const faultCode = (await h.api('work-fields', cookie.max)).fields.find(row => row.label === 'Fault code')
     assert.equal(faultCode.required, true)
     await h.submit('template.save', cookie.lead, { name: 'Dock light check', title: 'Check the dock light', priority: 'normal', requiredField: lamp, requiresEvidence: 'yes' }, '/app/templates')
@@ -2056,6 +2060,7 @@ try {
     await h.api('route.create', cookie.max, { name: 'Cold store round', ...stops }, 403)
     await h.submit('route.create', cookie.lead, { name: 'Cold store round', ...stops, everyDays: '7', firstDue: today, assignee: ids.max, tool: 'Probe thermometer' }, '/app/schedules')
     let route = (await h.api('routes', cookie.lead)).find(row => row.name === 'Cold store round')
+    assertDocumented('InspectionRoute', route)
     assert.deepEqual([route.stops.map(stop => stop.asset_name), route.every_days, route.next_due_date, route.tools], [['Cold room 1', 'Cold room 2', 'Cold room 3'], 7, today, ['Probe thermometer']])
     // The scheduler issues one run per occurrence within the seven-day lead time, however often it runs: today's and next week's.
     for (let pass = 0; pass < 3; pass++) await h.scheduled('*/15 * * * *')

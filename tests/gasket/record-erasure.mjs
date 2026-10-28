@@ -7,10 +7,19 @@ const imageType=['image','png'].join('/')
 export async function erasureFixture(h, owner, asset) {
   const person = await h.api('access.give',owner,{name:'synthetic-gasket-erased-person',email:'synthetic-gasket-erased@example.test',role:'maintainer'})
   const cookie = await h.signIn('synthetic-gasket-erased@example.test')
-  const work = (await h.api('workorder.create',owner,{asset,title:'synthetic-gasket-erased-work',description:'synthetic-gasket-erased-description',due:(await h.api('me',owner)).today,assignee:(await h.api('me',owner)).id})).id
-  const photo = (await h.api('workorder.evidence',owner,{workOrder:work,version:1,file:file('synthetic-gasket-erased-original.png',png,imageType)})).evidence
+  const createBody={asset,title:'synthetic-gasket-erased-work',description:'synthetic-gasket-erased-description',due:(await h.api('me',owner)).today,assignee:(await h.api('me',owner)).id}
+  const createHeaders={'idempotency-key':'synthetic-gasket-erasure-create-'+asset}
+  const created=await h.raw('/api/gasket/v1/workorder.create',{cookie:owner,body:createBody,headers:createHeaders})
+  assert.equal(created.status,200)
+  const work=(await created.json()).id
+  const field=(await h.api('workfield.save',owner,{label:'Synthetic receipt field '+asset,kind:'text'})).id
+  const fieldBody={workOrder:work,field,value:'synthetic-gasket-erased-retry-value'},fieldHeaders={'idempotency-key':'synthetic-gasket-erasure-field-'+asset}
+  const captured=await h.raw('/api/gasket/v1/workorder.field',{cookie:owner,body:fieldBody,headers:fieldHeaders})
+  assert.equal(captured.status,200)
+  assert.equal((await captured.json()).value,fieldBody.value)
+  const photo = (await h.api('workorder.evidence',owner,{workOrder:work,version:(await h.api(`work/${work}`,owner)).version,file:file('synthetic-gasket-erased-original.png',png,imageType)})).evidence
   await h.api('comment.post',owner,{workOrder:work,body:'synthetic-gasket-erased-comment',mention:[person.id]})
-  return {person:person.id,cookie,work,photo}
+  return {person:person.id,cookie,work,photo,retries:{createBody,createHeaders,fieldBody,fieldHeaders}}
 }
 const preview = (h,owner,kind,id) => h.api(`record-erasure-preview?kind=${kind}&id=${id}`,owner)
 export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
@@ -38,6 +47,7 @@ export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
   await h.api('retention.policy',owner,{kind:'maintenance_records',minimumDays:0,revision:minimum.revision,reason:'synthetic-gasket-release'})
   const before=await preview(h,owner,'work',work)
   assert.equal(before.eligible,true,JSON.stringify(before.blockers))
+  assert.ok(before.receiptResults>=2,'preview discloses the copied API results that will be redacted')
   assert.equal(before.dependencies.gk_evidence,1);assert.equal(before.dependencies.gk_comments,1)
   await h.api('record.erase',owner,{kind:'work',id:work,token:before.token},400)
   await h.api('workorder.evidence',owner,{workOrder:work,version:(await h.api(`work/${work}`,owner)).version,file:file('synthetic-gasket-erased-second.png',png,imageType)})
@@ -47,10 +57,17 @@ export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
   const applied=await h.submit('record.erase',owner,{kind:'work',id:work,token:ready.token,confirm:'yes'},`/app/settings/erasure?kind=work&id=${work}`)
   assert.equal(applied.searchParams.get('error'),null)
   const result=(await preview(h,owner,'work',work)).result
+  assert.ok(result.redacted.apiReceiptResults>=2)
   assert.deepEqual(result.removed,{...ready.dependencies,gk_work_orders:1})
   assert.deepEqual(result.retained,{audit:true,identityMarker:false})
   assert.deepEqual((await h.api('record.erase',owner,{kind:'work',id:work,confirm:true})).result,result)
   await h.api(`work/${work}`,owner,undefined,404)
+  const createReplay=await h.raw('/api/gasket/v1/workorder.create',{cookie:owner,body:fixture.retries.createBody,headers:fixture.retries.createHeaders})
+  assert.equal(createReplay.status,409)
+  assert.equal((await createReplay.json()).error,'idempotency_failed','erasure retains the claim so a retry cannot recreate the work')
+  const fieldReplay=await h.raw('/api/gasket/v1/workorder.field',{cookie:owner,body:fixture.retries.fieldBody,headers:fixture.retries.fieldHeaders})
+  assert.equal(fieldReplay.status,404)
+  assert.ok(!(await fieldReplay.text()).includes(fixture.retries.fieldBody.value),'a retry cannot expose an erased copied field value')
   assert.equal((await h.raw(`/app/evidence/${photo}`,{cookie:owner})).status,404)
   const audit=(await h.api('audit?action=workorder',owner)).rows.filter(row=>row.subject===work)
   assert.ok(audit.length>=3)

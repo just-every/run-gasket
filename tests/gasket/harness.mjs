@@ -79,6 +79,7 @@ export function exerciseKeyedActions(h, owner, actions) {
     const first = await request(), result = await first.json()
     assert.equal(first.status, status, path + ': ' + JSON.stringify(result))
     if (status === 200) {
+      assertOperation(path, result)
       receipts.push({ path, cookie, body, headers, result })
       assert.equal(first.headers.get('idempotency-replayed'), 'false', path)
       const audit = await ordinary('audit', owner)
@@ -94,19 +95,27 @@ export function exerciseKeyedActions(h, owner, actions) {
 }
 
 const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
+function validate(schema, actual, path) {
+  if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
+  if (schema.type) {
+    const types = [schema.type].flat()
+    assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')
+  }
+  if (schema.enum) assert.ok(schema.enum.includes(actual), path + ' matches its published choices')
+  if (actual && !Array.isArray(actual) && typeof actual === 'object') {
+    for (const key of schema.required ?? []) assert.ok(Object.hasOwn(actual, key), path + '.' + key + ' is present')
+    for (const [key, child] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(actual, key)) validate(child, actual[key], path + '.' + key)
+  }
+  if (Array.isArray(actual) && schema.items) for (const [index, child] of actual.entries()) validate(schema.items, child, path + '[' + index + ']')
+}
+
 export function assertDocumented(name, value) {
-      const validate = (schema, actual, path) => {
-        if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
-        if (schema.type) {
-          const types = [schema.type].flat()
-          assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')
-        }
-        if (schema.enum) assert.ok(schema.enum.includes(actual), path + ' matches its published choices')
-        if (actual && !Array.isArray(actual) && typeof actual === 'object') {
-          for (const key of schema.required ?? []) assert.ok(Object.hasOwn(actual, key), path + '.' + key + ' is present')
-          for (const [key, child] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(actual, key)) validate(child, actual[key], path + '.' + key)
-        }
-        if (Array.isArray(actual) && schema.items) for (const [index, child] of actual.entries()) validate(schema.items, child, path + '[' + index + ']')
-      }
-      validate(specification.components.schemas[name], value, name)
-    }
+  validate(specification.components.schemas[name], value, name)
+}
+
+export function assertOperation(action, value) {
+  const schema = specification.paths['/' + action]?.post.responses['200'].content[['application', 'json'].join('/')].schema
+  assert.ok(schema, action + ' publishes its successful response')
+  validate(schema, value, action)
+}
+

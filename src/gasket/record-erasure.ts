@@ -31,11 +31,21 @@ const joinText = (parts: string[]): string => parts.length===1?parts[0]:`(${join
 const quote = (name: string) => '"' + name.replace(/"/g, '""') + '"'
 const ownerOnly = (actor: Actor) => insist(actor.role === 'owner' && !actor.service, 'forbidden', 403)
 
+// Keep the hashed claim as a fence against replay, while erasing copied results.
+// Receipts contain no request bodies; retain only their opaque authority and hashes.
+function receiptScope(kind: string, id: string, record: Record<string, any>) {
+  const needles = kind === 'work' ? [id] : [id, record.operator_id, record.email, record.name].filter(Boolean)
+  return {
+    where: `result_json IS NOT NULL AND (${kind === 'user' ? "actor_id=? OR substr(actor_id,1,length(?)+1)=?||':' OR " : ''}${needles.map(() => "instr(lower(result_json),lower(?))>0").join(' OR ')})`,
+    args: [...(kind === 'user' ? [id,id,id] : []), ...needles],
+  }
+}
+
 export async function recordErasurePreview(env: Bindings, actor: Actor, kind: string, id: string) {
   ownerOnly(actor)
   insist(['work','user'].includes(kind), 'invalid_erasure_kind')
   const saved = await one(env, 'SELECT result_json FROM gk_record_erasure_results WHERE kind=? AND record_id=?', kind, id)
-  if (saved) return { kind, id, erased: true, eligible: false, result: JSON.parse(saved.result_json), dependencies: {}, blockers: [], token: '' }
+  if (saved) return { kind, id, erased: true, eligible: false, result: JSON.parse(saved.result_json), dependencies: {}, receiptResults: 0, blockers: [], token: '' }
   const record = await one(env, `SELECT * FROM ${kind === 'work' ? 'gk_work_orders' : 'gk_members'} WHERE id=?`, id)
   insist(record, 'record_not_found', 404)
   const children = kind === 'work' ? workChildren : userChildren
@@ -47,6 +57,8 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
     checks.push({ sql, args, count: n }); return n as number
   }
   for (const [table, where] of Object.entries(children)) dependencies[table] = await count(`${quote(table)} WHERE ${where}`, [key])
+  const receipts = receiptScope(kind,id,record)
+  const receiptResults = await count(`gk_api_writes WHERE ${receipts.where}`, receipts.args)
   const holdKind = kind === 'work' ? 'gk_retention_holds' : 'gk_retention_scope_holds'
   if (await count(`${holdKind} WHERE kind=? AND record_id=? AND held=1`, [kind,id])) blockers.push('Legal hold')
   const minimum = (await one(env, 'SELECT minimum_days FROM gk_retention_policies WHERE kind=?', kind === 'work' ? 'maintenance_records' : 'users'))?.minimum_days ?? 0
@@ -71,7 +83,7 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
   }
   // Examine every current table for references, including JSON snapshots. Unknown
   // dependencies are refused rather than silently orphaned or partially erased.
-  const ignored = new Set([...Object.keys(children), 'gk_audit','gk_record_erasure_results', kind === 'work' ? 'gk_work_orders' : 'gk_members', ...(kind === 'work' ? ['gk_connector_events'] : ['oa_operators','oa_auth_audit','oa_invitation_cancellations'])])
+  const ignored = new Set([...Object.keys(children), 'gk_api_writes', 'gk_audit','gk_record_erasure_results', kind === 'work' ? 'gk_work_orders' : 'gk_members', ...(kind === 'work' ? ['gk_connector_events'] : ['oa_operators','oa_auth_audit','oa_invitation_cancellations'])])
   const needles = kind === 'work' ? [id] : [id,record.operator_id,record.email,record.name].filter(Boolean)
   for (const { name: table } of await all(env, "SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB 'gk_*' OR name GLOB 'oa_*' OR name GLOB 'oc_*' OR name GLOB 'ik_*' OR name GLOB 'rer_*') ORDER BY name")) {
     if (ignored.has(table) || table === 'gk_guard') continue
@@ -94,8 +106,8 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
     if(unclassifiedAudit) blockers.push('Other records contain identity details in retained audit')
   }
   const auditSequence = (await one(env,'SELECT COALESCE(MAX(seq),0) AS n FROM gk_audit')).n
-  const token = await sha256Hex(JSON.stringify({ kind,id,record,dependencies,blockers,minimum,auditSequence }))
-  return { kind,id,erased:false,eligible:blockers.length===0,dependencies,blockers,token,result:null,checks,record,auditSequence,
+  const token = await sha256Hex(JSON.stringify({ kind,id,record,dependencies,receiptResults,blockers,minimum,auditSequence }))
+  return { kind,id,erased:false,eligible:blockers.length===0,dependencies,receiptResults,blockers,token,result:null,checks,record,auditSequence,
     obligations: ['Retained evidence is never erased. Unknown dependencies prevent erasure.', 'Anonymized audit and opaque identity markers remain. Prior downloads are outside local erasure.', 'Supply the later archive as the erasure journal to fence older restores.'] }
 }
 
@@ -109,7 +121,8 @@ export async function eraseRecord(env: Bindings, actor: Actor, input: Input) {
   insist(preview.eligible,'record_retained',409,{ blockers:preview.blockers })
   const {record,checks,auditSequence}=preview
   const children=kind==='work'?workChildren:userChildren, key=kind==='work'?id:record.operator_id
-  const result={removed:{...preview.dependencies,...(kind==='work'?{gk_work_orders:1}:{})},anonymized:kind==='user'?{members:1,operators:1}:{},retained:{audit:true,identityMarker:kind==='user'},priorDownloads:'Outside local erasure'}
+  const receipts=receiptScope(kind,id,record)
+  const result={removed:{...preview.dependencies,...(kind==='work'?{gk_work_orders:1}:{})},redacted:{apiReceiptResults:preview.receiptResults},anonymized:kind==='user'?{members:1,operators:1}:{},retained:{audit:true,identityMarker:kind==='user'},priorDownloads:'Outside local erasure'}
   await commit(env,[
     guard(env,'stale',"EXISTS(SELECT 1 FROM oa_sessions s JOIN oa_operators o ON o.id=s.operator_id JOIN gk_members m ON m.operator_id=o.id WHERE s.id=? AND s.revoked_at IS NULL AND s.expires_at>? AND s.operator_version=o.version AND o.status='active' AND o.role='owner' AND m.id=? AND m.status='active')",actor.sessionId,Date.now(),actor.id),
     guard(env,'stale','(SELECT COALESCE(MAX(seq),0) FROM gk_audit)=?',auditSequence),
@@ -118,6 +131,7 @@ export async function eraseRecord(env: Bindings, actor: Actor, input: Input) {
     ...await redactionStatements(env.DB),...await invalidateTransfersStatements(env.DB),
     stmt(env,"INSERT INTO gk_guard(code,ok) VALUES('record_erasure',1)"),
     ...Object.entries(children).map(([table,where])=>stmt(env,`DELETE FROM ${quote(table)} WHERE ${where}`,key)),
+    stmt(env,`UPDATE gk_api_writes SET state='failed',result_json=NULL WHERE ${receipts.where}`,...receipts.args),
     stmt(env,"UPDATE gk_audit SET detail='{}' WHERE subject=?",id),
     ...(kind==='work'?[stmt(env,'DELETE FROM gk_work_orders WHERE id=?',id)]:[
       stmt(env,"UPDATE oa_auth_audit SET value='{}' WHERE actor_id=? OR instr(value,?)>0 OR instr(lower(value),lower(?))>0 OR instr(lower(value),lower(?))>0",record.operator_id,record.operator_id,record.email,record.name),
