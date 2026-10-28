@@ -372,6 +372,11 @@ export async function requestTriageJourney() {
     const audit=await h.api('audit?action=request.convert',cookie.owner);assert.ok(audit.rows.some(e=>e.subject===root))
     if(process.env.REQUEST_SCREENSHOTS){await capture(page,h,`/app/requests/${root}`,'converted-request');await capture(page,h,`/app/requests/${duplicate}`,'duplicate-timeline');await capture(page,h,`/app/requests/${third}`,'declined-request');await capture(page,h,`/app/work/${workId}`,'corrective-source-evidence')}
     await erasePrivateRequest(f,root,workId)
+    for(const who of [cookie.tech,cookie.other])await h.api('request.reply',who,{request:root,version:1,text:'Old captured details'},403)
+    const retainedWork=await h.api(`work/${workId}`,cookie.lead)
+    const reprioritized=await h.raw('/api/gasket/v1/workorder.priority',{cookie:cookie.lead,body:{workOrder:workId,version:retainedWork.version,priority:'emergency',reason:'Equipment now needs urgent attention'},headers:{'idempotency-key':'synthetic-gasket-after-request-erasure'}})
+    assert.equal(reprioritized.status,200,await reprioritized.clone().text())
+    assert.equal((await h.api(`work/${workId}`,cookie.lead)).priority,'emergency','fresh authorized work continues after source request erasure')
     if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,`/app/requests/${root}`,'erased-converted-request')
     console.log('REQ-003 lead triage/filtering, request/reply, reasoned rejection, duplicate preservation and one no-retyping corrective order with original linked evidence passed')
   } finally {await context?.close();await browser?.close();await h.close()}
@@ -579,7 +584,8 @@ export async function requestResponseJourney() {
     }
     await h.api('request.clock',cookie.lead,{request:routine,revision:1,kind:'pause',reason:'Private access detail'})
     if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,`/app/requests/${routine}`,'response-paused')
-    await h.api('request.erase',cookie.owner,{request:routine,version:(await detail(routine)).version,confirm:true})
+    const erasedClock=await h.api('request.erase',cookie.owner,{request:routine,version:(await detail(routine)).version,confirm:true})
+    assert.equal(erasedClock.result.redacted.apiReceiptResults,1,'the retained clock response is erased with the request')
     assert.equal((await detail(routine)).clock,null)
     const oldClock=requestWrites.find(row=>row.path==='request.clock'&&row.body.request===routine)
     assert.ok(oldClock,'the erased request had a completed keyed clock change')

@@ -968,3 +968,22 @@ The versioned request queue and detail schemas describe retained fault data,
 original file metadata, requester answers and timelines. Queue access remains
 restricted; detail and original-file permissions stay independent. API keys
 never turn a published opaque intake target into estate browsing authority.
+
+### Keyed proposal preparation and independent decisions
+
+`proposal.prepare` and `proposal.decide` accept write keys through ordinary
+member sessions. Preparation remains a proposal and never executes the proposed
+maintenance change. Approval uses the exact retained payload hash, current source
+versions and the underlying business command's guards, with an approver other
+than its preparer. A replay rechecks current decision capability and independence
+and returns the original decision without another maintenance or stock effect.
+Rejection retains its reason and replays without a second decision. Service
+credentials receive neither scope. The documented proposal read returns at most
+200 retained rows, pending first; it is not a complete paginated history export.
+
+Eligible operator-request erasure also clears retained API results referencing
+that request or its linked work, while preserving failed hashed claims. The
+per-type result reports the number of response copies redacted. A concurrent
+late result cannot be stored after the request's erasure marker. Classified
+erasure summaries remain available; other retained business evidence and prior
+recipient downloads keep their existing boundaries.

@@ -84,6 +84,7 @@ const RETRYABLE: Record<string, Capability | null> = {
   'request.responsePolicy': 'work.assign', 'request.clock': 'work.assign',
   'request.triage': 'work.assign', 'request.convert': 'work.assign', 'request.reply': null,
   'request.erase': 'site.manage',
+  'proposal.prepare': 'proposal.prepare', 'proposal.decide': 'proposal.decide',
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -185,11 +186,16 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
     insist(higher?.schedule_id && lower?.schedule_id, 'scheduled_work_required', 409)
   }
   if (action === 'report.schedule') await reportScheduleAuthority(env, actor, input)
+  if (action === 'proposal.decide') {
+    const proposal = await one(env, 'SELECT prepared_by FROM gk_all_proposals WHERE id=?', input.text('proposal', { max: 100 }))
+    insist(proposal, 'proposal_not_found', 404)
+    insist(proposal.prepared_by !== actor.id, 'own_proposal', 403)
+  }
   if (['request.clock', 'request.triage', 'request.convert', 'request.reply', 'request.erase'].includes(action)) {
     const report = await one(env, 'SELECT requester_id,erased_at FROM gk_requests WHERE id=?', input.text('request'))
     insist(report, 'request_not_found', 404)
-    if (action !== 'request.erase') insist(!report.erased_at, 'request_erased', 410)
     if (action === 'request.reply') insist(report.requester_id === actor.id, 'not_your_request', 403)
+    if (action !== 'request.erase') insist(!report.erased_at, 'request_erased', 410)
   }
   if (action === 'search.save' || action === 'search.delete') {
     if (action === 'search.save') insist(!input.flag('shared') || actor.role === 'owner', 'forbidden', 403)
@@ -216,6 +222,7 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   }
   const principal = actor.service ? `${actor.id}:${actor.service.id}` : actor.id
   const keyHash = await sha256Hex(key), fingerprint = await sha256Hex(bytes)
+  const captureRevision = (await one(env, 'SELECT COALESCE(MAX(seq),0) AS n FROM gk_audit')).n
   const claimed = await stmt(env, "INSERT INTO gk_api_writes (actor_id,key_hash,action,fingerprint,role,state,created_at) VALUES (?,?,?,?,?,'pending',?) ON CONFLICT DO NOTHING", principal, keyHash, action, fingerprint, actor.role, now()).run()
   if (!claimed.meta.changes) {
     const kept = await one(env, 'SELECT action,fingerprint,role,state,result_json FROM gk_api_writes WHERE actor_id=? AND key_hash=?', principal, keyHash)
@@ -238,8 +245,10 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
     insist(new TextEncoder().encode(encoded).byteLength <= resultBytes, 'idempotency_result_too_large', 500)
     // An erasure can finish while a response is being retained. Its opaque
     // journal marker also fences late result storage, without releasing the key.
-    const erasureResult = action === 'record.erase' || action === 'attachment.erase'
-    const kept = await stmt(env, "UPDATE gk_api_writes SET state='completed',result_json=? WHERE actor_id=? AND key_hash=? AND state='pending' AND (? OR NOT EXISTS(SELECT 1 FROM gk_record_erasure_results e WHERE instr(?,e.record_id)>0 OR (e.kind='user' AND (e.record_id=? OR substr(?,1,length(e.record_id)+1)=e.record_id||':'))))", encoded, principal, keyHash, Number(erasureResult), encoded, principal, principal).run()
+    // Request erasure keeps linked maintenance work: later fresh writes remain
+    // valid; only captures predating that erasure are fenced from storing copies.
+    const erasureResult = ['record.erase', 'attachment.erase', 'request.erase'].includes(action)
+    const kept = await stmt(env, "UPDATE gk_api_writes SET state='completed',result_json=? WHERE actor_id=? AND key_hash=? AND state='pending' AND (? OR (NOT EXISTS(SELECT 1 FROM gk_record_erasure_results e WHERE instr(?,e.record_id)>0 OR (e.kind='user' AND (e.record_id=? OR substr(?,1,length(e.record_id)+1)=e.record_id||':'))) AND NOT EXISTS(SELECT 1 FROM gk_requests r JOIN gk_audit a ON a.subject=r.id AND a.action='request.erase' WHERE a.seq>? AND r.erased_at IS NOT NULL AND (instr(?,r.id)>0 OR (r.work_order_id IS NOT NULL AND instr(?,r.work_order_id)>0)))) )", encoded, principal, keyHash, Number(erasureResult), encoded, principal, principal, captureRevision, encoded, encoded).run()
     insist(kept.meta.changes, 'idempotency_result_erased', 409)
     return { result, replayed: false }
   } catch (error) {

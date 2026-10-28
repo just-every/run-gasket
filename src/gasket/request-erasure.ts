@@ -18,7 +18,10 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
   const version = input.integer('version', { min: 1 })
   insist(version === r.version, 'stale', 409)
   const removed = await requestErasureCounts(env, id)
-  const result = { removed, anonymized: { requests: 1, linkedWork: r.work_order_id && r.status === 'converted' ? 1 : 0 }, retained: { maintenanceWork: r.work_order_id ? 1 : 0, audit: true }, priorDownloads: 'Outside local erasure' }
+  const copied = "result_json IS NOT NULL AND EXISTS(SELECT 1 FROM json_tree(result_json) j WHERE j.type='text' AND (instr(j.atom,?)>0 OR (? IS NOT NULL AND instr(j.atom,?)>0)))"
+  const copiedArgs = [id,r.work_order_id,r.work_order_id]
+  const receiptResults = (await one(env, `SELECT COUNT(*) AS n FROM gk_api_writes WHERE ${copied}`, ...copiedArgs)).n
+  const result = { removed, redacted: { apiReceiptResults: receiptResults }, anonymized: { requests: 1, linkedWork: r.work_order_id && r.status === 'converted' ? 1 : 0 }, retained: { maintenanceWork: r.work_order_id ? 1 : 0, audit: true }, priorDownloads: 'Outside local erasure' }
   await commit(env, [
     guard(env, 'retention_hold', REQUEST_NOT_HELD, id, id, id, id),
     guard(env, 'request_evidence_retained', `NOT (${REQUEST_EVIDENCE_RETAINED})`, id),
@@ -26,6 +29,7 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
     guard(env, 'retention_hold', `(SELECT created_at FROM gk_requests WHERE id=?)<=?-COALESCE((SELECT minimum_days FROM gk_retention_policies WHERE kind='request_contacts'),0)*86400000`, id, now()),
     guard(env, 'retention_hold', `NOT EXISTS(SELECT 1 FROM gk_request_files WHERE request_id=?) OR (SELECT created_at FROM gk_requests WHERE id=?)<=?-COALESCE((SELECT minimum_days FROM gk_retention_policies WHERE kind='attachments'),0)*86400000`, id, id, now()),
     ...Object.entries(REQUEST_ERASURE_TABLES).map(([kind, table]) => guard(env, 'stale', `(SELECT COUNT(*) FROM ${table} WHERE request_id=?)=?`, id, removed[kind])),
+    guard(env, 'stale', `(SELECT COUNT(*) FROM gk_api_writes WHERE ${copied})=?`, ...copiedArgs, receiptResults),
     stmt(env, 'INSERT INTO gk_request_erasure_results(request_id,result_json) VALUES(?,?)', id, JSON.stringify(result)),
     // Fence older archives and invalidate export snapshots in the erasure batch.
     ...await redactionStatements(env.DB),
@@ -36,6 +40,7 @@ export async function eraseRequest(env: Bindings, actor: Actor, input: Input) {
     stmt(env, 'DELETE FROM gk_request_clock_events WHERE request_id=?', id),
     stmt(env, 'DELETE FROM gk_request_escalations WHERE request_id=?', id),
     stmt(env, 'DELETE FROM gk_request_clocks WHERE request_id=?', id),
+    stmt(env, `UPDATE gk_api_writes SET state='failed',result_json=NULL WHERE ${copied}`, ...copiedArgs),
     stmt(env, "UPDATE gk_audit SET detail='{}' WHERE subject=? AND action IN ('request.submit','request.triage','request.reply','request.convert','request.clock','request.escalation')", id),
     // Conversion copies the source description and title, so erase those copies.
     ...(r.work_order_id ? [

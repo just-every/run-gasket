@@ -23220,7 +23220,9 @@
                       "performance",
                       "reliability",
                       "availability",
-                      "bad-actors"
+                      "bad-actors",
+                      "history",
+                      "valuation"
                     ]
                   },
                   "weekday": {
@@ -24927,13 +24929,26 @@
                         },
                         "priorDownloads": {
                           "type": "string"
+                        },
+                        "redacted": {
+                          "type": "object",
+                          "properties": {
+                            "apiReceiptResults": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "apiReceiptResults"
+                          ],
+                          "additionalProperties": true
                         }
                       },
                       "required": [
                         "removed",
                         "anonymized",
                         "retained",
-                        "priorDownloads"
+                        "priorDownloads",
+                        "redacted"
                       ],
                       "additionalProperties": true
                     }
@@ -25055,6 +25070,318 @@
           }
         },
         "description": "Queue requires current work-assignment authority. A detail requires that authority or the original authenticated requester. Files retain their independent private-file door. Erased records expose no former description, contact or originals; service credentials have no request scope."
+      }
+    },
+    "/proposal.prepare": {
+      "post": {
+        "summary": "proposal.prepare",
+        "description": "Ordinary member session with the native proposal capability. Preparation confers no execution authority. Decisions require a current independent approver and preserve the exact payload hash, source versions and normal business guards. A keyed retry returns its retained result without repeating the command or decision. Failed or interrupted claims require manual reconciliation. No service credential scope is granted.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "schedule",
+                      "corrective",
+                      "count",
+                      "reassign",
+                      "interval",
+                      "merge"
+                    ]
+                  },
+                  "reasoning": {
+                    "type": "string"
+                  },
+                  "payload": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "kind",
+                  "reasoning",
+                  "payload"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "kind": "corrective",
+                "reasoning": "Recorded abnormal vibration warrants a maintenance inspection",
+                "payload": {
+                  "asset": "ASSET_ID",
+                  "title": "Inspect drive bearing",
+                  "due": "2026-11-01"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "schedule",
+                        "corrective",
+                        "count",
+                        "reassign",
+                        "interval",
+                        "merge"
+                      ]
+                    },
+                    "hash": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "hash"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/proposal.decide": {
+      "post": {
+        "summary": "proposal.decide",
+        "description": "Ordinary member session with the native proposal capability. Preparation confers no execution authority. Decisions require a current independent approver and preserve the exact payload hash, source versions and normal business guards. A keyed retry returns its retained result without repeating the command or decision. Failed or interrupted claims require manual reconciliation. No service credential scope is granted.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "proposal": {
+                    "type": "string"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approve",
+                      "reject"
+                    ]
+                  },
+                  "hash": {
+                    "type": "string"
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "proposal",
+                  "decision"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "proposal": "PROPOSAL_ID",
+                "decision": "approve",
+                "hash": "HASH_FROM_RETAINED_PROPOSAL"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "approved",
+                        "rejected"
+                      ]
+                    },
+                    "result": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/proposals": {
+      "get": {
+        "summary": "Read retained maintenance proposals",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Proposal"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Returns up to the latest 200 retained proposals, pending first. Payload, basis and attributed decisions are snapshots. This bounded native list is not an estate-wide paginated export; use the portable archive for complete retained history. Current member and site authorization applies; service credentials cannot read proposals."
       }
     }
   },
@@ -29310,6 +29637,87 @@
           "timeline",
           "clock",
           "linked"
+        ],
+        "additionalProperties": true
+      },
+      "Proposal": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "schedule",
+              "corrective",
+              "count",
+              "reassign",
+              "interval",
+              "merge"
+            ]
+          },
+          "payload_hash": {
+            "type": "string"
+          },
+          "reasoning": {
+            "type": "string"
+          },
+          "prepared_by": {
+            "type": "string"
+          },
+          "prepared_at": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ]
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "basis": {
+            "type": "object"
+          },
+          "decided_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decided_at": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "result_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "payload_hash",
+          "reasoning",
+          "prepared_by",
+          "prepared_at",
+          "status",
+          "payload",
+          "basis",
+          "decided_by",
+          "decided_at",
+          "result_id"
         ],
         "additionalProperties": true
       }
