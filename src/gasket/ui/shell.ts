@@ -18,6 +18,7 @@ type Destination = { href: string; label: string; detail: string; icon: Html; sh
 
 /** Every destination, by what the person may do. The second group is also the More page. */
 export const NAV: Destination[] = [
+  { href: '/app/messages', label: 'Messages', detail: 'Your direct conversations.', icon: ICON.people, show: actor => !actor.service && ['owner','lead','maintainer','supervisor'].includes(actor.role) },
   { href: '/app', label: 'Work', detail: 'Today\'s work orders.', icon: ICON.work, show: () => true, count: 'work' },
   { href: '/app/assets', label: 'Assets', detail: 'The equipment register.', icon: ICON.assets, show: () => true },
   { href: '/app/schedules', label: 'Schedules', detail: 'Preventive schedules and checklists.', icon: ICON.schedules, show: () => true },

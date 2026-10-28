@@ -569,3 +569,9 @@ td .gk-inline .gk-actions { margin: 0; }
 .gk-skip { position: fixed; top: 8px; left: 8px; z-index: 20; padding: 12px; background: var(--rer-surface); transform: translateY(-200%); }
 .gk-skip:focus { transform: none; }
 @media (min-width: 901px) { .gk-menu-toggle { display: none; } }
+
+/* Direct text keeps the original line breaks within the existing card layout. */
+.gk-message-thread { list-style: none; padding: 0; margin: 0; display: grid; gap: 18px; }
+.gk-message-thread li { min-width: 0; }
+.gk-message-thread time { color: var(--rer-muted); font-size: 13px; }
+.gk-message-body { white-space: pre-wrap; overflow-wrap: anywhere; }

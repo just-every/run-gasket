@@ -38,6 +38,15 @@ export async function recoveryJourney() {
     await h.api('planning.retire',owner,{kind:'tool',id:resourceTool,reason:'Gauge withdrawn before backup',revision:(await h.api('planning',owner)).revision})
     const retiredResources=(await h.api('planning',owner)).retired
     const recoveryLead=(await h.api('members',owner)).find(m=>m.role==='lead').id
+    const direct=(await h.api('conversation.start',owner,{member:recoveryLead})).id
+    const directSubmission={conversation:direct,submissionKey:randomUUID(),body:'synthetic-gasket-recovery-message'}
+    const directMessage=(await h.api('message.send',owner,directSubmission)).message
+    await h.api('conversation.read',lead,{conversation:direct,through:directMessage.seq})
+    await h.api('message.send',lead,{conversation:direct,submissionKey:randomUUID(),body:'synthetic-gasket-recovery-reply'})
+    const directOwner=await h.api(`conversations/${direct}`,owner)
+    const directLead=await h.api(`conversations/${direct}`,lead)
+    assert.equal(directOwner.unread,1)
+    assert.equal(directLead.unread,0)
     const stewardship=(await h.api('planning.grant',owner,{grantee:recoveryLead,site:'primary',kind:'tool',target:'',name:'Recovery gauge',revision:0,enabled:true,consent:true,reason:'Maintain the recovery gauge'})).id
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
     const credential = await h.api('service.create', owner, { name: 'Synthetic recovery service', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
@@ -60,6 +69,9 @@ export async function recoveryJourney() {
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')
     assert.ok(!bytes.includes(Buffer.from(credential.token)), 'service bearer secrets are absent from exports')
     const records = bytes.toString().trim().split('\n').map(line => JSON.parse(line))
+    for(const table of ['gk_conversations','gk_messages','gk_message_reads']) assert.ok(records[0].tables.some(row=>row.name===table),'the archive inventories direct messaging records')
+    const archivedMessages=records.flatMap(record=>record.items??[]).filter(item=>item.kind==='row'&&item.table==='gk_messages')
+    assert.deepEqual(archivedMessages.map(item=>item.row.body).sort(),['synthetic-gasket-recovery-message','synthetic-gasket-recovery-reply'])
     const subscriptions = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_connector_subscriptions')
     assert.equal(subscriptions.length, 1)
     assert.equal(subscriptions[0].row.secret_cipher, '', 'encrypted signing keys are also excluded')
@@ -83,6 +95,13 @@ export async function recoveryJourney() {
       assert.equal(restoredGrant.active,0,'restoring an archive never reactivates stewardship')
       assert.equal(restoredGrant.effective,0)
       const restoredLead=await restored.signIn((await restored.api('members',signed)).find(m=>m.id===recoveryLead).email)
+      assert.equal((await restored.raw(`/api/gasket/conversations/${direct}`,{cookie:owner})).status,401,'a source session cannot read restored messages')
+      assert.deepEqual(await restored.api(`conversations/${direct}`,signed),directOwner,'restored originals and owner unread state reconcile')
+      assert.deepEqual(await restored.api(`conversations/${direct}`,restoredLead),directLead,'each participant keeps their independent read marker')
+      const restoredReplay=await restored.api('message.send',signed,directSubmission)
+      assert.equal(restoredReplay.replayed,true)
+      assert.deepEqual(restoredReplay.message,directMessage,'restoration preserves durable submission identity without a second message')
+      assert.equal((await restored.api('audit?action=message.send',signed)).rows.length,2)
       await restored.api('planning.tool',restoredLead,{name:'Recovery gauge',identifier:'synthetic-gasket-restore-denied',calibrationDue:'2099-12-31',revision:restoredPlanning.revision},403)
       assert.deepEqual(restoredPlanning.retired,retiredResources,'retired evidence and attribution reconcile after empty restore')
       assert.deepEqual((await restored.api(`/automation/jobs?job=${expiryJob.job}`,signed)).input.qualificationReminders,reminderEvidence,'qualification reminder inputs survive retirement and inactive empty restore')
@@ -142,6 +161,7 @@ export async function recoveryJourney() {
       const unchanged = await harness({ vars: h.vars, installation: target })
       try {
         const stillOwner = await unchanged.signIn(h.vars.OWNER_EMAIL)
+        assert.deepEqual(await unchanged.api(`conversations/${direct}`,stillOwner),directOwner,'restored messaging remains durable after another Worker restart')
         assert.deepEqual(await unchanged.api('work?state=open', stillOwner), before, 'nonempty refusal writes no work')
         assert.deepEqual(await unchanged.api('schedules', stillOwner), schedules, 'nonempty refusal changes no PMs')
       } finally { await unchanged.close() }

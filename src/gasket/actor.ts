@@ -83,3 +83,20 @@ export function capabilitySql(sessionId: string, capability: Capability) {
     params: [sessionId, Date.now(), ...roles],
   }
 }
+
+/** Internal messaging never borrows a service principal or an owner's bypass. */
+export const HUMAN_ROLES: Role[] = ['owner', 'lead', 'maintainer', 'supervisor']
+export function humanMemberSql(alias: string) {
+  return `${alias}.status='active' AND EXISTS(SELECT 1 FROM oa_operators ho WHERE ho.id=${alias}.operator_id AND ho.status='active'
+    AND ((ho.role='owner' AND ${alias}.role='owner') OR (ho.role!='owner' AND ${alias}.role IN ('lead','maintainer','supervisor'))))
+    AND EXISTS(SELECT 1 FROM gk_site_memberships hs JOIN gk_sites hp ON hp.id=hs.site_id
+      WHERE hs.member_id=${alias}.id AND hs.site_id='primary' AND hs.status='active' AND hp.state='active')`
+}
+export function humanSessionSql(actor: Actor) {
+  return {
+    sql: `EXISTS(SELECT 1 FROM gk_members hm JOIN oa_sessions hsession ON hsession.operator_id=hm.operator_id
+      JOIN oa_operators hop ON hop.id=hm.operator_id WHERE hm.id=? AND hsession.id=? AND hsession.revoked_at IS NULL
+      AND hsession.expires_at>? AND hsession.operator_version=hop.version AND ${humanMemberSql('hm')})`,
+    params: [actor.id, actor.sessionId, Date.now()],
+  }
+}
