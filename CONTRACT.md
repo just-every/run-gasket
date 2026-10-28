@@ -884,7 +884,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 *Tier:* Core · *Cites:* BASE-ROLE-001, BASE-INPUT-001 · *Rules:* D-1
 
-**Requirement.** Technicians start, pause and resume timers and enter corrected time with reasons, distinguishing wrench time, travel, wait and admin by person and work. Overlap and implausible duration need review; authorized labor rates, overtime policy and contractor charges cost work without exposing pay rates to unauthorized roles. The recorded maintenance policy is in RULINGS.md RL-6.
+**Requirement.** Technicians start, pause and resume timers and enter corrected time with reasons, distinguishing wrench time, travel, wait and admin by person and work. Overlap and implausible duration need review; authorized labor rates, overtime policy and contractor charges cost work without exposing pay rates to unauthorized roles. The recorded maintenance policy is in RULINGS.md RL-6. ADMIN-002 and ADMIN-003 inherit the same source and rate privacy when site scope and delegated rights ship; FIELD-002 and FIELD-003 inherit retained segments and approval semantics when offline time ships. Original work-minute notes retain author attribution but declare no performer, interval, category or approval; they remain separately disclosed evidence, never guessed person time or pay. REPORT-010 carries approved person time under these privacy rights as part of its PDF capability.
 
 **Acceptance.**
 1. Record two technicians' timed work and a contractor invoice, cross midnight, correct a timer and attempt overlap.
@@ -894,7 +894,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 5. Timers submit separate elapsed segments when paused or stopped; paused gaps contribute no time.
 6. Corrections retain the original and replace it only when approved.
 7. Approval snapshots the latest authorized rate and splits elapsed time at each site midnight; each day uses its remaining regular-time allowance after other approved time, then the overtime multiplier.
-8. A later rate or correction never reprices other approved snapshots. Existing report readers receive aggregate approved time and work costs; person-level cost and pay policy remain owner-only, and audit details contain no pay rate. Overtime is a configurable review policy, not a legal wage calculation; no payroll data is transmitted. ADMIN-002 and ADMIN-003 inherit the same source and rate privacy when site scope and delegated rights ship; FIELD-002 and FIELD-003 inherit retained segments and approval semantics when offline time ships. Original work-minute notes retain author attribution but declare no performer, interval, category or approval; they remain separately disclosed evidence, never guessed person time or pay. REPORT-010 carries approved person time under these privacy rights before it is done.
+8. A later rate or correction never reprices other approved snapshots. Existing report readers receive aggregate approved time and work costs; person-level cost and pay policy remain owner-only, and audit details contain no pay rate. Overtime is a configurable review policy, not a legal wage calculation; no payroll data is transmitted.
 
 #### FIELD-007 — Crew completion and independent review
 
@@ -1121,7 +1121,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 *Tier:* Core · *Cites:* BASE-ROLE-001, BASE-INPUT-001
 
-**Requirement.** Every work order and asset shows actual labor, consumed and returned parts, contractor, tool and miscellaneous USD costs alongside estimates, commitments and posted amounts. Parent, site and cost-center rollups avoid double counting and rate visibility follows role rights; parent roll-ups follow the asset hierarchy (ASSET-001). The repair cost entries leads record on work orders (REPORT-005) are part of a work order's actual cost, and REPORT-005 ranks by this clause's reconciled work cost before it ships. Consumed and returned parts are the values PART-007 keeps on each issue and return, never a later price. The recorded maintenance policy is in RULINGS.md RL-7.
+**Requirement.** Every work order and asset shows actual labor, consumed and returned parts, contractor, tool and miscellaneous USD costs alongside estimates, commitments and posted amounts. Parent, site and cost-center rollups avoid double counting and rate visibility follows role rights; parent roll-ups follow the asset hierarchy (ASSET-001). The repair cost entries leads record on work orders (REPORT-005) are part of a work order's actual cost, and REPORT-005 ranks by this clause's reconciled work cost before it ships. Consumed and returned parts are the values PART-007 keeps on each issue and return, never a later price. The recorded maintenance policy is in RULINGS.md RL-7. REPORT-010 carries reconciled costs and approved time into its authorized PDF fields as part of its PDF capability. BUY-005 and REPORT-008 inherit provider-confirmed bill and ledger reconciliation before shipping; ADMIN-002 and ADMIN-003 inherit current cost scopes and protected person-level rates.
 
 **Acceptance.**
 1. Complete a two-technician repair using parts and a contractor, return an unused part and reconcile work, asset, parent and site cost downloads with underlying approved entries.
@@ -1131,7 +1131,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 5. Work, direct asset, current subtree, site and cost-center downloads share these sources; overlapping subtree rows are explicitly non-additive.
 6. Estimates, live approved purchase commitments, external commitment records and owner-recorded posted amounts are separate comparisons, never additional actual cost or verified ledger postings.
 7. Comparison corrections append a referenced credit; unknown source values and missing imported components remain disclosed.
-8. New financial comparison and work cost-center writes are owner-only; existing report readers retain aggregate USD access, without individual labor rates. REPORT-010 carries reconciled costs and approved time into its authorized PDF fields before it is done. BUY-005 and REPORT-008 inherit provider-confirmed bill and ledger reconciliation before shipping; ADMIN-002 and ADMIN-003 inherit current cost scopes and protected person-level rates.
+8. New financial comparison and work cost-center writes are owner-only; existing report readers retain aggregate USD access, without individual labor rates.
 
 #### REPORT-002 — Downtime and production availability
 
