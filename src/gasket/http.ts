@@ -253,7 +253,12 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
     const receipt = `/app/save-receipts/${id}`
     const claimed = await beginSave(env, actor, id, name!)
     try {
-      if (!claimed && !['printpack.preview','printpack.accept'].includes(name!)) throw new GasketError('save_already_attempted', 409)
+      if (!claimed) {
+        if (!['printpack.preview','printpack.accept'].includes(name!)) throw new GasketError('save_already_attempted', 409)
+        // A durable paper retry cannot borrow a different member's receipt or a different action.
+        const prior = await readSave(env, actor, id)
+        if (prior.action !== name) throw new GasketError('save_already_attempted', 409)
+      }
       const result = await action(saveBindings(env, id), actor, input, request) as { id?: string; job?: string } | Response | null
       if (result instanceof Response) { await finishSave(env, id, 'saved'); return result }
       const destination = returnTo.replace('{id}', encodeURIComponent(result?.id ?? ''))

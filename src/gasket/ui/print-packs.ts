@@ -12,7 +12,7 @@ export async function printPackCard(env: Bindings, actor: Actor, work: {id:strin
   const t=printText((await languagePreferences(env,actor)).effective), packs=await workPrintPacks(env,actor,work.id)
   return card(t('title'),h`<p>${t('warning')}</p>
     ${work.canIssue?form('printpack.issue','/app/print-packs/{id}',h`${hidden('workOrder',work.id)}${hidden('version',work.version)}`,t('issue'),{secondary:true}):''}
-    ${packs.length?h`<ul>${packs.map(pack=>h`<li><a href="/app/print-packs/${pack.id}">${t('open')} · ${t('revision')} ${pack.work_version}</a></li>`)}</ul>`:''}`)
+    ${packs.length?h`<ul>${packs.map(pack=>h`<li><a href="/app/print-packs/${pack.id}">${t('open')} · ${t('revision')} ${pack.work_version}</a><span class="gk-sub">${t('issuer')}: ${pack.issuer_name} · ${t('issued')}: ${new Date(pack.issued_at).toISOString()}</span></li>`)}</ul>`:''}`)
 }
 export async function printPackPage(env: Bindings, actor: Actor, url: URL, id: string) {
   const pack=await readPrintPack(env,actor,id), c=pack.content, locale=(await languagePreferences(env,actor)).effective,

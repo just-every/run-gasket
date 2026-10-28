@@ -71,7 +71,7 @@ export async function readPrintPack(env: Bindings, actor: Actor, id: string) {
 }
 export async function workPrintPacks(env: Bindings, actor: Actor, work: string) {
   await admit(env,actor,work)
-  return all(env,'SELECT id,work_version,issued_at,content_sha256 FROM gk_print_packs WHERE work_order_id=? ORDER BY issued_at,id',work)
+  return all(env,`SELECT id,work_version,issued_at,content_sha256,json_extract(content_json,'$.issuerName') AS issuer_name FROM gk_print_packs WHERE work_order_id=? ORDER BY issued_at,id`,work)
 }
 export async function printPackPdf(env: Bindings, actor: Actor, id: string) {
   const {row,content}=await packRow(env,actor,id), bytes=new Uint8Array(row.pdf_bytes)
