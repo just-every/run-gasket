@@ -56,7 +56,16 @@ export async function intervalBrowser(h,cookie,proposal) {
 // Lose only the browser's reply. Forward its original HTTP method, multipart
 // bytes and identity to the built Worker through the harness's public transport.
 // Playwright's second HTTPS client can disconnect before forwarding to workerd.
-async function loseSaveReply(h, router, path, committed = true) {
+async function loseSaveReply(h, router, path, committed = true, receiptPath) {
+  if (receiptPath) {
+    // A deliberately broken browser connection must not strand its receipt read.
+    // Forward that request through an independent connection to the same Worker.
+    await router.route('**' + receiptPath, async route => {
+      const headers = await route.request().allHeaders()
+      const response = await h.raw(receiptPath, { cookie: headers.cookie, headers: { accept: headers.accept } })
+      await route.fulfill({ status: response.status, headers: Object.fromEntries(response.headers), body: Buffer.from(await response.arrayBuffer()) })
+    }, { times: 1 })
+  }
   const handled = Promise.withResolvers()
   await router.route('**' + path, async route => {
     try {
@@ -163,13 +172,13 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
-    const lost = await loseSaveReply(h, page, action)
+    const retryId = retryDraft.find(([key])=>key==='__gk_save')[1]
+    const lost = await loseSaveReply(h, page, action, true, `/app/save-receipts/${retryId}`)
     // Captures change the viewport and scroll position. Target the keyboard event at
     // the submitter, and observe this submission leaving the browser before its feedback.
     const submitter = form.getByRole('button',{name:/./}).last()
     await submitter.scrollIntoViewIfNeeded()
     assert.deepEqual(await form.evaluate(el=>el.noValidate?[]:[...el.elements].filter(control=>control.validity&&!control.validity.valid).map(control=>({name:control.name,error:control.validationMessage}))),[],`${action} retained retry is valid`)
-    const retryId = retryDraft.find(([key])=>key==='__gk_save')[1]
     const [reply] = await Promise.all([
       lost.completed,
       page.waitForRequest(request=>request.method()==='POST'&&new URL(request.url()).pathname===action&&request.postData()?.includes(retryId)),
@@ -177,7 +186,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     ])
     const confirmation = await reply.json()
     const error = form.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s})
-    await error.waitFor()
+    await error.waitFor().catch(async cause => { throw new Error(`${action} receipt feedback: ${await form.getByRole('alert').innerText()}`, { cause }) })
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
     assert.equal(await error.evaluate(el=>el===document.activeElement),true,`${action} error has keyboard focus`)
     assert.equal(await form.getByRole('button',{name:/./}).last().isDisabled(),true,`${action} cannot repeat an uncertain save`)
@@ -568,7 +577,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       // Lose the response after a real write: the UI must not claim it was unsaved or retry it automatically.
       const again=page.locator('form[action="/app/do/workorder.time"]')
       await again.getByLabel('Minutes worked').fill('3');await again.getByLabel('Time note').fill(`Uncertain confirmation ${width}`)
-      const lost = await loseSaveReply(h, page, '/app/do/workorder.time')
+      const lost = await loseSaveReply(h, page, '/app/do/workorder.time', true, `/app/save-receipts/${await again.locator('[name=__gk_save]').inputValue()}`)
       await Promise.all([lost.completed, again.getByRole('button',{name:'Record time'}).click()])
       await again.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s}).waitFor()
       assert.match(await again.getByRole('alert').innerText(),new RegExp('connection ended.*Saved. The server confirmed','s'))
