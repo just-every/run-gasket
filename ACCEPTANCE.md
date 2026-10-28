@@ -1036,7 +1036,7 @@ Core · target · **done** · Cites BASE-ROLE-001, BASE-INPUT-001 · Rules D-2
 **Evidence.** `tests/gasket/flows.mjs` — "FIELD-007 crew completion and independent review"
 **Gap.** None.
 
-#### FIELD-008 — Field usability, print and secure device lifecycle
+#### FIELD-008 — Field usability and controlled print
 
 Core · target · **partial** · From FIELD-008
 

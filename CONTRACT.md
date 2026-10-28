@@ -906,7 +906,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 1. Complete a repair with two technicians, reassign to a third, submit and attempt review by each contributor.
 2. Require independent approval of the exact final revision and retain the return/rework history.
 
-#### FIELD-008 — Field usability, print and secure device lifecycle
+#### FIELD-008 — Field usability and controlled print
 
 *Tier:* Core · *From:* FIELD-008
 
@@ -1933,7 +1933,7 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | `FIELD-005` | Photos, annotations and signatures | target | partial | `tests/gasket/flows.mjs` — "FIELD-005 photos, annotations and revision-bound signatures" | A public-door journey offline signatures and original-file synchronization is missing. The cited journeys show online annotations, originals, signature revisions and required re-signing. |
 | `FIELD-006` | Wrench time, labor and contractor costs | target | done | `tests/gasket/labor-costs.mjs` — "laborJourney"; `tests/gasket/work-costing.mjs` — "costingJourney" |  |
 | `FIELD-007` | Crew completion and independent review | target | done | `tests/gasket/flows.mjs` — "FIELD-007 crew completion and independent review" |  |
-| `FIELD-008` | Field usability, print and secure device lifecycle | target | partial | `src/gasket/ui/work.ts`; `src/gasket/actor.ts` | Server work forms and member revocation exist; field device lifecycle, controlled print packs and offline cache isolation do not. |
+| `FIELD-008` | Field usability and controlled print | target | partial | `src/gasket/ui/work.ts`; `src/gasket/actor.ts` | Server work forms and member revocation exist; field device lifecycle, controlled print packs and offline cache isolation do not. |
 | `FIELD-010` | Shared and lost device lifecycle | target | missing | `src/gasket/ui/work.ts`; `src/gasket/actor.ts` | Server work forms and member revocation exist; field device lifecycle, controlled print packs and offline cache isolation do not. |
 | `FIELD-009` | Technician-created and after-the-fact work | target | partial | `tests/gasket/flows.mjs` — "FIELD-009 technician-created and after-the-fact work" | A public-door journey iOS/Android creation, two operational sites, requester/contractor refusal and revoked offline sync is missing. The cited journeys show web/API creation, after-the-fact evidence, current-site rights, independent review and report/audit attribution. |
 | `PART-001` | Multi-location stock and bin visibility | target | partial | `src/gasket/parts.ts`; `src/gasket/reservations.ts`; `src/gasket/catalogs.ts`; `tests/gasket/flows.mjs`; `tests/gasket/part-catalog.mjs`; `src/gasket/stock-sources.ts`; `src/gasket/ui/labels.ts`; `tests/gasket/receiving.mjs` (receivingJourney: same-part receipt sources across three bins, bin lookup, public-scan isolation and other-site refusal); `tests/gasket/receiving-browser.mjs` (controlledBrowser at 1440 and 390) | Current-site receipt-source quantities are visible for the same part across named bins, with authenticated bin-name lookup and a private stock-source link from published bin labels. Signed-out scans expose no stock and an unknown site is refused. Gap: Complete bin balances require reservation allocation, per-bin valuation, on-order allocation and count reconciliation, including historical unattributed movements. Additional-site scope remains ADMIN-002 and in-transit quantities remain PART-006; PART-001 remains partial. |
