@@ -2160,7 +2160,7 @@
       "executable": false
     },
     "src/gasket/ui/record-erasure.ts": {
-      "sha256": "88e2e8bba20c646a8857989d4a9a628fb0bdb3154a687186f6c74a6d1a895313",
+      "sha256": "4e93016e211b17f3daf06a8a07c5d28904f584912faca5e9a61982451025b78a",
       "executable": false
     },
     "src/gasket/ui/reliability.ts": {
@@ -4184,7 +4184,7 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "dacf45881583fe9d47d59459cb9bb6b0b638cfa58a972842f49c470d079ef0d6",
+      "sha256": "5080f264f59677546c01009d8bc7d8adb63d73b2859b98029ed950e65c246838",
       "executable": false
     },
     "tests/gasket/automation.mjs": {
@@ -4220,7 +4220,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "f80862c5fb23622b0278864ba09c59acbef20dab36d6251f684926b063fd6201",
+      "sha256": "3a7234eaf625084c29f40573fa66e6febe55968e979fa961070f655e71284d70",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4292,7 +4292,7 @@
       "executable": false
     },
     "tests/gasket/record-erasure.mjs": {
-      "sha256": "75065c6d0a008944a5287f535026a9dcc9eaecc21893eae658e22ae73e5c2f22",
+      "sha256": "c41734eeb7e3284628bb172d07e86aa9d5659ef767d849a2fcda51bbfc5e367a",
       "executable": false
     },
     "tests/gasket/recovery.mjs": {

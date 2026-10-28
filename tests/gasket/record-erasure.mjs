@@ -9,16 +9,16 @@ export async function erasureFixture(h, owner, asset) {
   const access=await h.raw('/api/gasket/v1/access.give',{cookie:owner,body:accessBody,headers:accessHeaders})
   assert.equal(access.status,200)
   const person=await access.json()
-  let cookie = await h.signIn('synthetic-gasket-erased@example.test')
+  let cookie = await h.signIn(accessBody.email)
   const operator = (await (await h.raw('/auth/session', { cookie })).json()).operator.id
   assert.equal((await h.raw('/auth/operator/role', { cookie: owner, body: { operatorId: operator, role: 'owner' } })).status, 200)
-  const issuingOwner = await h.signIn('synthetic-gasket-erased@example.test')
+  const issuingOwner = await h.signIn(accessBody.email)
   const credential = await h.api('service.create', issuingOwner, { name: 'synthetic-gasket-erased-credential', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
   const credentialRead = () => h.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })
   assert.equal((await credentialRead()).status, 200)
   assert.equal((await h.raw('/auth/operator/role', { cookie: owner, body: { operatorId: operator, role: 'member' } })).status, 200)
   assert.equal((await credentialRead()).status, 401)
-  cookie = await h.signIn('synthetic-gasket-erased@example.test')
+  cookie = await h.signIn(accessBody.email)
   const createBody={asset,title:'synthetic-gasket-erased-work',description:'synthetic-gasket-erased-description',due:(await h.api('me',owner)).today,assignee:(await h.api('me',owner)).id}
   const createHeaders={'idempotency-key':'synthetic-gasket-erasure-create-'+asset}
   const created=await h.raw('/api/gasket/v1/workorder.create',{cookie:owner,body:createBody,headers:createHeaders})
@@ -193,6 +193,7 @@ export async function erasureScreens(h,owner,work,label,kind='work') {
       assert.equal((await page.goto(h.origin+`/app/settings/erasure?kind=${kind}&id=${work}`)).status(),200)
       await page.getByRole('heading',{name:'Erasure preview',exact:true}).waitFor()
       if(width===1440) assert.match(await page.locator('main').innerText(),label==='held'?/Retained: erasure refused/:label.startsWith('eligible')?/Eligible for owner-confirmed erasure/:/Already erased/)
+      if(width===1440 && kind==='user') assert.match(await page.locator('main').innerText(),label.startsWith('eligible')?/Retired service clients to anonymize: 1\./:/Retired service clients anonymized: 1\./)
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
       assert.deepEqual(await page.locator('button,a,[role=button]').evaluateAll(nodes=>nodes.filter(n=>!n.textContent.trim()&&!n.querySelector('img[alt]')&&!n.getAttribute('data-tooltip')).map(n=>n.outerHTML)),[])
       await page.screenshot({path:`${directory}/erasure-${label}-${width}.png`,fullPage:true})

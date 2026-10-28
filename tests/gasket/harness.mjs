@@ -83,7 +83,7 @@ export function exerciseKeyedActions(h, owner, actions, { once = false } = {}) {
     const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + namespace + '-' + (++sequence) }
     const request = () => h.raw('/api/gasket/v1/' + path, { cookie, body, headers })
     const first = await request(), result = await first.json()
-    assert.equal(first.status, status, path + ': ' + JSON.stringify(result))
+    assert.equal(first.status, status, path + ': ' + JSON.stringify(result, (key,value) => ['token','secret'].includes(key) ? '[redacted]' : value))
     if (status === 200) {
       assertOperation(path, result)
       receipts.push({ path, cookie, body, headers, result })

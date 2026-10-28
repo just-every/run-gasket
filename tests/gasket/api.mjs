@@ -22,7 +22,7 @@ export async function apiJourney() {
     const write = async (action, body, key, cookie = owner, status = 200, legacy = false) => {
       const response = await h.raw(`/api/gasket/${legacy ? '' : 'v1/'}${action}`, { cookie, body, headers: { 'idempotency-key': key } })
       const result = await response.json()
-      assert.equal(response.status, status, JSON.stringify(result))
+      assert.equal(response.status, status, JSON.stringify(result, (key,value) => ['token','secret'].includes(key) ? '[redacted]' : value))
       return { result, replayed: response.headers.get('idempotency-replayed') }
     }
     const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
@@ -65,7 +65,9 @@ export async function apiJourney() {
     assert.equal((await h.api(`/v1/parts/${part}`, owner)).on_hand, 3000)
     await write('asset.create', { name: 'Missing identity' }, 'synthetic-gasket-invalid', owner, 400)
     assert.equal((await write('asset.create', { name: 'Missing identity' }, 'synthetic-gasket-invalid', owner, 409)).result.error, 'idempotency_failed')
-    await write('service.create', { name: 'Do not issue', scopes: ['assets:read'], expiresAt: Date.UTC(2026, 9, 27), consent: true }, 'synthetic-gasket-unsupported', owner, 400)
+    const previewAudit = await h.api('audit', owner)
+    assert.equal((await write('rules.preview', { rule: 'synthetic-gasket-preview' }, 'synthetic-gasket-unsupported', owner, 400)).result.error, 'idempotency_not_supported')
+    assert.deepEqual(await h.api('audit', owner), previewAudit, 'an unsupported keyed preview creates no claim or business effect')
     assert.deepEqual(await h.api('service-credentials', owner), [])
     assert.equal((await h.api('site', owner)).name, 'Synthetic API estate')
     await write('part.receive', { part, quantity: '3' }, 'not a key', owner, 400)
@@ -737,6 +739,10 @@ export async function apiJourney() {
     await h.api('v1/workorder.create', lead, { asset, template: crewTemplate.id, due: reschedule.due }, 409)
     for (const row of await h.api('v1/teams', owner)) documented('Team', row)
     if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, crewWork, part, issued.id, [[`work/${crewWork}`, 'Synthetic crew maintenance']], 'crew-')
+    const labelPortal = (await h.api('request.portal', owner, { name: 'Synthetic maintenance label', fields: [] })).id
+    const labelTarget = (await h.api('request.target', owner, { portal: labelPortal, kind: 'asset', asset, name: 'Synthetic pump label', publishConsent: true })).id
+    const labelled = await repeat('label.work', { target: labelTarget, title: 'Synthetic scanned repair', due: '2026-10-27', assignee: (await h.api('me', owner)).id }, 'synthetic-gasket-label-work')
+    assert.equal((await h.api(`v1/work/${labelled.id}`, owner)).asset_id, asset)
     // Eligible erasure has its own installation: the main journey deliberately
     // retains standing-rule evidence, which correctly prevents that work's erasure.
     const erasure = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
@@ -747,7 +753,7 @@ export async function apiJourney() {
       const erasedRetry = await erasureFixture(erasure, erasureOwner, erasureAsset)
       documented('RecordErasurePreview', await erasure.api(`v1/record-erasure-preview?kind=work&id=${erasedRetry.work}`, erasureOwner))
       if (process.env.API_SCREENSHOTS) await browserProof(erasure, erasureOwner, erasureAsset, erasedRetry.work, part, issued.id, [[`settings/erasure?kind=work&id=${erasedRetry.work}`, 'API retry results to redact: 2. Hashed retry claims remain to prevent repeated effects.']], 'retry-preview-')
-      await eraseFixture(erasure, erasureOwner, erasedRetry)
+      await eraseFixture(erasure, erasureOwner, erasedRetry, { screens: Boolean(process.env.API_SCREENSHOTS) })
       documented('RecordErasurePreview', await erasure.api(`v1/record-erasure-preview?kind=work&id=${erasedRetry.work}`, erasureOwner))
       if (process.env.API_SCREENSHOTS) await browserProof(erasure, erasureOwner, erasureAsset, erasedRetry.work, part, issued.id, [[`settings/erasure?kind=work&id=${erasedRetry.work}`, 'API retry results redacted: 2. Hashed retry claims remain to prevent repeated effects.']], 'retry-erased-')
     } finally { await erasure.close() }
