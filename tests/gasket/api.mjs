@@ -22,7 +22,7 @@ export async function apiJourney() {
     // Inherited action names must behave exactly like an unknown action. Keep
     // response bodies out of assertion output, including when a binding leaks.
     const dispatch = []
-    for (const name of ['synthetic.unknown', 'constructor', '__proto__', 'hasOwnProperty']) {
+    for (const name of ['synthetic.unknown', 'constructor', '__proto__', 'hasOwnProperty'].flatMap(name => [name, `v1/${name}`])) {
       const response = await h.raw(`/api/gasket/${name}`, { cookie: lead, body: {} })
       const text = await response.text()
       dispatch.push({ name, status: response.status, unknown: text === '{"error":"not_found"}',
@@ -32,7 +32,7 @@ export async function apiJourney() {
     const registeredResult = await registered.json()
     assert.equal(registered.status, 200, 'registered action remains available to a signed-in member')
     assert.ok(typeof registeredResult.id === 'string' && registeredResult.number === 1, 'registered action creates its record')
-    assert.deepEqual(dispatch, ['synthetic.unknown', 'constructor', '__proto__', 'hasOwnProperty'].map(name => ({ name, status: 404, unknown: true, private: true })))
+    assert.deepEqual(dispatch, ['synthetic.unknown', 'constructor', '__proto__', 'hasOwnProperty'].flatMap(name => [name, `v1/${name}`]).map(name => ({ name, status: 404, unknown: true, private: true })))
     const write = async (action, body, key, cookie = owner, status = 200, legacy = false) => {
       const response = await h.raw(`/api/gasket/${legacy ? '' : 'v1/'}${action}`, { cookie, body, headers: { 'idempotency-key': key } })
       const result = await response.json()
