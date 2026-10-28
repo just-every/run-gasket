@@ -94,7 +94,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Check generated contract documents
-        run: node scripts/contract-docs.mjs check
+        run: node src/base/contract-docs.mjs check
       - name: Install Chromium
         run: |
           set -euo pipefail

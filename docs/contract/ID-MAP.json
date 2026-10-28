@@ -45,9 +45,11 @@
       ]
     },
     "GAS-08": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "GAS-08"
+        "GAS-08",
+        "GAS-14",
+        "GAS-15"
       ]
     },
     "GAS-09": {
@@ -225,9 +227,10 @@
       ]
     },
     "ASSET-008": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "ASSET-008"
+        "ASSET-008",
+        "ASSET-010"
       ]
     },
     "ASSET-009": {
@@ -435,9 +438,10 @@
       ]
     },
     "FIELD-008": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "FIELD-008"
+        "FIELD-008",
+        "FIELD-010"
       ]
     },
     "FIELD-009": {

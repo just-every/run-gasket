@@ -31,7 +31,7 @@ export function readManifest(root: string): DocsSection[] {
         slugs.add(slug)
         if (!label) problems.push(`${where}: no label`)
         if (!summary) problems.push(`${where}: no summary`)
-        if (!/^(?:docs\/)?[A-Z0-9a-z-]+\.md$/.test(file)) problems.push(`${where}: file "${file}" must be a Markdown file at the root or in docs/`)
+        if (!/^(?:docs\/(?:[A-Z0-9a-z-]+\/)*)?[A-Z0-9a-z-]+\.md$/.test(file)) problems.push(`${where}: file "${file}" must be a Markdown file at the root or under docs/`)
         else if (!existsSync(join(root, file)) || !statSync(join(root, file)).isFile()) problems.push(`${where}: ${file} does not exist`)
         if (files.has(file)) problems.push(`${where}: ${file} is listed twice`)
         files.add(file)
