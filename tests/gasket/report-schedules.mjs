@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
-import { file, harness } from './harness.mjs'
+import { file, harness, exerciseKeyedActions } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { scheduleRiders } from './report-schedule-riders.mjs'
 import { assertPack } from './report-pack-assertions.mjs'
@@ -36,6 +36,7 @@ export async function reportSchedulesJourney(){
   let h=await harness({installation:store,vars,clockInstant:before,generationGate:true})
   try{
     const cookie={owner:await h.owner()},ids={}
+    exerciseKeyedActions(h,cookie.owner,['report.schedule'])
     await h.api('site.configure',cookie.owner,{name:'Great Lakes report plant',timezone:'America/New_York'})
     for(const [key,role] of [['lead','lead'],['supervisor','supervisor'],['tech','maintainer'],['agent','agent'],['delegate','lead'],['other','supervisor']]){
       ids[key]=(await h.api('access.give',cookie.owner,{name:key,email:`${key}@example.test`,role})).id

@@ -1,13 +1,14 @@
 // AGENT-003: cited comparisons, mandatory bounds, independent approval and rollback.
 import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 import { offset, zone } from './clock.mjs'
 
 export async function intervalJourney() {
   const initial = await harness(); let h = initial
   try {
     const cookie = { owner: await h.owner() }, ids = {}, assets = [], schedules = [], meters = [], jobs = []
+  exerciseKeyedActions(h, cookie.owner, ['interval.limit'])
     await h.api('site.configure', cookie.owner, { name: 'Great Lakes Packaging and Compressor Works', timezone: zone })
     for (const [key, role, name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['sam','supervisor','Rosa Alvarez'],['agent','agent','Reliability agent']]) {
       ids[key] = (await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})).id

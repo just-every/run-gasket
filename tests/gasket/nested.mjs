@@ -1,12 +1,13 @@
 // PM-009: nested programs through the same authenticated form/JSON/page doors.
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 
 export async function nestedJourney(onReady) {
   const h = await harness()
   try {
     const cookie = { owner: await h.owner() }, people = {}
+  exerciseKeyedActions(h, cookie.owner, ['nested.map', 'nested.satisfy', 'workorders.generate'])
     await h.api('site.configure', cookie.owner, { name: 'Great Lakes compressor and cooling plant', timezone: 'America/New_York' })
     for (const [key, role] of [['lead', 'lead'], ['tech', 'maintainer'], ['reviewer', 'supervisor'], ['agent', 'agent']]) {
       people[key] = (await h.api('access.give', cookie.owner, { name: key, email: `nested-${key}@example.test`, role })).id

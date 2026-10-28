@@ -36,7 +36,7 @@ const ownerOnly = (actor: Actor) => insist(actor.role === 'owner' && !actor.serv
 function receiptScope(kind: string, id: string, record: Record<string, any>) {
   const needles = kind === 'work' ? [id] : [id, record.operator_id, record.email, record.name].filter(Boolean)
   return {
-    where: `result_json IS NOT NULL AND (${kind === 'user' ? "actor_id=? OR substr(actor_id,1,length(?)+1)=?||':' OR " : ''}${needles.map(() => "instr(lower(result_json),lower(?))>0").join(' OR ')})`,
+    where: `result_json IS NOT NULL AND (${kind === 'user' ? "actor_id=? OR substr(actor_id,1,length(?)+1)=?||':' OR " : ''}EXISTS(SELECT 1 FROM json_tree(result_json) j WHERE j.type='text' AND (${needles.map(() => "instr(lower(j.atom),lower(?))>0").join(' OR ')})))`,
     args: [...(kind === 'user' ? [id,id,id] : []), ...needles],
   }
 }

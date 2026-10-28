@@ -96,6 +96,13 @@ export async function recoveryJourney() {
       assert.equal(recovery.restore.archive_hash, records.at(-1).archiveHash)
       assert.equal(recovery.drill, null, 'an import does not claim a verified drill')
       await restored.api('recovery.drill', signed, { receipt: recovery.restore.id }, 400)
+      const drillBody={receipt:recovery.restore.id,confirm:true},drillHeaders={'idempotency-key':'synthetic-gasket-recovery-confirmation'}
+      for(const replayed of ['false','true']) {
+        const confirmed=await restored.raw('/api/gasket/v1/recovery.drill',{cookie:signed,body:drillBody,headers:drillHeaders})
+        assert.equal(confirmed.status,200,await confirmed.clone().text())
+        assert.equal(confirmed.headers.get('idempotency-replayed'),replayed)
+        assert.equal((await confirmed.json()).id,recovery.restore.id)
+      }
       await restored.submit('recovery.drill', signed, { receipt: recovery.restore.id, confirm: 'yes' }, '/app/automation')
       const drill = (await restored.api('recovery', signed)).drill
       assert.equal(drill.drill_by, (await restored.api('me', signed)).id)

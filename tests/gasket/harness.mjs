@@ -71,10 +71,11 @@ export const file = (filename, content, type = 'application/octet-stream') => ({
 export function exerciseKeyedActions(h, owner, actions) {
   const ordinary = h.api, selected = new Set(actions)
   let sequence = 0
+  const namespace = randomBytes(8).toString('hex')
   const receipts = []
   h.api = async (path, cookie, body, status = 200) => {
     if (!selected.has(path) || body === undefined || body.preview) return ordinary(path, cookie, body, status)
-    const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + (++sequence) }
+    const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + namespace + '-' + (++sequence) }
     const request = () => h.raw('/api/gasket/v1/' + path, { cookie, body, headers })
     const first = await request(), result = await first.json()
     assert.equal(first.status, status, path + ': ' + JSON.stringify(result))
@@ -118,4 +119,3 @@ export function assertOperation(action, value) {
   assert.ok(schema, action + ' publishes its successful response')
   validate(schema, value, action)
 }
-

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 export async function ruleSourcesJourney() {
   const h=await harness({clockInstant:Date.parse('2026-10-21T12:00:00Z')}),owner=await h.owner()
+  exerciseKeyedActions(h, owner, ['rules.save', 'rules.control'])
   try {
     await h.api('site.configure',owner,{name:'Great Lakes Assembly',timezone:'UTC'})
     const me=(await h.api('me',owner)).id

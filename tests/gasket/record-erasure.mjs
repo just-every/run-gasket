@@ -5,7 +5,10 @@ import { png } from './fixtures.mjs'
 const imageType=['image','png'].join('/')
 
 export async function erasureFixture(h, owner, asset) {
-  const person = await h.api('access.give',owner,{name:'synthetic-gasket-erased-person',email:'synthetic-gasket-erased@example.test',role:'maintainer'})
+  const accessBody={name:'synthetic-gasket-erased-person',email:'synthetic-gasket-erased@example.test',role:'maintainer'},accessHeaders={'idempotency-key':'synthetic-gasket-erasure-access-'+asset}
+  const access=await h.raw('/api/gasket/v1/access.give',{cookie:owner,body:accessBody,headers:accessHeaders})
+  assert.equal(access.status,200)
+  const person=await access.json()
   const cookie = await h.signIn('synthetic-gasket-erased@example.test')
   const createBody={asset,title:'synthetic-gasket-erased-work',description:'synthetic-gasket-erased-description',due:(await h.api('me',owner)).today,assignee:(await h.api('me',owner)).id}
   const createHeaders={'idempotency-key':'synthetic-gasket-erasure-create-'+asset}
@@ -19,7 +22,7 @@ export async function erasureFixture(h, owner, asset) {
   assert.equal((await captured.json()).value,fieldBody.value)
   const photo = (await h.api('workorder.evidence',owner,{workOrder:work,version:(await h.api(`work/${work}`,owner)).version,file:file('synthetic-gasket-erased-original.png',png,imageType)})).evidence
   await h.api('comment.post',owner,{workOrder:work,body:'synthetic-gasket-erased-comment',mention:[person.id]})
-  return {person:person.id,cookie,work,photo,retries:{createBody,createHeaders,fieldBody,fieldHeaders}}
+  return {person:person.id,cookie,work,photo,retries:{createBody,createHeaders,fieldBody,fieldHeaders,accessBody,accessHeaders}}
 }
 const preview = (h,owner,kind,id) => h.api(`record-erasure-preview?kind=${kind}&id=${id}`,owner)
 export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
@@ -90,6 +93,10 @@ export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
   assert.equal(user.dependencies.gk_site_memberships,1)
   if(screens) await erasureScreens(h,owner,person,'eligible-user','user')
   const erased=await h.api('record.erase',owner,{kind:'user',id:person,token:user.token,confirm:true})
+  assert.ok(erased.result.redacted.apiReceiptResults>=1)
+  const accessReplay=await h.raw('/api/gasket/v1/access.give',{cookie:owner,body:fixture.retries.accessBody,headers:fixture.retries.accessHeaders})
+  assert.equal(accessReplay.status,409)
+  assert.equal((await accessReplay.json()).error,'idempotency_failed','an erased identity cannot be invited again by replaying its old grant')
   assert.deepEqual(erased.result.anonymized,{members:1,operators:1})
   assert.equal(erased.result.removed.gk_site_memberships,1)
   assert.deepEqual((await h.api('sites/primary',owner)).members,roster.filter(row=>row.member_id!==person),'erasure removes only this person’s site access records')

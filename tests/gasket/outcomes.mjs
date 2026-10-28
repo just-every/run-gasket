@@ -1,20 +1,21 @@
 // AGENT-004: human-agreed windows, matched exposure, gaps and approved reversal.
 import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 import { offset, zone } from './clock.mjs'
 
 export async function outcomeJourney() {
   const initial=await harness({clockOffset:offset-8*86_400_000});let h=initial
   try {
     const cookie={owner:await h.owner()},ids={},assets=[],meters=[],plans={},baselineJobs=[]
+  exerciseKeyedActions(h, cookie.owner, ['interval.limit', 'outcome.window', 'outcome.assess', 'outcome.reversal', 'outcome.investigate'])
     await h.api('site.configure',cookie.owner,{name:'Lake Erie Compressor Works',timezone:zone})
     for(const [key,role,name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['agent','agent','Reliability agent']]) {
       ids[key]=(await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})).id;cookie[key]=await h.signIn(`${key}@example.test`)
     }
     const base=(await h.api('me',cookie.owner)).today
     const day=n=>{const d=new Date(`${base}T12:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
-    const reopen=async n=>{await h.stop();h=await harness({installation:initial.installation,vars:initial.vars,clockOffset:offset+(n-8)*86_400_000});cookie.owner=await h.signIn(initial.vars.OWNER_EMAIL);for(const key of ['lead','max','agent'])cookie[key]=await h.signIn(`${key}@example.test`)}
+    const reopen=async n=>{await h.stop();h=await harness({installation:initial.installation,vars:initial.vars,clockOffset:offset+(n-8)*86_400_000});cookie.owner=await h.signIn(initial.vars.OWNER_EMAIL);for(const key of ['lead','max','agent'])cookie[key]=await h.signIn(`${key}@example.test`); exerciseKeyedActions(h,cookie.owner,['outcome.assess','outcome.reversal','outcome.investigate'])}
     for(let i=0;i<3;i++) {
       assets.push((await h.api('asset.create',cookie.lead,{tag:`OUT-CMP-${i+1}`,name:`Compressor ${i+1} for packaging hall production`,location:'Lake Erie plant',category:'Air compressor'})).id)
       meters.push((await h.api('meter.create',cookie.lead,{asset:assets[i],name:'Operating hours',kind:'counter',unit:'h'})).id)

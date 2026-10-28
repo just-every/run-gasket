@@ -2,10 +2,11 @@ import { rulesBrowser } from './rules-browser.mjs'
 // Rule authoring and execution through the built Worker's public HTTP doors.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 import { now } from './clock.mjs'
 export async function rulesJourney() {
  const h=await harness(),cookie={owner:await h.owner()},ids={}
+  exerciseKeyedActions(h, cookie.owner, ['rules.save', 'rules.control'])
  try {
   await h.api('site.configure',cookie.owner,{name:'Great Lakes Assembly',timezone:'UTC'})
   for(const [who,role] of [['lead','lead'],['tech','maintainer'],['supervisor','supervisor']]) {

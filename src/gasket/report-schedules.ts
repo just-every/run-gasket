@@ -10,6 +10,10 @@ async function author(env:Bindings,actor:Actor,row?:Row|null){
   insist(!actor.service&&can(actor,'board.read')&&can(actor,'history.export')&&(actor.role==='owner'||row?.editor_id===actor.id),'forbidden',403)
   if(actor.role!=='owner')insist((await member(env,row!.owner_id,row!.zone))?.role==='owner','forbidden',403)
 }
+export async function reportScheduleAuthority(env:Bindings,actor:Actor,input:Input){
+  const id=input.text('schedule',{optional:true,max:100})
+  await author(env,actor,id?await one(env,'SELECT * FROM gk_report_schedules WHERE id=?',id):null)
+}
 async function member(env:Bindings,id:string,zone:string):Promise<Actor|null>{
   const r=await one(env,`SELECT m.*,o.status AS operator_status,o.role AS operator_role FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=?`,id)
   if(!r||r.status!=='active'||r.operator_status!=='active'||(r.role==='owner'&&r.operator_role!=='owner'))return null

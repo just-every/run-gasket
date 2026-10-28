@@ -1,3 +1,4 @@
+import { apiWriteClaim } from './api-write-context'
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
 import type { Input } from './input'
@@ -24,7 +25,12 @@ export async function confirmRecoveryDrill(env: Bindings, actor: Actor, input: I
   // Operational receipts advance during confirmation; import already validates their archived counts and digests.
   for (const table of tables.filter(row => row.name.startsWith('gk_') && !['gk_guard','gk_recovery_receipts','gk_form_saves'].includes(row.name))) {
     insist(/^gk_[a-z0-9_]+$/.test(table.name), 'invalid_recovery_table')
-    conditions.push(guard(env, 'stale', `(SELECT COUNT(*) FROM "${table.name}")=?`, table.count))
+    const claim = apiWriteClaim()
+    // The claim for this confirmation is new operational data. Every archived
+    // retry receipt still counts; unrelated changes retain the ordinary refusal.
+    conditions.push(table.name === 'gk_api_writes' && claim
+      ? guard(env, 'stale', '(SELECT COUNT(*) FROM gk_api_writes WHERE NOT(actor_id=? AND key_hash=?))=?', claim.principal, claim.keyHash, table.count)
+      : guard(env, 'stale', `(SELECT COUNT(*) FROM "${table.name}")=?`, table.count))
   }
   await commit(env, [...conditions, stmt(env, 'UPDATE gk_recovery_receipts SET drill_by=?,drill_at=? WHERE id=? AND drill_at IS NULL', actor.id, now(), id)],
     { actor: actor.id, action: 'recovery.drill', subject: id, detail: { contentHash: receipt.content_hash, recoveryPoint: receipt.recovery_point } })

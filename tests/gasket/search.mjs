@@ -5,10 +5,11 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { randomUUID } from 'node:crypto'
 import { png } from './fixtures.mjs'
-import { file, harness } from './harness.mjs'
+import { file, harness, exerciseKeyedActions } from './harness.mjs'
 
 export async function searchJourney(h, cookie, count = 12) {
   const owner = cookie.owner
+  exerciseKeyedActions(h,owner,['search.save','search.delete'])
   const member = (await h.api('access.give', owner, { name: 'Search technician', email: 'synthetic-gasket-search@example.test', role: 'maintainer' })).id
   const tech = await h.signIn('synthetic-gasket-search@example.test')
   // Every serial is unique, including the one beyond the old list's 500-row cap.

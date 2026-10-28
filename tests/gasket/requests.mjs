@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
-import { harness, file } from './harness.mjs'
+import { harness, file, exerciseKeyedActions } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { draftPrivacy } from './request-draft-privacy.mjs'
 import { photoPrivacy, installationLimit, erasePrivateRequest } from './request-privacy.mjs'
@@ -605,6 +605,7 @@ export async function requestResponseJourney() {
 
 export async function strategyRolloutJourney() {
   const f=await requestFixture({clockInstant:Date.parse('2026-10-23T16:00:00Z')}),{h,cookie}=f
+  exerciseKeyedActions(h,cookie.owner,['pm.copy','pm.adapt','pm.approve','pm.rollout'])
   let browser,context
   try {
     const original=(await h.api('checklist.create',cookie.lead,{name:'Existing compressor procedure',items:['Existing guard inspection']})).id

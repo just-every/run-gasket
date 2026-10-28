@@ -16,6 +16,8 @@ import { EVIDENCE_BYTES } from './work'
 import { exceptionAuthority } from './exceptions'
 import { purchaseOrderDetail } from './purchase-orders'
 import { approvalRoute } from './purchase-authority'
+import { reportScheduleAuthority } from './report-schedules'
+import { withApiWriteClaim } from './api-write-context'
 
 const JSON_TYPE = ['application', 'json'].join('/')
 const RETRYABLE: Record<string, Capability | null> = {
@@ -66,6 +68,18 @@ const RETRYABLE: Record<string, Capability | null> = {
   'quote.save': 'site.manage', 'purchase.save': 'site.manage', 'purchase.approve': 'work.review',
   'purchase.send': 'site.manage', 'purchase.acknowledge': 'site.manage',
   'receipt.receive': 'register.manage', 'receipt.inspect': 'register.manage',
+  'pm.copy': 'register.manage', 'pm.adapt': 'register.manage', 'pm.approve': 'work.review', 'pm.rollout': 'work.review',
+  'nested.map': 'register.manage', 'nested.satisfy': 'work.assign',
+  'rules.save': 'register.manage', 'rules.control': 'register.manage', 'interval.limit': 'register.manage',
+  'outcome.window': 'register.manage', 'outcome.assess': 'proposal.prepare',
+  'outcome.reversal': 'proposal.prepare', 'outcome.investigate': 'proposal.prepare',
+  'workorders.generate': 'work.assign',
+  'site.create': 'site.manage', 'site.update': 'site.manage', 'site.membership': 'site.manage',
+  'site.configure': 'site.manage', 'site.technicianWork': 'site.manage',
+  'access.give': 'site.manage', 'access.role': 'site.manage', 'access.end': 'site.manage',
+  'service.revoke': 'site.manage', 'retention.policy': 'site.manage', 'retention.hold': 'site.manage',
+  'record.erase': 'site.manage', 'attachment.erase': 'site.manage', 'recovery.drill': 'site.manage',
+  'search.save': null, 'search.delete': null, 'report.schedule': null,
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -99,7 +113,7 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
   const capability = action === 'workorder.sign' && input.text('role', { max: 12 }) === 'supervisor' ? 'work.review' : RETRYABLE[action]
   if (capability) requireCapability(actor, capability)
-  if (['planning.slot', 'schedule.edit', 'workorders.bulk', 'workorders.fromTemplate'].includes(action) && input.flag('preview')) throw new GasketError('idempotency_preview_not_supported', 400)
+  if (['planning.slot', 'schedule.edit', 'workorders.bulk', 'workorders.fromTemplate', 'nested.satisfy'].includes(action) && input.flag('preview')) throw new GasketError('idempotency_preview_not_supported', 400)
   if (action === 'schedule.exception') await exceptionAuthority(env, actor, input)
   if (action === 'labor.entry') insist(actor.role === 'owner' || (input.text('person', { optional: true }) || actor.id) === actor.id, 'forbidden', 403)
   if (action === 'labor.entry' || action === 'labor.timer' || action === 'labor.invoice') await workOrder(env, input.text('workOrder', { max: 100 }))
@@ -151,6 +165,30 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
       insist(route.required.some(row => (!step || row.id === step) && row.effectiveId === actor.id && row.eligible), 'approval_authority_changed', 403)
     }
   }
+  if (action === 'pm.approve' || action === 'pm.rollout') {
+    const strategy = await one(env, 'SELECT r.number,r.created_by FROM gk_pm_strategy_revisions r WHERE r.strategy_id=? ORDER BY r.number DESC LIMIT 1', input.text('strategy'))
+    insist(strategy, 'strategy_not_found', 404)
+    insist(strategy.created_by !== actor.id && (action !== 'pm.approve' || strategy.number > 1), action === 'pm.approve' ? 'independent_adapted_strategy_required' : 'independent_rollout_required', 409)
+  }
+  if ((action === 'rules.save' && input.has('rule')) || action === 'rules.control') {
+    const rule = await one(env, 'SELECT owner_id FROM gk_rules WHERE id=?', input.text('rule'))
+    if (action === 'rules.control') insist(rule, 'rule_not_found', 404)
+    if (rule) insist(actor.role === 'owner' || rule.owner_id === actor.id, 'rule_not_yours', 403)
+  }
+  if (action === 'nested.satisfy') {
+    const higher = await one(env, 'SELECT schedule_id FROM gk_work_orders WHERE id=?', input.text('higherWork'))
+    const lower = await one(env, 'SELECT schedule_id FROM gk_work_orders WHERE id=?', input.text('lowerWork'))
+    insist(higher?.schedule_id && lower?.schedule_id, 'scheduled_work_required', 409)
+  }
+  if (action === 'report.schedule') await reportScheduleAuthority(env, actor, input)
+  if (action === 'search.save' || action === 'search.delete') {
+    if (action === 'search.save') insist(!input.flag('shared') || actor.role === 'owner', 'forbidden', 403)
+    const id = input.text('id', { optional: action === 'search.save', max: 100 })
+    const saved = id ? await one(env, 'SELECT owner_id FROM gk_search_views WHERE id=?', id) : null
+    // A deleted view has no private result payload. Its original principal may
+    // still recover the deletion receipt; a new request uses the normal handler.
+    if (saved) insist(saved.owner_id === actor.id || actor.role === 'owner', 'forbidden', 403)
+  }
   // Receipt access must not outlive the record authority that made it.
   // State and version checks stay in the handler for new effects; a completed
   // receipt remains replayable after its own successful state transition.
@@ -182,12 +220,13 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   // Claim before invoking the action: overlap, restart or uncertain results never
   // repeat a mutation. An interrupted claim stays pending for human reconciliation.
   try {
-    const result = await run(input)
+    const result = await withApiWriteClaim({ principal, keyHash }, () => run(input))
     const encoded = JSON.stringify(result)
     insist(encoded.length <= 64_000, 'idempotency_result_too_large', 500)
     // An erasure can finish while a response is being retained. Its opaque
     // journal marker also fences late result storage, without releasing the key.
-    const kept = await stmt(env, "UPDATE gk_api_writes SET state='completed',result_json=? WHERE actor_id=? AND key_hash=? AND state='pending' AND NOT EXISTS(SELECT 1 FROM gk_record_erasure_results e WHERE (e.kind='work' AND instr(?,e.record_id)>0) OR (e.kind='user' AND (e.record_id=? OR substr(?,1,length(e.record_id)+1)=e.record_id||':')))", encoded, principal, keyHash, encoded, principal, principal).run()
+    const erasureResult = action === 'record.erase' || action === 'attachment.erase'
+    const kept = await stmt(env, "UPDATE gk_api_writes SET state='completed',result_json=? WHERE actor_id=? AND key_hash=? AND state='pending' AND (? OR NOT EXISTS(SELECT 1 FROM gk_record_erasure_results e WHERE instr(?,e.record_id)>0 OR (e.kind='user' AND (e.record_id=? OR substr(?,1,length(e.record_id)+1)=e.record_id||':'))))", encoded, principal, keyHash, Number(erasureResult), encoded, principal, principal).run()
     insist(kept.meta.changes, 'idempotency_result_erased', 409)
     return { result, replayed: false }
   } catch (error) {
