@@ -18,9 +18,9 @@ import { daysBetween, localNow, showClock, showDate, showDay, showInstant, showL
 import { partList } from '../parts'
 import { usd } from '../bad-actors'
 import { assignable, site } from '../site'
-import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../today'
+import { TABS, pendingProposals, recentActivity, workToday, todayPageRows, type Tab } from '../today'
 import { woDigits } from '../quantity'
-import { workList, workOrderDetail } from '../work'
+import { workList, workPageRows, workOrderDetail } from '../work'
 import { teamList } from '../crew'
 import { kitList, substituteList } from '../reservations'
 import { chaseCard } from './chasing'
@@ -115,12 +115,14 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const filtered = mine || state === 'closed' || state === 'open'
   const tab = (TABS as readonly string[]).includes(url.searchParams.get('tab') ?? '') ? url.searchParams.get('tab') as Tab : 'today'
   const [today, place, pending, activity] = await Promise.all([workToday(env, actor, url), site(env), pendingProposals(env), recentActivity(env, actor)])
-  const rows = filtered ? await workList(env, actor, url) : today.tabs[tab]
-  const all = url.searchParams.get('all') === '1', shown = all ? rows : rows.slice(0, SHOWN)
+  const selection = new URL(url)
+  if (!selection.searchParams.has('limit')) selection.searchParams.set('limit', selection.searchParams.get('all') === '1' ? '100' : String(SHOWN))
+  const result = filtered ? await workPageRows(env, actor, selection) : await todayPageRows(env, actor, selection)
+  const rows = result.rows, shown = rows
   const assigner = can(actor, 'work.assign')
   const here = (params: string) => `/app${params ? `?${params}` : ''}`
 
-  const tabs = h`<nav class="gk-count-tabs" aria-label="Today's work">${TABS.map((key, index) => h`${index === 1 ? raw('<span class="gk-tab-rule" aria-hidden="true"></span>') : ''}<a href="${here(key === 'today' ? '' : `tab=${key}`)}" class="gk-count-tab gk-count-${key}"${!filtered && key === tab ? raw(' aria-current="page"') : ''}>${TAB_LABEL[key]} <b class="gk-num">${today.tabs[key].length}</b></a>`)}</nav>`
+  const tabs = h`<nav class="gk-count-tabs" aria-label="Today's work">${TABS.map((key, index) => h`${index === 1 ? raw('<span class="gk-tab-rule" aria-hidden="true"></span>') : ''}<a href="${here(key === 'today' ? '' : `tab=${key}`)}" class="gk-count-tab gk-count-${key}"${!filtered && key === tab ? raw(' aria-current="page"') : ''}>${TAB_LABEL[key]} <b class="gk-num">${today.counts[key]}</b></a>`)}</nav>`
 
   const filters = h`<nav class="gk-tab-filters" aria-label="Other work lists">${[['state=open', 'All open', state === 'open' && !mine], ['mine=1', 'Assigned to me', mine], ['state=closed', 'Closed', state === 'closed']].map(([params, label, on]) => h`<a href="${here(params as string)}"${on ? raw(' aria-current="page"') : ''}>${label}</a>`)}</nav>`
   const agent = pending.count && pending.latest && (can(actor, 'proposal.decide') || can(actor, 'proposal.prepare')) ? h`<p class="gk-agent">${ICON.proposals}<span class="gk-agent-text"><b>${pending.latest.prepared_by}:</b> ${pending.latest.reasoning.split(/(?<=\.)\s/)[0]}</span><span class="gk-approval"><i class="gk-dot" aria-hidden="true"></i>${pending.count} proposal${pending.count === 1 ? '' : 's'} waiting for a decision</span><a class="gk-agent-link" href="/app/proposals">Review</a></p>` : ''
@@ -134,7 +136,12 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const [title, text] = filtered ? [state === 'closed' ? 'No closed work orders yet' : mine ? 'Nothing is assigned to you' : 'No open work orders', 'Work orders appear here when a schedule falls due or when you raise corrective work on an asset.'] : emptyText[tab]
   const empty = h`<div class="gk-empty gk-empty-flat"><img src="/brand/assets/clipboard.svg" alt="" width="160" height="128"><h2>${title}</h2><p>${text}</p>${assigner && !filtered && tab === 'today' ? h`<p><a class="gk-button gk-secondary" href="/app/schedules">Go to schedules</a></p>` : ''}</div>`
 
-  const more = rows.length > shown.length ? h`<a class="gk-more-rows" href="${here([filtered ? url.searchParams.toString() : tab === 'today' ? '' : `tab=${tab}`, 'all=1'].filter(Boolean).join('&'))}">+ ${rows.length - shown.length} more</a>` : ''
+  const continuation = new URLSearchParams(selection.searchParams)
+  continuation.set('cursor', result.next ?? '')
+  const first = new URLSearchParams(selection.searchParams); first.delete('cursor')
+  const exportParams = new URLSearchParams(selection.searchParams); exportParams.delete('cursor'); exportParams.set('snapshot', result.start)
+  const more = h`<nav class="gk-more-rows" aria-label="Work pages"><span role="status">${result.total ? result.offset + 1 : 0}–${result.offset + rows.length} of ${result.total} work orders</span> ${result.offset ? h`<a href="${here(first.toString())}">First page</a> ` : ''}${result.next ? h`<a href="${here(continuation.toString())}">Next page</a>` : ''}</nav>${filtered ? h`<p><a href="/app/work.csv?${exportParams.toString()}">Download work CSV</a> · Up to 2,000 matching work orders. Larger or changed lists are refused; accepted work and files are preserved.</p>` : ''}`
+
   const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${woDigits(row.number)} ${row.asset_tag ?? row.location}</a> ${shortTask(row.title)}`)}</span><a href="${here('state=open')}">All open work</a></p>` : ''
 
   let log: Html = h``

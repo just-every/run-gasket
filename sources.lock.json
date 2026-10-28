@@ -1528,7 +1528,7 @@
       "executable": false
     },
     "src/gasket/doors.ts": {
-      "sha256": "b5bae1bd04186f0f1d36924d5e3649cbb6a76ddb8d87aa95469388925a26cad6",
+      "sha256": "d15929a59afa587c7da5d31e779be9f4cf89cc058a1f0287c414315137831d76",
       "executable": false
     },
     "src/gasket/exceptions.ts": {
@@ -1552,7 +1552,7 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "f87a8b1af5118c812aa1b03a1a39d1f386ba9dfcf1997a8422d68bdc36a2903b",
+      "sha256": "6a638e05cc0d96a4a73df96a0ed1bfc7401f5d674a46f931694f9a2cfd814588",
       "executable": false
     },
     "src/gasket/input.ts": {
@@ -1685,6 +1685,10 @@
     },
     "src/gasket/outcomes.ts": {
       "sha256": "ca4bcd82a9ffc21b69002462364119bc6a545357dcbbee022c8466e3fec74118",
+      "executable": false
+    },
+    "src/gasket/pagination.ts": {
+      "sha256": "86c9ed24b7816ad77f2086072fb12af87d51c5d55435d4134af1a5d0e3c367c3",
       "executable": false
     },
     "src/gasket/part-identity.ts": {
@@ -1968,7 +1972,7 @@
       "executable": false
     },
     "src/gasket/today.ts": {
-      "sha256": "872777c3ea4ef8fb3470b1c166c583c7b8f7e6b0a49349e5356854949a1d6ae9",
+      "sha256": "b323e39b383f642fa87ac705d4cad5639fbd4b5bc9d34882b6be006127464990",
       "executable": false
     },
     "src/gasket/tools.ts": {
@@ -2220,7 +2224,7 @@
       "executable": false
     },
     "src/gasket/ui/work.ts": {
-      "sha256": "b7f6cf902540bac5f1c94e324e1ab4e83e0676ebe2e2905f74ec65368f6f2227",
+      "sha256": "1dc91149ed2f1add00ccede3cbf7d343602d39cdb67511ef1128e0b5566a4771",
       "executable": false
     },
     "src/gasket/valuation.ts": {
@@ -2240,7 +2244,7 @@
       "executable": false
     },
     "src/gasket/views.ts": {
-      "sha256": "22e5d75f7b9eba40fb70b3fe16d50f3af22e64fa68b16fd1bda495d4a2883a27",
+      "sha256": "10fa77775ac6fa59e2fe02a1dd8ad9e1fbc629bb197735ff9c75c5ba022851e5",
       "executable": false
     },
     "src/gasket/webhook-signing.ts": {
@@ -2264,7 +2268,7 @@
       "executable": false
     },
     "src/gasket/work.ts": {
-      "sha256": "ac8936b248c3ec4e1fd5913e9cebeaf189ed6681cb4df24ad571b536bcb933a9",
+      "sha256": "48e522ff536bee9a982571ed4451f3db1d0caca5bdbbdac10b020361a24fa680",
       "executable": false
     },
     "src/gasket/zip.ts": {
@@ -4200,7 +4204,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "b12b46c2ec94a6770495c8732c37963e56f2732ed108f06dfcb7162b4a4c79d9",
+      "sha256": "33c64b03391285034e1d6dcfd479cb664c3f66f2703d7a2fcbb4cf81fe463b9f",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4397,6 +4401,10 @@
     },
     "tests/gasket/work-costing.mjs": {
       "sha256": "1f549bbadc55258850b9208bb74d15dd500d52b91c59e45e10daffddf2bd997b",
+      "executable": false
+    },
+    "tests/gasket/work-pagination.mjs": {
+      "sha256": "97abd7495c437f78735255ed4c48e7401777cb170a9781411d3f4255f7e1d5b6",
       "executable": false
     },
     "tests/gasket/work-pdf.mjs": {
