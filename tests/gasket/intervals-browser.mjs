@@ -669,13 +669,25 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
         inspected.add(new URL(path,h.origin).pathname)
       }
       const fixed=inspected.size
+      let downloads=0
       for (const [path,destination] of linked) {
         if (inspected.has(path)) continue
         inspected.add(path)
+        // A linked attachment has no document or landmarks to inspect. Exercise
+        // its authenticated HTTP door and consume its body instead of navigating
+        // the page, which makes Playwright throw as soon as the download starts.
+        const response=await h.raw(destination,{cookie:cookie.owner})
+        assert.equal(response.status,200,`${destination} linked door opens`)
+        const bytes=await response.arrayBuffer()
+        if (/^attachment(?:;|$)/i.test(response.headers.get('content-disposition')||'')) {
+          assert.ok(bytes.byteLength>0,`${destination} attachment has a readable body`)
+          downloads++
+          continue
+        }
         await open(destination, `linked-record-${inspected.size}`)
       }
       console.log('workspace action inventory unexercised='+JSON.stringify([...visibleActions].filter(action=>!exercisedActions.has(action)).sort()))
-      console.log(`workspace pages proof fixed=${fixed} linked=${inspected.size-fixed} assistive-names=present keyboard=usable`)
+      console.log(`workspace pages proof fixed=${fixed} linked=${inspected.size-fixed-downloads} downloads=${downloads} assistive-names=present keyboard=usable`)
 
     }
   } finally {for (const snapshot of snapshots) await snapshot.close();await context.close()}
