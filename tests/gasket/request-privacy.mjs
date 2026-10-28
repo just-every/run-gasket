@@ -42,7 +42,7 @@ export async function photoPrivacy(f,jpeg) {
   await h.api('request.portal',cookie.owner,{portal,revision:1,name:'Photo privacy intake',fields:photos})
   const extra=Object.fromEntries(photos.map(p=>[`field_${p.key}`,file('evidence.png',png,'image/png')]))
   const tooMany=await h.raw(`/request/${portal}`,{cookie:cookie.tech,body:{...payload,target,submissionKey:randomUUID(),...extra}})
-  assert.equal(tooMany.status,400);assert.match(await tooMany.text(),/too many photos/)
+  assert.equal(tooMany.status,400);assert.match((await tooMany.text()).match(/<p>Save failed: ([^<]+)<\/p>/)?.[1] || '',/Use no more than five photos.*Nothing was saved/)
 }
 export async function installationLimit(f) {
   const {h,cookie,asset,payload}=f
@@ -56,7 +56,7 @@ export async function installationLimit(f) {
     for(let j=0;j<5;j++) {
       const r=await h.raw(`/request/${portal}`,{body:{...payload,target,submissionKey:randomUUID(),photo:undefined,field_nameplate:undefined}})
       if(r.status===429) {
-        assert.match(await r.text(),/intake rate limited/)
+        assert.match((await r.text()).match(/<p>Save failed: ([^<]+)<\/p>/)?.[1] || '',/Too many requests from this network.*Nothing was saved/)
         const rows=await h.api('requests',cookie.lead);assert.equal(rows.length,100)
         const log=(await h.api('audit?action=request.limit',cookie.owner)).rows
         assert.ok(log.length>0)
