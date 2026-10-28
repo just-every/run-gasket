@@ -19969,7 +19969,10 @@
                                 "type": "string"
                               },
                               "error": {
-                                "type": "string"
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
                               }
                             },
                             "required": [],
