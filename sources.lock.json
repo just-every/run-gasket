@@ -1348,7 +1348,7 @@
       "executable": false
     },
     "src/gasket/actor.ts": {
-      "sha256": "1f989e57b46fad541e27e7f790f2599d24ef97a99c2e529749ab7efdb4d9ff73",
+      "sha256": "ffd53df4f9f76d6357570bf637763088ee683dcd510630636ddb80b73db3a428",
       "executable": false
     },
     "src/gasket/agent-follow-up.ts": {
@@ -4256,7 +4256,7 @@
       "executable": false
     },
     "tests/gasket/messages.mjs": {
-      "sha256": "dc31c206ac3e55d891e5d3d2b7742d1bb62c89c4a41834416cdc268ef4c1fade",
+      "sha256": "7b82c41234d8d96216fd745b9974e536be428e6c8e5ce5b9216ced07b76c456e",
       "executable": false
     },
     "tests/gasket/metrics.mjs": {
