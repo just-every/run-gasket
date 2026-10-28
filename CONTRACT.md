@@ -853,7 +853,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 *Tier:* Core · *Cites:* BASE-ROLE-001, BASE-INPUT-001
 
-**Requirement.** Reconnect sync is resumable and idempotent with per-record results. Server-side assignment, stock, meter and review versions remain authoritative; conflicting offline changes need a visible resolution and never disappear. Revoked users/devices cannot upload; remote wipe policy and local-data expiry are disclosed. Work created offline whose creator's create-work right or access ended before it syncs is refused at sync with a visible per-record reason that stays on the device and in the lead's view (FIELD-009).
+**Requirement.** Reconnect sync is resumable and idempotent with per-record results. Server-side assignment, stock, meter and review versions remain authoritative; conflicting offline changes need a visible resolution and never disappear. Revoked users/devices cannot upload. Device-local expiry and wipe disclosure belong to FIELD-010. Work created offline whose creator's create-work right or access ended before it syncs is refused at sync with a visible per-record reason that stays on the device and in the lead's view (FIELD-009).
 
 **Acceptance.**
 1. Two devices edit the same job offline and consume the last part, then reconnect in reverse order and interrupt photo sync.
@@ -918,7 +918,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 #### FIELD-010 — Shared and lost device lifecycle
 
-*Tier:* Core · *From:* FIELD-008
+*Tier:* Core · *From:* FIELD-008, FIELD-003
 
 **Requirement.** Shared-device sign-out protects cached maintenance data. Lost devices can be revoked without deleting server history; local expiry and wipe behavior are disclosed.
 

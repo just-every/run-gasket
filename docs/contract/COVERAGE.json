@@ -939,7 +939,8 @@
       "text": "**FIELD-003 \u2014 Reconnection, conflicts and device revocation.** Reconnect sync is resumable and idempotent with per-record results. Server-side assignment, stock, meter and review versions remain authoritative; conflicting offline changes need a visible resolution and never disappear. Revoked users/devices cannot upload; remote wipe policy and local-data expiry are disclosed. Work created offline whose creator's create-work right or access ended before it syncs is refused at sync with a visible per-record reason that stays on the device and in the lead's view (FIELD-009). **Acceptance evidence:** Two devices edit the same job offline and consume the last part, then reconnect in reverse order and interrupt photo sync. Inspect one accepted movement, visible conflict and retained draft; revoke a device and verify refused upload. Create work in airplane mode, revoke the creator's create-work right before reconnecting, sync, and see the work refused with a visible reason that stays on the device and the lead's view (FIELD-009).",
       "to": "clause",
       "ids": [
-        "FIELD-003"
+        "FIELD-003",
+        "FIELD-010"
       ]
     },
     {

@@ -408,9 +408,10 @@
       ]
     },
     "FIELD-003": {
-      "how": "kept",
+      "how": "split",
       "to": [
-        "FIELD-003"
+        "FIELD-003",
+        "FIELD-010"
       ]
     },
     "FIELD-004": {
