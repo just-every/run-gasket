@@ -11,7 +11,13 @@
     {
       "file": "CONTRACT.md",
       "line": 3,
-      "text": "Target edition: 17 October 2026. Gasket is a complete mobile CMMS for US maintenance teams replacing MaintainX, UpKeep or Fiix by Rockwell Automation and competing with Limble and Tractian. It keeps equipment available by turning faults, preventive requirements and live condition evidence into timely, resourced work, then preserving the technician evidence, spare-parts movements, purchasing, maintenance costs and reliability outcomes. It serves the full owned-equipment maintenance job, from one workshop to multiple plants and storerooms.",
+      "text": "Target edition: 17 October 2026.",
+      "to": "changelog"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 3,
+      "text": "Gasket is a complete mobile CMMS for US maintenance teams replacing MaintainX, UpKeep or Fiix by Rockwell Automation and competing with Limble and Tractian. It keeps equipment available by turning faults, preventive requirements and live condition evidence into timely, resourced work, then preserving the technician evidence, spare-parts movements, purchasing, maintenance costs and reliability outcomes. It serves the full owned-equipment maintenance job, from one workshop to multiple plants and storerooms.",
       "to": "section",
       "section": "intro"
     },
