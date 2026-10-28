@@ -4364,7 +4364,7 @@
       "executable": false
     },
     "tests/gasket/safety.mjs": {
-      "sha256": "86524f6b18010aa136505a98d60726651f9389d4fd33e220eafff8e975d7adc4",
+      "sha256": "0c2aa6bb3b61e96f6782e7ba1ac45f440538dd1610c0a6b35e2751a1d6491cbd",
       "executable": false
     },
     "tests/gasket/search.mjs": {

@@ -191,7 +191,7 @@ export async function safetyJourney() {
   const retired=(await h.api('planning',owner)).retired.find(r=>r.kind==='qualification')
   const protectedPreview=await h.api(`retention-preview?kind=qualification&id=${retired.id}`,owner)
   assert.equal(protectedPreview.eligible,false,'retained sign-offs protect retired qualification evidence')
-  assert.equal(protectedPreview.dependencies.safetySignoffs,3)
+  assert.equal(protectedPreview.dependencies.safetySignoffs,5)
   const signedBefore=await state()
   assert.equal((await h.api('qualification.erase',owner,{id:retired.id,revision:protectedPreview.revision,confirm:true},409)).error,'qualification_retained')
   assert.deepEqual(await state(),signedBefore,'refused erasure preserves every signed snapshot and permit')
