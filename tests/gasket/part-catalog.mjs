@@ -11,7 +11,7 @@ export async function partCatalogJourney(h,cookie,onReady) {
   try {return await catalogJourney(h,cookie,browser.run)} finally {await browser.close()}
 }
 async function catalogJourney(h,cookie,onReady) {
-  exerciseKeyedActions(h, cookie.owner, ['catalog.import', 'catalog.undo', 'catalog.receive', 'catalog.prefer', 'part.merge.approve'], { once: true })
+  exerciseKeyedActions(h, cookie.owner, ['catalog.import', 'catalog.apply', 'catalog.undo', 'catalog.receive', 'catalog.prefer', 'part.merge.approve'], { once: true })
   const supplier=async(name,email)=> (await h.api('supplier.save',cookie.owner,{name,contact:'Dina Morris',email,phone:'+1 216 555 0164',street:'4100 Lakeside Avenue',city:'Cleveland',state:'OH',zip:'44114',taxTreatment:'sales_tax',paymentTerms:'Net 30',leadDays:6,active:true})).id
   const first=await supplier('Lake Erie Bearings','catalog@erie.example.test'),second=await supplier('Midwest Industrial Supply','catalog@midwest.example.test')
   const header='number,name,unit,manufacturer,manufacturerNumber,vendorNumber,packUnit,packQuantity,price\n'
@@ -26,7 +26,7 @@ async function catalogJourney(h,cookie,onReady) {
   assert.deepEqual({parts:await h.api('parts',cookie.lead),audit:await h.api('audit',cookie.owner)},beforePreview,'PART-008 catalog preview writes no records or audit')
   await h.api('catalog.import',cookie.owner,importFile(first,catalogA),400)
   await h.api('catalog.import',cookie.owner,{...importFile(first,catalogA.replace('10.00','11.00')),fingerprint:reviewedA.fingerprint},409)
-  const firstImport=await h.api('catalog.import',cookie.owner,{...importFile(first,catalogA),fingerprint:reviewedA.fingerprint})
+  const firstImport=await h.api('catalog.apply',cookie.owner,{supplier:first,filename:'bearings.csv',base64:Buffer.from(catalogA).toString('base64'),mediaType:'text/csv',fingerprint:reviewedA.fingerprint})
   assert.equal(firstImport.created,1)
   const reviewedB=await h.api('catalog.preview',cookie.owner,importFile(second,catalogB))
   const browserImported=await onReady?.({stage:'import',h,cookie,supplier:second,csv:catalogB})

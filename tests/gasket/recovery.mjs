@@ -1,5 +1,6 @@
 import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
 // Portable inactive recovery through supported commands and authenticated HTTP.
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
@@ -8,6 +9,27 @@ import { createHash, randomUUID } from 'node:crypto'
 import { harness, file, exerciseKeyedActions } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { installation } from './installation.mjs'
+
+// Interrupt the public export command after real archive work begins. Only
+// the exact child this journey started receives the signal.
+async function interruptExport(root, output) {
+  const { RER_LOCAL_OPERATION: _operation, ...env } = process.env
+  const child = spawn(join(root, 'node_modules/.bin/rer'), ['export', '--output', output, '--cwd', root, '--non-interactive'], { cwd: root, env: { ...env, CI: 'true', WRANGLER_SEND_METRICS: 'false' }, stdio: ['ignore','pipe','pipe'] })
+  let interrupted = false, seen = ''
+  const deadline = setTimeout(() => child.kill('SIGTERM'), 120_000)
+  const progress = bytes => {
+    seen = (seen + bytes.toString()).slice(-4000)
+    if (!interrupted && seen.includes('Building the archive:')) { interrupted = true; child.kill('SIGINT') }
+  }
+  child.stdout.on('data', progress)
+  child.stderr.on('data', progress)
+  try {
+    const status = await new Promise((resolve,reject) => { child.once('error',reject); child.once('close',(code,signal)=>resolve({code,signal})) })
+    assert.ok(interrupted, `the export reached archive construction before interruption (exit ${status.code}, signal ${status.signal})`)
+    assert.ok(status.code !== 0 || status.signal, 'the owned export command reports interruption')
+    await assert.rejects(readFile(output), { code: 'ENOENT' }, 'an interrupted transfer publishes no partial archive')
+  } finally { clearTimeout(deadline) }
+}
 
 export async function recoveryJourney() {
   const h = await harness(), target = await installation(), corruptTarget = await installation()
@@ -59,6 +81,16 @@ export async function recoveryJourney() {
     const erasedRecords=await erasureFixture(h,owner,asset)
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'recovery.rer')
+    await interruptExport(h.installation.root, archive)
+    const interruptedSource = await harness({ vars: h.vars, installation: h.installation })
+    try {
+      const inspecting = await interruptedSource.signIn(h.vars.OWNER_EMAIL)
+      assert.equal((await interruptedSource.api('recovery', inspecting)).backup, null, 'interrupted export never records a successful backup')
+      assert.equal((await interruptedSource.api(`work/${accepted.id}`, inspecting)).title, 'Accepted before backup')
+      assert.deepEqual(Buffer.from(await (await interruptedSource.raw(`/app/request-files/${photo}`, { cookie: inspecting })).arrayBuffer()), png, 'interruption preserves the source original')
+      assert.equal((await interruptedSource.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })).status, 200, 'interruption leaves source service authority active')
+    } finally { await interruptedSource.close() }
+    // The documented retry starts the transfer again at the same output path.
     await h.installation.rer('export', '--output', archive)
     const bytes = await readFile(archive)
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')

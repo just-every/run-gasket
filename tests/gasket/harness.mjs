@@ -78,7 +78,7 @@ export function exerciseKeyedActions(h, owner, actions, { once = false } = {}) {
     if (!selected.has(path) || body === undefined || body.preview) return ordinary(path, cookie, body, status)
     // The shared core journey keeps one replay sanity check per action and
     // person. Its remaining business assertions use their original HTTP door.
-    const identity = path + ':' + cookie
+    const identity = path + ':' + cookie + (path.endsWith('.job') ? ':' + body.action : '')
     if (once && exercised.has(identity)) return ordinary(path, cookie, body, status)
     const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + namespace + '-' + (++sequence) }
     const request = () => h.raw('/api/gasket/v1/' + path, { cookie, body, headers })
