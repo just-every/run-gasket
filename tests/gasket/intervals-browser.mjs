@@ -176,7 +176,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       submitter.press('Enter'),
     ])
     const confirmation = await reply.json()
-    const error = form.getByRole('alert')
+    const error = form.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s})
     await error.waitFor()
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
     assert.equal(await error.evaluate(el=>el===document.activeElement),true,`${action} error has keyboard focus`)
@@ -570,7 +570,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
       await again.getByLabel('Minutes worked').fill('3');await again.getByLabel('Time note').fill(`Uncertain confirmation ${width}`)
       const lost = await loseSaveReply(h, page, '/app/do/workorder.time')
       await Promise.all([lost.completed, again.getByRole('button',{name:'Record time'}).click()])
-      await again.getByRole('alert').waitFor()
+      await again.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s}).waitFor()
       assert.match(await again.getByRole('alert').innerText(),new RegExp('connection ended.*Saved. The server confirmed','s'))
       assert.equal(await again.getByLabel('Time note').inputValue(),`Uncertain confirmation ${width}`)
       assert.equal(await again.getByRole('button',{name:'Record time'}).isDisabled(),true)
