@@ -38,7 +38,7 @@ export const doorOf = (request: Request): Door => new URL(request.url).pathname.
 
 export const OPEN = "('open', 'in_progress', 'returned')"
 export const EVIDENCE_BYTES = 1_500_000
-const EVIDENCE_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic', pdf: 'application/pdf' }
+const EVIDENCE_TYPES: Record<string, string> = Object.assign(Object.create(null), { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic', pdf: 'application/pdf' })
 
 export async function workOrder(env: Bindings, id: string) {
   const row = await one(env, 'SELECT * FROM gk_work_orders WHERE id = ?', id)

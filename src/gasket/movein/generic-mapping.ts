@@ -27,7 +27,7 @@ export function dateValue(text:string,order:DateOrder,zone='UTC') {
 }
 function reference(text:string,rows:Row[],keys:string[],explicit:Record<string,string>,label:string):Row|null {
   if(!text)return null
-  const mapped=explicit[text]
+  const mapped=Object.hasOwn(explicit,text)?explicit[text]:undefined
   const matches=rows.filter(r=>mapped?r.id===mapped:keys.some(k=>String(r[k]??'').toLowerCase()===text.toLowerCase()))
   insist(matches.length===1,`Unknown or ambiguous ${label}: ${text}`)
   return matches[0]
@@ -37,7 +37,7 @@ export function mapWorkRow(cells:Record<string,string>,context:MappingContext):{
   const {actor,order}=context,history=/^(completed|closed|done)$/i.test(get('Status'))
   insist(history||/^(open|in_progress)$/i.test(get('Status')),'Status must be open, in_progress or completed')
   const title=get('Title');insist(title&&title.length<=160,'A title of at most 160 characters is required')
-  const referenceId=get('Asset ID'),mapped=context.assetMapping[referenceId]??context.importedAssets.get(referenceId)
+  const referenceId=get('Asset ID'),mapped=(Object.hasOwn(context.assetMapping,referenceId)?context.assetMapping[referenceId]:undefined)??context.importedAssets.get(referenceId)
   if(mapped)insist(context.assets.some(a=>a.id===mapped)||[...context.importedAssets.values()].includes(mapped),'Mapped asset is unavailable')
   const asset=mapped?{id:mapped}:reference(referenceId,context.assets,['id','tag'],{},'asset')
   const location=get('Location')||null

@@ -19,7 +19,7 @@ import { woDigits } from './quantity'
 import { EVIDENCE_BYTES } from './work'
 
 export const COMMENT_PHOTOS = 4
-const PHOTO_TYPES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic' }
+const PHOTO_TYPES: Record<string, string> = Object.assign(Object.create(null), { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', heic: 'image/heic' })
 type Kind = 'work' | 'asset'
 const COLUMN: Record<Kind, string> = { work: 'work_order_id', asset: 'asset_id' }
 
