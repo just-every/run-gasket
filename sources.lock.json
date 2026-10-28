@@ -4244,7 +4244,7 @@
       "executable": false
     },
     "tests/gasket/metrics.mjs": {
-      "sha256": "a989170c8a32fae9c7b7ab3f34659a95bb137b17f07972f9716d8e40e0e532de",
+      "sha256": "83e40d42e5404722674010a5747e78301f94bb70eb54a9e64dce239f8287328a",
       "executable": false
     },
     "tests/gasket/nested.mjs": {

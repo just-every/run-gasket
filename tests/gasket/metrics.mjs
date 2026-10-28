@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { file, harness } from './harness.mjs'
 import { historyAssetsCsv, workCsv } from './fixtures.mjs'
 import { now, zone } from './clock.mjs'
+import { addDays, zonedInstant } from '../../src/gasket/dates.ts'
 
 const local = instant => {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(instant).map(p => [p.type,p.value]))
@@ -11,14 +12,18 @@ const local = instant => {
 }
 export async function metricsJourney(h, cookie, people) {
   const today = local(now()).slice(0,10)
+  // A closed day keeps elapsed coverage stable across read and classification.
+  // Recent historian readings remain inside their ordinary freshness window.
+  const recordedNow = zonedInstant(zone, today + 'T00:00')
+  const period = `from=${addDays(today,-1)}&to=${addDays(today,-1)}`
   const asset = (await h.api('asset.create', cookie.lead, { tag: 'DQ-901', name: 'Process chilled-water recirculation pump', location: 'North plant · Chiller skid 4' })).id
   const meter = (await h.api('meter.create', cookie.lead, { asset, name: 'Drive operating hours', unit: 'h', kind: 'counter' })).id
-  for (const [value,minutes] of [['100',180],['102',60]]) await h.api('meter.feed', cookie.lead, { meter, source: 'Plant historian export', value, takenOn: local(now()-minutes*60000) })
-  const late = await h.api('meter.feed', cookie.lead, { meter, source: 'Delayed gateway file', value: '99', takenOn: local(now()-30*3600000) })
+  for (const [value,minutes] of [['100',180],['102',60]]) await h.api('meter.feed', cookie.lead, { meter, source: 'Plant historian export', value, takenOn: local(recordedNow-minutes*60000) })
+  const late = await h.api('meter.feed', cookie.lead, { meter, source: 'Delayed gateway file', value: '99', takenOn: local(recordedNow-30*3600000) })
   assert.equal(late.quality,'stale')
   const job = (await h.api('workorder.create', cookie.lead, { asset, title: 'Inspect noisy drive bearing and restore circulation', due: today, assignee: people.max })).id
-  await h.api('downtime.start', cookie.max, { workOrder: job, startedOn: local(now()-120*60000), reason: 'Bearing vibration exceeded shutdown trigger' })
-  await h.api('downtime.end', cookie.max, { workOrder: job, endedOn: local(now()-90*60000) })
+  await h.api('downtime.start', cookie.max, { workOrder: job, startedOn: local(recordedNow-120*60000), reason: 'Bearing vibration exceeded shutdown trigger' })
+  await h.api('downtime.end', cookie.max, { workOrder: job, endedOn: local(recordedNow-90*60000) })
   // This journey imports its own records: prior flows deliberately edit and retain their moved-in records.
   const ownSource=text=>text.replaceAll('82001','92001').replaceAll('82002','92002').replaceAll('HK-201','DQ-201').replaceAll('HK-202','DQ-202').replace(/700([1-8])/g,'9700$1')
   const files = { assets: file('maintainx-assets-quality.csv', ownSource(historyAssetsCsv)), work: file('maintainx-incomplete-history.csv', ownSource(workCsv)) }
@@ -27,8 +32,8 @@ export async function metricsJourney(h, cookie, people) {
   const part=(await h.api('part.create',cookie.lead,{number:'DQ-5',name:'Pump drive bearing',unit:'ea',location:'M-4',minimum:'1'})).id
   await h.api('part.receive',cookie.lead,{part,quantity:'5',note:'Packing slip has no price'})
   const originalHistory = await h.api(`assets/${asset}/history`, cookie.lead)
-  const get = () => h.api(`metrics?asset=${asset}`, cookie.lead)
-  const before = await get(), report = await h.api(`reliability?asset=${asset}`, cookie.lead)
+  const get = () => h.api(`metrics?asset=${asset}&${period}`, cookie.lead)
+  const before = await get(), report = await h.api(`reliability?asset=${asset}&${period}`, cookie.lead)
   assert.deepEqual(before.coverage.mtbf,report.mtbf)
   assert.deepEqual([before.coverage.failures,before.coverage.mtbf.hours,before.coverage.mttr.minutes],[1,2,30])
   assert.ok(before.coverage.mtbf.unknownHours > 0)
@@ -68,7 +73,7 @@ export async function metricsJourney(h, cookie, people) {
   assert.ok(after.sourceRevision>before.sourceRevision)
   assert.notEqual(after.inputFingerprint,before.inputFingerprint)
   assert.deepEqual((await h.api(`assets/${asset}`,cookie.lead)).meters,sources.meters,'late and original readings survive recomputation')
-  const updated = await h.api(`reliability?asset=${asset}`,cookie.lead)
+  const updated = await h.api(`reliability?asset=${asset}&${period}`,cookie.lead)
   assert.deepEqual(updated.failures[0].classifications[0],stop.classifications[0],'original stop classification is retained')
   assert.equal(updated.failures[0].failureMode.key,'dq-bearing')
   const retained=(await h.api(`assets/${asset}/history`,cookie.lead)).events
