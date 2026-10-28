@@ -19,7 +19,7 @@ export async function recordErasurePage(env: Bindings, actor: Actor, url: URL) {
       ${preview.erased?h`<p>Erasure completed. Anonymized audit remains. Prior downloads are outside local erasure.</p>${table(['Removed record type','Count'],Object.entries(preview.result.removed as Record<string,number>).filter(([,count])=>count>0).map(([type,count])=>[label(type),count]),'Erasure result',{wrap:[0]})}`:h`${preview.obligations?.map(text=>h`<p>${text}</p>`)}${preview.eligible?form('record.erase',url.pathname+url.search,h`${hidden('kind',kind)}${hidden('id',id)}${hidden('token',preview.token)}<label><input type="checkbox" name="confirm" required> I confirm permanent erasure of this previewed record and its eligible dependencies.</label>`,'Erase this record'):''}`}`):''}`,{url})
 }
 
-const qualificationLabel=(name:string)=>({retiredQualifications:'Retired qualifications',auditDetails:'Audit details',reminders:'Renewal notices',safetySignoffs:'Safety sign-offs',reminderInputs:'Reminder captures',stewardship:'Stewardship scopes',releasedHolds:'Released qualification holds'} as Record<string,string>)[name]??label(name)
+const qualificationLabel=(name:string)=>({retiredQualifications:'Retired qualifications',auditDetails:'Audit details',reminders:'Renewal notices',safetySignoffs:'Safety sign-offs',reminderInputs:'Reminder captures',stewardship:'Stewardship scopes',releasedHolds:'Released qualification holds',legacyNotices:'Unattributed older notices'} as Record<string,string>)[name]??label(name)
 
 async function qualificationPage(env: Bindings, actor: Actor, url: URL, id: string) {
   const preview=id?await qualificationErasurePreview(env,actor,id):null

@@ -26,7 +26,8 @@ const HOLD_SCOPE = `(h.kind='user' AND (h.record_id=?
  OR h.record_id IN (SELECT grantee_id FROM gk_resource_grants WHERE ${GRANTS})))
  OR (h.kind='qualification' AND h.record_id IN (SELECT id FROM gk_retired_resources WHERE ${FAMILY}))`
 const MINIMUM_DAYS = `COALESCE((SELECT MAX(minimum_days) FROM gk_retention_policies WHERE kind IN ('maintenance_records','users')),0)`
-const ELIGIBLE = `NOT EXISTS(SELECT 1 FROM gk_qualifications WHERE member_id=? AND name=? COLLATE NOCASE)
+const ELIGIBLE = `NOT EXISTS(SELECT 1 FROM gk_qualification_reminders WHERE record_id='legacy')
+ AND NOT EXISTS(SELECT 1 FROM gk_qualifications WHERE member_id=? AND name=? COLLATE NOCASE)
  AND NOT EXISTS(SELECT 1 FROM gk_safety_attestations WHERE signer=? AND json_extract(qualification_json,'$.name')=? COLLATE NOCASE)
  AND NOT EXISTS(SELECT 1 FROM gk_retention_scope_holds h WHERE h.held=1 AND (${HOLD_SCOPE}))
  AND NOT EXISTS(SELECT 1 FROM gk_retired_resources WHERE ${FAMILY} AND retired_at>?-${MINIMUM_DAYS}*86400000)`
@@ -57,7 +58,9 @@ export async function qualificationErasurePreview(env: Bindings, actor: Actor, i
   const activeReplacement=Boolean(await one(env,'SELECT 1 FROM gk_qualifications WHERE member_id=? AND name=? COLLATE NOCASE',...pair))
   const minimumDays=(await one(env,`SELECT ${MINIMUM_DAYS} AS days`)).days
   const tooYoung=Boolean(await one(env,`SELECT 1 FROM gk_retired_resources WHERE ${FAMILY} AND retired_at>?-${MINIMUM_DAYS}*86400000`,...pair,now()))
+  const legacyNotices=(await one(env,"SELECT COUNT(*) AS n FROM gk_qualification_reminders WHERE record_id='legacy'")).n
   const blockers=[
+    ...(legacyNotices?[{code:'legacy_notice',message:'Unattributed older renewal notices must be reconciled before qualification erasure.'}]:[]),
     ...(activeReplacement?[{code:'active_replacement',message:'An active qualification replacement remains.'}]:[]),
     ...(safety?[{code:'safety_signoff',message:'Retained safety sign-offs require this qualification evidence.'}]:[]),
     ...holds.map(row=>({code:'hold',id:row.record_id,message:`${row.kind==='qualification'?'Qualification':'Person'} hold: ${row.reason}`})),
@@ -67,7 +70,7 @@ export async function qualificationErasurePreview(env: Bindings, actor: Actor, i
     eligible: Boolean(await one(env, `SELECT 1 WHERE ${ELIGIBLE}`, ...eligibleParams(pair))),
     blockers,
     qualification:{name:pair[1],person:(await one(env,'SELECT name FROM gk_members WHERE id=?',pair[0]))?.name??'Former member'},
-    dependencies: { retiredQualifications: family.length, auditDetails: audit, reminders, safetySignoffs: safety, reminderInputs, stewardship, releasedHolds },
+    dependencies: { retiredQualifications: family.length, auditDetails: audit, reminders, safetySignoffs: safety, reminderInputs, stewardship, releasedHolds, legacyNotices },
     policy: 'Retain indefinitely until explicit owner confirmation. Active qualifications, holds, minimum ages and retained safety sign-offs prevent erasure.',
     obligations: ['Audit actor, action, record, site and time remain. User identity erasure is separate.', 'Prior downloads remain outside local erasure. Restore requires the later erasure journal.'] }
 }
@@ -93,7 +96,7 @@ export async function eraseQualification(env: Bindings, actor: Actor, input: Inp
     ...await redactionStatements(env.DB), ...await invalidateTransfersStatements(env.DB),
     stmt(env, "INSERT INTO gk_guard(code,ok) VALUES('qualification_erasure',1)"),
     stmt(env, `INSERT OR IGNORE INTO gk_erased_qualification_records SELECT record_id FROM (${RECORDS}) WHERE record_id IS NOT NULL AND record_id<>'legacy'`, ...noticeParams(pair)),
-    stmt(env, `UPDATE gk_automation_jobs SET input=${qualificationInputSql('input')}`),
+    stmt(env, `UPDATE gk_automation_jobs SET input=${qualificationInputSql('input','erase')}`, ...pair),
     // Delete notices before redacting the only remaining links to earlier versions.
     stmt(env, `DELETE FROM gk_qualification_reminders WHERE ${NOTICES}`, ...noticeParams(pair)),
     stmt(env, `UPDATE gk_audit SET detail='{}' WHERE ${AUDITS}`, ...auditParams(pair)),

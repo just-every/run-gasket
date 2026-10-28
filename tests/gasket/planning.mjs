@@ -212,7 +212,7 @@ export async function qualificationPlanningJourney() {
     let deletion=await previewErasure()
     assert.equal(deletion.eligible,true)
     assert.deepEqual(deletion.qualification,{name:'Unused training',person:'Luis Ortega'})
-    assert.deepEqual((({reminderInputs,...counts})=>counts)(deletion.dependencies),{retiredQualifications:1,auditDetails:3,reminders:2,safetySignoffs:0,stewardship:0,releasedHolds:0})
+    assert.deepEqual((({reminderInputs,...counts})=>counts)(deletion.dependencies),{retiredQualifications:1,auditDetails:3,reminders:2,safetySignoffs:0,stewardship:0,releasedHolds:0,legacyNotices:0})
     assert.ok(deletion.dependencies.reminderInputs>0,'preview identifies retained reminder captures')
     assert.equal((await h.raw('/api/gasket/qualification.erase',{body:{id:resource,confirm:true,revision:deletion.revision}})).status,401)
     await erase({revision:deletion.revision-1},409)

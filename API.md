@@ -775,3 +775,8 @@ action, site and time attribution.
 Qualification erasure redacts released qualification-hold reasons and their audit
 payloads as well as qualification and stewardship copies. Active holds on the
 holder, recorded contributors or a named steward refuse erasure atomically.
+
+Older captured qualification inputs are matched by their recorded holder and
+qualification name as well as current evidence identities. New job captures
+exclude the obsolete shared identity. Unattributed older renewal notices refuse
+erasure until reconciled; the application does not guess which person owns them.
