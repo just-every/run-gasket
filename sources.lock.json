@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "9a4de6b54aa7c26b777085153ff05aed97caba6f47525bb7f3ff78970fb95a43",
+      "sha256": "d4179dbfa919c74da53b5c641364c8104f628397dea50658895cda21d161a278",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "2eb25854b9dd714d8ec537161b2bb430f7a04b546c833403d4d286b192d4eafb",
+      "sha256": "d2e98b3d96cb6387b1800f5663c2b06533acc88ce5d2fbca3c6db42dfdadc8e5",
       "executable": false
     },
     "base-copies.json": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ed95144cf5ef936f7cb84bec654e43d92a8146c09a016d610bfde594e397c041",
+      "sha256": "a70f3c8799972e64621bbdb3107a3ff5b5af949c2c3ccf31516aa1da7652e581",
       "executable": false
     },
     "DEMO.md": {
@@ -284,7 +284,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "96e6b4c972bfdfbc737571eecd644aac1e5a5e7e310c4c8dc91d3c4518a087f2",
+      "sha256": "db924d9ab443323a687da2286515de3308b23a891ee82f5bca59ec3a7b50efbf",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -711,12 +711,20 @@
       "sha256": "b0dc34a0a096e5bf6acc15b5ddd39bb6bed92defeb5bbd57d758b31ccda46606",
       "executable": false
     },
+    "migrations/core/0100_qualification_erasure.sql": {
+      "sha256": "ab872a218c18acbb3b7cb2da9715c91859899f0920276bd2bbbb4a2708ce5acc",
+      "executable": false
+    },
     "migrations/core/0100_qualification_identity.sql": {
       "sha256": "0a8989294db1671f001f4e6077985e6608bc6cd2615c4be397be00fbc9b47104",
       "executable": false
     },
     "migrations/core/0100_record_erasure.sql": {
       "sha256": "dcc47a3600f27184a278d469e83104e099d71083d2b9bafde664413b9baae331",
+      "executable": false
+    },
+    "migrations/core/0101_erasure_audit.sql": {
+      "sha256": "db500d6d96ddd407764298a6ad5123d1712b123f3316638c0143acf07ae838dc",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1324,7 +1332,7 @@
       "executable": false
     },
     "src/gasket/actions.ts": {
-      "sha256": "566beba46fd289ebcdd732581c5f0fff6a45d2567f60a0d48ef196e2c7347916",
+      "sha256": "ded065db2359d2b14a56d5188e9a6db7531b40abbd3030a266d9fc3adfe7b07f",
       "executable": false
     },
     "src/gasket/actor.ts": {
@@ -1688,7 +1696,7 @@
       "executable": false
     },
     "src/gasket/planning.ts": {
-      "sha256": "f4f0dcf677bf0ebe29fb650eee1ddc88d0b0ac50537f8ac51ed01cc3f8788ac6",
+      "sha256": "e53d0ecf56a01ae41447c449e6d6273a45edfbbbfc7050a73aea007c117b610a",
       "executable": false
     },
     "src/gasket/pm-library.ts": {
@@ -1725,6 +1733,10 @@
     },
     "src/gasket/purchase-report.ts": {
       "sha256": "d4970fe3cbbaf8e2b41539974fef29ec4ee49ce68c82616459b61a09887b72b7",
+      "executable": false
+    },
+    "src/gasket/qualification-erasure.ts": {
+      "sha256": "61fd74741cf803564228a6c9b5fa6137032c7fd2f1cc3ce02fa6d3b29a2cd8e4",
       "executable": false
     },
     "src/gasket/qualification-reminders.ts": {
@@ -1824,7 +1836,7 @@
       "executable": false
     },
     "src/gasket/retention.ts": {
-      "sha256": "fec61bcc5d75990d4b852241a5b73c1674ff986a32b347a2ad89eea8b1a4c334",
+      "sha256": "1c9bb8006877ffea7bd63907770af19f9fb7d2e0509a36c1d204bd6d18cc7356",
       "executable": false
     },
     "src/gasket/review.ts": {
@@ -4224,7 +4236,7 @@
       "executable": false
     },
     "tests/gasket/planning.mjs": {
-      "sha256": "be6bad825f3c51eba6b14f7554959afca8449d6bf2e256567bc45c06e0ecb8ca",
+      "sha256": "0b0d477c6b839a30cbf7a0c9ca68367eb459cf40e288c64cf7c7599b7339abdf",
       "executable": false
     },
     "tests/gasket/purchase-orders.mjs": {
@@ -4252,7 +4264,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "fa790bbd7bac01a75e188c55493b4133a6862fe838540faeb56914775f0315b8",
+      "sha256": "bf6e6193781bb425e37b4ed30cc30cd95abed1ff61914cbc983574fd9e058615",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {
@@ -4320,7 +4332,7 @@
       "executable": false
     },
     "tests/gasket/safety.mjs": {
-      "sha256": "d1778c1eb47b7f1db00bf3b6d9c69bb3d4b7925c65ee84942572ee1e19a31aa9",
+      "sha256": "eea17d73dd52ea7ad89a377eef009c206a0d23e6eb2fda343f810332fa705028",
       "executable": false
     },
     "tests/gasket/search.mjs": {
