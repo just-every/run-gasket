@@ -1,4 +1,4 @@
-// ASSET-008: the tools a route or schedule says its work needs. Each work order
+// ASSET-008 / ASSET-010: the tools a route or schedule says its work needs. Each work order
 // it issues lists them, and the person doing the work records which one they
 // used (a serial or asset number), so a calibration's reference standard is
 // traceable; submission waits until every listed tool is recorded. A tool

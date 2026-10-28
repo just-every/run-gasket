@@ -560,7 +560,31 @@
     {
       "file": "CONTRACT.md",
       "line": 105,
-      "text": "**ASSET-008 \u2014 Inspections, rounds and calibration.** Leads publish multi-asset inspection routes and calibration tasks with due tolerances, required tools, certificate attachments and failed-reading follow-up. Each stop records its asset and procedure revision; missed or failed stops stay open independently. A route is an ordered list of at least two stops, each an asset and the checklist done there; issuing it makes a run with one work order per stop, all due the same day and pinned to each checklist's current revision, so a failed reading (FIELD-004) raises its follow-up on that stop alone. A missed stop keeps its reason and stays open; a supervisor (the review right) signs a run off only once every stop is closed, so signing never closes missing work. A route may repeat every N whole days from its first due date (fixed cadence, to a default person): the scheduler (PM-001) and Create due work orders issue one run per occurrence (`route@date`) once its date is within the site's lead time, whatever state earlier runs are in, and a route with a retired stop waits. A route or schedule may name required tools; each work order it issues lists them, and its submission waits until the person doing it records which one was used (a serial or asset number). A calibration task is a schedule on an instrument whose procedure carries the tolerances: its number steps with inclusive limits (FIELD-004), at least one required, so a reading outside them fails and needs a linked finding with follow-up work. Its due tolerance is a grace window of 0 to 90 whole days after the due date, in the site's time zone: the task reads in date before the due date, due through due date + grace, overdue after; its cadence runs from the day its work is approved unless the lead chooses fixed (PM-003). Its work needs a certificate (an attached PDF or image marked as the certificate) before review; approval keeps the latest certificate as the instrument's next certificate version with the procedure revision, the tools used, whether it was on time (approved by due date + grace) and its result: out of tolerance when any number step failed, in tolerance otherwise. That result is Gasket's reading of the recorded values against the procedure's limits; Gasket does not certify the instrument or verify the reference standard's own certification. Earlier versions are kept. A tool register with its own calibration due dates and booking is PLAN-004's, and compliance template libraries, qualification links and audit packs are SAFE-002's, each owed to calibration tasks before it ships. **Acceptance evidence:** Schedule a route across three assets and a gauge calibration, fail one reading and skip one stop. Inspect independent follow-up, calibration certificate/version and incomplete route state; signing a route cannot close missing work.",
+      "text": "**ASSET-008 \u2014 Inspections, rounds and calibration.** Leads publish multi-asset inspection routes and calibration tasks with due tolerances, required tools, certificate attachments and failed-reading follow-up. Each stop records its asset and procedure revision; missed or failed stops stay open independently.",
+      "to": "clause",
+      "ids": [
+        "ASSET-008",
+        "ASSET-010"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 105,
+      "text": "A route is an ordered list of at least two stops, each an asset and the checklist done there; issuing it makes a run with one work order per stop, all due the same day and pinned to each checklist's current revision, so a failed reading (FIELD-004) raises its follow-up on that stop alone. A missed stop keeps its reason and stays open; a supervisor (the review right) signs a run off only once every stop is closed, so signing never closes missing work. A route may repeat every N whole days from its first due date (fixed cadence, to a default person): the scheduler (PM-001) and Create due work orders issue one run per occurrence (`route@date`) once its date is within the site's lead time, whatever state earlier runs are in, and a route with a retired stop waits. A route or schedule may name required tools; each work order it issues lists them, and its submission waits until the person doing it records which one was used (a serial or asset number).",
+      "to": "docs",
+      "path": "docs/maintenance-semantics.md"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 105,
+      "text": "A calibration task is a schedule on an instrument whose procedure carries the tolerances: its number steps with inclusive limits (FIELD-004), at least one required, so a reading outside them fails and needs a linked finding with follow-up work. Its due tolerance is a grace window of 0 to 90 whole days after the due date, in the site's time zone: the task reads in date before the due date, due through due date + grace, overdue after; its cadence runs from the day its work is approved unless the lead chooses fixed (PM-003). Its work needs a certificate (an attached PDF or image marked as the certificate) before review; approval keeps the latest certificate as the instrument's next certificate version with the procedure revision, the tools used, whether it was on time (approved by due date + grace) and its result: out of tolerance when any number step failed, in tolerance otherwise. That result is Gasket's reading of the recorded values against the procedure's limits; Gasket does not certify the instrument or verify the reference standard's own certification. Earlier versions are kept. A tool register with its own calibration due dates and booking is PLAN-004's, and compliance template libraries, qualification links and audit packs are SAFE-002's, each owed to calibration tasks before it ships.",
+      "to": "docs",
+      "path": "docs/maintenance-semantics.md"
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 105,
+      "text": "**Acceptance evidence:** Schedule a route across three assets and a gauge calibration, fail one reading and skip one stop. Inspect independent follow-up, calibration certificate/version and incomplete route state; signing a route cannot close missing work.",
       "to": "clause",
       "ids": [
         "ASSET-008",

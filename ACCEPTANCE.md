@@ -559,7 +559,7 @@ Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INP
 
 Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INPUT-001
 
-**Requirement.** Leads publish calibration tasks with due tolerances, required tools, certificate attachments and failed-reading follow-up. The procedure pins numeric tolerances; an out-of-tolerance reading needs a linked corrective finding. Review retains certificate versions, tool identities and on-time status without claiming equipment certification. [Maintenance semantics](docs/maintenance-semantics.md#asset-008) defines the calibration calculation.
+**Requirement.** Leads publish calibration tasks with due tolerances, required tools, certificate attachments and failed-reading follow-up. The procedure pins numeric tolerances; an out-of-tolerance reading needs a linked corrective finding. Review retains certificate versions, tool identities and on-time status without claiming equipment certification. [Maintenance semantics](docs/maintenance-semantics.md#asset-010) defines the calibration calculation.
 
 **Acceptance.**
 1. Schedule gauge calibration with required tools, fail a reading and inspect its independent corrective work.

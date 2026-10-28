@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "425668679e27fbb6f6352767d054ae1d137ce1d6f16704939e63eb56a1b21140",
+      "sha256": "745e537e1ad99561ee7c37f0d2fe44c94a5fd4125399d1bcc08483bae8bcab6d",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -204,7 +204,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "50eb62d6e79b96f84d6550dc807f95adabfb557bf618adab569e9105864b8802",
+      "sha256": "a60725a0e77c756faa938c0401ab4f3549d6e6c609e70b87c0b38bb861b12c71",
       "executable": false
     },
     "DEMO.md": {
@@ -232,7 +232,7 @@
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
-      "sha256": "94f4a670ea821140ad0e8f5c2ba1fa2861fe54c182974398c69d48a0e93ab085",
+      "sha256": "08e2690d2c5b121d1e82be4e7bdbef6d6395810deb45387073b1a54744ad8f67",
       "executable": false
     },
     "docs/contract/DONE-AUDIT.md": {
@@ -256,11 +256,11 @@
       "executable": false
     },
     "docs/maintenance-scope.md": {
-      "sha256": "8247c1f372fa4f762dd3d032f3794153d9681cfeb4ace8f5d4b768bbc18054f0",
+      "sha256": "9db0b27f8fd97815796b0bd2b49126b244fd13fea6cc2a02018e60afd4aa2652",
       "executable": false
     },
     "docs/maintenance-semantics.md": {
-      "sha256": "3e936c5d51a8290bb521811b6ff61fc917b9d91155dbc60635b4afe1c9a9066e",
+      "sha256": "165db350a72b8c4a4333be3d301889ef5f88cb07c2b7a9dbebda5a27391a6ea5",
       "executable": false
     },
     "docs/migration-sources.md": {
@@ -1964,7 +1964,7 @@
       "executable": false
     },
     "src/gasket/tools.ts": {
-      "sha256": "ff1fe0921e8afae25b99cc9bd55be89cc8b185a84f841d6878a059a6cf7079b5",
+      "sha256": "a530efd9b5249f4b8d6bacb808e837e3fefbc2968027db9ed18a1ed9537beadf",
       "executable": false
     },
     "src/gasket/triage.ts": {
