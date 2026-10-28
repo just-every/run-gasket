@@ -53,6 +53,7 @@ export async function printPacksJourney() {
     assert.equal(pack.content.instructions,f.instructions)
     assert.deepEqual([pack.content.workVersion,pack.content.checklistNumber,pack.content.issuer,pack.content.locale],[1,1,people.tech,'es-US'])
     assert.equal(sha(JSON.stringify(pack.content)),pack.contentDigest)
+    assert.deepEqual((await h.api(`work/${f.work}/print-packs`,cookies.tech)).map(row=>[row.id,row.issuer_name,row.issued_at,row.content_sha256]),[[issued.id,'Synthetic tech',instant,pack.contentDigest]],'the native work history exposes immutable issuance provenance')
     const pdfPath=`/app/print-packs/${issued.id}/pack.pdf`
     const response=await h.raw(pdfPath,{cookie:cookies.tech})
     assert.equal(response.status,200)
@@ -98,6 +99,17 @@ export async function printPacksJourney() {
     assert.equal(refused.status,500)
     assert.equal((await h.api(`print-previews/${preview}`,cookies.tech)).receipt,null)
     assert.deepEqual(await h.api(`work/${f.work}`,owner),f.detail,'a failed transaction retains no result, original, follow-up or receipt')
+    // A retry identity never borrows another person's receipt or another action's result.
+    for(const [member,expected] of [[owner,404],[cookies.tech,409]]) {
+      const save=randomUUID()
+      await h.raw('/app/do/language.preference',{cookie:member,form:new URLSearchParams({locale:member===owner?'en-US':'es-US',__gk_save:save,returnTo:'/app/settings/language'}),headers:{accept:['application','json'].join('/')}})
+      const before=await (await h.raw(`/app/save-receipts/${save}`,{cookie:member,headers:{accept:['application','json'].join('/')}})).json()
+      const forged=await h.raw('/app/do/printpack.accept',{cookie:cookies.tech,form:new URLSearchParams({preview,digest:draft.digest,confirm:'yes',__gk_save:save}),headers:{accept:['application','json'].join('/')}})
+      assert.equal(forged.status,expected,'a paper retry cannot overwrite a foreign or differently bound save receipt')
+      assert.deepEqual(await (await h.raw(`/app/save-receipts/${save}`,{cookie:member,headers:{accept:['application','json'].join('/')}})).json(),before)
+      assert.equal((await h.api(`print-previews/${preview}`,cookies.tech)).receipt,null)
+      assert.deepEqual(await h.api(`work/${f.work}`,owner),f.detail)
+    }
     // Lose the reply after the actual transaction, then retry the same public form.
     h.setSaveFault('after')
     const form=new URLSearchParams({preview,digest:draft.digest,confirm:'yes',returnTo:`/app/print-previews/${preview}`,__gk_save:randomUUID()})

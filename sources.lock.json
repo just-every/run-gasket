@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "b3dfa3f72a8b319a7537927a061dfd23ed5e785ed5b2572f9a94393ff7e5d05f",
+      "sha256": "38ce795b32ca30f04f93c609b7e11d2df2625bf957af4e6a7f3fb86e83cc72e5",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "a967d7e20ed3c095cd4c7557953c94678810a362531b5c3531ab44ce83efe586",
+      "sha256": "b769e172bd3a092724d5d7f229fd9713da4e6498ed9f59b439c966d151d3a06b",
       "executable": false
     },
     "DEMO.md": {
@@ -1560,7 +1560,7 @@
       "executable": false
     },
     "src/gasket/http.ts": {
-      "sha256": "238d25201d6fa331881c5fe1f93aecd91853b5405d3f4177e0f0c08932fac93a",
+      "sha256": "da3ed6da937f9b4846d2be22daf2fc173e948ab9354464421095e0cef885f71b",
       "executable": false
     },
     "src/gasket/input.ts": {
@@ -1748,7 +1748,7 @@
       "executable": false
     },
     "src/gasket/print-packs.ts": {
-      "sha256": "58862803447d07b6825a04c22ce859d11849e986a6db3d838df0ad206cc6cf28",
+      "sha256": "454f5880a25380dbc6273c3979457f05baa1e06fcc47da14db70c65581103ede",
       "executable": false
     },
     "src/gasket/print-pdf.ts": {
@@ -2168,7 +2168,7 @@
       "executable": false
     },
     "src/gasket/ui/print-packs.ts": {
-      "sha256": "0ff057bd34f1318deea1f1c1023a5fa74f42be6d7d056792ba2b751bbfd0340e",
+      "sha256": "bfb4ff6dd2186142e2f104937936c0fcd180f616a68e9c862a8835d5d6b0e497",
       "executable": false
     },
     "src/gasket/ui/proposals.ts": {
@@ -4311,6 +4311,10 @@
       "sha256": "3388f1479c72e30cfe0f86c6839370d1ca7f7f36eb0015db6b5c23e10960a1b8",
       "executable": false
     },
+    "tests/gasket/print-packs.mjs": {
+      "sha256": "a6835d40b73c5dd829b602e0d4b66067ccd9ae9a1a28b50c0cf450fdc6a20482",
+      "executable": false
+    },
     "tests/gasket/purchase-orders.mjs": {
       "sha256": "ed8a761c77ff9a9a268fa3c48d4c8de0f5743ff77ed0dcd30864af5976d2b00c",
       "executable": false
@@ -4336,7 +4340,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "24de0ea802e1e5e12e06054f3528cc9112f79901da4808b4f7bbe430328bcb3d",
+      "sha256": "e6e20f465435c68f09f04140a4b8083d89cf0d4d98aff2d0efa0e25f6fc72e7f",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {

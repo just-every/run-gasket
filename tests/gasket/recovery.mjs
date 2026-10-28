@@ -69,8 +69,8 @@ export async function recoveryJourney() {
     const paperDraft=await h.api(`print-previews/${paperPreview}`,owner)
     const paperAccept={preview:paperPreview,digest:paperDraft.digest,confirm:true}
     const paperReceipt=(await h.api('printpack.accept',owner,paperAccept)).receipt
-    const paperSnapshot=await h.api(`work/${paperWork.work}`,owner)
     const erasedRecords=await erasureFixture(h,owner,asset)
+    const paperSnapshot=await h.api(`work/${paperWork.work}`,owner)
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'recovery.rer')
     await h.installation.rer('export', '--output', archive)
