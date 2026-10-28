@@ -2,9 +2,9 @@
 // production HTTPS origin so sign-in mail goes through the real Resend adapter.
 // The only fake is the network edge. An explicit outbound callback can qualify
 // a real provider; ordinary journeys capture requests without external effects.
+import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import { mkdtemp, readdir, readFile, realpath, rm } from 'node:fs/promises'
-import { createServer } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,14 +16,6 @@ const require = createRequire(await realpath(join(root, 'node_modules/wrangler/p
 const { Miniflare, convertV4MiniflareOptions, Log, LogLevel } = require('miniflare')
 const { unstable_splitSqlQuery: splitSql } = require('wrangler')
 
-async function freePort() {
-  const socket = createServer()
-  await new Promise(resolve => socket.listen(0, '127.0.0.1', resolve))
-  const { port } = socket.address()
-  await new Promise(resolve => socket.close(resolve))
-  return port
-}
-
 /**
  * With `installation`, the Worker runs on that local installation's D1 (already migrated) and leaves it in place.
  * With `offset` (ms), the Worker's clock runs that far from the machine's: an entry module replaces Date before the
@@ -32,7 +24,7 @@ async function freePort() {
 export async function emittedWorker(vars, { installation, offset, instant, outbound, generationGate = false, formSaveFault = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
-  const port = await freePort(), origin = `https://127.0.0.1:${port}`
+  let origin = 'https://127.0.0.1'
   const mails = []
   let mailOutcome = 'accepted'
   let saveFault = false
@@ -45,9 +37,9 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   if (offset !== undefined || instant !== undefined) modules.unshift(
     { type: 'ESModule', path: join(root, 'dist/server/pinned-entry.mjs'), contents: `import './pinned-clock.mjs'\nexport * from './${config.main}'\n${formSaveFault?`import worker from './${config.main}'\n${formSaveGate}`:generationGate?`import worker from './${config.main}'\n${reportGenerationGate}`:`export { default } from './${config.main}'`}\n` },
     { type: 'ESModule', path: join(root, 'dist/server/pinned-clock.mjs'), contents: `const Real = Date, offset = ${offset ?? 0}, instant = ${instant ?? "undefined"}\nclass PinnedDate extends Real { constructor(...args) { super(...(args.length ? args : [instant ?? Real.now() + offset])) } static now() { return instant ?? Real.now() + offset } }\nglobalThis.Date = PinnedDate\n` })
-  const mf = new Miniflare({
+  const options = () => ({
     ...convertV4MiniflareOptions({
-      host: '127.0.0.1', port, https: true, unsafeTriggerHandlers: true, modulesRoot: join(root, 'dist/server'),
+      host: '127.0.0.1', port: 0, https: true, unsafeTriggerHandlers: true, modulesRoot: join(root, 'dist/server'),
       modules,
       compatibilityDate: config.compatibility_date, compatibilityFlags: config.compatibility_flags,
       assets: { directory: join(root, 'dist/client'), routerConfig: { has_user_worker: true } },
@@ -73,9 +65,16 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
     log: new Log(LogLevel.WARN),
     resourcePersistencePath: installation ? join(installation, '.wrangler/state/v3') : join(directory, 'state'),
   })
+  const mf = new Miniflare(options())
   const close = async () => { await mf.dispose(); await rm(directory, { recursive: true, force: true }) }
   try {
-    await mf.ready
+    // Bind atomically: a probe that closes a free socket cannot reserve its port.
+    // Miniflare retains this live port across setOptions({ port: 0 }); configure
+    // auth from that address before making requests or exposing the harness.
+    origin = (await mf.ready).origin
+    bindings.AUTH_ORIGIN = vars.AUTH_ORIGIN ?? origin
+    await mf.setOptions(options())
+    assert.equal((await mf.ready).origin, origin, 'auth configuration retains the live Worker listener')
     if (installation) return worker()
     const db = await mf.getD1Database('DB')
     for (const file of (await readdir(join(root, 'migrations/core'))).filter(file => file.endsWith('.sql')).sort()) {
