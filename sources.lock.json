@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "5b8e40ef0a289845891cdf4f1c63087f284d1d4637bd44af43aeb0635d8e47be",
+      "sha256": "409ab8ee96026026f4cf8fdd061c0997460c302eaadb8692f7d4645b18c82279",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "378da086cd739b423611d5cb4ee59121cc087741a87673b98518149c5ae1672b",
+      "sha256": "cd69740905ed69f0bd2f55c0cbae67995b524b589c7454816a8cf816dfdcf73d",
       "executable": false
     },
     "base-copies.json": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "45429411b8bccb007f2dc84c1fd275fcb1b6be713e73188499edd587783e6dfa",
+      "sha256": "b78dda7ef11f587eedd7b6cd359aae4b32205e280ef1ce91dd1fdb348b14e18b",
       "executable": false
     },
     "DEMO.md": {
@@ -4204,7 +4204,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "24f77c0999d06694264392a8ceccdd9ac7623b371acdb32a5a40e1bae6e22f50",
+      "sha256": "287b299b8035375174bf6263ca6437879ff575b0665bff52c8c5a7360c0e48b4",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4220,7 +4220,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "a91352c4a1f3210f1fb855a8335e8bc85852465298a7ddbf9e7c2e504f400f3c",
+      "sha256": "7c96e2934d90658965bc47e030893e38db1c2a2be9f45997d1e80e1599896218",
       "executable": false
     },
     "tests/gasket/installation.mjs": {

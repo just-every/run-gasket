@@ -538,7 +538,7 @@ expiry and calculated expiry state are separate from issuing-body verification.
 
 Planning mutations use the ordinary authenticated action and form doors:
 
-- `planning.qualification`: owner-only `member`, `name`, inclusive `expires`
+- `planning.qualification`: owner or exact scoped steward; `member`, `name`, inclusive `expires`
   date and `reference`. A renewal retains the former value in the audit.
   Explicit `remind: true` with `remindDays` from 0 to 365 opts into owner-only
   in-app notices before expiry and after the inclusive expiry date. The existing
@@ -546,9 +546,9 @@ Planning mutations use the ordinary authenticated action and form doors:
   at most one due and one expired notice per owner; renewal starts a new occasion.
   Retired or replaced evidence no longer contributes active notices. No external
   delivery or automatic qualification renewal is performed.
-- `planning.tool`: owner-only `name`, `identifier`, inclusive `calibrationDue`,
+- `planning.tool`: owner or exact scoped steward; `name`, `identifier`, inclusive `calibrationDue`,
   optional existing `id`, and current planning `revision`. Names are immutable.
-- `planning.retire`: owner-only `kind` (`qualification` or `tool`), `reason`
+- `planning.retire`: owner or exact scoped steward; `kind` (`qualification` or `tool`), `reason`
   and current `revision`; a qualification names `member` and `name`, while a
   tool names its `id`. Retirement stores an immutable attributed snapshot,
   removes eligibility and releases tool bookings. Retired evidence is returned

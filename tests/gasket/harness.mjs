@@ -68,13 +68,18 @@ export async function harness({ vars, installation, clockOffset = offset, clockI
 export const file = (filename, content, type = 'application/octet-stream') => ({ filename, base64: Buffer.from(content).toString('base64'), type })
 
 /** Exercise existing business journeys through documented keyed JSON doors. */
-export function exerciseKeyedActions(h, owner, actions) {
+export function exerciseKeyedActions(h, owner, actions, { once = false } = {}) {
   const ordinary = h.api, selected = new Set(actions)
+  const exercised = new Set()
   let sequence = 0
   const namespace = randomBytes(8).toString('hex')
   const receipts = []
   h.api = async (path, cookie, body, status = 200) => {
     if (!selected.has(path) || body === undefined || body.preview) return ordinary(path, cookie, body, status)
+    // The shared core journey keeps one replay sanity check per action and
+    // person. Its remaining business assertions use their original HTTP door.
+    const identity = path + ':' + cookie
+    if (once && exercised.has(identity)) return ordinary(path, cookie, body, status)
     const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + namespace + '-' + (++sequence) }
     const request = () => h.raw('/api/gasket/v1/' + path, { cookie, body, headers })
     const first = await request(), result = await first.json()
@@ -90,6 +95,7 @@ export function exerciseKeyedActions(h, owner, actions) {
       assert.equal(replay.headers.get('idempotency-replayed'), 'true', path)
       assert.deepEqual(await replay.json(), result, path + ' retains its original result')
       assert.deepEqual(await ordinary('audit', auditor), audit, path + ' replay adds no business or audit effect')
+      exercised.add(identity)
     }
     return result
   }
