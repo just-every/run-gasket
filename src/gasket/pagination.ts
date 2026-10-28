@@ -36,7 +36,7 @@ export async function pageRows(env: Bindings, actor: Actor, url: URL, source: Pa
     stmt(env, `${prefix} SELECT * FROM items ORDER BY ${source.order} LIMIT ? OFFSET ?`, ...source.args, limit, offset),
   ])
   const { total, revision } = result[0].results[0]
-  const snapshot = `${revision}:${total}`
+  const snapshot = await sha256Hex(`${revision}:${total}`)
   insist(expected === undefined || expected === snapshot, 'work_snapshot_changed', 409, { message: 'Work changed. Restart the list or download; no partial export was returned.' })
   insist(offset <= total, 'invalid_cursor')
   const encode = async (at: number) => {

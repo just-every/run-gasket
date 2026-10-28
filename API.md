@@ -42,6 +42,18 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 | `imports` | The move-in journal (lead, owner) |
 | `audit` (`?action=`, `?from=`, `?to=`, `?site=`, `?limit=`, `?before=`) | Audit entries newest first, 100 a page (`limit` up to 500); `next` continues with `before`. `action` is one action or a family such as `workorder`; `from` and `to` are site-local dates; each entry carries the role it acted under and its authority (supervisor, owner). `/app/audit.csv` with the same filters downloads every matching entry. |
 
+### Complete work lists and bounded CSV
+
+`GET /api/gasket/work` retains its array response and existing work fields. Read `X-Total-Count` for the exact authorized total, then follow the `Link` header with `rel="next"`, or pass `X-Next-Cursor` as `cursor`. `GET /api/gasket/work-page` returns the same records as `{rows,total,offset,next,start}`. Both accept `state=open` or `state=closed`, `mine=1`, `team`, and `limit` from 1 through 200 (default 100). A maintainer still sees only assigned work and active collaborations. The existing `work:read` service scope permits both JSON doors; no other scope is implied.
+
+The Work screen shows exact tab totals, the visible range, Next page and First page. Its normal six-row view is a bounded page; `all=1` selects 100 rows per page. Today, Overdue, In progress and Done today retain their existing assignment boundary. Counts include every match, independently of the current page. Sort ties resolve by work number and identity.
+
+Cursors are opaque, authenticated, deterministic for unchanged reads, and bound to the current actor, session, role, site day and normalized filters. Altered or foreign cursors return `invalid_cursor` (400). Audited estate changes or changed totals refuse continuation with `work_snapshot_changed` (409); restart from the first page. These are conservative snapshot checks: an unrelated audited change can also require a restart. Page size may change without changing the selected records.
+
+`GET /app/work.csv` downloads the complete authorized open or closed work list with the same `state`, `mine` and `team` filters. The screen's download binds to its displayed snapshot. JSON clients may pass a page's `start` token as `snapshot`. Downloads are bounded to 2,000 matching orders; `exportLimit` may select a lower positive ceiling. A larger selection returns `work_export_limit_exceeded` (413), and a changed snapshot returns 409, before any CSV bytes or attachment header are returned. Narrow the filters or restart the download. Accepted records and original evidence are unchanged by either refusal. CSV contains the work list fields and escapes spreadsheet formulas; it is not a complete archive or an attachment download.
+
+This primary-site slice makes no claim of qualification at the SAFE-003 target estate capacity, complete estate exports, additional operational sites, or native offline packs. Version 1's existing collection response and live-read search semantics remain as documented below.
+
 ## Changing
 
 `POST /api/gasket/ACTION` with a JSON body. Success answers `200` with the result (usually `{"id": ...}`); a refusal answers `4xx {"error": CODE, "detail"?: ...}`. Codes are stable words such as `forbidden`, `stale`, `not_your_work`, `insufficient_stock`, `meter_went_backwards`, `not_ready_for_review`, `own_work`, `proposal_stale` and `undo_blocked`.
