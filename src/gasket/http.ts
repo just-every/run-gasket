@@ -1,3 +1,5 @@
+import { downloadPrivateManual } from './private-file-links'
+import { privateManualLinkPage } from './ui/documents'
 import { recordErasurePage } from './ui/record-erasure'
 import { authorizeOperationalSite } from './site-access'
 import { withSiteAuthority } from './site-context'
@@ -264,6 +266,8 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  privateManualLink: privateManualLinkPage,
+  privateManualFile: (env, actor, url, id) => downloadPrivateManual(env, actor, id, url),
   spreadsheetReconciliation: reconciliationPage,
   spreadsheetTemplate: guarded(actor=>can(actor,'import.run'),async(_env,_actor,_url,id)=>{
     const [kind,format]=id.split('.') as [SheetKind,'csv'|'xls'|'xlsx']

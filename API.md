@@ -711,3 +711,21 @@ Site-scoped estate records, cross-site transfers with meter history, organizatio
 rollups, operational per-site dates and technician rights, native app coverage,
 background-job membership revocation and complete multi-site archive reconciliation remain unimplemented. Preparing
 site metadata does not establish those acceptance points.
+
+## Private manual revision links
+
+An ordinary authenticated member may call `POST /api/gasket/document.privateLink`
+with a `revision` identifier. The response contains a relative `href`, `expiresAt`
+in epoch milliseconds, `filename`, `revision` and `asset`. The asset's Documents
+card also opens a private revision link page with the expiry and download action.
+Issuance is stateless and creates no delegated permission or stored credential.
+
+Links last five minutes and require the exact issuing browser session. Issuance
+and download both require current membership and record access in the operational
+primary site. A different actor, another session for the same actor, sign-out,
+revoked access, an altered revision or an altered expiry refuses the download.
+An expired link returns 410; fresh issuance requires current access again.
+Adding a new master revision preserves the linked original. Downloads preserve
+original bytes and use an attachment disposition, no-store caching, no-referrer,
+nosniff and a sandbox policy. Service credentials and other private-file kinds
+are outside this door. Cross-site file links remain unqualified under ADMIN-008.
