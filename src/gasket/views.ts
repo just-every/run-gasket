@@ -1,3 +1,4 @@
+import { resourceRecords } from './resource-records'
 import { publicRecordErasurePreview } from './record-erasure'
 import { siteDirectory } from './site-access'
 import { historyReport } from './history-report'
@@ -80,6 +81,7 @@ export const views: Record<string, View> = {
   serviceCredentials: (env, actor) => serviceCredentials(env, actor),
   complianceTemplates: env=>complianceTemplates(env),
   safety: (env,actor,id)=>readSafety(env,actor,id),
+  resourceRecords:(env,actor,_id,url)=>resourceRecords(env,actor,url),
   planning:(env,actor,_id,url)=>planningView(env,actor,url),
   rules: (env,actor,urlId,url)=>rulesView(env,actor,url),
   customFields: env => customFields(env, undefined, undefined, true),

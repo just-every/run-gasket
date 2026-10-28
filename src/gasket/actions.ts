@@ -1,5 +1,7 @@
+import { saveResourceGrant } from './resource-authority'
 import { eraseRecord } from './record-erasure'
 import { createSite, updateSite, setSiteMembership } from './site-access'
+import { eraseQualification } from './qualification-erasure'
 import { saveReportSchedule } from './report-schedules'
 import { createServiceCredential, revokeServiceCredential } from './service-auth'
 import { publishSafety, attestSafety } from './safety'
@@ -93,10 +95,12 @@ export const actions: Record<string, Handler> = {
   'service.create': createServiceCredential, 'service.revoke': revokeServiceCredential,
   'safety.publish': (env,actor,input) => publishSafety(env,actor,input),
   'safety.attest': (env,actor,input) => attestSafety(env,actor,input),
+  'planning.grant':saveResourceGrant,
   'planning.qualification':saveQualification, 'planning.tool':savePlanningTool, 'planning.retire':retirePlanningResource, 'planning.window':savePlanningWindow, 'planning.window.remove':removePlanningWindow, 'planning.requirements':saveRequirements, 'planning.slot':planSlot,
   'rules.save': saveRule, 'rules.control': controlRule, 'rules.preview': previewRule,
   'part.category': setPartCategory, 'customfield.save': saveCustomField, 'customfield.retire': retireCustomField, 'customvalue.set': setCustomValues,
   'record.erase': (env, actor, input) => eraseRecord(env, actor, input),
+  'qualification.erase': eraseQualification,
   'attachment.erase': (env, actor, input) => eraseAttachment(env, actor, input),
   'recovery.drill': (env, actor, input) => confirmRecoveryDrill(env, actor, input),
   'retention.policy': (env, actor, input) => setRetentionPolicy(env, actor, input),

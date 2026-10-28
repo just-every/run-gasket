@@ -18,6 +18,7 @@ import { purchaseOrderDetail } from './purchase-orders'
 import { approvalRoute } from './purchase-authority'
 import { reportScheduleAuthority } from './report-schedules'
 import { withApiWriteClaim } from './api-write-context'
+import { resourceAuthority } from './resource-authority'
 
 const JSON_TYPE = ['application', 'json'].join('/')
 const RETRYABLE: Record<string, Capability | null> = {
@@ -42,7 +43,7 @@ const RETRYABLE: Record<string, Capability | null> = {
   'workorder.tool': 'work.do', 'workorder.sign': 'work.do',
   'finding.record': 'work.do', 'downtime.start': 'work.do', 'downtime.end': 'work.do',
   'workorder.cancel': 'work.assign', 'workorder.reopen': 'work.assign',
-  'planning.qualification': 'site.manage', 'planning.tool': 'site.manage', 'planning.retire': 'site.manage',
+  'planning.qualification': null, 'planning.tool': null, 'planning.retire': null,
   'planning.window': 'work.assign', 'planning.window.remove': 'work.assign', 'planning.requirements': 'work.assign', 'planning.slot': 'work.assign',
   'safety.publish': 'register.manage', 'safety.attest': 'work.do', 'calibration.create': 'register.manage',
   'closure.add': 'register.manage', 'closure.remove': 'register.manage',
@@ -186,6 +187,22 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
     insist(higher?.schedule_id && lower?.schedule_id, 'scheduled_work_required', 409)
   }
   if (action === 'report.schedule') await reportScheduleAuthority(env, actor, input)
+  if (action === 'planning.qualification' || action === 'planning.tool') {
+    await resourceAuthority(env, actor, action === 'planning.tool' ? 'tool' : 'qualification', action === 'planning.tool' ? '' : input.text('member'), input.text('name'))
+  }
+  if (action === 'planning.retire') {
+    const kind = input.text('kind')
+    insist(['qualification', 'tool'].includes(kind), 'invalid_resource_kind')
+    let name = kind === 'qualification' ? input.text('name') : ''
+    if (kind === 'tool') {
+      const id = input.text('id')
+      const tool = await one(env, 'SELECT name FROM gk_planning_tools WHERE id=?', id)
+        ?? await one(env, "SELECT json_extract(snapshot,'$.name') AS name FROM gk_retired_resources WHERE kind='tool' AND record_id=? ORDER BY retired_at DESC,id DESC LIMIT 1", id)
+      insist(tool, 'resource_not_found', 404)
+      name = tool.name
+    }
+    await resourceAuthority(env, actor, kind, kind === 'qualification' ? input.text('member') : '', name)
+  }
   if (action === 'proposal.decide') {
     const proposal = await one(env, 'SELECT prepared_by FROM gk_all_proposals WHERE id=?', input.text('proposal', { max: 100 }))
     insist(proposal, 'proposal_not_found', 404)

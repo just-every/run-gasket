@@ -8746,7 +8746,7 @@
     "/planning.qualification": {
       "post": {
         "summary": "planning.qualification",
-        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Current native scoped stewardship is honored as well as owner authority; a retry rechecks the live exact resource grant. Revocation and inactive restore never grant record maintenance.",
         "security": [
           {
             "memberSession": []
@@ -8873,7 +8873,7 @@
     "/planning.tool": {
       "post": {
         "summary": "planning.tool",
-        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Current native scoped stewardship is honored as well as owner authority; a retry rechecks the live exact resource grant. Revocation and inactive restore never grant record maintenance.",
         "security": [
           {
             "memberSession": []
@@ -8997,7 +8997,7 @@
     "/planning.retire": {
       "post": {
         "summary": "planning.retire",
-        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation.",
+        "description": "Ordinary member authority only. Same server rules as the corresponding form. Retries recheck current capability, site and applicable record authority; completed receipts return the original result after its own state transition. No service credential scope grants this operation. Current native scoped stewardship is honored as well as owner authority; a retry rechecks the live exact resource grant. Revocation and inactive restore never grant record maintenance.",
         "security": [
           {
             "memberSession": []
@@ -22391,7 +22391,8 @@
                       "work",
                       "request",
                       "attachment",
-                      "user"
+                      "user",
+                      "qualification"
                     ]
                   },
                   "id": {
