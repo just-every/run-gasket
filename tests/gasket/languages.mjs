@@ -107,7 +107,8 @@ export async function languageJourney() {
     await page.locator('[name=field_reading]').fill('12.50')
     await page.locator('[name=field_noticed]').fill('2026-10-22')
     await page.locator('[name=field_detail]').fill('Night shift <unaltered>')
-    await page.locator('[name=photo]').setInputFiles({name:'synthetic-gasket-1.png',mimeType:'image/png',buffer:png})
+    const [picker]=await Promise.all([page.waitForEvent('filechooser'),page.getByRole('button',{name:'Elegir archivo: Foto (opcional)',exact:true}).click()])
+    await picker.setFiles({name:'synthetic-gasket-1.png',mimeType:'image/png',buffer:png})
     await page.getByRole('button',{name:'Guardar borrador',exact:true}).click()
     await page.locator('#draft-status').filter({hasText:'Seleccione el almacenamiento'}).waitFor()
     await page.getByLabel('Guardar este borrador y las fotos en este dispositivo privado',{exact:true}).check()
@@ -147,13 +148,15 @@ export async function languageJourney() {
     assert.equal((await h.api('requests',cookie.lead)).length,0)
     await capture('spanish-retry')
     await context.setOffline(false)
-    let lost=false
+    let lost=false,accepted
+    const persisted=new Promise(resolve=>{accepted=resolve})
     await page.route('**/request/'+portal,async route=>{
-      if(route.request().method()==='POST'&&!lost){lost=true;const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed')}
+      if(route.request().method()==='POST'&&!lost){lost=true;const response=await route.fetch();assert.equal(response.status(),200);await route.abort('failed');accepted()}
       else await route.continue()
     })
     await page.getByRole('button',{name:'Enviar solicitud',exact:true}).click()
     await page.getByRole('alert').filter({hasText:'Sin confirmar'}).waitFor()
+    await persisted
     assert.equal((await h.api('requests',cookie.lead)).length,1)
     await Promise.all([page.waitForURL('**/received/'+key),page.getByRole('button',{name:'Enviar solicitud',exact:true}).click()])
     assert.match(await page.getByRole('status').textContent(),/La solicitud R-1 está guardada/)
@@ -187,6 +190,7 @@ export async function languageJourney() {
       await own.getByRole('button',{name:'Save my language · Guardar mi idioma',exact:true}).click()
       await settings.page.getByRole('status').filter({hasText:'Saved.'}).waitFor()
       assert.equal((await h.api('languages',cookie.owner)).preference,'es-US')
+      await settings.page.getByText('Maintain Spanish interface strings',{exact:true}).click()
       await capture('language-settings',settings.page)
     } finally {await settings.context.close();await settings.browser.close()}
     await h.api('language.catalog',cookie.owner,{key:'send',reset:true})

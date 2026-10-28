@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "1c167090c3b70342543f2eedfd6ec8e40a9843cc4ad9e81d7b9ab93bc0d36e21",
+      "sha256": "006c26194fadbab34dbbca88a8b7600cd048281e49e177aaaf398cc88aa5bd2b",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "57e1378ea2ef41dd39a0d4ab9d8f5f64356ba436ab1fce35b8ac62e5faca3124",
+      "sha256": "094645df6664d7a3018f300f448d0e24f966f6bf358b4a043a4e17972d12cb3f",
       "executable": false
     },
     "DEMO.md": {
@@ -860,7 +860,7 @@
       "executable": false
     },
     "public/request-drafts.js": {
-      "sha256": "d641962bc4e0adad9eaf0841109676b807c71b7790fcb87f10a43acb77740a2f",
+      "sha256": "80d7b0733a011b77792cea48ed6379f0ea38b928082dc94eb105f7349817a810",
       "executable": false
     },
     "public/rer-theme.css": {
@@ -1564,7 +1564,7 @@
       "executable": false
     },
     "src/gasket/intake-catalog.ts": {
-      "sha256": "5a5bbc5d17affaf8329e32fc7477f861ea18075bcd85acf5c7588dd99840cedc",
+      "sha256": "58650c801a35bad7edbd8f1966d3b211bcb28ecd650d1a9732e05df5ee99f6d3",
       "executable": false
     },
     "src/gasket/interval-evidence.ts": {
@@ -4256,7 +4256,7 @@
       "executable": false
     },
     "tests/gasket/languages.mjs": {
-      "sha256": "9985444478a998dc996111f39bd6aac44e0142a6455fd06a116c2750ffe7eab0",
+      "sha256": "1e982c336def212cc749641089541c92b2b049411254c4b9e19e31eef7f47fdb",
       "executable": false
     },
     "tests/gasket/messages.mjs": {
@@ -4364,7 +4364,7 @@
       "executable": false
     },
     "tests/gasket/request-privacy.mjs": {
-      "sha256": "65cbd467265f4ea6df3173a96a541be89193d4b0e5ce542bf6b97646c715613a",
+      "sha256": "f2a6fbe6311533a2102a73c6d007a047f8e2625f4f29e6084ed286ec509318cc",
       "executable": false
     },
     "tests/gasket/requests.mjs": {
