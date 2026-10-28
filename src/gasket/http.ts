@@ -157,6 +157,14 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
     const { code, status, detail } = failure(error)
     if (api || (publicRequest && request.headers.get('accept')?.includes(['application', 'json'].join('/')))) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
     if (code === 'site_not_found' || code === 'site_not_operational') return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+    if (code === 'work_snapshot_changed' || code === 'work_export_limit_exceeded') {
+      const restart = new URLSearchParams([...url.searchParams].filter(([key]) => ['state', 'mine', 'team', 'tab', 'limit', 'all'].includes(key)))
+      const limits = detail as { total?: number; limit?: number } | undefined
+      const message = code === 'work_snapshot_changed'
+        ? 'Work changed while this list or download was open. Restart to read a complete current snapshot.'
+        : `The ${limits?.total ?? 'matching'} work orders exceed the selected download limit of ${limits?.limit ?? 2000}. Narrow the work filters and try again.`
+      return page(env, 'Work list needs a restart', actor, h`<h1>Work list needs a restart</h1><p role="alert">${message}</p><p>No partial download was returned. Accepted work and original files are unchanged.</p><p><a class="gk-button gk-secondary" href="/app?${restart.toString()}">Restart work list</a></p>`, { url, status })
+    }
     if (status === 404) return page(env, 'Not found', actor, h`<h1>Not found</h1><p>There is nothing here you can open.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status: 404 })
     return page(env, 'That did not work', actor, h`<h1>That did not work</h1><p>${code.replace(/_/g, ' ')}.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status })
   }

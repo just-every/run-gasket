@@ -9,8 +9,8 @@ The requirements, evidence and remaining gaps below come from CONTRACT.md.
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 14 | 0 | 0 | 14 |
-| Target and push further | 54 | 32 | 38 | 124 |
-| All | 68 | 32 | 38 | 138 |
+| Target and push further | 54 | 33 | 37 | 124 |
+| All | 68 | 33 | 37 | 138 |
 
 Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). REPORT-006 remains partial following the ct review of `0cbb33a22baacae6a513a6f52eedf381265a67e8`. The independent history-period and distinct mutation repairs are present in this implementation; fresh ct judgment and guarded landing evidence remain required. The current documentation candidate preserves these code and test bytes. Other rows preserve main evidence and scope.
 
@@ -1326,13 +1326,13 @@ Organizations version maintenance and compliance templates, required inspection 
 
 #### SAFE-003 — Capacity, ownership and honest service state
 
-target · **missing**
+target · **partial**
 
 The target supports a US organization with multiple sites, at least 10,000 assets, 100,000 parts and one million historical work orders, with paginated search/export. The supported offline pack holds at least one technician's assigned and team work for the next 7 days (no fewer than 200 work orders) with their procedures, asset histories and linked manuals, and up to 2 GB of attachments. Storage, connector and notification limits are visible before use; reaching a limit preserves accepted evidence and shows actionable failure instead of silent truncation. **Acceptance evidence:** Load a representative estate at the declared capacity through import/public API, page/search/export all records, download an offline pack at that 7-day, 200-work-order, 2 GB floor on a phone and work it in airplane mode, and exceed a configured limit. Inspect exact counts, usable core workflows and explicit refusal without lost accepted data.
 
-**Evidence.** None.
+**Evidence.** `tests/gasket/work-pagination.mjs` — workPaginationJourney, registered in `tests/gasket/flows.mjs`: imports 1,205 same-day open work orders through public preview and resumable apply, closes a separate cohort through independent review, traverses authorized web and JSON pages exactly once, reconciles legacy arrays, versioned API fields and complete bounded CSV, tests tied sort keys, altered and foreign cursors, changed snapshots, configured export-limit refusal, signed-out and revoked access, forbidden records and planned-site refusal, and preserves accepted records and original attachment digests. Browser navigation assertions run at 1440; proof captures Today, All open, Closed and Done today at 1440 and 390. `API.md` documents current paging, snapshot and CSV limits.
 
-**Gap.** No declared/verified target capacity or limit-aware complete exports; work lists currently cap returned rows.
+**Gap.** This proves only operational primary-site work-list completeness at the demonstrated fixture size, not declared or qualified target capacity. Gap: ADMIN-002 operational multi-site authorization; qualification at 10,000 assets, 100,000 parts and one million historical work orders with complete estate-wide search and export performance; the seven-day offline pack containing at least 200 work orders with procedures, asset histories, linked manuals and up to 2 GB of attachments; real-phone airplane-mode proof and the held SMS sender and APNs and FCM delivery dependencies; comprehensive visible storage, connector and notification limits before use and failure handling that preserves all accepted evidence. ADMIN-009 retains its resumable rer-export dependency, and br retains Work-table bulk-selection custody.
 
 ## Push further
 

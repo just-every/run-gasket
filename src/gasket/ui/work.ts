@@ -112,7 +112,7 @@ const shortTask = (title: string) => {
 
 export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const mine = url.searchParams.get('mine') === '1', state = url.searchParams.get('state')
-  const filtered = mine || state === 'closed' || state === 'open'
+  const filtered = mine || state === 'closed' || state === 'open' || url.searchParams.has('team')
   const tab = (TABS as readonly string[]).includes(url.searchParams.get('tab') ?? '') ? url.searchParams.get('tab') as Tab : 'today'
   const [today, place, pending, activity] = await Promise.all([workToday(env, actor, url), site(env), pendingProposals(env), recentActivity(env, actor)])
   const selection = new URL(url)

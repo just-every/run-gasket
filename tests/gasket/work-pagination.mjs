@@ -5,20 +5,9 @@ import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
+import * as XLSX from 'xlsx/xlsx.mjs'
+const readCsv = bytes => { const book = XLSX.read(bytes, { type: 'array', raw: true }); return { rows: XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, defval: '', raw: true }) } }
 import { file, harness } from './harness.mjs'
-
-// Independent CSV decoding keeps the download assertion outside product code.
-const readCsv=bytes=>{
-  const text=new TextDecoder().decode(bytes),rows=[];let row=[],value='',quoted=false
-  for(let i=0;i<text.length;i++) {
-    const c=text[i]
-    if(c==='"') {if(quoted&&text[i+1]==='"'){value+='"';i++}else quoted=!quoted}
-    else if(c===','&&!quoted){row.push(value);value=''}
-    else if(c==='\n'&&!quoted){row.push(value.replace(/\r$/,''));rows.push(row);row=[];value=''}
-    else value+=c
-  }
-  assert.equal(quoted,false);return {rows}
-}
 
 const csv = rows => rows.map(row => row.map(value => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n') + '\r\n'
 const sha = bytes => createHash('sha256').update(bytes).digest('hex')
@@ -46,10 +35,12 @@ export async function workPaginationJourney() {
     for (let n = 0; imported.state !== 'completed' && n < 30; n++) imported = await h.api('spreadsheet.job', owner, { job: imported.job, action: 'resume' })
     assert.equal(imported.state, 'completed')
     const expected = preview.accepted.map(row => row.targetId)
+    console.log('Work completeness: 1205 public import records accepted')
     const closed = []
     for (let n = 0; n < 9; n++) {
       const id = (await h.api('workorder.create', owner, { asset, title: `Synthetic closed ${n}`, due: '2026-10-20', assignee: techId })).id
-      await h.api('workorder.cancel', owner, { workOrder: id, reason: 'Synthetic duplicate preserved in history' })
+      const submitted = await h.api('workorder.submit', tech, { workOrder: id, version: 1 })
+      await h.api('workorder.review', owner, { workOrder: id, version: submitted.version, decision: 'approve' })
       closed.push(id)
     }
     const hidden = (await h.api('workorder.create', owner, { asset, title: 'Synthetic forbidden assignment', due: '2026-10-20', assignee: otherId })).id
@@ -80,7 +71,7 @@ export async function workPaginationJourney() {
     await traverse(`work-page?team=${team}&limit=137`, owner, expected)
     await traverse('work-page?state=closed&limit=4', owner, closed)
     await traverse('work-page?state=closed&limit=4', tech, closed)
-    const versioned = await traverse('v1/work?status=open&limit=200', owner, allOpen)
+    const versioned = await traverse('v1/work?limit=200', owner, [...allOpen, ...closed])
     for (const row of native) {
       const v1 = versioned.find(other => other.id === row.id)
       assert.deepEqual([v1.title, v1.status, v1.due], [row.title, row.status, row.due_date])
@@ -94,6 +85,29 @@ export async function workPaginationJourney() {
       const link = response.headers.get('link'); path = link ? link.match(/^<([^>]+)>/)[1] : null
     } while (path)
     assert.deepEqual(legacy, native)
+
+    async function traverseWeb(base, cookie, ids) {
+      let path = base; const seen = []
+      do {
+        const response = await h.raw(path, { cookie })
+        assert.equal(response.status, 200)
+        const html = await response.text()
+        const table = html.match(/<table class="gk-work-table">([\s\S]*?)<\/table>/)?.[1] ?? ''
+        const rows = [...table.matchAll(/class="gk-wo" href="\/app\/work\/([^"<>]+)"/g)].map(match => match[1])
+        seen.push(...rows)
+        assert.match(html, new RegExp(`of ${ids.length} work orders`))
+        const next = html.match(/href="([^"<>]+)">Next page<\/a>/)?.[1]
+        path = next ? next.replaceAll('&amp;', '&') : null
+      } while (path)
+      assert.equal(new Set(seen).size, seen.length)
+      assert.deepEqual(seen.sort(), [...ids].sort())
+    }
+    await traverseWeb('/app?state=open&limit=200', tech, [...expected, collaboration])
+    await traverseWeb(`/app?team=${team}&limit=200`, owner, expected)
+    await traverseWeb('/app?limit=200', owner, [...allOpen, ...closed])
+    await traverseWeb('/app?tab=done&limit=4', owner, closed)
+    await traverseWeb('/app?tab=progress&limit=4', owner, [expected[0]])
+    await traverseWeb('/app?state=closed&limit=4', tech, closed)
 
     async function exportRows(cookie, ids) {
       const response = await h.raw('/app/work.csv?state=open', { cookie })
@@ -115,6 +129,19 @@ export async function workPaginationJourney() {
     const closedCsv = readCsv(new Uint8Array(await (await h.raw('/app/work.csv?state=closed', { cookie: tech })).arrayBuffer())).rows
     assert.deepEqual(closedCsv.slice(1).map(row => row[0]), closed, 'equal close instants retain a deterministic total order')
 
+    const credential = await h.api('service.create', owner, { name: 'Synthetic work reader', scopes: ['work:read'], expiresAt: Date.parse('2026-10-21T16:00:00Z'), consent: true })
+    const service = path => h.raw('/api/gasket/' + path, { headers: { authorization: `Bearer ${credential.token}` } })
+    const serviceFirst = await service('work-page?limit=137')
+    assert.equal(serviceFirst.status, 200)
+    const servicePage = await serviceFirst.json()
+    assert.equal(servicePage.total, allOpen.length)
+    const serviceNext = await service(query('work-page?limit=137', servicePage.next))
+    assert.equal(serviceNext.status, 200)
+    assert.ok((await serviceNext.json()).rows.every(row => !servicePage.rows.some(first => first.id === row.id)))
+    assert.equal((await service('parts')).status, 403)
+    await h.api('service.revoke', owner, { credential: credential.id })
+    assert.equal((await service(query('work-page?limit=137', servicePage.next))).status, 401)
+
     const first = await h.api('work-page?state=open&limit=137', tech)
     assert.equal((await h.api('work-page?state=open&limit=137', tech)).next, first.next, 'unchanged reads issue deterministic cursors')
     for (const base of ['work-page?state=closed&limit=137', `work-page?team=${team}&limit=137`]) await h.api(query(base, first.next), tech, undefined, 400)
@@ -126,8 +153,9 @@ export async function workPaginationJourney() {
     // Refusal must return no partial download and must not alter accepted data.
     const limited = await h.raw('/app/work.csv?exportLimit=1000', { cookie: tech })
     assert.equal(limited.status, 413); assert.equal(limited.headers.get('content-disposition'), null)
-    assert.match(await limited.text(), /work export limit exceeded/)
+    assert.match(await limited.text(), /Narrow the work filters/)
     assert.deepEqual(await h.api(`work/${expected[0]}`, owner), before); assert.equal(await digest(), sha(evidenceBytes))
+    const ownerSnapshot = await h.api('work-page?state=open&limit=137', owner)
     await h.api('workorder.priority', owner, { workOrder: expected[1], priority: 'high', reason: 'Synthetic changed snapshot' })
     assert.equal((await h.api(query('work-page?state=open&limit=137', first.next), tech, undefined, 409)).error, 'work_snapshot_changed')
     const staleCsv = await h.raw('/app/work.csv?snapshot=' + encodeURIComponent(first.start), { cookie: tech })
@@ -135,7 +163,7 @@ export async function workPaginationJourney() {
     assert.equal(await digest(), sha(evidenceBytes))
     assert.equal((await h.api('work-page', tech)).total, expected.length + 1)
 
-    await browserProof(h, owner, { open: allOpen.length, today: allOpen.length, closed: closed.length })
+    await browserProof(h, owner, { open: allOpen.length, today: allOpen.length + closed.length, closed: closed.length, staleSnapshot: ownerSnapshot.start })
     for (const path of ['/api/gasket/work', '/api/gasket/work-page', '/app/work.csv']) {
       assert.equal((await h.raw(path)).status, path.startsWith('/api/') ? 401 : 303)
     }
@@ -164,10 +192,10 @@ async function browserProof(h, owner, totals) {
     const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 1100 } })
     await context.addCookies(owner.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
     const page = await context.newPage()
-    for (const [path, name, total] of [['/app', 'today', totals.today], ['/app?state=open', 'open', totals.open], ['/app?state=closed', 'closed', totals.closed]]) {
+    for (const [path, name, total] of [['/app', 'today', totals.today], ['/app?state=open', 'open', totals.open], ['/app?state=closed', 'closed', totals.closed], ['/app?tab=done', 'done', totals.closed]]) {
       assert.equal((await page.goto(h.origin + path)).status(), 200)
       assert.match(await page.getByRole('navigation', { name: 'Work pages' }).innerText(), new RegExp(`1–6 of ${total} work orders`))
-      if (name === 'today') assert.match(await page.getByRole('navigation', { name: "Today's work" }).innerText(), new RegExp(`Today ${totals.today}`))
+      if (name === 'today') assert.match((await page.getByRole('navigation', { name: "Today's work" }).innerText()).replace(/\s+/g, ' '), new RegExp(`Today ${totals.today}`))
       const firstIds = await page.locator('.gk-work-table tbody .gk-wo').evaluateAll(nodes => nodes.map(node => node.getAttribute('href')))
       await Promise.all([page.waitForNavigation(), page.getByRole('link', { name: 'Next page', exact: true }).click()])
       assert.match(await page.getByRole('navigation', { name: 'Work pages' }).innerText(), new RegExp(`7–${Math.min(12, total)} of ${total} work orders`))
@@ -179,6 +207,16 @@ async function browserProof(h, owner, totals) {
         await page.screenshot({ path: `${directory}/work-${name}-${width}.png`, fullPage: true })
       }
       await page.setViewportSize({ width: 1440, height: 1100 })
+    }
+    for (const [path, name, status] of [['/app/work.csv?exportLimit=1000', 'limit-refused', 413], ['/app/work.csv?state=open&snapshot=' + encodeURIComponent(totals.staleSnapshot), 'snapshot-refused', 409]]) {
+      await page.setViewportSize({ width: 1440, height: 1100 })
+      assert.equal((await page.goto(h.origin + path)).status(), status)
+      assert.ok((await page.getByRole('alert').innerText()).length > 20)
+      assert.equal(await page.getByRole('link', { name: 'Restart work list', exact: true }).count(), 1)
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 1100 })
+        await page.screenshot({ path: `${directory}/work-${name}-${width}.png`, fullPage: true })
+      }
     }
     await context.close()
   } finally { await browser.close() }
