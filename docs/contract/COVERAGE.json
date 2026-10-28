@@ -2,7 +2,7 @@
   "schema": 1,
   "seed": "gasket-product",
   "old": {
-    "commit": "f4514ee6922d5fc2f72c1e192365cec676094979",
+    "commit": "a62a04135c77202b90b2d26b339fea5f2fee0be5",
     "files": [
       "CONTRACT.md"
     ]
@@ -344,6 +344,15 @@
     },
     {
       "file": "CONTRACT.md",
+      "line": 61,
+      "text": "**ADMIN-003 — Role rights and separation of duties.** Owner controls identity, integrations and retention; site admin manages that site; lead plans/assigns and manages registers; technician creates corrective and emergency work, including work already completed, against assets and locations (FIELD-009) and records assigned or self-assigned work; supervisor reviews independently; storeroom clerk counts/issues/receives, and a stores supervisor independently approves count variances (PART-004); buyer drafts POs; purchasing approver authorizes spend; analyst reads authorized reports. Permission templates and custom grants keep work creation, execution, approval and cost-rate visibility separate. Create work is a default technician right that an owner or site admin revokes per role and site, and a ready-made Operator template sees and records only work assigned to that person. Broader delegated scheduling rights inherited from REPORT-006 must preserve current report and export permissions, attributable preparation, explicit owner authorization of the saved revision and separation of preparation from outbound authority. **Acceptance evidence:** Sign in each role and exercise its permitted public doors, including direct forbidden writes/exports. Add a custom site-scoped role, revoke it and test old sessions; technician work and purchasing cannot be self-approved. Remove create work from the technician role at one site and see that site's technicians refused at app and API while the other site's technicians still create work; give a person the Operator template and see only their assigned work. For PLAN-004, explicit revocable grants must support qualification and tool-record creation, correction and retirement within authorized sites and records, independently of planning access, erasure, retention and private-document rights.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-003"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
       "line": 63,
       "text": "**ADMIN-004 — Requester and contractor access.** Requesters and contractors are invited by mobile phone number or email address (ADMIN-014); neither needs a company email. Requesters submit and follow their own faults without seeing private maintenance costs or other people's requests. Contractors receive expiring access to named work, instructions and evidence, record completion and costs, and cannot browse the asset estate or approve their work. Neither ever reads the team's internal comments or their photos (PLAN-006). Requesters and contractors never create work orders at any door (FIELD-009); they use request intake (REQ-001, REQ-002). **Acceptance evidence:** Invite a requester by US mobile number only and an external electrician by email, have the requester sign in with a one-time SMS code, submit a fault and follow it, and finish assigned contractor work. Change URL/API identifiers to other records, inspect denied access, expire the contractor grant and test its active session. The requester and the contractor are refused a work order's and an asset's internal comments and comment photos (PLAN-006) by URL and API. A requester and a contractor are refused work creation at the web, API and app doors (FIELD-009).",
       "to": "clause",
@@ -371,6 +380,15 @@
     },
     {
       "file": "CONTRACT.md",
+      "line": 69,
+      "text": "**ADMIN-007 — Retention and verifiable erasure.** Owners set retention and legal holds for attachments, request contacts, users and maintenance records. An erasure preview identifies dependencies and retained obligations; apply removes eligible records/files, anonymizes retained audit, and produces a per-type result. Later restores honor the erasure journal; recipients' prior downloads remain outside local erasure. **Acceptance evidence:** Create a held work record and an eligible requester/photo, preview and apply erasure through the owner door, inspect bytes and anonymized audit, and restore an older archive with the later erasure journal. Held records remain and erased records do not reappear. PLAN-004 qualification erasure inherits dependency previews, applicable retention minima and holds, atomic eligible erasure, attributable anonymized audit and durable per-type results; complete copied-data reconciliation remains required.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-007"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
       "line": 71,
       "text": "**ADMIN-008 — Protected credentials and private attachments.** Provider tokens, sensor certificates and mobile credentials are encrypted under installation authority, narrowly scoped, rotatable and revocable.",
       "to": "clause",
@@ -394,6 +412,15 @@
       "to": "clause",
       "ids": [
         "ADMIN-008"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 73,
+      "text": "**ADMIN-009 — Complete portable archive and inactive restore.** Owners download a documented archive of all sites, assets, work/history, PMs, requests, stock/movements, POs, costs, attachments, audit and import mappings with schema versions, counts and digests. Restore into empty data validates before writes, pauses automation and excludes sessions/provider secrets; owners reconnect services deliberately. **Acceptance evidence:** Export a realistic multi-site estate through the supported command/download, interrupt/resume, validate digests and restore to a fresh installation. Compare every record class; corrupt and nonempty restores write nothing and restored PMs do not send or buy. Qualification erasure results and later-journal fencing must survive portable archive and inactive restore; an incompatible older archive is refused before publication.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-009"
       ]
     },
     {
@@ -448,6 +475,15 @@
       "to": "clause",
       "ids": [
         "ADMIN-015"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 89,
+      "text": "**ADMIN-016 — User and full maintenance-record erasure.** The unfinished user and full maintenance-record erasure portion of ADMIN-007 remains a separate obligation. Owner-confirmed erasure must respect retention, legal holds and retained evidence obligations, preserve anonymized audit and prevent resurrection on later restore. Erasing an eligible retired qualification family does not erase its user identity or discharge complete maintenance-record erasure; retained obligations and prevention of resurrection remain required.",
+      "to": "clause",
+      "ids": [
+        "ADMIN-016"
       ]
     },
     {
@@ -677,6 +713,185 @@
       "ids": [
         "PLAN-004"
       ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 137,
+      "text": "Ct approves these supported defaults with riders: only the owner creates, edits or retires qualification records and tool records, including tool identity and calibration facts. Retirement preserves attributed history and prevents retired records from satisfying new requirements. Planning reads, availability edits and resource use require the existing work assignment right and existing record access; they do not grant record-maintenance rights, unrestricted personnel access, private certificate originals, personal identifiers, private contacts, pay rates or unrelated records. Source documents retain their separate access controls.",
+      "to": "rulings",
+      "ids": [
+        "RL-3"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 139,
+      "text": "A certification or licence reference is information the owner entered, not verification by Gasket with an issuing body. Every reference display identifies it as “Owner-entered reference — not verified by Gasket with the issuing body,” with recorded dates and calculated expiry distinguished from verification. Gasket does not certify competence, physical safety, trade licensing, legal compliance or employment-law compliance. Qualified people choose applicable standards and authorize physical maintenance and equipment release.",
+      "to": "rulings",
+      "ids": [
+        "RL-3"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 141,
+      "text": "A hard block refuses planning confirmation or assignment when a required qualification or tool is missing, expired, unavailable or incompatibly booked. No override is supported. Gap: Broader qualification and tool-record role grants remain required under PLAN-004 and ADMIN-003. Gap: Authorized recorded exceptions remain part of the target and require a separately authorized approver, reason, attributable audit, explicit scope and expiry before shipping. Gap: Automatic qualification expiry and renewal reminders are unproved; existing document expiry reminders remain under ASSET-003 and external notification delivery under PM-005.",
+      "to": "rulings",
+      "ids": [
+        "RL-3"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 143,
+      "text": "Qualification data can be personal data. Corrections and retirement preserve attributed prior evidence under ADMIN-006; retirement is not erasure. Retention, legal holds, eligible erasure, anonymized retained audit and prevention of resurrection on restore remain under ADMIN-007 and ADMIN-016. Complete archive and inactive restore coverage remain under ADMIN-009 and GAS-11. Gap: Qualification-specific audit, erasure, retention and restore coverage is unproved by this policy review.",
+      "to": "rulings",
+      "ids": [
+        "RL-3"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 145,
+      "text": "SAFE-001 inherits qualification references for qualified sign-offs, prerequisites, expiry and changed-evidence reapproval; SAFE-002 inherits training and qualification links, retained certificates and complete portable compliance audit packs. ADMIN-002 inherits site-scoped access at every door before additional sites ship. ASSET-006 and ASSET-008 retain linked tool-register, calibration, booking and tool-use obligations. All unproved obligations remain named Gaps without reducing the complete target.",
+      "to": "rulings",
+      "ids": [
+        "RL-3"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 147,
+      "text": "**Acceptance evidence:** Plan a high-voltage repair for a technician with an expired credential and a shared tool already booked. Resolve both constraints and inspect the schedulable slot and utilization denominator.",
+      "to": "clause",
+      "ids": [
+        "PLAN-004"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 149,
+      "text": "CT policy ruling, 27 October 2026, reviewed pin 2d16c035c2eff1371d08ef6fd4c5608a55c708a9: APPROVE WITH RIDERS for ordinary owner-confirmed erasure of unused retired qualification families. This resolves the pending policy decision only. PLAN-004 remains partial.",
+      "to": "rulings",
+      "ids": [
+        "RL-12"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 151,
+      "text": "An active owner using the ordinary authenticated owner door may explicitly confirm erasure after a dependency preview. Eligibility applies to the whole recorded qualification family, including its corrections and replacements. An active replacement, applicable hold, unmet user or maintenance-record retention minimum, retained safety sign-off or other retained evidence obligation refuses erasure. Apply rechecks current authority, eligibility and the confirmed revision atomically; stale confirmation and conflicting concurrent changes refuse without partial erasure.",
+      "to": "clause",
+      "ids": [
+        "PLAN-011"
+      ],
+      "also": [
+        {
+          "to": "rulings",
+          "ids": [
+            "RL-12"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 153,
+      "text": "Successful erasure removes eligible retired qualification details, correction copies and associated reminder content, anonymizes retained qualification audit details, and records durable per-type results. Actor attribution, action, site and time remain attributable; the user account and identity remain. Retirement, expiry and reminder automation never authorize automatic erasure. This qualification slice does not establish user identity erasure or complete maintenance-record erasure.",
+      "to": "clause",
+      "ids": [
+        "PLAN-011"
+      ],
+      "also": [
+        {
+          "to": "rulings",
+          "ids": [
+            "RL-12"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 155,
+      "text": "Later archives preserve the erasure result. A later erasure journal fences older archives before publication; restore must preserve the erasure or refuse without publishing resurrected data.",
+      "to": "clause",
+      "ids": [
+        "PLAN-011"
+      ],
+      "also": [
+        {
+          "to": "rulings",
+          "ids": [
+            "RL-12"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 157,
+      "text": "Owner-only qualification and tool-record upkeep is an initial authority boundary. PLAN-004 and ADMIN-003 retain explicit, revocable delegation to named active people within authorized sites and records for creation, correction and retirement. Planning access alone grants no record-maintenance, private certificate, erasure, retention or hold-release authority.",
+      "to": "clause",
+      "ids": [
+        "PLAN-010"
+      ],
+      "also": [
+        {
+          "to": "rulings",
+          "ids": [
+            "RL-12"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 159,
+      "text": "Owner-entered qualification references remain unverified with issuing bodies. Gasket does not establish competence, physical safety, licensing or legal compliance. Prior recipient copies, independently retained archives and provider-held copies remain outside demonstrated local erasure. Applicable retention decisions remain the owner’s responsibility with qualified advice where needed.",
+      "to": "section",
+      "section": "Boundaries",
+      "also": [
+        {
+          "to": "clause",
+          "ids": [
+            "PLAN-010"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 161,
+      "text": "Through JSON and form doors, preview and explicitly erase an eligible unused retired qualification family. Assert exact dependency and per-type results, removal of original and corrected reference details and reminder content, preserved actor attribution, and stable retry results. Refuse signed-out and unauthorized callers, stale and unconfirmed requests, active replacements, each applicable hold, each unmet retention minimum and retained safety sign-offs; assert unchanged protected evidence. Exercise competing hold and erasure operations. Inspect a later archive, restore its durable results without resurrection, and refuse an older archive fenced by the later journal.",
+      "to": "clause",
+      "ids": [
+        "PLAN-011"
+      ],
+      "also": [
+        {
+          "to": "rulings",
+          "ids": [
+            "RL-12"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 163,
+      "text": "Grant a named person qualification-record maintenance rights within an explicit site and record scope; exercise permitted creation, correction and retirement, refuse operations outside that scope, revoke the grant and refuse further use through existing sessions. The grant supplies no erasure, retention, hold-release or private-document authority. Authorized recorded exceptions remain a separate required journey with a separately authorized approver, reason, attributable audit, explicit scope and expiry.",
+      "to": "clause",
+      "ids": [
+        "PLAN-004",
+        "PLAN-010"
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
+      "line": 165,
+      "text": "PLAN-004 implementation update, 28 October 2026: under the 27 October ruling, an active owner explicitly grants a named active person creation, correction and retirement of an exact qualification family or named tool within the operational primary site. Every write rechecks the live session, grant, current membership revision and operator generation atomically. Revocation and membership reinstatement cannot revive old authority; archives restore grants inactive. A steward receives only the necessary record facts, without private original references, contacts, unrelated personnel, work planning, reminder consent, erasure, retention or hold-release rights. Qualification erasure also redacts matching scope names and retained grant audit payloads, redacts released qualification-hold reasons and their audit payloads, names active refusal reasons in the preview, removes reminder captures and fences delayed captures using opaque evidence identities. Pre-identity captured inputs are matched to their recorded holder and qualification name. Unattributed older renewal notices prevent erasure until reconciled; their shared identity is never guessed. Authorized recorded exceptions remain absent, and additional operational sites remain owed under ADMIN-002. PLAN-004 remains partial; this update changes no original acceptance point or CT rider.",
+      "to": "changelog"
     },
     {
       "file": "CONTRACT.md",
@@ -2100,6 +2315,32 @@
     },
     {
       "file": "CONTRACT.md",
+      "line": 465,
+      "text": "Gap: PLAN-004 and ADMIN-003 retain operational multi-site and broader role-template stewardship, plus authorized recorded exceptions with approver, reason, audit, scope and expiry. PLAN-004, ADMIN-007 and ADMIN-016 retain complete copied-data reconciliation, including unattributed older renewal notices, and user identity and full maintenance-record erasure beyond the demonstrated qualification slice. ADMIN-002 retains multi-site authorization. ADMIN-009 retains complete archive reconciliation. SAFE-001 retains qualified sign-offs, prerequisites and changed-evidence reapproval; SAFE-002 retains qualification links, retained certificates and complete audit packs. PM-005 retains external reminder delivery. Issuing-body verification, provider-held copies, legal retention sufficiency and physical-safety approval remain unproved boundaries within PLAN-004, ADMIN-007, ADMIN-016, SAFE-001 and SAFE-002. Policy approval supplies no completion.",
+      "cell": "gap",
+      "to": "gap",
+      "ids": [
+        "PLAN-004",
+        "PLAN-010",
+        "PLAN-011",
+        "ADMIN-009",
+        "ADMIN-016"
+      ],
+      "also": [
+        {
+          "to": "section",
+          "section": "Boundaries"
+        },
+        {
+          "to": "rulings",
+          "ids": [
+            "RL-12"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "CONTRACT.md",
       "line": 466,
       "cell": "gap",
       "text": "Owned parts/access blockers, promised dates, missed-promise notices and attributed resolution exist; predecessor/permit/receipt dependencies, enforced ready/blocked planning and connected production-window moves with affected-owner notices remain absent.",
@@ -2122,7 +2363,7 @@
       "file": "CONTRACT.md",
       "line": 469,
       "cell": "gap",
-      "text": "No conversations, team or All team chat, direct/group messages, unread state, offline message queue or message-to-work conversion.",
+      "text": "Online operational-primary-site one-to-one text is implemented; PLAN-008 remains partial. Conservative current defaults are active existing human participants only, no owner content-reading bypass, fixed participant pairs, append-only indefinite retention, metadata-only audit and no automatic outbound delivery; adopted under the standing conservative-default rule, with policy approval and broader scoped delegation still open. Missing: team and site-wide All team conversations, ad-hoc groups and join or leave boundaries; photos, files, record links and mentions; message-to-request and corrective-work conversion with original attributed evidence; edits and deletion history; conversation-specific owner retention, legal hold and eligible erasure with complete audit and archive reconciliation. Held: native iOS and Android messaging and deep links, APNs and FCM plus email delivery under preferences, offline queuing and exactly-once reconnect proof on devices; SMS sender qualification and phone-only identities retain ADMIN-004 and ADMIN-014. Requester and contractor identities receive no internal conversation access and remain unbuilt prerequisites. Additional operational sites retain ADMIN-002. No native-device, provider-delivery, complete messaging or legal-retention qualification is claimed.",
       "to": "gap",
       "ids": [
         "PLAN-008"
@@ -2741,247 +2982,6 @@
       "line": 571,
       "text": "PLAN-004 gate correction, 27 October 2026: unchanged qualification facts preserve their evidence identity when reminder preferences change. Original qualification records receive distinct migrated identities; pre-identity immutable snapshots remain valid only for the original unchanged record. Retirement, replacement and factual corrections still require fresh sign-off. Expiry jobs retain qualification identity, expiry, explicit reminder consent, selected lead window and intended owner recipients before execution; the worker consumes those facts and rechecks live qualification and recipient authority in its write. Qualification reminder inputs and outputs remain owner-held; private evidence references are excluded from these job inputs. Automation health includes stored qualification notices for the owner. The existing planning, safety and recovery journeys cited in the rows prove this correction. PLAN-004 remains partial and PM-008 remains done. The historical judged-at pin is a baseline; this update concerns only the named planning and reminder behavior and does not rejudge other rows.",
       "to": "changelog"
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 61,
-      "text": "**ADMIN-003 — Role rights and separation of duties.** Owner controls identity, integrations and retention; site admin manages that site; lead plans/assigns and manages registers; technician creates corrective and emergency work, including work already completed, against assets and locations (FIELD-009) and records assigned or self-assigned work; supervisor reviews independently; storeroom clerk counts/issues/receives, and a stores supervisor independently approves count variances (PART-004); buyer drafts POs; purchasing approver authorizes spend; analyst reads authorized reports. Permission templates and custom grants keep work creation, execution, approval and cost-rate visibility separate. Create work is a default technician right that an owner or site admin revokes per role and site, and a ready-made Operator template sees and records only work assigned to that person. Broader delegated scheduling rights inherited from REPORT-006 must preserve current report and export permissions, attributable preparation, explicit owner authorization of the saved revision and separation of preparation from outbound authority. **Acceptance evidence:** Sign in each role and exercise its permitted public doors, including direct forbidden writes/exports. Add a custom site-scoped role, revoke it and test old sessions; technician work and purchasing cannot be self-approved. Remove create work from the technician role at one site and see that site's technicians refused at app and API while the other site's technicians still create work; give a person the Operator template and see only their assigned work. For PLAN-004, explicit revocable grants must support qualification and tool-record creation, correction and retirement within authorized sites and records, independently of planning access, erasure, retention and private-document rights.",
-      "to": "clause",
-      "ids": [
-        "ADMIN-003"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 69,
-      "text": "**ADMIN-007 — Retention and verifiable erasure.** Owners set retention and legal holds for attachments, request contacts, users and maintenance records. An erasure preview identifies dependencies and retained obligations; apply removes eligible records/files, anonymizes retained audit, and produces a per-type result. Later restores honor the erasure journal; recipients' prior downloads remain outside local erasure. **Acceptance evidence:** Create a held work record and an eligible requester/photo, preview and apply erasure through the owner door, inspect bytes and anonymized audit, and restore an older archive with the later erasure journal. Held records remain and erased records do not reappear. PLAN-004 qualification erasure inherits dependency previews, applicable retention minima and holds, atomic eligible erasure, attributable anonymized audit and durable per-type results; complete copied-data reconciliation remains required.",
-      "to": "clause",
-      "ids": [
-        "ADMIN-007"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 73,
-      "text": "**ADMIN-009 — Complete portable archive and inactive restore.** Owners download a documented archive of all sites, assets, work/history, PMs, requests, stock/movements, POs, costs, attachments, audit and import mappings with schema versions, counts and digests. Restore into empty data validates before writes, pauses automation and excludes sessions/provider secrets; owners reconnect services deliberately. **Acceptance evidence:** Export a realistic multi-site estate through the supported command/download, interrupt/resume, validate digests and restore to a fresh installation. Compare every record class; corrupt and nonempty restores write nothing and restored PMs do not send or buy. Qualification erasure results and later-journal fencing must survive portable archive and inactive restore; an incompatible older archive is refused before publication.",
-      "to": "clause",
-      "ids": [
-        "ADMIN-009"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 89,
-      "text": "**ADMIN-016 — User and full maintenance-record erasure.** The unfinished user and full maintenance-record erasure portion of ADMIN-007 remains a separate obligation. Owner-confirmed erasure must respect retention, legal holds and retained evidence obligations, preserve anonymized audit and prevent resurrection on later restore. Erasing an eligible retired qualification family does not erase its user identity or discharge complete maintenance-record erasure; retained obligations and prevention of resurrection remain required.",
-      "to": "clause",
-      "ids": [
-        "ADMIN-016"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 137,
-      "text": "Ct approves these supported defaults with riders: only the owner creates, edits or retires qualification records and tool records, including tool identity and calibration facts. Retirement preserves attributed history and prevents retired records from satisfying new requirements. Planning reads, availability edits and resource use require the existing work assignment right and existing record access; they do not grant record-maintenance rights, unrestricted personnel access, private certificate originals, personal identifiers, private contacts, pay rates or unrelated records. Source documents retain their separate access controls.",
-      "to": "rulings",
-      "ids": [
-        "RL-3"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 139,
-      "text": "A certification or licence reference is information the owner entered, not verification by Gasket with an issuing body. Every reference display identifies it as “Owner-entered reference — not verified by Gasket with the issuing body,” with recorded dates and calculated expiry distinguished from verification. Gasket does not certify competence, physical safety, trade licensing, legal compliance or employment-law compliance. Qualified people choose applicable standards and authorize physical maintenance and equipment release.",
-      "to": "rulings",
-      "ids": [
-        "RL-3"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 141,
-      "text": "A hard block refuses planning confirmation or assignment when a required qualification or tool is missing, expired, unavailable or incompatibly booked. No override is supported. Gap: Broader qualification and tool-record role grants remain required under PLAN-004 and ADMIN-003. Gap: Authorized recorded exceptions remain part of the target and require a separately authorized approver, reason, attributable audit, explicit scope and expiry before shipping. Gap: Automatic qualification expiry and renewal reminders are unproved; existing document expiry reminders remain under ASSET-003 and external notification delivery under PM-005.",
-      "to": "rulings",
-      "ids": [
-        "RL-3"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 143,
-      "text": "Qualification data can be personal data. Corrections and retirement preserve attributed prior evidence under ADMIN-006; retirement is not erasure. Retention, legal holds, eligible erasure, anonymized retained audit and prevention of resurrection on restore remain under ADMIN-007 and ADMIN-016. Complete archive and inactive restore coverage remain under ADMIN-009 and GAS-11. Gap: Qualification-specific audit, erasure, retention and restore coverage is unproved by this policy review.",
-      "to": "rulings",
-      "ids": [
-        "RL-3"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 145,
-      "text": "SAFE-001 inherits qualification references for qualified sign-offs, prerequisites, expiry and changed-evidence reapproval; SAFE-002 inherits training and qualification links, retained certificates and complete portable compliance audit packs. ADMIN-002 inherits site-scoped access at every door before additional sites ship. ASSET-006 and ASSET-008 retain linked tool-register, calibration, booking and tool-use obligations. All unproved obligations remain named Gaps without reducing the complete target.",
-      "to": "rulings",
-      "ids": [
-        "RL-3"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 147,
-      "text": "**Acceptance evidence:** Plan a high-voltage repair for a technician with an expired credential and a shared tool already booked. Resolve both constraints and inspect the schedulable slot and utilization denominator.",
-      "to": "clause",
-      "ids": [
-        "PLAN-004"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 149,
-      "text": "CT policy ruling, 27 October 2026, reviewed pin 2d16c035c2eff1371d08ef6fd4c5608a55c708a9: APPROVE WITH RIDERS for ordinary owner-confirmed erasure of unused retired qualification families. This resolves the pending policy decision only. PLAN-004 remains partial.",
-      "to": "rulings",
-      "ids": [
-        "RL-12"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 151,
-      "text": "An active owner using the ordinary authenticated owner door may explicitly confirm erasure after a dependency preview. Eligibility applies to the whole recorded qualification family, including its corrections and replacements. An active replacement, applicable hold, unmet user or maintenance-record retention minimum, retained safety sign-off or other retained evidence obligation refuses erasure. Apply rechecks current authority, eligibility and the confirmed revision atomically; stale confirmation and conflicting concurrent changes refuse without partial erasure.",
-      "to": "clause",
-      "ids": [
-        "PLAN-011"
-      ],
-      "also": [
-        {
-          "to": "rulings",
-          "ids": [
-            "RL-12"
-          ]
-        }
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 153,
-      "text": "Successful erasure removes eligible retired qualification details, correction copies and associated reminder content, anonymizes retained qualification audit details, and records durable per-type results. Actor attribution, action, site and time remain attributable; the user account and identity remain. Retirement, expiry and reminder automation never authorize automatic erasure. This qualification slice does not establish user identity erasure or complete maintenance-record erasure.",
-      "to": "clause",
-      "ids": [
-        "PLAN-011"
-      ],
-      "also": [
-        {
-          "to": "rulings",
-          "ids": [
-            "RL-12"
-          ]
-        }
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 155,
-      "text": "Later archives preserve the erasure result. A later erasure journal fences older archives before publication; restore must preserve the erasure or refuse without publishing resurrected data.",
-      "to": "clause",
-      "ids": [
-        "PLAN-011"
-      ],
-      "also": [
-        {
-          "to": "rulings",
-          "ids": [
-            "RL-12"
-          ]
-        }
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 157,
-      "text": "Owner-only qualification and tool-record upkeep is an initial authority boundary. PLAN-004 and ADMIN-003 retain explicit, revocable delegation to named active people within authorized sites and records for creation, correction and retirement. Planning access alone grants no record-maintenance, private certificate, erasure, retention or hold-release authority.",
-      "to": "clause",
-      "ids": [
-        "PLAN-010"
-      ],
-      "also": [
-        {
-          "to": "rulings",
-          "ids": [
-            "RL-12"
-          ]
-        }
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 159,
-      "text": "Owner-entered qualification references remain unverified with issuing bodies. Gasket does not establish competence, physical safety, licensing or legal compliance. Prior recipient copies, independently retained archives and provider-held copies remain outside demonstrated local erasure. Applicable retention decisions remain the owner’s responsibility with qualified advice where needed.",
-      "to": "section",
-      "section": "Boundaries",
-      "also": [
-        {
-          "to": "clause",
-          "ids": [
-            "PLAN-010"
-          ]
-        }
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 161,
-      "text": "Through JSON and form doors, preview and explicitly erase an eligible unused retired qualification family. Assert exact dependency and per-type results, removal of original and corrected reference details and reminder content, preserved actor attribution, and stable retry results. Refuse signed-out and unauthorized callers, stale and unconfirmed requests, active replacements, each applicable hold, each unmet retention minimum and retained safety sign-offs; assert unchanged protected evidence. Exercise competing hold and erasure operations. Inspect a later archive, restore its durable results without resurrection, and refuse an older archive fenced by the later journal.",
-      "to": "clause",
-      "ids": [
-        "PLAN-011"
-      ],
-      "also": [
-        {
-          "to": "rulings",
-          "ids": [
-            "RL-12"
-          ]
-        }
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 163,
-      "text": "Grant a named person qualification-record maintenance rights within an explicit site and record scope; exercise permitted creation, correction and retirement, refuse operations outside that scope, revoke the grant and refuse further use through existing sessions. The grant supplies no erasure, retention, hold-release or private-document authority. Authorized recorded exceptions remain a separate required journey with a separately authorized approver, reason, attributable audit, explicit scope and expiry.",
-      "to": "clause",
-      "ids": [
-        "PLAN-004",
-        "PLAN-010"
-      ]
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 165,
-      "text": "PLAN-004 implementation update, 28 October 2026: under the 27 October ruling, an active owner explicitly grants a named active person creation, correction and retirement of an exact qualification family or named tool within the operational primary site. Every write rechecks the live session, grant, current membership revision and operator generation atomically. Revocation and membership reinstatement cannot revive old authority; archives restore grants inactive. A steward receives only the necessary record facts, without private original references, contacts, unrelated personnel, work planning, reminder consent, erasure, retention or hold-release rights. Qualification erasure also redacts matching scope names and retained grant audit payloads, redacts released qualification-hold reasons and their audit payloads, names active refusal reasons in the preview, removes reminder captures and fences delayed captures using opaque evidence identities. Pre-identity captured inputs are matched to their recorded holder and qualification name. Unattributed older renewal notices prevent erasure until reconciled; their shared identity is never guessed. Authorized recorded exceptions remain absent, and additional operational sites remain owed under ADMIN-002. PLAN-004 remains partial; this update changes no original acceptance point or CT rider.",
-      "to": "changelog"
-    },
-    {
-      "file": "CONTRACT.md",
-      "line": 465,
-      "text": "Gap: PLAN-004 and ADMIN-003 retain operational multi-site and broader role-template stewardship, plus authorized recorded exceptions with approver, reason, audit, scope and expiry. PLAN-004, ADMIN-007 and ADMIN-016 retain complete copied-data reconciliation, including unattributed older renewal notices, and user identity and full maintenance-record erasure beyond the demonstrated qualification slice. ADMIN-002 retains multi-site authorization. ADMIN-009 retains complete archive reconciliation. SAFE-001 retains qualified sign-offs, prerequisites and changed-evidence reapproval; SAFE-002 retains qualification links, retained certificates and complete audit packs. PM-005 retains external reminder delivery. Issuing-body verification, provider-held copies, legal retention sufficiency and physical-safety approval remain unproved boundaries within PLAN-004, ADMIN-007, ADMIN-016, SAFE-001 and SAFE-002. Policy approval supplies no completion.",
-      "cell": "gap",
-      "to": "gap",
-      "ids": [
-        "PLAN-004",
-        "PLAN-010",
-        "PLAN-011",
-        "ADMIN-009",
-        "ADMIN-016"
-      ],
-      "also": [
-        {
-          "to": "section",
-          "section": "Boundaries"
-        },
-        {
-          "to": "rulings",
-          "ids": [
-            "RL-12"
-          ]
-        }
-      ]
     }
   ]
 }
