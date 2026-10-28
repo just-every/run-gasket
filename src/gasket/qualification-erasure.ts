@@ -14,6 +14,7 @@ const AUDITS = `(action='planning.qualification' AND subject=? AND json_extract(
 const RECORDS = `SELECT record_id FROM gk_retired_resources WHERE ${FAMILY}
  UNION SELECT json_extract(detail,'$.previous.record_id') FROM gk_audit WHERE action='planning.qualification' AND subject=? AND json_extract(detail,'$.name')=? COLLATE NOCASE
  UNION SELECT json_extract(detail,'$.recordId') FROM gk_audit WHERE action='planning.qualification' AND subject=? AND json_extract(detail,'$.name')=? COLLATE NOCASE`
+const JOB_INPUTS = `rule_id='expiry' AND EXISTS(SELECT 1 FROM json_each(input,'$.qualificationReminders.qualifications') WHERE json_extract(value,'$.member_id')=? AND json_extract(value,'$.name')=? COLLATE NOCASE)`
 const NOTICES = `record_id<>'legacy' AND record_id IN (${RECORDS})`
 const ELIGIBLE = `NOT EXISTS(SELECT 1 FROM gk_qualifications WHERE member_id=? AND name=? COLLATE NOCASE)
  AND NOT EXISTS(SELECT 1 FROM gk_safety_attestations WHERE signer=? AND json_extract(qualification_json,'$.name')=? COLLATE NOCASE)
@@ -38,10 +39,11 @@ export async function qualificationErasurePreview(env: Bindings, actor: Actor, i
   const { pair, family } = await context(env, id)
   const audit = (await one(env, `SELECT COUNT(*) AS n FROM gk_audit WHERE ${AUDITS}`, ...pair, ...pair)).n
   const reminders = (await one(env, `SELECT COUNT(*) AS n FROM gk_qualification_reminders WHERE ${NOTICES}`, ...noticeParams(pair))).n
+  const automationInputs = (await one(env, `SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE ${JOB_INPUTS}`, ...pair)).n
   const safety = (await one(env, "SELECT COUNT(*) AS n FROM gk_safety_attestations WHERE signer=? AND json_extract(qualification_json,'$.name')=? COLLATE NOCASE", ...pair)).n
   return { id, erased: false, revision: (await one(env, 'SELECT revision FROM gk_planning_state WHERE singleton=1')).revision,
     eligible: Boolean(await one(env, `SELECT 1 WHERE ${ELIGIBLE}`, ...eligibleParams(pair))),
-    dependencies: { retiredQualifications: family.length, auditDetails: audit, reminders, safetySignoffs: safety },
+    dependencies: { retiredQualifications: family.length, auditDetails: audit, reminders, automationInputs, safetySignoffs: safety },
     policy: 'Retain indefinitely until explicit owner confirmation. Active qualifications, holds, minimum ages and retained safety sign-offs prevent erasure.',
     obligations: ['Audit actor, action, record, site and time remain. User identity erasure is separate.', 'Prior downloads remain outside local erasure. Restore requires the later erasure journal.'] }
 }
@@ -56,7 +58,7 @@ export async function eraseQualification(env: Bindings, actor: Actor, input: Inp
   insist(preview.eligible, 'qualification_retained', 409)
   const { pair, family } = await context(env, id)
   const result = { removed: { retiredQualifications: family.length, reminders: preview.dependencies!.reminders },
-    anonymized: { auditDetails: preview.dependencies!.auditDetails }, retained: { audit: true, userIdentity: true }, priorDownloads: 'Outside local erasure' }
+    anonymized: { auditDetails: preview.dependencies!.auditDetails, automationInputs: preview.dependencies!.automationInputs }, retained: { audit: true, userIdentity: true }, priorDownloads: 'Outside local erasure' }
   const authority = capabilitySql(actor.sessionId, 'site.manage')
   await commit(env, [
     guard(env, 'forbidden', authority.sql, ...authority.params),
@@ -64,8 +66,11 @@ export async function eraseQualification(env: Bindings, actor: Actor, input: Inp
     guard(env, 'qualification_retained', ELIGIBLE, ...eligibleParams(pair)),
     guard(env, 'stale', `(SELECT COUNT(*) FROM gk_retired_resources WHERE ${FAMILY})=?`, ...pair, family.length),
     guard(env, 'stale', `(SELECT COUNT(*) FROM gk_qualification_reminders WHERE ${NOTICES})=?`, ...noticeParams(pair), preview.dependencies!.reminders),
+    guard(env, 'stale', `(SELECT COUNT(*) FROM gk_automation_jobs WHERE ${JOB_INPUTS})=?`, ...pair, preview.dependencies!.automationInputs),
     ...await redactionStatements(env.DB), ...await invalidateTransfersStatements(env.DB),
     stmt(env, "INSERT INTO gk_guard(code,ok) VALUES('qualification_erasure',1)"),
+    // Remove copied qualification facts while preserving the job's other inputs and outcome.
+    stmt(env, `UPDATE gk_automation_jobs SET input=json_set(input,'$.qualificationReminders.qualifications',json((SELECT json_group_array(json(value)) FROM json_each(input,'$.qualificationReminders.qualifications') WHERE NOT (json_extract(value,'$.member_id')=? AND json_extract(value,'$.name')=? COLLATE NOCASE)))) WHERE ${JOB_INPUTS}`, ...pair, ...pair),
     // Delete notices before redacting the only remaining links to earlier versions.
     stmt(env, `DELETE FROM gk_qualification_reminders WHERE ${NOTICES}`, ...noticeParams(pair)),
     stmt(env, `UPDATE gk_audit SET detail='{}' WHERE ${AUDITS}`, ...pair, ...pair),

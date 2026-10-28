@@ -720,7 +720,7 @@ site metadata does not establish those acceptance points.
 The owner reads `GET /api/gasket/retention-preview?kind=qualification&id=ID`,
 using the retired resource id from `planning`. The preview reports the current
 planning revision, eligibility, retained safety sign-offs, retired record count,
-reminder count and audit details to anonymize. A qualification hold uses
+reminder count, copied automation inputs and audit details to anonymize. A qualification hold uses
 `retention.hold` with `kind: qualification` and that retired id. A user hold
 protects all that person's retired qualifications. Existing user and maintenance
 minimum ages both apply, measured conservatively from retirement.
@@ -733,7 +733,7 @@ qualification. A hold racing erasure cannot also succeed. Nothing deletes
 automatically. Tool history and unrelated qualifications are preserved.
 
 An eligible operation removes every retired version of the same qualification
-for that person, its renewal notices and private correction and retirement
+for that person, its renewal notices, copied qualification facts in automation inputs, and private correction and retirement
 audit payloads. Audit actor, role, action, record, site and time remain; user
 identity erasure is separate. The result reports removed and anonymized counts,
 is stored without reference text and is returned unchanged on a retry. Earlier

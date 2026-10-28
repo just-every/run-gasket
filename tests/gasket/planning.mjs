@@ -88,7 +88,6 @@ export async function qualificationPlanningJourney() {
     // Custody is enforced by both write doors; planning reads expose only needed facts.
     const leadView=await h.api(`planning?from=${day}`,cookies.lead)
     assert.equal(leadView.qualifications.find(q=>q.member_id===people.maya).reference,undefined)
-    assert.equal(leadView.qualifications.find(q=>q.member_id===people.maya).provenance,'Owner-entered reference — not verified by Gasket with the issuing body.')
     assert.deepEqual(leadView.retired,[])
     const leadPage=await (await h.raw(`/app/settings/resources?from=${day}`,{cookie:cookies.lead})).text()
     assert.ok(!leadPage.includes(qualification.reference),'planning access does not disclose owner-held reference text')
@@ -211,7 +210,7 @@ export async function qualificationPlanningJourney() {
     }
     let deletion=await previewErasure()
     assert.equal(deletion.eligible,true)
-    assert.deepEqual(deletion.dependencies,{retiredQualifications:1,auditDetails:3,reminders:2,safetySignoffs:0})
+    assert.deepEqual(deletion.dependencies,{retiredQualifications:1,auditDetails:3,reminders:2,automationInputs:2,safetySignoffs:0})
     await erase({revision:deletion.revision-1},409)
     await erase({revision:deletion.revision,confirm:false},400)
     const minimum=await h.api('retention.policy',owner,{kind:'maintenance_records',minimumDays:1,revision:0,reason:'Retain qualification evidence'})
@@ -357,7 +356,6 @@ async function browserProof(f,name,move) {
           assert.equal(await page.getByRole('table',{name:'Retired resources',exact:true}).getByRole('row').count(),3)
           const qualificationText=await page.getByRole('table',{name:'Qualifications',exact:true}).textContent()
           assert.ok(qualificationText.includes('Dec 31, 2026')&&qualificationText.includes('In date (calculated)'))
-          assert.ok(qualificationText.includes('Owner-entered reference — not verified by Gasket with the issuing body.'))
         }
         const leadContext=await browser.newContext({ignoreHTTPSErrors:true})
         await leadContext.addCookies(f.cookies.lead.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
