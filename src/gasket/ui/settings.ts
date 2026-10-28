@@ -1,3 +1,4 @@
+import { intakeCompleteness, languageOptions, languagePreferences } from '../languages'
 import { resourceGrants } from '../resource-authority'
 // Site, people and access, the audit trail and the More page.
 import type { Bindings } from '../../auth.server'
@@ -101,4 +102,15 @@ export async function morePage(env: Bindings, actor: Actor, url: URL) {
   const steward=actor.role!=='agent'&&(await resourceGrants(env,actor)).some(g=>g.effective)
   const items = SETTINGS.filter(item => item.show(actor)||(steward&&item.href==='/app/settings/resources'))
   return page(env, 'More', actor, h`<h1>More</h1><ul class="gk-more">${items.map(item => h`<li><a href="${item.href}">${item.label}</a><span class="gk-sub">${item.detail}</span></li>`)}</ul>${items.length ? '' : h`<p class="gk-muted">Nothing else for your role.</p>`}`, { url })
+}
+
+
+export async function languagePage(env:Bindings,actor:Actor,url:URL) {
+  const preferences=await languagePreferences(env,actor)
+  const report=actor.role==='owner'?await intakeCompleteness(env,actor):null
+  return page(env,'Display language',actor,h`<h1>Display language · Idioma de la interfaz</h1><p>These preferences currently apply to the primary-site fault portal and scoped QR intake. Authored names, answers and records stay unchanged. Other workspace screens and delivery channels are not yet localized.</p>
+    ${card('Your language · Su idioma',form('language.preference','/app/settings/language',select('Display language · Idioma','locale',[{value:'',label:'Organization default · Predeterminado de la organización'},...languageOptions],preferences.preference ?? '',{required:false}),'Save my language · Guardar mi idioma'))}
+    ${actor.role==='owner'?card('Organization default',form('language.default','/app/settings/language',select('Default display language','locale',languageOptions,preferences.organization),'Save organization default')):''}
+    ${report?card('Intake catalog completeness',h`<p>Complete interface catalogs for both existing intake doors. Custom field labels, options and other authored text remain as entered; reviewed translations belong to the procedure translation workflow.</p><p><a href="/app/settings/language/catalog.json">Download completeness report</a></p>${table(['Language','Translated','Total','Missing'],report.languages.map(row=>[row.locale,row.translated,row.total,row.missing.join(', ') || 'None']))}
+      <details><summary>Maintain Spanish interface strings</summary><p>Use a key from the report. Leaving the translation empty displays English with a visible untranslated marker. Restore the shipped entry to undo an override. This changes interface text only.</p>${form('language.catalog','/app/settings/language',h`${field('Catalog key','key')}${field('Spanish interface string (empty means untranslated)','value',{required:false})}`,'Save Spanish entry')}${form('language.catalog','/app/settings/language',h`${field('Catalog key','key')}${hidden('reset','yes')}`,'Restore shipped entry')}</details>`):''}`,{url})
 }
