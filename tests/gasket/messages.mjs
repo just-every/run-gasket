@@ -60,6 +60,9 @@ export async function messagesJourney() {
     assert.equal((await h.api(`conversations/${id}`, cookies.tech)).unread,1,'read state is independent for each participant')
     assert.equal((await h.api(`conversations/${id}`, cookies.lead)).unread,0)
 
+    await h.api('message.edit',cookies.tech,{message:accepted.message.id,body:'synthetic-gasket-rewritten'},404)
+    await h.api('message.delete',owner,{message:accepted.message.id},404)
+    assert.equal((await h.raw(`/api/gasket/conversations/${id}`,{cookie:cookies.tech,method:'DELETE'})).status,405)
     const protectedSnapshot = await h.api(`conversations/${id}`, cookies.tech)
     const assertNoContent = async response => {
       assert.ok([401,403,404].includes(response.status),`refused with ${response.status}`)
@@ -76,6 +79,18 @@ export async function messagesJourney() {
       const denied = await h.raw('/app/do/message.send',{cookie:who,form:new URLSearchParams({...send(id,'synthetic-gasket-forbidden-form'),returnTo:`/app/messages/${id}`})})
       if(who) {assert.equal(denied.status,303);assert.ok(new URL(denied.headers.get('location'),h.origin).searchParams.has('error'))}
       else assert.equal(denied.status,401)
+    }
+    for(const who of [cookies.agent,undefined]) {
+      for(const path of ['/api/gasket/conversations','/api/gasket/message-people','/app/messages']) {
+        const response=await h.raw(path,{cookie:who})
+        if(!who&&path.startsWith('/app'))assert.equal(response.status,303)
+        else await assertNoContent(response)
+      }
+      for(const action of ['conversation.start','conversation.read']) {
+        const response=await h.raw(`/app/do/${action}`,{cookie:who,form:new URLSearchParams({member:people.tech,conversation:id,through:String(latest),returnTo:'/app/messages'})})
+        if(who){assert.equal(response.status,303);assert.ok(new URL(response.headers.get('location'),h.origin).searchParams.has('error'))}
+        else assert.equal(response.status,401)
+      }
     }
     assert.deepEqual(await h.api('conversations',owner),[],'an owner has no conversation-reading bypass')
     assert.deepEqual((await h.api('conversations',cookies.other)).map(row=>row.id),[alternate],'only the other conversation is visible')
@@ -125,8 +140,19 @@ export async function messagesJourney() {
     assert.equal((await h.raw('/auth/session/revoke',{cookie:ownerAgain,body:{sessionId:session.id}})).status,204)
     await assertNoContent(await h.raw(`/api/gasket/conversations/${id}`,{cookie:cookies.tech}))
     await h.api('message.send',cookies.tech,first,401)
+    for(const path of ['/api/gasket/conversations','/api/gasket/message-people','/app/messages',`/app/messages/${id}`]) {
+      const response=await h.raw(path,{cookie:cookies.tech})
+      if(path.startsWith('/app'))assert.equal(response.status,303)
+      else await assertNoContent(response)
+    }
     await h.api('access.end',ownerAgain,{member:people.lead})
     await assertNoContent(await h.raw(`/api/gasket/conversations/${id}`,{cookie:cookies.lead}))
+    for(const path of ['/api/gasket/conversations','/api/gasket/message-people','/app/messages',`/app/messages/${id}`]) {
+      const response=await h.raw(path,{cookie:cookies.lead})
+      if(path.startsWith('/app'))assert.equal(response.status,303)
+      else await assertNoContent(response)
+    }
+    await assertNoContent(await h.raw('/api/gasket/message.send',{cookie:cookies.lead,body:send(id,'synthetic-gasket-ended')}))
     cookies.tech=await h.signIn(address('synthetic-gasket-tech'))
     assert.equal((await h.api(`conversations/${id}`,cookies.tech)).canSend,false)
     await h.api('message.send',cookies.tech,first,409)

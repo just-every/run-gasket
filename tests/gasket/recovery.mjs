@@ -169,6 +169,7 @@ export async function recoveryJourney() {
     let source = await harness({ vars: h.vars, installation: h.installation })
     try {
       const signed = await source.signIn(h.vars.OWNER_EMAIL)
+      assert.deepEqual(await source.api(`conversations/${direct}`,signed),directOwner,'export leaves source messages and read state unchanged')
       const backup = await source.api('recovery', signed)
       assert.equal(backup.backup.kind, 'backup')
       assert.equal(backup.backup.recovery_point, records[0].exportedAt)
