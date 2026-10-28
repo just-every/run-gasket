@@ -3,7 +3,7 @@ import { pathToFileURL } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
 import * as XLSX from 'xlsx/xlsx.mjs'
-import { file, harness } from './harness.mjs'
+import { file, harness, exerciseKeyedActions } from './harness.mjs'
 
 const csv = rows => rows.map(row=>row.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\r\n')+'\r\n'
 function workbook(rows,format='xlsx',name='work') {
@@ -14,6 +14,7 @@ export async function genericMigrationJourney(){
   const h=await harness({clockInstant:Date.parse('2027-03-07T13:59:00Z')})
   try{
     const owner=await h.owner()
+    exerciseKeyedActions(h, owner, ['spreadsheet.apply', 'spreadsheet.job'], { once: true })
     await h.api('site.configure',owner,{name:'Lakeside maintenance',timezone:'America/New_York'})
     const techId=(await h.api('access.give',owner,{name:'Sam Mechanic',email:'sam@example.test',role:'maintainer'})).id
     const tech=await h.signIn('sam@example.test')

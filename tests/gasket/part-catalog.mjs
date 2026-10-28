@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
-import { harness, file } from './harness.mjs'
+import { harness, file, exerciseKeyedActions } from './harness.mjs'
 import { png } from './fixtures.mjs'
 
 export async function partCatalogJourney(h,cookie,onReady) {
@@ -11,6 +11,7 @@ export async function partCatalogJourney(h,cookie,onReady) {
   try {return await catalogJourney(h,cookie,browser.run)} finally {await browser.close()}
 }
 async function catalogJourney(h,cookie,onReady) {
+  exerciseKeyedActions(h, cookie.owner, ['catalog.import', 'catalog.undo', 'catalog.receive', 'catalog.prefer', 'part.merge.approve'], { once: true })
   const supplier=async(name,email)=> (await h.api('supplier.save',cookie.owner,{name,contact:'Dina Morris',email,phone:'+1 216 555 0164',street:'4100 Lakeside Avenue',city:'Cleveland',state:'OH',zip:'44114',taxTreatment:'sales_tax',paymentTerms:'Net 30',leadDays:6,active:true})).id
   const first=await supplier('Lake Erie Bearings','catalog@erie.example.test'),second=await supplier('Midwest Industrial Supply','catalog@midwest.example.test')
   const header='number,name,unit,manufacturer,manufacturerNumber,vendorNumber,packUnit,packQuantity,price\n'

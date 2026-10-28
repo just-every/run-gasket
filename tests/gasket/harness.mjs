@@ -93,7 +93,10 @@ export function exerciseKeyedActions(h, owner, actions, { once = false } = {}) {
       const replay = await request()
       assert.equal(replay.status, 200, path)
       assert.equal(replay.headers.get('idempotency-replayed'), 'true', path)
-      assert.deepEqual(await replay.json(), result, path + ' retains its original result')
+      if (['service.create', 'webhook.subscribe', 'webhook.rotate'].includes(path)) {
+        const { token: _token, secret: _secret, ...metadata } = result
+        assert.deepEqual(await replay.json(), { ...metadata, secretAvailable: false }, path + ' confirms issuance without retaining its one-time secret')
+      } else assert.deepEqual(await replay.json(), result, path + ' retains its original result')
       assert.deepEqual(await ordinary('audit', auditor), audit, path + ' replay adds no business or audit effect')
       exercised.add(identity)
     }
@@ -105,6 +108,11 @@ export function exerciseKeyedActions(h, owner, actions, { once = false } = {}) {
 const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
 function validate(schema, actual, path) {
   if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
+  if (schema.oneOf) {
+    const matches = schema.oneOf.filter(choice => { try { validate(choice, actual, path); return true } catch { return false } })
+    assert.equal(matches.length, 1, path + ' matches exactly one documented response')
+  }
+  if (Object.hasOwn(schema, 'const')) assert.deepEqual(actual, schema.const, path + ' matches its documented value')
   if (schema.type) {
     const types = [schema.type].flat()
     assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')

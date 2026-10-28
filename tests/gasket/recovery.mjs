@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { readFile, writeFile, copyFile, chmod } from 'node:fs/promises'
 import { createHash, randomUUID } from 'node:crypto'
-import { harness, file } from './harness.mjs'
+import { harness, file, exerciseKeyedActions } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { installation } from './installation.mjs'
 
@@ -13,6 +13,7 @@ export async function recoveryJourney() {
   const h = await harness(), target = await installation(), corruptTarget = await installation()
   try {
     const owner = await h.owner()
+    exerciseKeyedActions(h, owner, ['service.create'], { once: true })
     await h.api('site.configure', owner, { name: 'Recovery estate', timezone: 'UTC' })
     assert.deepEqual(await h.api('recovery', owner), { backup: null, restore: null, drill: null, backupAgeMinutes: null })
     assert.equal((await h.raw('/api/gasket/recovery')).status, 401)
@@ -65,7 +66,13 @@ export async function recoveryJourney() {
     const records = bytes.toString().trim().split('\n').map(line => JSON.parse(line))
     assert.ok(!bytes.includes(Buffer.from(bearerHash)), 'archives exclude the usable bearer verifier as well as its token')
     const credentials = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_api_credentials')
-    assert.deepEqual(credentials.map(item => [item.row.id, item.row.token_hash, item.row.revoked_at]), [[credential.id, `inactive-${credential.id}`, null]])
+    assert.deepEqual(credentials.map(item=>item.row.id).sort(),[credential.id,erasedRecords.credential.id].sort())
+    assert.deepEqual(credentials.filter(item=>item.row.id===credential.id).map(item => [item.row.id, item.row.token_hash, item.row.revoked_at]), [[credential.id, `inactive-${credential.id}`, null]])
+    const retiredCredential=credentials.find(item=>item.row.id===erasedRecords.credential.id).row
+    assert.equal(retiredCredential.token_hash,`inactive-${erasedRecords.credential.id}`)
+    assert.ok(retiredCredential.revoked_at!==null)
+    assert.ok(!bytes.includes(Buffer.from(erasedRecords.credential.token)), 'unused former-owner bearer values never enter archives')
+    assert.ok(!bytes.includes(Buffer.from(createHash('sha256').update(erasedRecords.credential.token).digest('hex'))), 'former-owner verifiers also stay out of archives')
     const subscriptions = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_connector_subscriptions')
     assert.equal(subscriptions.length, 1)
     assert.equal(subscriptions[0].row.secret_cipher, '', 'encrypted signing keys are also excluded')
@@ -225,8 +232,9 @@ export async function recoveryJourney() {
       const later = join(h.installation.root, 'exports', 'after-erasure.rer')
       await h.installation.rer('export', '--output', later)
       const afterBytes = await readFile(later)
+      assert.ok(!afterBytes.includes(Buffer.from(erasedRecords.credential.token)))
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-erased-retry-value')), 'later archives exclude erased API result copies')
-      for (const text of ['synthetic-gasket-erased-person','synthetic-gasket-erased@example.test','synthetic-gasket-erased-work','synthetic-gasket-erased-description','synthetic-gasket-erased-original.png','synthetic-gasket-erased-second.png','synthetic-gasket-erased-comment']) assert.ok(!afterBytes.includes(Buffer.from(text)),`archive removes ${text}`)
+      for (const text of ['synthetic-gasket-erased-credential','synthetic-gasket-erased-person','synthetic-gasket-erased@example.test','synthetic-gasket-erased-work','synthetic-gasket-erased-description','synthetic-gasket-erased-original.png','synthetic-gasket-erased-second.png','synthetic-gasket-erased-comment']) assert.ok(!afterBytes.includes(Buffer.from(text)),`archive removes ${text}`)
       assert.ok(!afterBytes.includes(Buffer.from(qualification.reference)), 'erased qualification references are absent from archive bytes')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-fault')), 'anonymous archive contains no erased fault')
       assert.ok(!afterBytes.includes(Buffer.from('synthetic-gasket-private-photo.png')), 'work attachment filename is absent from the later archive')
@@ -247,6 +255,7 @@ export async function recoveryJourney() {
           const person=(await clean.api('members',cleanOwner)).find(row=>row.id===erasedRecords.person)
           assert.deepEqual([person.name,person.status],['Erased user','ended'])
           assert.equal((await clean.api(`record-erasure-preview?kind=user&id=${erasedRecords.person}`,cleanOwner)).erased,true)
+          assert.equal((await clean.raw('/api/gasket/v1/assets',{headers:{authorization:`Bearer ${erasedRecords.credential.token}`}})).status,401,'inactive restore preserves erased credential refusal')
           assert.deepEqual((await clean.api(`retention-preview?kind=qualification&id=${retiredQualification.id}`,cleanOwner)).result,qualificationErased.result,'restored erasure result is durable')
           const planning=await clean.api('planning',cleanOwner)
           assert.deepEqual(planning.qualifications,[],'erased references never regain eligibility')

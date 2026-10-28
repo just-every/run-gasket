@@ -1,7 +1,7 @@
 // AGENT-005: agent queries and promised dates through the built Worker's public doors.
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 import { offset, zone } from './clock.mjs'
 
 export async function agentFollowUpJourney() {
@@ -9,6 +9,7 @@ export async function agentFollowUpJourney() {
   let h = initial
   try {
     const cookie = { owner: await h.owner() }, ids = {}
+    exerciseKeyedActions(h, cookie.owner, ['agent.query', 'agent.answer', 'agent.escalate', 'agent.closure'], { once: true })
     await h.api('site.configure', cookie.owner, { name: 'Great Lakes Compressor Works', timezone: zone })
     for (const [key, role] of [['lead','lead'],['max','maintainer'],['mo','maintainer'],['sam','supervisor'],['agent','agent']]) {
       ids[key] = (await h.api('access.give', cookie.owner, { name: `${key} Great Lakes`, email: `${key}@example.test`, role })).id

@@ -59,6 +59,8 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
   for (const [table, where] of Object.entries(children)) dependencies[table] = await count(`${quote(table)} WHERE ${where}`, [key])
   const receipts = receiptScope(kind,id,record)
   const receiptResults = await count(`gk_api_writes WHERE ${receipts.where}`, receipts.args)
+  const credentialMetadata = kind === 'user' ? await count('gk_api_credentials WHERE member_id=?', [id]) : 0
+  if (kind === 'user' && await count('gk_api_credentials WHERE member_id=? AND revoked_at IS NULL', [id])) blockers.push('Revoke service credentials first')
   const holdKind = kind === 'work' ? 'gk_retention_holds' : 'gk_retention_scope_holds'
   if (await count(`${holdKind} WHERE kind=? AND record_id=? AND held=1`, [kind,id])) blockers.push('Legal hold')
   const minimum = (await one(env, 'SELECT minimum_days FROM gk_retention_policies WHERE kind=?', kind === 'work' ? 'maintenance_records' : 'users'))?.minimum_days ?? 0
@@ -83,7 +85,7 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
   }
   // Examine every current table for references, including JSON snapshots. Unknown
   // dependencies are refused rather than silently orphaned or partially erased.
-  const ignored = new Set([...Object.keys(children), 'gk_api_writes', 'gk_audit','gk_record_erasure_results', kind === 'work' ? 'gk_work_orders' : 'gk_members', ...(kind === 'work' ? ['gk_connector_events'] : ['oa_operators','oa_auth_audit','oa_invitation_cancellations'])])
+  const ignored = new Set([...Object.keys(children), 'gk_api_writes', 'gk_audit','gk_record_erasure_results', kind === 'work' ? 'gk_work_orders' : 'gk_members', ...(kind === 'work' ? ['gk_connector_events'] : ['oa_operators','oa_auth_audit','oa_invitation_cancellations','gk_api_credentials'])])
   const needles = kind === 'work' ? [id] : [id,record.operator_id,record.email,record.name].filter(Boolean)
   for (const { name: table } of await all(env, "SELECT name FROM sqlite_master WHERE type='table' AND (name GLOB 'gk_*' OR name GLOB 'oa_*' OR name GLOB 'oc_*' OR name GLOB 'ik_*' OR name GLOB 'rer_*') ORDER BY name")) {
     if (ignored.has(table) || table === 'gk_guard') continue
@@ -99,15 +101,16 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
     const related = await count('gk_work_orders WHERE id<>? AND (follow_up_of=? OR merged_into=?)', [id,id,id])
     if (related) blockers.push('Related work')
   }
-  const otherAudit=await count('gk_audit WHERE subject<>? AND (actor=? OR instr(detail,?)>0)',[id,id,id])
+  const lifecycle = kind === 'user' ? " AND NOT(action IN ('service.create','service.revoke','service.invalidate') AND subject IN (SELECT id FROM gk_api_credentials WHERE member_id=?))" : ''
+  const otherAudit=await count('gk_audit WHERE subject<>? AND (actor=? OR instr(detail,?)>0)'+lifecycle,[id,id,id,...(kind==='user'?[id]:[])])
   if(otherAudit) blockers.push('Retained audit for another record')
   if(kind==='user') {
     const unclassifiedAudit=await count("gk_audit WHERE actor<>? AND subject<>? AND instr(detail,?)=0 AND (instr(lower(detail),lower(?))>0 OR instr(lower(detail),lower(?))>0)",[id,id,id,record.email,record.name])
     if(unclassifiedAudit) blockers.push('Other records contain identity details in retained audit')
   }
   const auditSequence = (await one(env,'SELECT COALESCE(MAX(seq),0) AS n FROM gk_audit')).n
-  const token = await sha256Hex(JSON.stringify({ kind,id,record,dependencies,receiptResults,blockers,minimum,auditSequence }))
-  return { kind,id,erased:false,eligible:blockers.length===0,dependencies,receiptResults,blockers,token,result:null,checks,record,auditSequence,
+  const token = await sha256Hex(JSON.stringify({ kind,id,record,dependencies,receiptResults,credentialMetadata,blockers,minimum,auditSequence }))
+  return { kind,id,erased:false,eligible:blockers.length===0,dependencies,receiptResults,credentialMetadata,blockers,token,result:null,checks,record,auditSequence,
     obligations: ['Retained evidence is never erased. Unknown dependencies prevent erasure.', 'Anonymized audit and opaque identity markers remain. Prior downloads are outside local erasure.', 'Supply the later archive as the erasure journal to fence older restores.'] }
 }
 
@@ -122,7 +125,7 @@ export async function eraseRecord(env: Bindings, actor: Actor, input: Input) {
   const {record,checks,auditSequence}=preview
   const children=kind==='work'?workChildren:userChildren, key=kind==='work'?id:record.operator_id
   const receipts=receiptScope(kind,id,record)
-  const result={removed:{...preview.dependencies,...(kind==='work'?{gk_work_orders:1}:{})},redacted:{apiReceiptResults:preview.receiptResults},anonymized:kind==='user'?{members:1,operators:1}:{},retained:{audit:true,identityMarker:kind==='user'},priorDownloads:'Outside local erasure'}
+  const result={removed:{...preview.dependencies,...(kind==='work'?{gk_work_orders:1}:{})},redacted:{apiReceiptResults:preview.receiptResults,...(preview.credentialMetadata?{credentialMetadata:preview.credentialMetadata}:{})},anonymized:kind==='user'?{members:1,operators:1}:{},retained:{audit:true,identityMarker:kind==='user'},priorDownloads:'Outside local erasure'}
   await commit(env,[
     guard(env,'stale',"EXISTS(SELECT 1 FROM oa_sessions s JOIN oa_operators o ON o.id=s.operator_id JOIN gk_members m ON m.operator_id=o.id WHERE s.id=? AND s.revoked_at IS NULL AND s.expires_at>? AND s.operator_version=o.version AND o.status='active' AND o.role='owner' AND m.id=? AND m.status='active')",actor.sessionId,Date.now(),actor.id),
     guard(env,'stale','(SELECT COALESCE(MAX(seq),0) FROM gk_audit)=?',auditSequence),
@@ -134,6 +137,10 @@ export async function eraseRecord(env: Bindings, actor: Actor, input: Input) {
     stmt(env,`UPDATE gk_api_writes SET state='failed',result_json=NULL WHERE ${receipts.where}`,...receipts.args),
     stmt(env,"UPDATE gk_audit SET detail='{}' WHERE subject=?",id),
     ...(kind==='work'?[stmt(env,'DELETE FROM gk_work_orders WHERE id=?',id)]:[
+      stmt(env, "UPDATE gk_audit SET detail='{}' WHERE action IN ('service.create','service.revoke','service.invalidate') AND subject IN (SELECT id FROM gk_api_credentials WHERE member_id=?)", id),
+      // Opaque credential identities retain attribution; no former bearer or
+      // entered client metadata can survive eligible identity erasure.
+      stmt(env, "UPDATE gk_api_credentials SET name='Erased service client',token_hash='inactive-'||id,scopes_json='[]',expires_at=0,revoked_at=COALESCE(revoked_at,?) WHERE member_id=?", now(), id),
       stmt(env,"UPDATE oa_auth_audit SET value='{}' WHERE actor_id=? OR instr(value,?)>0 OR instr(lower(value),lower(?))>0 OR instr(lower(value),lower(?))>0",record.operator_id,record.operator_id,record.email,record.name),
       stmt(env,"UPDATE gk_retention_scope_holds SET reason='Erased identity' WHERE kind='user' AND record_id=? AND held=0",id),
       stmt(env,"UPDATE oa_operators SET email=?,display_name='Erased user',version=version+1 WHERE id=?",`erased-${id}@example.invalid`,record.operator_id),

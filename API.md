@@ -595,7 +595,7 @@ For example, send `GET /api/gasket/v1/assets?limit=50`, then `GET /api/gasket/v1
 
 ## Write retry receipts
 
-For the following 162 actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and all stored successful results are limited to 64,000 bytes. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Catalog photos also allow 2,064,000 bytes of JSON and retain the 1,500,000-byte decoded photo limit. Comment posts allow 8,064,000 bytes of JSON with at most four photos, each at most 1,500,000 decoded bytes. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
+For the following 209 actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and all stored successful results are limited to 64,000 bytes. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Catalog photos also allow 2,064,000 bytes of JSON and retain the 1,500,000-byte decoded photo limit. Comment posts allow 8,064,000 bytes of JSON with at most four photos, each at most 1,500,000 decoded bytes. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
 
 The receipt allowlist includes the planning, safety, schedule and labor operations listed below, together with `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` `document.link`, `asset.move`, `asset.lifecycle`, `asset.agreement`, `asset.contact`, `asset.sighting`, `asset.state`, `asset.retire`, `meter.feed`, `meter.adjust` `meter.window`, `part.price`, `part.substitute`, `kit.create`, `bom.revise`, `workorder.reserve` `reservation.release`, `part.photo`, `comment.post` and `comment.edit`.
 
@@ -605,7 +605,7 @@ A durable claim is stored before execution. An overlapping request, or a claim i
 
 Example: POST `/api/gasket/v1/asset.create` with the JSON content type, the installation's `Origin`, a member session cookie and `Idempotency-Key: synthetic-gasket-1`. Body: `{"tag":"00042","name":"Pump","location":"Workshop"}`. If the response is lost, repeat those exact bytes with the same key. Read the returned id using the asset detail door and inspect its history or the register page. Errors use the existing `{error,detail?}` contract: 400 invalid input, 401 absent session, 403 forbidden access, 404 absent record or route, 409 conflict, 413 oversized keyed body and 415 unsupported keyed media type.
 
-INT-001 remains partial: complete target-entity coverage, comprehensive OpenAPI schemas and write keys beyond the 162 listed actions are still owed. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+INT-001 remains partial: comprehensive schemas for the remaining native read models and complete custody, erasure and portable-recovery proof remain owed. All current native mutation actions accept write keys; read-only previews deliberately do not retain claims. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
 
 ### Crew, work control and purchasing retries
 
@@ -707,7 +707,7 @@ another revision, handoff, result log, movement, submission or review.
 
 Procedure, assignment and execution schemas describe this tested native slice.
 Other maintenance entities, broader write-key coverage
-and the remaining credential custody, retention and erasure riders remain unfinished; the 162-action
+and the remaining credential custody, retention and erasure riders remain unfinished; the 209-action
 receipt allowlist refuses every other keyed action explicitly.
 
 A template saved through JSON retains `requiredFields` in its current revision and
@@ -1055,3 +1055,58 @@ Older captured qualification inputs are matched by their recorded holder and
 qualification name as well as current evidence identities. New job captures
 exclude the obsolete shared identity. Unattributed older renewal notices refuse
 erasure until reconciled; the application does not guess which person owns them.
+
+## Complete native write retries
+
+Every current native mutation accepts an optional write key on either API base.
+The 209 operations include the prior maintenance actions and these additional groups:
+
+| Area | Actions |
+| --- | --- |
+| Catalog and canonical stock | `catalog.import`, `catalog.apply`, `catalog.undo`, `catalog.receive`, `catalog.prefer`, `part.merge.approve` |
+| Independent spend authority | `spend.policy`, `spend.delegate`, `purchase.emergency`, `purchase.release` |
+| Replenishment and vendor policy | `replenishment.policy`, `replenishment.envelope`, `replenishment.envelope.approve`, `replenishment.envelope.revoke`, `vendor.rule` |
+| Resource custody | `planning.grant`, `qualification.erase` |
+| Conversation and scanned work | `comment.read`, `label.work` |
+| Accountable follow-up | `agent.query`, `agent.answer`, `agent.escalate`, `agent.closure` |
+| Bounded model runs | `agentrun.grant`, `agentrun.revoke`, `agentrun.start` |
+| Connector management | `webhook.subscribe`, `webhook.control`, `webhook.rotate`, `webhook.resume`, `webhook.retry` |
+| Credential issuance | `service.create` |
+| Reviewed migration and reconciliation | `import.apply`, `import.job`, `spreadsheet.apply`, `spreadsheet.job` |
+
+The six computed previews (`catalog.preview`, `part.merge.preview`, `pm.preview`,
+`rules.preview`, `import.preview`, `spreadsheet.preview`) write no retry claim.
+Call them without a key, inspect their result, then use the documented reviewed
+fingerprint or hash on the corresponding mutation. Migration job operations retain
+the original returned checkpoint; a fresh key resumes the next bounded batch.
+Replaying an apply never reapplies an import after its separate undo.
+
+All operations retain native permission checks. Emergency purchase decisions,
+commitment release and replenishment-envelope approval recheck independence before
+replay. Resource grants and erasure remain owner-only. Query answers remain bound
+to the named recipient. Model-run replay refuses a revoked grant or ended agent;
+it never makes another provider call. The fixed nine service scopes do not expand.
+
+Issuance returns a bearer or signing secret once. For `service.create`,
+`webhook.subscribe` and `webhook.rotate`, the first response includes that secret;
+the retained replay response omits it and includes `secretAvailable: false`.
+It confirms the same issuance and adds no audit or provider effect. A client that
+lost the first secret deliberately issues a replacement and revokes its predecessor,
+or rotates its signing key. Never infer that a retry can recover a lost secret.
+No plaintext bearer or signing secret enters a retained write result.
+
+Keyed catalog import and apply accept the same 2,064,000-byte JSON envelope as
+other 1,500,000-byte originals. Scanned work uses that envelope for its photo.
+The MaintainX apply envelope allows four 4,000,000-byte originals plus base64
+and 64,000 bytes of metadata. Spreadsheet apply allows one 10,000,000-byte original
+plus base64 and 64,000 bytes of metadata. The native parsers still enforce each
+original-file limit and reviewed identity. An oversized stream refuses before
+parsing and before a claim or business effect is created.
+
+Eligible user erasure previews retired service-client metadata. It refuses active
+owner identity, active access, unrevoked credentials, retention minima, holds and
+retained business dependencies. On confirmed eligible erasure, opaque credential
+identity and attribution remain, while the entered client name, scopes, usable
+verifier and copied retry results are removed. Old bearers remain unusable;
+later archives and inactive restore preserve that result. Prior recipient copies
+remain outside local erasure. This does not certify legal retention sufficiency.

@@ -1,12 +1,13 @@
 // PART-005 through the policy, automation, purchase, receiving and stores doors.
 import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
-import { harness, file } from './harness.mjs'
+import { harness, file, exerciseKeyedActions } from './harness.mjs'
 
 export async function replenishmentJourney() {
   const h=await harness()
   try {
     const cookie={owner:await h.owner()}, ids={}
+    exerciseKeyedActions(h, cookie.owner, ['replenishment.policy', 'replenishment.envelope', 'replenishment.envelope.approve', 'replenishment.envelope.revoke'], { once: true })
     await h.api('site.configure',cookie.owner,{name:'Great Lakes Manufacturing',timezone:'America/New_York'})
     for(const [key,role,name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['sam','supervisor','Rosa Alvarez'],['agent','agent','Stores assistant']]) {
       ids[key]=(await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})).id

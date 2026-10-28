@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "409ab8ee96026026f4cf8fdd061c0997460c302eaadb8692f7d4645b18c82279",
+      "sha256": "71c7396003c1294fb94d12dea659626a6fa1f5daff814e389aa7d38f28040686",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "cd69740905ed69f0bd2f55c0cbae67995b524b589c7454816a8cf816dfdcf73d",
+      "sha256": "00eee022acdd915f01dda7f52368fef0bf94c41fc372d9bedc7454021a402125",
       "executable": false
     },
     "base-copies.json": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b78dda7ef11f587eedd7b6cd359aae4b32205e280ef1ce91dd1fdb348b14e18b",
+      "sha256": "ddf9faece8fe9fc2828bde17f35886dec0743d237e810e7fb0298a73916e55ec",
       "executable": false
     },
     "DEMO.md": {
@@ -744,7 +744,7 @@
       "executable": false
     },
     "openapi.json": {
-      "sha256": "3f7fa620c9f062a1586fd2c788bbb5cf1c72704ac27786d3894347afc6ccdf33",
+      "sha256": "19c6d71ece2d598c1061ce447ce06ff0d4e303a17eb4034986de7fa6004ac701",
       "executable": false
     },
     "OPERATIONS.json": {
@@ -1380,7 +1380,7 @@
       "executable": false
     },
     "src/gasket/api-contract.ts": {
-      "sha256": "b19ce07025b45cbe1b8f5c1559258fac3073d7f279ab40fb8566dca9517128d5",
+      "sha256": "cd3d99c13814b1aab7a8ee96a23ec30976e8622df3425a65511a4cc8be5357c2",
       "executable": false
     },
     "src/gasket/api-write-context.ts": {
@@ -1788,7 +1788,7 @@
       "executable": false
     },
     "src/gasket/record-erasure.ts": {
-      "sha256": "c0ed42d354aeec8c6d74105aeafae3e04747ea67be46aebe9e8dbf5b9476d00f",
+      "sha256": "3e317a7030a99818fd7365d569f1f8b711867aba7e0d9dae1d58b1f087ed777d",
       "executable": false
     },
     "src/gasket/recovery.ts": {
@@ -4160,7 +4160,7 @@
       "executable": false
     },
     "tests/gasket/agent-follow-up.mjs": {
-      "sha256": "c99136681a9c3b88d9cce6c5c0d1f1b072298fd53814f23e7991c1e552f35ccb",
+      "sha256": "c7acb253551d828e579ba32442d89a63a9ab4e8d078f05ac64a352537c8910fc",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
@@ -4172,7 +4172,7 @@
       "executable": false
     },
     "tests/gasket/agent-runs.mjs": {
-      "sha256": "26213342d47f57c1b4b7f1f5722770d9680c6ea7810b46572fc194b0182d238f",
+      "sha256": "55d05c3ad2e7c6292dfaec22ff3c44e8d6fb99d3ae0adbe9a718d1752a2f947c",
       "executable": false
     },
     "tests/gasket/agent-stock-browser.mjs": {
@@ -4184,11 +4184,11 @@
       "executable": false
     },
     "tests/gasket/api.mjs": {
-      "sha256": "568f03ca7846d3ec1f97e88b8fbade91fccbcc096b0f1d7d80a6fa5ac9788422",
+      "sha256": "dacf45881583fe9d47d59459cb9bb6b0b638cfa58a972842f49c470d079ef0d6",
       "executable": false
     },
     "tests/gasket/automation.mjs": {
-      "sha256": "a8726f0d389850683a5be291fdbb241c568e92b7f5daf598131e193480d43c51",
+      "sha256": "36a49ef889d8ee954420df94d0293716f748172a0903f1abae51c0f37bcecb0b",
       "executable": false
     },
     "tests/gasket/clock.mjs": {
@@ -4204,7 +4204,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "287b299b8035375174bf6263ca6437879ff575b0665bff52c8c5a7360c0e48b4",
+      "sha256": "48d6d5e9b18d661346f55e11a7ae02a16f53210e446473ff602db9130b4da8b8",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4216,11 +4216,11 @@
       "executable": false
     },
     "tests/gasket/generic-migration.mjs": {
-      "sha256": "ffa155b5331aee9bdbcb0e0afb9b5b5e9f4a4e8a688625b02004d8ff9cb96595",
+      "sha256": "1b99026140d0c0333169ec5a1deacdb9ee59902d15304f12ff8a185548e1d540",
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "7c96e2934d90658965bc47e030893e38db1c2a2be9f45997d1e80e1599896218",
+      "sha256": "f80862c5fb23622b0278864ba09c59acbef20dab36d6251f684926b063fd6201",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4264,11 +4264,11 @@
       "executable": false
     },
     "tests/gasket/part-catalog.mjs": {
-      "sha256": "4523c64e3cf2efef186ec33b0f13ed1d6c5fd4aef0280c5c5899c56b3d91bb8a",
+      "sha256": "8ed7635d2ad8515312acf761cda77d1ca19849bf9f27119e783edc8007df5457",
       "executable": false
     },
     "tests/gasket/planning.mjs": {
-      "sha256": "6ff19fcc370dd53e5d2f2ad6eeeab89df651d8e18dff9766e1355752526dedd2",
+      "sha256": "29a94142bb4b201ad99a185058aedabadcc7950169934ee3a7b5fd9ad59748d0",
       "executable": false
     },
     "tests/gasket/purchase-orders.mjs": {
@@ -4292,11 +4292,11 @@
       "executable": false
     },
     "tests/gasket/record-erasure.mjs": {
-      "sha256": "310a805d7dfba0b53edcebed78ff8cd395f77f4d6e7a183321276fcdd9677414",
+      "sha256": "75065c6d0a008944a5287f535026a9dcc9eaecc21893eae658e22ae73e5c2f22",
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "1202029ceccd64effad09d72fbcbc004ad377b3648ea956ea5471a3333a869f8",
+      "sha256": "d24c8da5743783b8418788652ae497e7ecdc72f8bb6065207ac40a23ff2dd44e",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {
@@ -4308,7 +4308,7 @@
       "executable": false
     },
     "tests/gasket/replenishment.mjs": {
-      "sha256": "fef2a98c82b269b013e3f15b9a89f56910c6fe3bfef4c4c6ac4926d26186f8f0",
+      "sha256": "83dbad75f2b407a03bd9158a34eb390c7e3594eb948b0fd541e9686dc3625258",
       "executable": false
     },
     "tests/gasket/report-generation-gate.mjs": {
@@ -4380,7 +4380,7 @@
       "executable": false
     },
     "tests/gasket/spend.mjs": {
-      "sha256": "2e9d75522cb3f28e9d512f6416d019be4d1e84719691b22b9716b5ab60e447fd",
+      "sha256": "79c9d022927a177dc09a180a84683acb22c31dbe67215f9f9f10438fe68d94ca",
       "executable": false
     },
     "tests/gasket/vendor-follow-up-browser.mjs": {
@@ -4388,7 +4388,7 @@
       "executable": false
     },
     "tests/gasket/vendor-follow-up.mjs": {
-      "sha256": "b21e5ca0d239aec12dc0ef25e849b7410c33ac4b4185428326cb094ad1eb02b8",
+      "sha256": "88e42a4dc874df0d47952acbd57c807d9e21d89e31c995369d23588afb3c176e",
       "executable": false
     },
     "tests/gasket/work-costing-browser.mjs": {

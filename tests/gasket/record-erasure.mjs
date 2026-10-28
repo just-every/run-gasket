@@ -9,7 +9,16 @@ export async function erasureFixture(h, owner, asset) {
   const access=await h.raw('/api/gasket/v1/access.give',{cookie:owner,body:accessBody,headers:accessHeaders})
   assert.equal(access.status,200)
   const person=await access.json()
-  const cookie = await h.signIn('synthetic-gasket-erased@example.test')
+  let cookie = await h.signIn('synthetic-gasket-erased@example.test')
+  const operator = (await (await h.raw('/auth/session', { cookie })).json()).operator.id
+  assert.equal((await h.raw('/auth/operator/role', { cookie: owner, body: { operatorId: operator, role: 'owner' } })).status, 200)
+  const issuingOwner = await h.signIn('synthetic-gasket-erased@example.test')
+  const credential = await h.api('service.create', issuingOwner, { name: 'synthetic-gasket-erased-credential', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
+  const credentialRead = () => h.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })
+  assert.equal((await credentialRead()).status, 200)
+  assert.equal((await h.raw('/auth/operator/role', { cookie: owner, body: { operatorId: operator, role: 'member' } })).status, 200)
+  assert.equal((await credentialRead()).status, 401)
+  cookie = await h.signIn('synthetic-gasket-erased@example.test')
   const createBody={asset,title:'synthetic-gasket-erased-work',description:'synthetic-gasket-erased-description',due:(await h.api('me',owner)).today,assignee:(await h.api('me',owner)).id}
   const createHeaders={'idempotency-key':'synthetic-gasket-erasure-create-'+asset}
   const created=await h.raw('/api/gasket/v1/workorder.create',{cookie:owner,body:createBody,headers:createHeaders})
@@ -22,7 +31,7 @@ export async function erasureFixture(h, owner, asset) {
   assert.equal((await captured.json()).value,fieldBody.value)
   const photo = (await h.api('workorder.evidence',owner,{workOrder:work,version:(await h.api(`work/${work}`,owner)).version,file:file('synthetic-gasket-erased-original.png',png,imageType)})).evidence
   await h.api('comment.post',owner,{workOrder:work,body:'synthetic-gasket-erased-comment',mention:[person.id]})
-  return {person:person.id,cookie,work,photo,retries:{createBody,createHeaders,fieldBody,fieldHeaders,accessBody,accessHeaders}}
+  return {person:person.id,cookie,work,photo,credential,retries:{createBody,createHeaders,fieldBody,fieldHeaders,accessBody,accessHeaders}}
 }
 const preview = (h,owner,kind,id) => h.api(`record-erasure-preview?kind=${kind}&id=${id}`,owner)
 export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
@@ -91,9 +100,15 @@ export async function eraseFixture(h,owner,fixture,{screens=false}={}) {
   const roster=(await h.api('sites/primary',owner)).members
   assert.ok(roster.some(row=>row.member_id===person && row.status==='ended'))
   assert.equal(user.dependencies.gk_site_memberships,1)
+  assert.equal(user.credentialMetadata,1,'eligible erasure previews the retired client metadata')
   if(screens) await erasureScreens(h,owner,person,'eligible-user','user')
   const erased=await h.api('record.erase',owner,{kind:'user',id:person,token:user.token,confirm:true})
   assert.ok(erased.result.redacted.apiReceiptResults>=1)
+  assert.equal(erased.result.redacted.credentialMetadata,1)
+  assert.equal((await h.raw('/api/gasket/v1/assets',{headers:{authorization:`Bearer ${fixture.credential.token}`}})).status,401,'eligible erasure never revives the retired bearer')
+  const lifecycle=(await h.api('audit?action=service',owner)).rows.filter(row=>row.subject===fixture.credential.id)
+  assert.ok(lifecycle.length>=2)
+  assert.ok(lifecycle.every(row=>row.detail==='{}'),'credential lifecycle retains attribution without the erased client name')
   const accessReplay=await h.raw('/api/gasket/v1/access.give',{cookie:owner,body:fixture.retries.accessBody,headers:fixture.retries.accessHeaders})
   assert.equal(accessReplay.status,409)
   assert.equal((await accessReplay.json()).error,'idempotency_failed','an erased identity cannot be invited again by replaying its old grant')

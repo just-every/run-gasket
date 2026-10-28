@@ -11,7 +11,7 @@ export async function apiJourney() {
   let resumed
   try {
     let owner = await h.owner()
-    exerciseKeyedActions(h, () => owner, ['site.configure', 'site.technicianWork', 'access.give', 'access.role', 'access.end', 'service.revoke'])
+    exerciseKeyedActions(h, () => owner, ['site.configure', 'site.technicianWork', 'access.give', 'access.role', 'access.end', 'service.revoke','service.create'])
     await h.api('site.configure', owner, { name: 'Synthetic API estate', timezone: 'UTC' })
     const member = (await h.api('access.give', owner, { name: 'Synthetic API lead', email: 'synthetic-gasket-api@example.test', role: 'lead' })).id
     const lead = await h.signIn('synthetic-gasket-api@example.test')

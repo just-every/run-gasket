@@ -1,7 +1,7 @@
 // PM-008 through public doors against the built Worker and real D1.
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { file, harness } from './harness.mjs'
+import { file, harness, exerciseKeyedActions } from './harness.mjs'
 import { now, zone } from './clock.mjs'
 
 export async function automationJourney() {
@@ -163,6 +163,7 @@ export async function connectorJourney() {
   const start=async()=>{h=await harness({vars,installation:activeInstall,clockOffset:runtimeOffset,outbound})}
   try {
     await start();cookie={owner:await h.owner()}
+    exerciseKeyedActions(h, cookie.owner, ['webhook.subscribe','webhook.control','webhook.rotate','webhook.resume','webhook.retry'], { once: true })
     await h.api('site.configure',cookie.owner,{name:'Connector plant',timezone:zone})
     const ids={}
     for(const [who,role]of[['lead','lead'],['max','maintainer'],['sam','supervisor'],['agent','agent']]){

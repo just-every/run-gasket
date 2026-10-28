@@ -6,7 +6,7 @@ import { harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 const day='2026-10-20', tomorrow='2026-10-21'
 async function fixture() {
   const h=await harness({clockInstant:Date.parse('2026-10-20T16:00:00Z')}),owner=await h.owner()
-  exerciseKeyedActions(h, owner, ['planning.qualification','planning.tool','planning.retire','planning.window','planning.window.remove','planning.requirements','planning.slot','automation.control'])
+  exerciseKeyedActions(h, owner, ['planning.qualification','planning.tool','planning.retire','planning.window','planning.window.remove','planning.requirements','planning.slot','automation.control','planning.grant','qualification.erase'])
   await h.api('site.configure',owner,{name:'Lake Erie Works',timezone:'America/New_York'})
   const people={},cookies={owner}
   for(const [key,role] of [['lead','lead'],['maya','maintainer'],['luis','maintainer'],['supervisor','supervisor'],['agent','agent']]) {

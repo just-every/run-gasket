@@ -3,7 +3,7 @@
 // network edge is faked; the key is a synthetic fixture and must never surface.
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 import { offset, zone } from './clock.mjs'
 
 const KEY = 'synthetic-gasket-1', BASE = 'https://models.example.test/v1'
@@ -25,6 +25,7 @@ export async function agentRunJourney() {
   const pick = (refs, kind) => refs.filter(ref => ref.type === kind)
   try {
     const cookie = { owner: await h.owner() }, ids = {}
+    exerciseKeyedActions(h, cookie.owner, ['agentrun.grant', 'agentrun.revoke', 'agentrun.start'], { once: true })
     await h.api('site.configure', cookie.owner, { name: 'Lake Erie Compressor Works', timezone: zone })
     for (const [key, role, name] of [['lead', 'lead', 'Mara Chen'], ['max', 'maintainer', 'Luis Ortega'], ['agent', 'agent', 'Reliability agent']]) {
       ids[key] = (await h.api('access.give', cookie.owner, { name, email: `${key}@example.test`, role })).id

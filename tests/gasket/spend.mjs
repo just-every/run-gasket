@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { spendBrowser } from './spend-browser.mjs'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 
 export async function spendJourney(h,cookie,ids,onReady) {
+  exerciseKeyedActions(h, cookie.owner, ['spend.policy', 'spend.delegate', 'purchase.emergency', 'purchase.release'], { once: true })
   const today=(await h.api('me',cookie.owner)).today
   const members={}
   for(const [key,name] of [['first','Rosa Alvarez'],['second','Devin Cole'],['delegate','Morgan Chen']]) {

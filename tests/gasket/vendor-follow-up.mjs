@@ -1,7 +1,7 @@
 // BUY-006 through the purchase, receiving, follow-up, automation and notice doors.
 import assert from 'node:assert/strict'
 import { pathToFileURL } from 'node:url'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions } from './harness.mjs'
 import { now, zone } from './clock.mjs'
 
 const DAY = 86_400_000, cron = '*/15 * * * *'
@@ -10,6 +10,7 @@ export async function vendorFollowUpJourney() {
   const h=await harness()
   try {
     const cookie={owner:await h.owner()}, ids={}
+    exerciseKeyedActions(h, cookie.owner, ['vendor.rule'], { once: true })
     await h.api('site.configure',cookie.owner,{name:'Great Lakes Manufacturing',timezone:zone})
     for(const [key,role,name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['sam','supervisor','Rosa Alvarez'],['agent','agent','Stores assistant']]) {
       ids[key]=(await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})).id

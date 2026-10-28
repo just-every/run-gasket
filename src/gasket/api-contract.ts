@@ -86,6 +86,19 @@ const RETRYABLE: Record<string, Capability | null> = {
   'request.triage': 'work.assign', 'request.convert': 'work.assign', 'request.reply': null,
   'request.erase': 'site.manage',
   'proposal.prepare': 'proposal.prepare', 'proposal.decide': 'proposal.decide',
+  'catalog.import': 'site.manage', 'catalog.apply': 'site.manage', 'catalog.undo': 'site.manage',
+  'catalog.receive': 'register.manage', 'catalog.prefer': 'register.manage', 'part.merge.approve': 'register.manage',
+  'spend.policy': 'site.manage', 'spend.delegate': 'site.manage',
+  'purchase.emergency': 'work.review', 'purchase.release': 'work.review',
+  'replenishment.policy': 'register.manage', 'replenishment.envelope': 'site.manage',
+  'replenishment.envelope.approve': 'work.review', 'replenishment.envelope.revoke': 'site.manage',
+  'vendor.rule': 'site.manage', 'planning.grant': 'site.manage', 'qualification.erase': 'site.manage',
+  'comment.read': null,
+  'agent.query': 'proposal.prepare', 'agent.answer': null, 'agent.escalate': 'proposal.prepare', 'agent.closure': 'proposal.prepare',
+  'agentrun.grant': 'agent.run', 'agentrun.revoke': 'agent.run', 'agentrun.start': 'agent.run',
+  'webhook.subscribe': 'site.manage', 'webhook.control': 'site.manage', 'webhook.rotate': 'site.manage', 'webhook.resume': 'site.manage', 'webhook.retry': 'site.manage',
+  'service.create': 'site.manage', 'label.work': 'work.create',
+  'import.apply': 'import.run', 'import.job': 'import.run', 'spreadsheet.apply': 'import.run', 'spreadsheet.job': 'import.run',
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -93,8 +106,9 @@ async function body(request: Request, action: string) {
   insist(request.headers.get('content-type')?.startsWith(JSON_TYPE), 'idempotency_requires_json', 415)
   // Base64 originals plus bounded metadata; each handler still enforces its
   // decoded file limit. Only fingerprints and small results enter receipts.
-  const fileBytes = action === 'document.add' || action === 'document.revise' || action === 'safety.attest' ? DOCUMENT_BYTES : action === 'workorder.evidence' || action === 'part.photo' || action === 'receipt.receive' ? EVIDENCE_BYTES : action === 'comment.post' ? EVIDENCE_BYTES * 4 : action === 'quote.save' || action === 'purchase.save' ? EVIDENCE_BYTES * 5 : action === 'workorder.sign' ? 200_000 : 0
-  const limit = fileBytes ? Math.ceil(fileBytes / 3) * 4 + 64_000 : 64_000
+  const fileBytes = action === 'document.add' || action === 'document.revise' || action === 'safety.attest' || action === 'catalog.import' || action === 'catalog.apply' ? DOCUMENT_BYTES : action === 'workorder.evidence' || action === 'part.photo' || action === 'receipt.receive' || action === 'label.work' ? EVIDENCE_BYTES : action === 'comment.post' ? EVIDENCE_BYTES * 4 : action === 'quote.save' || action === 'purchase.save' ? EVIDENCE_BYTES * 5 : action === 'workorder.sign' ? 200_000 : 0
+  const importBytes = action === 'import.apply' ? 16_000_000 : action === 'spreadsheet.apply' ? 10_000_000 : 0
+  const limit = importBytes ? Math.ceil(importBytes / 3) * 4 + 64_000 : fileBytes ? Math.ceil(fileBytes / 3) * 4 + 64_000 : 64_000
   const reader = request.body?.getReader(), chunks: Uint8Array[] = []
   let size = 0
   if (reader) while (true) {
@@ -114,7 +128,7 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   const key = request.headers.get('idempotency-key')!
   insist(/^[A-Za-z0-9._:-]{1,128}$/.test(key), 'invalid_idempotency_key')
   insist(Object.hasOwn(RETRYABLE, action), 'idempotency_not_supported', 400)
-  if (action === 'workorder.create') insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
+  if (action === 'workorder.create' || action === 'label.work') insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
   const bytes = await body(request, action)
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
   const capability = action === 'workorder.sign' && input.text('role', { max: 12 }) === 'supervisor' ? 'work.review' : RETRYABLE[action]
@@ -126,6 +140,17 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   if (action === 'safety.attest') {
     const order = await workOrder(env, input.text('workOrder', { max: 100 }))
     insist(order.assignee_id === actor.id, 'not_your_work', 403)
+  }
+  if (action === 'agent.answer') {
+    const query = await one(env, 'SELECT q.recipient_id FROM gk_agent_queries q JOIN gk_work_orders w ON w.id=q.work_order_id WHERE q.id=?', input.text('query', { max: 100 }))
+    insist(query, 'query_not_found', 404)
+    insist(query.recipient_id === actor.id, 'not_your_query', 403)
+  }
+  if (action === 'agentrun.start') {
+    const grant = await one(env, 'SELECT status,agent_id FROM gk_agent_grants WHERE id=?', input.text('grant', { max: 100 }))
+    insist(grant, 'grant_not_found', 404)
+    insist(grant.status === 'active', 'grant_revoked', 409)
+    insist(await one(env, "SELECT 1 FROM gk_members WHERE id=? AND role='agent' AND status='active'", grant.agent_id), 'agent_unavailable', 409)
   }
   if (action === 'comment.edit') {
     const comment = await one(env, 'SELECT author_id FROM gk_comments WHERE id=?', input.text('comment', { max: 100 }))
@@ -161,6 +186,20 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
       : await one(env, 'SELECT c.counter_id FROM gk_counts c JOIN gk_count_lines l ON l.count_id=c.id WHERE l.id=?', input.text('line', { max: 100 }))
     insist(count, action === 'count.submit' ? 'count_not_found' : 'count_line_not_found', 404)
     insist(action === 'count.submit' ? count.counter_id === actor.id : count.counter_id !== actor.id, action === 'count.submit' ? 'not_the_counter' : 'independent_approval_required', 403)
+  }
+  if (action === 'purchase.emergency') {
+    const order = await purchaseOrderDetail(env, actor, input.text('order'))
+    insist(order.created_by !== actor.id && order.current.created_by !== actor.id, 'independent_approval_required', 403)
+  }
+  if (action === 'purchase.release') {
+    const revision = await one(env, 'SELECT r.created_by,p.created_by AS initiator FROM gk_purchase_revisions r JOIN gk_purchase_orders p ON p.id=r.order_id WHERE r.id=?', input.text('revisionId'))
+    insist(revision, 'commitment_not_found', 404)
+    insist(revision.created_by !== actor.id && revision.initiator !== actor.id, 'independent_approval_required', 403)
+  }
+  if (action === 'replenishment.envelope.approve') {
+    const envelope = await one(env, 'SELECT created_by FROM gk_replenishment_envelopes WHERE id=?', input.text('envelope'))
+    insist(envelope, 'envelope_not_found', 404)
+    insist(envelope.created_by !== actor.id, 'independent_approval_required', 403)
   }
   if (action === 'purchase.approve') {
     const order = await purchaseOrderDetail(env, actor, input.text('order'))
@@ -248,14 +287,21 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
     insist(kept.role === actor.role, 'idempotency_authority_changed', 403)
     insist(kept.state === 'completed', kept.state === 'pending' ? 'idempotency_pending' : 'idempotency_failed', 409)
     const result = JSON.parse(kept.result_json)
-    if (action === 'workorder.create') await workOrderDetail(env, actor, result.id)
+    if (action === 'workorder.create' || action === 'label.work') await workOrderDetail(env, actor, result.id)
     return { result, replayed: true }
   }
   // Claim before invoking the action: overlap, restart or uncertain results never
   // repeat a mutation. An interrupted claim stays pending for human reconciliation.
   try {
     const result = await withApiWriteClaim({ principal, keyHash }, () => run(input))
-    const encoded = JSON.stringify(result)
+    // Issuance secrets are returned once. A retry confirms the same issuance
+    // through metadata; it never retains or recovers bearer or signing values.
+    let retained = result
+    if (action === 'service.create' || action === 'webhook.subscribe' || action === 'webhook.rotate') {
+      const { token: _token, secret: _secret, ...metadata } = result as Record<string, unknown>
+      retained = { ...metadata, secretAvailable: false }
+    }
+    const encoded = JSON.stringify(retained)
     // Assessments retain their source evidence, unlike small mutation receipts.
     // Keep their documented response bounded below the database row limit.
     const resultBytes = action === 'outcome.assess' ? 1_500_000 : 64_000
