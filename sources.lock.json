@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "38ce795b32ca30f04f93c609b7e11d2df2625bf957af4e6a7f3fb86e83cc72e5",
+      "sha256": "44a9b190371b75c9e391dcd58ea7d0e794da17516fdf0ae1fb0bc735732c92dc",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b769e172bd3a092724d5d7f229fd9713da4e6498ed9f59b439c966d151d3a06b",
+      "sha256": "16af7911e7031f8c8b08b7d0a0973bca22c952924f15c528b764c86d7984e253",
       "executable": false
     },
     "DEMO.md": {
@@ -1392,7 +1392,7 @@
       "executable": false
     },
     "src/gasket/attachment-erasure.ts": {
-      "sha256": "d9c412418eefab095a5927caf3ed6bdd3b009065c4c0dd3a93f28bdd13f7e379",
+      "sha256": "1bf85bd5f89e3fcffe06f2ddc42147e4a989c455d6493ed250e6a9a95e20cf48",
       "executable": false
     },
     "src/gasket/audit.ts": {
@@ -1744,7 +1744,7 @@
       "executable": false
     },
     "src/gasket/print-catalog.ts": {
-      "sha256": "40e24e079f8f3a60ce23911a0e36cdc218ff77064d0b28cc98deb140f29977fa",
+      "sha256": "550a9f259aa9354cc18d779f264807e133f2774fc949822958531c04ae684f18",
       "executable": false
     },
     "src/gasket/print-packs.ts": {
@@ -4312,7 +4312,7 @@
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {
-      "sha256": "a6835d40b73c5dd829b602e0d4b66067ccd9ae9a1a28b50c0cf450fdc6a20482",
+      "sha256": "542fd26c45caf53231ff30a47c7d8515e229da6763ced85a905b64a7cfd9a9fc",
       "executable": false
     },
     "tests/gasket/purchase-orders.mjs": {

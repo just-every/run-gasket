@@ -44,9 +44,9 @@ const es: Record<keyof typeof en, string> = {
 export type PrintKey = keyof typeof en
 export const printText = (locale: Locale) => (key: PrintKey) => (locale === 'es-US' ? es : en)[key]
 export function printError(locale: Locale, code: string) {
-  const key = /access|forbidden|not_your_work|authentication|not_a_member/.test(code) ? 'error_access'
+  const key = /access|forbidden|not_your_work|authentication|not_a_member|save_receipt_not_found/.test(code) ? 'error_access'
     : /stale|pack_mismatch|work_order_not_open/.test(code) ? 'error_stale'
-    : /reused/.test(code) ? 'error_reused'
+    : /reused|save_already_attempted/.test(code) ? 'error_reused'
     : /invalid|missing|too_long|file|meter|outcome|step|unexpected|no_checklist/.test(code) ? 'error_invalid' : 'error_generic'
   return printText(locale)(key)
 }

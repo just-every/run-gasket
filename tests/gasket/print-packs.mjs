@@ -126,11 +126,22 @@ export async function printPacksJourney() {
     assert.equal(captured.findings.length,1);assert.ok(captured.findings[0].follow_up_id)
     assert.deepEqual([receipt.entrant,receipt.performedOn,receipt.enteredAt,receipt.originalDigest],[people.tech,'2026-10-15T10:30',instant,sha(png)])
     assert.equal((await h.api('audit?action=printpack.accept',owner)).rows.length,1)
+    const paperRetention=await h.api(`retention-preview?kind=attachment&id=${receipt.evidence}`,owner)
+    assert.equal(paperRetention.eligible,false)
+    assert.equal(paperRetention.dependencies.paperEntries,1)
+    await h.api('attachment.erase',owner,{evidence:receipt.evidence,version:2,confirm:true},409)
+    assert.deepEqual(Buffer.from(await (await h.raw(`/app/print-previews/${preview}/original`,{cookie:cookies.tech})).arrayBuffer()),png,'retained paper originals survive attachment erasure refusal')
+
     await h.api('workorder.submit',cookies.tech,{workOrder:f.work,version:2},409)
     assert.ok(captured.missing.some(message=>message.includes('photo')),'paper is not a step photo or a safety attestation')
     await h.api('printpack.preview',cookies.tech,{...payload,submissionKey:randomUUID()},409)
     const foreign=await printPackFixture(h,owner,people.tech)
     await h.api('printpack.preview',cookies.tech,{...payload,submissionKey:randomUUID(),workOrder:foreign.work},409)
+    const optional=(await h.api('workorder.evidence',cookies.tech,{workOrder:foreign.work,version:1,file:file('synthetic-gasket-optional.png',png)})).evidence
+    assert.equal((await h.api(`retention-preview?kind=attachment&id=${optional}`,owner)).eligible,true)
+    await h.api('attachment.erase',owner,{evidence:optional,version:2,confirm:true})
+    assert.equal((await h.raw(`/app/evidence/${optional}`,{cookie:owner})).status,404,'ordinary optional attachment erasure still completes')
+
     await h.api('printpack.preview',cookies.tech,{...payload,submissionKey:randomUUID(),version:2},409)
     await h.api('workorder.evidence',cookies.tech,{workOrder:f.work,version:2,item:3,file:file('synthetic-gasket-step.png',png)})
     await h.api('workorder.submit',cookies.tech,{workOrder:f.work,version:3})
