@@ -696,7 +696,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 *Tier:* Core · *From:* PLAN-004 · *Cites:* BASE-DATA-003, BASE-DATA-006, BASE-AUDIT-001, BASE-ROLE-001
 
-**Requirement.** RL-12 permits ordinary owner-confirmed erasure of an eligible retired qualification family, considering every correction and replacement and every retained obligation. It preserves durable per-type results and attributable anonymized audit while the user identity remains. Retirement, expiry and reminders do not authorize automatic erasure. An agent erasure call carries destructive and sensitive, with the company's policy deciding execution. [Qualification custody](docs/qualification-custody.md) defines captured-copy matching and older-archive fencing.
+**Requirement.** RL-12 permits ordinary owner-confirmed erasure of an eligible retired qualification family, considering every correction and replacement and every retained obligation. It preserves durable per-type results and attributable anonymized audit while the user identity remains. Retirement, expiry and reminders do not authorize automatic erasure. An agent erasure call carries destructive, adding sensitive when the family contains regulated identity or health data; the company's policy decides execution. [Qualification custody](docs/qualification-custody.md) defines captured-copy matching and older-archive fencing.
 
 **Acceptance.**
 1. Through JSON and form doors, preview the complete retired family and explicitly confirm the exact eligible revision; read dependency reasons and durable per-type results, including a stable retry.
