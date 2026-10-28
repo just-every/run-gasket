@@ -23340,6 +23340,1722 @@
           }
         }
       }
+    },
+    "/me": {
+      "get": {
+        "summary": "Read current maintenance identity",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentMember"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "The ordinary authenticated member session uses the same current site and record authorization as the screen. Service credentials have no scope for this door."
+      }
+    },
+    "/site": {
+      "get": {
+        "summary": "Read primary installation settings",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "timezone": {
+                          "type": "string"
+                        },
+                        "lead_days": {
+                          "type": "integer"
+                        },
+                        "technician_create_work": {
+                          "type": "integer"
+                        },
+                        "count_approval_cents": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "timezone",
+                        "lead_days",
+                        "technician_create_work",
+                        "count_approval_cents"
+                      ],
+                      "additionalProperties": true
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "The ordinary authenticated member session uses the same current site and record authorization as the screen. Service credentials have no scope for this door."
+      }
+    },
+    "/members": {
+      "get": {
+        "summary": "Read member directory",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Member"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Active owner member session only. Lists installation membership, without private authentication material. A service credential cannot read the directory."
+      }
+    },
+    "/sites": {
+      "get": {
+        "summary": "Read authorized site metadata",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SiteSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "The ordinary authenticated member session uses the same current site and record authorization as the screen. Service credentials have no scope for this door."
+      }
+    },
+    "/sites/{id}": {
+      "get": {
+        "summary": "Read authorized site detail",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SiteDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Returns one authorized site. Only the owner receives its membership list. Planned site metadata does not enable operational estate access; selecting a planned site for a maintenance request returns site_not_operational."
+      }
+    },
+    "/search-views": {
+      "get": {
+        "summary": "Read personal and shared saved filters",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SavedSearch"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "The ordinary authenticated member session uses the same current site and record authorization as the screen. Service credentials have no scope for this door."
+      }
+    },
+    "/record-erasure-preview": {
+      "get": {
+        "summary": "Preview owner-confirmed eligible erasure",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "work",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RecordErasurePreview"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Ordinary active owner only. Returns current dependencies, protected evidence, copied API result counts and a confirmation token. Preview changes no records. An erased record returns the retained summary without a new confirmation token."
+      }
+    },
+    "/retention-settings": {
+      "get": {
+        "summary": "Read owner retention minima",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "automaticErasure": {
+                      "type": "boolean"
+                    },
+                    "policy": {
+                      "type": "string"
+                    },
+                    "policies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "attachments",
+                              "request_contacts",
+                              "users",
+                              "maintenance_records"
+                            ]
+                          },
+                          "minimum_days": {
+                            "type": "integer"
+                          },
+                          "revision": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "minimum_days",
+                          "revision"
+                        ],
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "automaticErasure",
+                    "policy",
+                    "policies"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Ordinary active owner only. No automatic erasure is authorized; minimum ages delay eligible explicit erasure. Holds and retained safety evidence remain independently effective."
+      }
+    },
+    "/request.portal": {
+      "post": {
+        "summary": "request.portal",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "portal": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "mode": {
+                    "type": "string",
+                    "enum": [
+                      "authenticated",
+                      "public"
+                    ]
+                  },
+                  "publicConsent": {
+                    "type": "boolean"
+                  },
+                  "disabled": {
+                    "type": "boolean"
+                  },
+                  "fields": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "text",
+                            "choice",
+                            "number",
+                            "date",
+                            "photo"
+                          ]
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "options": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "label",
+                        "type",
+                        "required"
+                      ],
+                      "additionalProperties": true
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "name": "Synthetic fault intake",
+                "mode": "authenticated",
+                "fields": [
+                  {
+                    "key": "stopped",
+                    "label": "Equipment stopped?",
+                    "type": "choice",
+                    "required": true,
+                    "options": [
+                      "Yes",
+                      "No"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.target": {
+      "post": {
+        "summary": "request.target",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "portal": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "asset",
+                      "location",
+                      "bin"
+                    ]
+                  },
+                  "asset": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "publishConsent": {
+                    "type": "boolean"
+                  },
+                  "custom": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "portal",
+                  "kind",
+                  "name",
+                  "publishConsent"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "portal": "PORTAL_ID",
+                "kind": "asset",
+                "asset": "ASSET_ID",
+                "name": "Synthetic pump",
+                "publishConsent": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.field": {
+      "post": {
+        "summary": "request.field",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "portal": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "text",
+                      "choice",
+                      "number",
+                      "date",
+                      "photo"
+                    ]
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "options": {
+                    "type": "string"
+                  },
+                  "required": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "portal",
+                  "revision",
+                  "type",
+                  "label"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "portal": "PORTAL_ID",
+                "revision": 1,
+                "type": "text",
+                "label": "Shift detail",
+                "required": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.responsePolicy": {
+      "post": {
+        "summary": "request.responsePolicy",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "urgency": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "high",
+                      "emergency"
+                    ]
+                  },
+                  "afterHours": {
+                    "type": "string",
+                    "enum": [
+                      "business",
+                      "elapsed"
+                    ]
+                  },
+                  "owner": {
+                    "type": "string"
+                  },
+                  "escalation": {
+                    "type": "string"
+                  },
+                  "weekdays": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "opens": {
+                    "type": "integer"
+                  },
+                  "closes": {
+                    "type": "integer"
+                  },
+                  "acknowledgmentMinutes": {
+                    "type": "integer"
+                  },
+                  "resolutionMinutes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "urgency",
+                  "afterHours",
+                  "owner",
+                  "escalation",
+                  "weekdays",
+                  "opens",
+                  "closes",
+                  "acknowledgmentMinutes",
+                  "resolutionMinutes"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "urgency": "high",
+                "afterHours": "business",
+                "owner": "LEAD_ID",
+                "escalation": "ESCALATION_LEAD_ID",
+                "weekdays": [
+                  "1",
+                  "2",
+                  "3",
+                  "4",
+                  "5"
+                ],
+                "opens": 480,
+                "closes": 1020,
+                "acknowledgmentMinutes": 30,
+                "resolutionMinutes": 480
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "revision": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "revision"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.clock": {
+      "post": {
+        "summary": "request.clock",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "pause",
+                      "resume"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "request",
+                  "revision",
+                  "kind",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "request": "REQUEST_ID",
+                "revision": 1,
+                "kind": "pause",
+                "reason": "Waiting for the operator to provide details"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.triage": {
+      "post": {
+        "summary": "request.triage",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer"
+                  },
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "assess",
+                      "ask_details",
+                      "approve",
+                      "decline",
+                      "abandon",
+                      "duplicate"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "impact": {
+                    "type": "string",
+                    "enum": [
+                      "unknown",
+                      "running",
+                      "reduced",
+                      "stopped"
+                    ]
+                  },
+                  "canonical": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "request",
+                  "version",
+                  "decision",
+                  "reason"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "request": "REQUEST_ID",
+                "version": 1,
+                "decision": "ask_details",
+                "reason": "Describe the observed vibration",
+                "impact": "reduced"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.reply": {
+      "post": {
+        "summary": "request.reply",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer"
+                  },
+                  "text": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "request",
+                  "version",
+                  "text"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "request": "REQUEST_ID",
+                "version": 2,
+                "text": "Vibration occurs when starting the equipment"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.convert": {
+      "post": {
+        "summary": "request.convert",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer"
+                  },
+                  "due": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "request",
+                  "version"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "request": "REQUEST_ID",
+                "version": 3,
+                "due": "2026-11-01"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/request.erase": {
+      "post": {
+        "summary": "request.erase",
+        "description": "Ordinary current member session with the native request permission. Service credentials cannot call this door. A successful retry returns the retained result without repeating effects. Request replies remain requester-only; erased requests refuse later triage, replies, conversion and clock replays. Failed and interrupted claims require manual reconciliation.",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Origin",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "request": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer"
+                  },
+                  "confirm": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "request",
+                  "confirm"
+                ],
+                "additionalProperties": true
+              },
+              "example": {
+                "request": "REQUEST_ID",
+                "version": 4,
+                "confirm": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original action result; Idempotency-Replayed header identifies a retry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "removed": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "integer"
+                          }
+                        },
+                        "anonymized": {
+                          "type": "object",
+                          "properties": {
+                            "requests": {
+                              "type": "integer"
+                            },
+                            "linkedWork": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "requests",
+                            "linkedWork"
+                          ],
+                          "additionalProperties": true
+                        },
+                        "retained": {
+                          "type": "object",
+                          "properties": {
+                            "maintenanceWork": {
+                              "type": "integer"
+                            },
+                            "audit": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "maintenanceWork",
+                            "audit"
+                          ],
+                          "additionalProperties": true
+                        },
+                        "priorDownloads": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "removed",
+                        "anonymized",
+                        "retained",
+                        "priorDownloads"
+                      ],
+                      "additionalProperties": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "result"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "Idempotency-Replayed": {
+                "description": "Present on keyed requests; a replay returns the stored result without repeating effects.",
+                "schema": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/requests": {
+      "get": {
+        "summary": "Read authorized request queue",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RequestSummary"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Queue requires current work-assignment authority. A detail requires that authority or the original authenticated requester. Files retain their independent private-file door. Erased records expose no former description, contact or originals; service credentials have no request scope."
+      }
+    },
+    "/requests/{id}": {
+      "get": {
+        "summary": "Read authorized fault and retained timeline",
+        "security": [
+          {
+            "memberSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized native records with immutable procedure revisions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Queue requires current work-assignment authority. A detail requires that authority or the original authenticated requester. Files retain their independent private-file door. Erased records expose no former description, contact or originals; service credentials have no request scope."
+      }
     }
   },
   "components": {
@@ -26978,6 +28694,622 @@
           "source",
           "citations",
           "definitions"
+        ],
+        "additionalProperties": true
+      },
+      "CurrentMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "lead",
+              "maintainer",
+              "supervisor",
+              "agent"
+            ]
+          },
+          "today": {
+            "type": "string",
+            "format": "date"
+          },
+          "zone": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "today",
+          "zone"
+        ],
+        "additionalProperties": true
+      },
+      "Member": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "lead",
+              "maintainer",
+              "supervisor",
+              "agent"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "ended"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "name",
+          "role",
+          "status"
+        ],
+        "additionalProperties": true
+      },
+      "SiteSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "planned"
+            ]
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "manager": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "timezone",
+          "state",
+          "revision",
+          "manager"
+        ],
+        "additionalProperties": true
+      },
+      "SiteDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "planned"
+            ]
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "manager": {
+            "type": "integer"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "member_id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "ended"
+                  ]
+                },
+                "manager": {
+                  "type": "integer"
+                },
+                "revision": {
+                  "type": "integer"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "owner",
+                    "lead",
+                    "maintainer",
+                    "supervisor",
+                    "agent"
+                  ]
+                },
+                "member_status": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "ended"
+                  ]
+                }
+              },
+              "required": [
+                "member_id",
+                "status",
+                "manager",
+                "revision",
+                "name",
+                "role",
+                "member_status"
+              ],
+              "additionalProperties": true
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "timezone",
+          "state",
+          "revision",
+          "manager"
+        ],
+        "additionalProperties": true
+      },
+      "SavedSearch": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shared": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "filters": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "q": {
+                "type": "string"
+              },
+              "tag": {
+                "type": "string"
+              },
+              "serial": {
+                "type": "string"
+              },
+              "site": {
+                "type": "string"
+              },
+              "owner": {
+                "type": "string"
+              },
+              "from": {
+                "type": "string"
+              },
+              "to": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [],
+            "additionalProperties": true
+          }
+        },
+        "required": [
+          "id",
+          "owner_id",
+          "name",
+          "shared",
+          "revision",
+          "filters"
+        ],
+        "additionalProperties": true
+      },
+      "RecordErasurePreview": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "work",
+              "user"
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "erased": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "dependencies": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "receiptResults": {
+            "type": "integer"
+          },
+          "blockers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "token": {
+            "type": "string"
+          },
+          "result": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "obligations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "erased",
+          "eligible",
+          "dependencies",
+          "receiptResults",
+          "blockers",
+          "token",
+          "result"
+        ],
+        "additionalProperties": true
+      },
+      "RequestSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "needs_details",
+              "approved",
+              "converted",
+              "duplicate",
+              "declined",
+              "abandoned"
+            ]
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "emergency"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "work_order_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "impact": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "urgency",
+          "description",
+          "created_at",
+          "version",
+          "asset_id",
+          "work_order_id",
+          "impact"
+        ],
+        "additionalProperties": true
+      },
+      "RequestDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "number": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "new",
+              "needs_details",
+              "approved",
+              "converted",
+              "duplicate",
+              "declined",
+              "abandoned"
+            ]
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "normal",
+              "high",
+              "emergency"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "asset_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "work_order_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "impact": {
+            "type": "string"
+          },
+          "contact": {
+            "type": "string"
+          },
+          "requester_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "form": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "text",
+                    "choice",
+                    "number",
+                    "date",
+                    "photo"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "type",
+                "required"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "field_key": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "filename": {
+                  "type": "string"
+                },
+                "media_type": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer"
+                },
+                "sha256": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "field_key",
+                "filename",
+                "media_type",
+                "size",
+                "sha256"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "timeline": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "at": {
+                  "type": "integer"
+                },
+                "actor": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "text",
+                "at",
+                "actor"
+              ],
+              "additionalProperties": true
+            }
+          },
+          "clock": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "linked": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "status",
+          "urgency",
+          "description",
+          "created_at",
+          "version",
+          "asset_id",
+          "work_order_id",
+          "impact",
+          "contact",
+          "requester_id",
+          "answers",
+          "form",
+          "files",
+          "timeline",
+          "clock",
+          "linked"
         ],
         "additionalProperties": true
       }

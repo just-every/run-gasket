@@ -83,12 +83,13 @@ export function exerciseKeyedActions(h, owner, actions) {
       assertOperation(path, result)
       receipts.push({ path, cookie, body, headers, result })
       assert.equal(first.headers.get('idempotency-replayed'), 'false', path)
-      const audit = await ordinary('audit', owner)
+      const auditor = typeof owner === 'function' ? owner() : owner
+      const audit = await ordinary('audit', auditor)
       const replay = await request()
       assert.equal(replay.status, 200, path)
       assert.equal(replay.headers.get('idempotency-replayed'), 'true', path)
       assert.deepEqual(await replay.json(), result, path + ' retains its original result')
-      assert.deepEqual(await ordinary('audit', owner), audit, path + ' replay adds no business or audit effect')
+      assert.deepEqual(await ordinary('audit', auditor), audit, path + ' replay adds no business or audit effect')
     }
     return result
   }

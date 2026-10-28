@@ -80,6 +80,10 @@ const RETRYABLE: Record<string, Capability | null> = {
   'service.revoke': 'site.manage', 'retention.policy': 'site.manage', 'retention.hold': 'site.manage',
   'record.erase': 'site.manage', 'attachment.erase': 'site.manage', 'recovery.drill': 'site.manage',
   'search.save': null, 'search.delete': null, 'report.schedule': null,
+  'request.portal': 'site.manage', 'request.target': 'site.manage', 'request.field': 'site.manage',
+  'request.responsePolicy': 'work.assign', 'request.clock': 'work.assign',
+  'request.triage': 'work.assign', 'request.convert': 'work.assign', 'request.reply': null,
+  'request.erase': 'site.manage',
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -181,6 +185,12 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
     insist(higher?.schedule_id && lower?.schedule_id, 'scheduled_work_required', 409)
   }
   if (action === 'report.schedule') await reportScheduleAuthority(env, actor, input)
+  if (['request.clock', 'request.triage', 'request.convert', 'request.reply', 'request.erase'].includes(action)) {
+    const report = await one(env, 'SELECT requester_id,erased_at FROM gk_requests WHERE id=?', input.text('request'))
+    insist(report, 'request_not_found', 404)
+    if (action !== 'request.erase') insist(!report.erased_at, 'request_erased', 410)
+    if (action === 'request.reply') insist(report.requester_id === actor.id, 'not_your_request', 403)
+  }
   if (action === 'search.save' || action === 'search.delete') {
     if (action === 'search.save') insist(!input.flag('shared') || actor.role === 'owner', 'forbidden', 403)
     const id = input.text('id', { optional: action === 'search.save', max: 100 })
@@ -222,7 +232,10 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   try {
     const result = await withApiWriteClaim({ principal, keyHash }, () => run(input))
     const encoded = JSON.stringify(result)
-    insist(encoded.length <= 64_000, 'idempotency_result_too_large', 500)
+    // Assessments retain their source evidence, unlike small mutation receipts.
+    // Keep their documented response bounded below the database row limit.
+    const resultBytes = action === 'outcome.assess' ? 1_500_000 : 64_000
+    insist(new TextEncoder().encode(encoded).byteLength <= resultBytes, 'idempotency_result_too_large', 500)
     // An erasure can finish while a response is being retained. Its opaque
     // journal marker also fences late result storage, without releasing the key.
     const erasureResult = action === 'record.erase' || action === 'attachment.erase'

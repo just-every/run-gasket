@@ -4,17 +4,19 @@ import { createHash, randomUUID } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
-import { harness, file, exerciseKeyedActions } from './harness.mjs'
+import { harness, file, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { draftPrivacy } from './request-draft-privacy.mjs'
 import { photoPrivacy, installationLimit, erasePrivateRequest } from './request-privacy.mjs'
 
+const keyedRequests = (h, owner) => exerciseKeyedActions(h,owner,['request.portal','request.target','request.field','request.responsePolicy','request.clock','request.triage','request.convert','request.reply','request.erase'])
 export async function requestFixture(options) {
   const h=await harness(options),cookie={owner:await h.owner()}
   await h.api('site.configure',cookie.owner,{name:'Great Lakes Assembly',timezone:'America/New_York'})
   for(const [person,role] of [['lead','lead'],['tech','maintainer'],['other','maintainer'],['agent','agent']]) {
     await h.api('access.give',cookie.owner,{name:person,email:`${person}@example.test`,role});cookie[person]=await h.signIn(`${person}@example.test`)
   }
+  const requestWrites=keyedRequests(h,cookie.owner)
   const asset=(await h.api('asset.create',cookie.lead,{tag:'PUMP-22',name:'Private financial pump name',location:'Private room',notes:'Private maintenance notes',criticality:'critical'})).id
   const fields=[{key:'stopped',label:'Is the line stopped?',type:'choice',required:true,options:['Yes','No']},{key:'reading',label:'Gauge reading',type:'number',required:false},{key:'noticed',label:'First noticed',type:'date',required:false},{key:'detail',label:'Shift detail',type:'text',required:false},{key:'nameplate',label:'Nameplate photo',type:'photo',required:false}]
   const portal=(await h.api('request.portal',cookie.owner,{name:'Assembly fault report',fields})).id
@@ -26,7 +28,7 @@ export async function requestFixture(options) {
     if(status===200) {assert.equal(response.status,303,await response.clone().text());return {receipt:response.headers.get('location')}}
     assert.equal(response.status,status,(await response.text()).slice(0,200));return response
   }
-  return {h,cookie,asset,fields,portal,target,payload,post}
+  return {h,cookie,asset,fields,portal,target,payload,post,requestWrites}
 }
 export async function requestPortalJourney() {
   const f=await requestFixture(),{h,cookie,asset,fields,portal,target,payload,post}=f
@@ -308,6 +310,8 @@ export async function requestTriageJourney() {
     assert.equal((await detail(root)).status,'needs_details')
     await h.api('request.reply',cookie.other,{request:root,version:2,text:'Pretended answer'},403)
     const creator=await h.api(`requests/${root}`,cookie.tech)
+    assertDocumented('RequestDetail',creator)
+    for(const row of await h.api('v1/requests',cookie.lead))assertDocumented('RequestSummary',row)
     assert.ok(creator.timeline.some(e=>e.kind==='ask_details' && e.text==='Does the noise continue after warmup?'))
     await h.api('request.reply',cookie.tech,{request:root,version:creator.version,text:'Yes, the noise continues and the line is stopped.'})
     assert.equal((await detail(root)).status,'new')
@@ -496,7 +500,8 @@ export async function requestReportJourney() {
 export async function requestResponseJourney() {
   const f=await requestFixture({clockInstant:Date.parse('2026-10-23T20:30:00Z')}),{cookie,portal,target,payload,post}=f
   let h=f.h,browser,context
-  const advance=async at=>{await h.stop();h=await harness({installation:f.h.installation,vars:f.h.vars,clockInstant:Date.parse(at)})}
+  let requestWrites=f.requestWrites
+  const advance=async at=>{await h.stop();h=await harness({installation:f.h.installation,vars:f.h.vars,clockInstant:Date.parse(at)});requestWrites=keyedRequests(h,cookie.owner)}
   const detail=id=>h.api(`requests/${id}`,cookie.lead)
   try {
     const owner=(await h.api('me',cookie.owner)).id,lead=(await h.api('me',cookie.lead)).id
@@ -576,6 +581,14 @@ export async function requestResponseJourney() {
     if(process.env.REQUEST_SCREENSHOTS)await capture(page,h,`/app/requests/${routine}`,'response-paused')
     await h.api('request.erase',cookie.owner,{request:routine,version:(await detail(routine)).version,confirm:true})
     assert.equal((await detail(routine)).clock,null)
+    const oldClock=requestWrites.find(row=>row.path==='request.clock'&&row.body.request===routine)
+    assert.ok(oldClock,'the erased request had a completed keyed clock change')
+    const afterErasure=await detail(routine),afterErasureAudit=await h.api('audit',cookie.owner)
+    const oldReplay=await h.raw('/api/gasket/v1/request.clock',oldClock)
+    assert.equal(oldReplay.status,410)
+    assert.deepEqual(await oldReplay.json(),{error:'request_erased'})
+    assert.deepEqual(await detail(routine),afterErasure)
+    assert.deepEqual(await h.api('audit',cookie.owner),afterErasureAudit)
     assert.equal(JSON.parse((await h.api('audit?action=request.clock',cookie.owner)).rows.find(e=>e.subject===routine).detail).reason,undefined)
     // A retained policy grants no right to a recipient whose access changes.
     await h.api('request.responsePolicy',cookie.owner,{...policy,urgency:'high',afterHours:'elapsed',acknowledgmentMinutes:1,resolutionMinutes:1})

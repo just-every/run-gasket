@@ -932,3 +932,39 @@ stable confirmation retries. Recovery confirmation excludes only its own trusted
 in-flight claim from the archived receipt count; unrelated changes still refuse
 the confirmation as stale. Import still validates the archive's counts and
 digests before publication.
+
+### Identity, site metadata and retry response limits
+
+The versioned specification now also describes `me`, `site`, `members`, `sites`,
+site detail, `search-views`, `retention-settings` and `record-erasure-preview`.
+These reads preserve their native permissions. Only owners receive the private
+member directory and retention controls; ordinary site detail omits the owner's
+membership list. Planned site metadata grants no operational access. The erasure
+preview returns dependencies, copied-response counts and the current explicit
+confirmation token; it never applies erasure.
+
+Retained mutation results are limited to 64,000 UTF-8 bytes. The immutable
+`outcome.assess` result includes its source evidence and permits up to 1,500,000
+UTF-8 bytes. An over-limit result returns `idempotency_result_too_large` after the
+claim, stays failed and requires manual reconciliation; it never repeats the
+assessment automatically. A successful assessment retry returns the original
+source snapshot without a second assessment or audit effect.
+
+### Keyed operator-request management
+
+Ordinary member clients can use retry keys for `request.portal`,
+`request.target`, `request.field`, `request.responsePolicy`, `request.clock`,
+`request.triage`, `request.reply`, `request.convert` and `request.erase`.
+Portal publication and erasure retain owner authority and explicit consent.
+Triage, conversion and clock changes require current assignment authority;
+only the original authenticated requester may supply a reply. A completed
+reply can retry after its own status transition, while erased requests refuse
+old triage, conversion, reply and clock keys without restoring private intake.
+Owner-confirmed erasure retains its classified summary for stable retries.
+The public intake submission keeps its existing separate submission-key
+protocol and does not gain a service-credential scope.
+
+The versioned request queue and detail schemas describe retained fault data,
+original file metadata, requester answers and timelines. Queue access remains
+restricted; detail and original-file permissions stay independent. API keys
+never turn a published opaque intake target into estate browsing authority.

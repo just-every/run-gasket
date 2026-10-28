@@ -11,9 +11,14 @@ export async function apiJourney() {
   let resumed
   try {
     let owner = await h.owner()
+    exerciseKeyedActions(h, () => owner, ['site.configure', 'site.technicianWork', 'access.give', 'access.role', 'access.end', 'service.revoke'])
     await h.api('site.configure', owner, { name: 'Synthetic API estate', timezone: 'UTC' })
     const member = (await h.api('access.give', owner, { name: 'Synthetic API lead', email: 'synthetic-gasket-api@example.test', role: 'lead' })).id
     const lead = await h.signIn('synthetic-gasket-api@example.test')
+    documented('CurrentMember', await h.api('/v1/me', owner))
+    for (const person of await h.api('/v1/members', owner)) documented('Member', person)
+    for (const site of await h.api('/v1/sites', owner)) documented('SiteSummary', site)
+    documented('SiteDetail', await h.api('/v1/sites/primary', owner))
     const write = async (action, body, key, cookie = owner, status = 200, legacy = false) => {
       const response = await h.raw(`/api/gasket/${legacy ? '' : 'v1/'}${action}`, { cookie, body, headers: { 'idempotency-key': key } })
       const result = await response.json()
@@ -740,8 +745,10 @@ export async function apiJourney() {
       await erasure.api('site.configure', erasureOwner, { name: 'Synthetic retry erasure estate', timezone: 'UTC' })
       const erasureAsset = (await erasure.api('asset.create', erasureOwner, { ...assetBody, tag: 'synthetic-gasket-erasure-asset' })).id
       const erasedRetry = await erasureFixture(erasure, erasureOwner, erasureAsset)
+      documented('RecordErasurePreview', await erasure.api(`v1/record-erasure-preview?kind=work&id=${erasedRetry.work}`, erasureOwner))
       if (process.env.API_SCREENSHOTS) await browserProof(erasure, erasureOwner, erasureAsset, erasedRetry.work, part, issued.id, [[`settings/erasure?kind=work&id=${erasedRetry.work}`, 'API retry results to redact: 2. Hashed retry claims remain to prevent repeated effects.']], 'retry-preview-')
       await eraseFixture(erasure, erasureOwner, erasedRetry)
+      documented('RecordErasurePreview', await erasure.api(`v1/record-erasure-preview?kind=work&id=${erasedRetry.work}`, erasureOwner))
       if (process.env.API_SCREENSHOTS) await browserProof(erasure, erasureOwner, erasureAsset, erasedRetry.work, part, issued.id, [[`settings/erasure?kind=work&id=${erasedRetry.work}`, 'API retry results redacted: 2. Hashed retry claims remain to prevent repeated effects.']], 'retry-erased-')
     } finally { await erasure.close() }
     // A sole-owner decision receipt stops being available when independent review becomes possible.
