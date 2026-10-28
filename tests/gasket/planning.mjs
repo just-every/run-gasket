@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 import { mkdir } from 'node:fs/promises'
-import { harness } from './harness.mjs'
+import { harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 
 const day='2026-10-20', tomorrow='2026-10-21'
 async function fixture() {
   const h=await harness({clockInstant:Date.parse('2026-10-20T16:00:00Z')}),owner=await h.owner()
+  exerciseKeyedActions(h, owner, ['planning.qualification','planning.tool','planning.retire','planning.window','planning.window.remove','planning.requirements','planning.slot','automation.control'])
   await h.api('site.configure',owner,{name:'Lake Erie Works',timezone:'America/New_York'})
   const people={},cookies={owner}
   for(const [key,role] of [['lead','lead'],['maya','maintainer'],['luis','maintainer'],['supervisor','supervisor'],['agent','agent']]) {
@@ -14,7 +15,7 @@ async function fixture() {
   }
   const team=(await h.api('team.create',owner,{name:'Electrical',trade:'Electrical',member:[people.maya,people.luis]})).id
   const asset=(await h.api('asset.create',owner,{tag:'HV-1',name:'High voltage drive',location:'Plant room'})).id
-  const view=()=>h.api(`planning?from=${day}`,owner)
+  const view=async()=>{const result=await h.api(`/v1/planning?from=${day}`,owner);assertDocumented('PlanningView',result);return result}
   const change=async(action,body,status=200,who=owner)=>h.api(action,who,{revision:(await view()).revision,...body},status)
   const work=async(title,assignee=people.maya,extra={})=>(await h.api('workorder.create',owner,{asset,title,due:day,assignee,team,estimateHours:'2',...extra})).id
   const window=(member,date,start='08:00',end='16:00',kind='available')=>change('planning.window',{member,starts:`${date}T${start}`,ends:`${date}T${end}`,kind,reason:kind==='available'?'Published shift':'Approved leave'})
@@ -29,6 +30,9 @@ export async function qualificationPlanningJourney() {
     await h.api('planning',cookies.maya,undefined,403)
     assert.equal((await h.raw('/app/settings/resources',{cookie:cookies.maya})).status,403)
     for(const member of [people.maya,people.luis]) await window(member,day)
+    const spare = await window(people.luis,tomorrow)
+    await change('planning.window.remove',{id:spare.id,reason:'Withdraw unused shift'})
+    assert.equal((await view()).windows.some(row=>row.id===spare.id),false)
     const repair=await work('High voltage repair'),other=await work('Shared tool inspection',people.luis)
     const part=(await h.api('part.create',owner,{number:'HV-SEAL',name:'Drive seal',unit:'each'})).id
     await h.api('bom.revise',owner,{asset,part:[part],quantity:['1'],tool:['Insulation tester']})
@@ -42,6 +46,9 @@ export async function qualificationPlanningJourney() {
     for(const workOrder of [repair,other])await h.api('workorder.reserve',owner,{workOrder,part,quantity:'1'})
     await change('planning.slot',slot(other,day,'08:00','10:00',{tool:[tool]}))
     const proposal=slot(repair,day,'08:00','10:00',{tool:[tool],preview:true})
+    const keyedPreview=await h.raw('/api/gasket/v1/planning.slot',{cookie:owner,body:{...proposal,revision:(await view()).revision},headers:{'idempotency-key':'synthetic-gasket-preview'}})
+    assert.equal(keyedPreview.status,400)
+    assert.equal((await keyedPreview.json()).error,'idempotency_preview_not_supported')
     let preview=await change('planning.slot',proposal)
     assert.deepEqual(preview.conflicts.sort(),['qualification_required: High voltage','tool_double_booked: Insulation tester'].sort())
     const refused=await change('planning.slot',{...proposal,preview:false},409)

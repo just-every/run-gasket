@@ -1,9 +1,12 @@
 // BUY-001: real supplier, catalog and maintenance requisition doors.
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
-import { harness } from './harness.mjs'
+import { mkdir } from 'node:fs/promises'
+import { chromium } from '@playwright/test'
+import { harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 
 export async function purchasingJourney(h, cookie, ids) {
+  exerciseKeyedActions(h,cookie.owner,['supplier.save','supplier.catalog','costcenter.save','requisition.request'])
   const owner = (await h.api('me', cookie.owner)).id
   const supplier = { name: 'Great Lakes Bearings & Service', contact: 'Dina Morris', email: 'orders@greatlakes.example.test', phone: '+1 216 555 0164', street: '4100 Lakeside Avenue', city: 'Cleveland', state: 'OH', zip: '44114-1234', taxTreatment: 'sales_tax', taxNote: 'Ohio destination sales tax', paymentTerms: 'Net 30', leadDays: 6, active: true }
   for (const role of ['lead', 'max', 'sam', 'agent']) await h.api('supplier.save', cookie[role], supplier, 403)
@@ -11,11 +14,13 @@ export async function purchasingJourney(h, cookie, ids) {
   assert.equal(made.searchParams.get('notice'), 'Saved.')
   const vendor = made.pathname.split('/').pop()
   let detail = await h.api(`suppliers/${vendor}`, cookie.max)
+  assertDocumented('SupplierDetail',detail)
   assert.equal(detail.contact, supplier.contact); assert.equal(detail.email, supplier.email); assert.equal(detail.phone, supplier.phone)
   assert.deepEqual(detail.shipTo, { street: supplier.street, city: supplier.city, state: supplier.state, zip: supplier.zip, country: 'US' })
   assert.equal(detail.tax_treatment, 'sales_tax'); assert.equal(detail.payment_terms, 'Net 30'); assert.equal(detail.lead_days, 6)
   await h.api('supplier.catalog', cookie.owner, { supplier: vendor, revision: detail.revision, sku: 'BRG-6205', description: '6205 sealed bearing', kind: 'part', unit: 'each', price: '18.75' })
   detail = await h.api(`suppliers/${vendor}`, cookie.lead)
+  assertDocumented('SupplierDetail',detail)
   assert.deepEqual(detail.items.map(row => [row.sku, row.kind, row.price_cents]), [['BRG-6205', 'part', 1875]])
   await h.api('supplier.catalog', cookie.owner, { supplier: vendor, revision: detail.revision, sku: 'LABOR', description: 'Contractor bearing replacement', kind: 'service', unit: 'hour', price: '95' })
   detail = await h.api(`suppliers/${vendor}`, cookie.owner)
@@ -31,6 +36,7 @@ export async function purchasingJourney(h, cookie, ids) {
   const created = await h.submit('requisition.request', cookie.max, requisition, '/app/requisitions/{id}')
   assert.equal(created.searchParams.get('notice'), 'Saved.')
   const request = created.pathname.split('/').pop(), read = await h.api(`requisitions/${request}`, cookie.owner)
+  assertDocumented('Requisition',read)
   assert.equal(read.asset_id, ids.asset); assert.equal(read.work_order_id, ids.work); assert.equal(read.cost_center_id, center)
   assert.equal(read.purchaser_id, owner); assert.equal(read.requested_by, ids.max); assert.equal(read.status, 'pending')
   assert.deepEqual(read.lines.map(row => [row.kind, row.description, row.quantity, row.unit]), [['part', '6205 sealed bearings', '2', 'each'], ['service', 'Contractor installation labor', '1.5', 'hour'], ['repair', 'Rebuild spare motor', '1', 'job']])
@@ -61,6 +67,27 @@ export async function purchasingJourney(h, cookie, ids) {
   const auditPage = await (await h.raw('/app/audit?action=requisition.request', { cookie: cookie.owner })).text()
   assert.ok(auditPage.includes(`/app/requisitions/${request}`))
   assert.ok(auditPage.includes('Requested a maintenance purchase'))
+  if(process.env.PURCHASING_SCREENSHOTS) {
+    await mkdir(process.env.PURCHASING_SCREENSHOTS,{recursive:true})
+    const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox']})
+    try {
+      const context=await browser.newContext({ignoreHTTPSErrors:true})
+      await context.addCookies(cookie.owner.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
+      const page=await context.newPage()
+      for(const [name,path] of [['purchasing','/app/purchasing'],['supplier',`/app/suppliers/${vendor}`],['requisition',`/app/requisitions/${request}`]])for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:1000})
+        const response=await page.goto(h.origin+path)
+        await page.getByText(supplier.name,{exact:true}).first().waitFor()
+        if(width===1440) {
+          assert.equal(response.status(),200)
+          assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false)
+          for(const button of await page.locator('button:visible').all())assert.ok((await button.textContent()).trim()||await button.getAttribute('data-tooltip'))
+        }
+        await page.screenshot({path:`${process.env.PURCHASING_SCREENSHOTS}/${name}-${width}.png`,fullPage:true})
+      }
+      await context.close()
+    } finally {await browser.close()}
+  }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

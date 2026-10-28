@@ -645,9 +645,27 @@
     },
     {
       "binding": "DB",
+      "name": "0100_qualification_identity.sql",
+      "sha256": "0a8989294db1671f001f4e6077985e6608bc6cd2615c4be397be00fbc9b47104",
+      "sql": "-- Give each original qualification a distinct identity without changing immutable sign-offs.\nUPDATE gk_qualifications\nSET record_id='legacy-' || hex(member_id) || '-' || hex(name)\nWHERE record_id='legacy';\n"
+    },
+    {
+      "binding": "DB",
       "name": "0100_record_erasure.sql",
       "sha256": "dcc47a3600f27184a278d469e83104e099d71083d2b9bafde664413b9baae331",
       "sql": "-- Results retain opaque ids and counts, never the erased payload.\nCREATE TABLE gk_record_erasure_results (\n kind TEXT NOT NULL CHECK(kind IN ('work','user')),\n record_id TEXT NOT NULL,\n result_json TEXT NOT NULL,\n erased_at INTEGER NOT NULL,\n PRIMARY KEY(kind,record_id)\n);\nDROP TRIGGER gk_audit_no_update;\nCREATE TRIGGER gk_audit_no_update BEFORE UPDATE ON gk_audit\nWHEN NOT (\n NEW.detail='{}' AND NEW.seq=OLD.seq AND NEW.at=OLD.at AND NEW.actor=OLD.actor\n AND NEW.action=OLD.action AND NEW.subject=OLD.subject AND NEW.role IS OLD.role\n AND (\n  (EXISTS(SELECT 1 FROM gk_guard WHERE code='request_erasure' AND ok=1)\n   AND OLD.action IN ('request.submit','request.triage','request.reply','request.convert','workorder.create','request.clock','request.escalation'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='record_erasure' AND ok=1))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='attachment_erasure' AND ok=1)\n   AND OLD.action IN ('workorder.evidence','workorder.annotate'))\n )\n)\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n\n-- A retained tombstone cannot regain authority through an older identity.\nCREATE TRIGGER gk_erased_member_stays_ended BEFORE UPDATE ON gk_members\nWHEN NEW.status<>'ended' AND EXISTS(SELECT 1 FROM gk_record_erasure_results WHERE kind='user' AND record_id=OLD.id)\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_erased_operator_stays_inactive BEFORE UPDATE ON oa_operators\nWHEN NEW.status<>'inactive' AND EXISTS(SELECT 1 FROM gk_members m JOIN gk_record_erasure_results r ON r.kind='user' AND r.record_id=m.id WHERE m.operator_id=OLD.id)\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0100_service_lifecycle_audit.sql",
+      "sha256": "2e039dedb93d520d75e98415479d78c7b551314b04a90210d242168a57539fe9",
+      "sql": "-- Only a live mutation batch supplies this context; no authority survives it.\nCREATE TABLE gk_authority_actor (\n  singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n  actor TEXT NOT NULL,\n  action TEXT NOT NULL,\n  at INTEGER NOT NULL\n);\n\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,\n    (SELECT CASE WHEN o.role='owner' THEN 'owner' ELSE m.role END\n      FROM gk_members m LEFT JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=a.actor),\n    'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0101_service_authority_snapshot.sql",
+      "sha256": "9f7665ced012b523e6440f7b79be2d6db113cb8bb0fb9d21a6a42f3f1360f1cb",
+      "sql": "-- Preserve the authority that authorized the batch before a self-demotion.\nALTER TABLE gk_authority_actor ADD COLUMN role TEXT;\n\nDROP TRIGGER gk_service_invalidation_audit;\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,a.role,'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",

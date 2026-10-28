@@ -7,7 +7,7 @@ import { installation } from './installation.mjs'
 import { createHash } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import { chromium } from '@playwright/test'
-import { file, harness } from './harness.mjs'
+import { file, harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 import { png } from './fixtures.mjs'
 
 const provenance='Owner-entered reference — not verified by Gasket with the issuing body.'
@@ -78,7 +78,7 @@ export async function safetyJourney() {
  await upgradeQualificationProof()
  const h=await harness({clockInstant:Date.parse('2026-10-26T16:00:00Z')})
  try {
-  const owner=await h.owner();await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
+  const owner=await h.owner();const receipts=exerciseKeyedActions(h,owner,['safety.publish','safety.attest','calibration.create']);await h.api('site.configure',owner,{name:'Erie maintenance',timezone:'America/New_York'})
   const tech=(await h.api('access.give',owner,{name:'Synthetic technician',email:'safety-tech@example.test',role:'maintainer'})).id
   const who=await h.signIn('safety-tech@example.test')
   const supervisor=(await h.api('access.give',owner,{name:'Independent reviewer',email:'safety-review@example.test',role:'supervisor'})).id
@@ -97,7 +97,7 @@ export async function safetyJourney() {
   assert.equal(library[0].qualification,'Isolation training')
   assert.equal(JSON.parse(library[0].intervals)[0].everyDays,30)
   const current=()=>h.api(`work/${work}`,who)
-  const state=()=>h.api(`work/${work}/safety`,who)
+  const state=async()=>{const result=await h.api(`v1/work/${work}/safety`,who);assertDocumented('SafetyState',result);return result}
   assert.equal((await h.raw(`/api/gasket/work/${work}/safety`)).status,401)
   await h.api(`work/${work}/safety`,agent,undefined,403)
   await h.api('planning',who,undefined,403)
@@ -126,6 +126,20 @@ export async function safetyJourney() {
   assert.equal((await sign({expires:'2026-10-25'},409)).error,'permit_expired')
   await sign({isolated:false},400)
   if(process.env.SAFETY_SCREENSHOTS)await browserProof(h,owner,who,checklist,work,'open')
+  await sign()
+  const permitOriginal=Buffer.alloc(1_500_000,80)
+  await sign({file:file('synthetic-permit.txt',permitOriginal)})
+  const beforeOversize=await state()
+  await sign({file:file('oversize-permit.txt',Buffer.alloc(1_500_001,80))},400)
+  const oversized=await h.raw('/api/gasket/v1/safety.attest',{cookie:who,body:{padding:'x'.repeat(2_064_001)},headers:{'idempotency-key':'synthetic-gasket-permit-overflow'}})
+  assert.equal(oversized.status,413)
+  assert.deepEqual(await state(),beforeOversize,'oversized permit requests retain the authorized safety evidence')
+  const receipt=receipts.filter(row=>row.path==='safety.attest').at(-1)
+  await h.api('workorder.assign',owner,{workOrder:work,assignee:(await h.api('me',owner)).id})
+  const forbiddenReplay=await h.raw('/api/gasket/v1/safety.attest',{cookie:who,body:receipt.body,headers:receipt.headers})
+  assert.equal(forbiddenReplay.status,403)
+  assert.equal((await forbiddenReplay.json()).error,'not_your_work')
+  await h.api('workorder.assign',owner,{workOrder:work,assignee:tech})
   await sign()
   assert.deepEqual((await state()).missing,[])
   const signedQualification=(await state()).attestations.at(-1).qualification
@@ -182,6 +196,7 @@ export async function safetyJourney() {
   assert.ok(Object.keys(entries).some(p=>p.startsWith('permits/')))
   assert.ok(Object.keys(entries).some(p=>p.endsWith('certificate.png')))
   assert.ok(Object.keys(entries).some(p=>p.endsWith('isolation.txt')))
+  assert.deepEqual(entries[Object.keys(entries).find(path=>path.endsWith('-synthetic-permit.txt'))],permitOriginal,'the portable compliance pack retains every permit-original byte')
   assert.ok(Object.keys(entries).some(p=>p.startsWith('signatures/')))
   assert.ok(JSON.parse(entries['review.json']).signatures.some(s=>s.role==='technician'))
   assert.ok(entries['MANIFEST.csv'])

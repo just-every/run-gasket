@@ -4,6 +4,7 @@
 // Every Worker runs on the flows' pinned clock (clock.mjs).
 import assert from 'node:assert/strict'
 import { randomBytes } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { emittedWorker } from '../emitted-worker.mjs'
 import { offset } from './clock.mjs'
 import { installation as newInstallation } from './installation.mjs'
@@ -65,3 +66,47 @@ export async function harness({ vars, installation, clockOffset = offset, clockI
 }
 
 export const file = (filename, content, type = 'application/octet-stream') => ({ filename, base64: Buffer.from(content).toString('base64'), type })
+
+/** Exercise existing business journeys through documented keyed JSON doors. */
+export function exerciseKeyedActions(h, owner, actions) {
+  const ordinary = h.api, selected = new Set(actions)
+  let sequence = 0
+  const receipts = []
+  h.api = async (path, cookie, body, status = 200) => {
+    if (!selected.has(path) || body === undefined || body.preview) return ordinary(path, cookie, body, status)
+    const headers = { 'idempotency-key': 'synthetic-gasket-journey-' + (++sequence) }
+    const request = () => h.raw('/api/gasket/v1/' + path, { cookie, body, headers })
+    const first = await request(), result = await first.json()
+    assert.equal(first.status, status, path + ': ' + JSON.stringify(result))
+    if (status === 200) {
+      receipts.push({ path, cookie, body, headers, result })
+      assert.equal(first.headers.get('idempotency-replayed'), 'false', path)
+      const audit = await ordinary('audit', owner)
+      const replay = await request()
+      assert.equal(replay.status, 200, path)
+      assert.equal(replay.headers.get('idempotency-replayed'), 'true', path)
+      assert.deepEqual(await replay.json(), result, path + ' retains its original result')
+      assert.deepEqual(await ordinary('audit', owner), audit, path + ' replay adds no business or audit effect')
+    }
+    return result
+  }
+  return receipts
+}
+
+const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
+export function assertDocumented(name, value) {
+      const validate = (schema, actual, path) => {
+        if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
+        if (schema.type) {
+          const types = [schema.type].flat()
+          assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')
+        }
+        if (schema.enum) assert.ok(schema.enum.includes(actual), path + ' matches its published choices')
+        if (actual && !Array.isArray(actual) && typeof actual === 'object') {
+          for (const key of schema.required ?? []) assert.ok(Object.hasOwn(actual, key), path + '.' + key + ' is present')
+          for (const [key, child] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(actual, key)) validate(child, actual[key], path + '.' + key)
+        }
+        if (Array.isArray(actual) && schema.items) for (const [index, child] of actual.entries()) validate(schema.items, child, path + '[' + index + ']')
+      }
+      validate(specification.components.schemas[name], value, name)
+    }

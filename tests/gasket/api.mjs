@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
-import { harness } from './harness.mjs'
+import { harness, file, exerciseKeyedActions, assertDocumented as documented } from './harness.mjs'
+import { png } from './fixtures.mjs'
 
 export async function apiJourney() {
   const h = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
@@ -22,7 +23,9 @@ export async function apiJourney() {
     const example = action => structuredClone(specification.paths['/' + action].post.requestBody.content[['application', 'json'].join('/')].example)
     const repeat = async (action, body, key, cookie = owner) => {
       const first = await write(action, body, key, cookie)
+      const audit = await h.api('audit', owner)
       const again = await write(action, body, key, cookie)
+      assert.deepEqual(await h.api('audit', owner), audit, action + ' retry adds no audit effect')
       assert.equal(first.replayed, 'false')
       assert.equal(again.replayed, 'true')
       assert.deepEqual(again.result, first.result)
@@ -39,6 +42,7 @@ export async function apiJourney() {
     assert.equal(changed.result.revision, 2)
     assert.deepEqual((await write('asset.update', { ...assetBody, asset, revision: 1, name: 'Synthetic updated pump' }, 'synthetic-gasket-update')).result, changed.result)
     const detail = await h.api(`/v1/assets/${asset}`, owner)
+    documented('AssetDetail', detail)
     assert.equal(detail.name, 'Synthetic updated pump'); assert.equal(detail.versions.length, 1)
     assert.equal(detail.versions[0].revision, 1)
     assert.deepEqual(await h.api(`assets/${asset}`, owner), detail)
@@ -94,7 +98,165 @@ export async function apiJourney() {
     await h.api('/v1/work?cursor=invalid', owner, undefined, 400)
     assert.equal((await h.api('/v1/assets?site=Forbidden%20site', owner)).total, 0)
     assert.equal((await h.raw('/api/gasket/v1/assets')).status, 401)
+    const unknownSite = await h.raw('/api/gasket/v1/assets', { cookie: owner, headers: { 'x-gasket-site': 'synthetic-gasket-unknown-site' } })
+    assert.equal(unknownSite.status, 404)
+    assert.deepEqual(await unknownSite.json(), { error: 'site_not_found' })
     await h.api('/v2/assets', owner, undefined, 404)
+    // Keep the documented lifecycle and feed estate attributable across retries.
+    const lifecycleAsset = (await h.api('/v1/asset.create', lead, { ...assetBody, tag: 'synthetic-gasket-record-lifecycle' })).id
+    const parent = (await h.api('/v1/asset.create', lead, { ...assetBody, tag: 'synthetic-gasket-building', level: 'building' })).id
+    const maintenanceWrites = []
+    const maintain = async (action, fields) => {
+      const body = { ...example(action), ...fields }, key = 'synthetic-gasket-maintenance-' + action
+      maintenanceWrites.push({ action, body, key })
+      assert.equal((await h.raw('/api/gasket/v1/' + action, { body, headers: { 'idempotency-key': key } })).status, 401)
+      return repeat(action, body, key, lead)
+    }
+    const moved = await maintain('asset.move', { asset: lifecycleAsset, parent })
+    const refusedSiteReplay = await h.raw('/api/gasket/v1/asset.move', { cookie: lead, body: maintenanceWrites[0].body, headers: { 'idempotency-key': maintenanceWrites[0].key, 'x-gasket-site': 'synthetic-gasket-unknown-site' } })
+    assert.equal(refusedSiteReplay.status, 404)
+    assert.deepEqual(await refusedSiteReplay.json(), { error: 'site_not_found' })
+    assert.equal(refusedSiteReplay.headers.get('idempotency-replayed'), null)
+    assert.equal(moved.revision, 2)
+    assert.equal((await h.api(`/v1/assets/${lifecycleAsset}`, owner)).hierarchy.parent.id, parent)
+    await write('asset.move', { asset: lifecycleAsset, parent, revision: 1 }, 'synthetic-gasket-stale-move', lead, 409)
+    await write('asset.move', { asset: lifecycleAsset, parent: lifecycleAsset, revision: 2 }, 'synthetic-gasket-invalid-parent', lead, 409)
+    await maintain('asset.lifecycle', { asset: lifecycleAsset })
+    await maintain('asset.agreement', { asset: lifecycleAsset })
+    await maintain('asset.contact', { asset: lifecycleAsset })
+    await maintain('asset.sighting', { asset: lifecycleAsset })
+    await maintain('asset.state', { asset: lifecycleAsset })
+    await write('asset.lifecycle', { ...example('asset.lifecycle'), asset: lifecycleAsset, revision: 2 }, 'synthetic-gasket-stale-lifecycle', lead, 409)
+    await write('asset.state', { ...example('asset.state'), asset: lifecycleAsset, effectiveOn: '2026-10-27T14:00' }, 'synthetic-gasket-future-state', lead, 400)
+    const feedMeter = (await h.api('/v1/meter.create', lead, { asset: lifecycleAsset, name: 'Synthetic feed hours', unit: 'h', kind: 'counter' })).id
+    await maintain('meter.window', { meter: feedMeter })
+    const fed = await maintain('meter.feed', { meter: feedMeter })
+    assert.equal(fed.normalized, '100')
+    const corrected = await maintain('meter.adjust', { reading: fed.id })
+    assert.equal(corrected.normalized, '101')
+    await write('meter.feed', { ...example('meter.feed'), meter: feedMeter, takenOn: '2026-10-26T15:01', value: '99' }, 'synthetic-gasket-feed-backwards', lead, 409)
+    let lifecycleDetail = await h.api(`/v1/assets/${lifecycleAsset}`, owner)
+    documented('AssetDetail', lifecycleDetail)
+    assert.equal(lifecycleDetail.lifecycle.facts.purchase_cents, 123456)
+    assert.equal(lifecycleDetail.lifecycle.facts.replacement_cents, 200000)
+    assert.equal(lifecycleDetail.lifecycle.facts.revision, 1)
+    assert.deepEqual(lifecycleDetail.lifecycle.agreements.map(row => [row.provider, row.annual_cents, row.active]), [['Synthetic service company', 12000, true]])
+    assert.deepEqual(lifecycleDetail.documents.contacts.map(row => [row.name, row.email]), [['Synthetic maintenance contact', 'synthetic-gasket-service@example.test']])
+    assert.deepEqual(lifecycleDetail.sightings.map(row => [row.outcome, row.seen_location]), [['elsewhere', 'Synthetic repair bay']])
+    assert.deepEqual(lifecycleDetail.states.map(row => [row.state, row.effective_on]), [['degraded', '2026-10-26T14:00']])
+    assert.deepEqual(lifecycleDetail.meters.map(row => [row.feed_window_hours, row.normalized, row.readings.map(reading => [reading.recorded_value, reading.value, reading.standing]), row.adjustments.map(adjustment => adjustment.reason)]), [[18, '101', [['100', '101', 'good']], ['Synthetic source correction']]])
+    const stockWrites = []
+    const stockWrite = async (action, fields) => {
+      const body = { ...example(action), ...fields }, key = 'synthetic-gasket-stock-' + action
+      stockWrites.push({ action, body, key })
+      return repeat(action, body, key, lead)
+    }
+    const substitute = pages.parts.find(id => id !== part)
+    await stockWrite('part.price', { part })
+    assert.equal((await h.api(`/v1/parts/${part}`, owner)).price_cents, 345)
+    await write('part.price', { part, price: '-1.00' }, 'synthetic-gasket-negative-price', lead, 400)
+    await stockWrite('part.substitute', { part, substitute })
+    await write('part.substitute', { part, substitute: part }, 'synthetic-gasket-self-substitute', lead, 400)
+    const kit = await stockWrite('kit.create', { part: [part] })
+    const kits = await h.api('/v1/kits', owner)
+    documented('KitRegister', kits)
+    assert.deepEqual(kits.kits.map(row => [row.id, row.lines.map(line => [line.id, line.quantity])]), [[kit.id, [[part, '1']]]])
+    assert.deepEqual(kits.substitutes.map(row => [row.part_id, row.substitute_id]), [[part, substitute]])
+    await stockWrite('bom.revise', { asset: lifecycleAsset, part: [part], alternateFor: [part], alternate: [substitute] })
+    const bom = (await h.api(`/v1/assets/${lifecycleAsset}`, owner)).bom
+    documented('BillOfMaterials', bom)
+    assert.equal(bom.revision, 1)
+    assert.deepEqual(bom.lines.map(row => [row.part.id, row.quantity, row.fits, row.alternates.map(alternate => alternate.part.id)]), [[part, '1', true, [substitute]]])
+    await write('bom.revise', { ...example('bom.revise'), asset: lifecycleAsset, part: [part], revision: 0 }, 'synthetic-gasket-stale-bom', lead, 409)
+    const reserved = await stockWrite('workorder.reserve', { workOrder: work, kit: kit.id })
+    assert.equal(reserved.reservations.length, 1)
+    assert.deepEqual((await h.api(`/v1/parts/${part}`, owner)).reservations.map(row => [row.id, row.quantity, row.state]), [[reserved.reservations[0], '1', 'open']])
+    assert.equal((await h.api(`/v1/parts/${part}`, owner)).reserved, '1')
+    assert.equal((await h.api(`/v1/parts/${part}`, owner)).available, '2')
+    await write('workorder.reserve', { workOrder: work, part, quantity: '4' }, 'synthetic-gasket-duplicate-reserve', lead, 409)
+    await stockWrite('reservation.release', { reservation: reserved.reservations[0] })
+    const releasedStock = await h.api(`/v1/parts/${part}`, owner)
+    documented('PartDetail', releasedStock)
+    documented('WorkDetail', await h.api(`/v1/work/${work}`, owner))
+    assert.equal(releasedStock.onHand, '3')
+    assert.equal(releasedStock.reserved, '0')
+    assert.equal(releasedStock.available, '3')
+    assert.deepEqual(releasedStock.reservations.map(row => [row.id, row.state, row.releaseReason]), [[reserved.reservations[0], 'released', 'Synthetic plan changed']])
+    const catalogPhoto = await stockWrite('part.photo', { part, photo: file('synthetic-gasket-catalog.png', Buffer.concat([png, Buffer.alloc(100000)])) })
+    const catalogPhotos = (await h.api(`/v1/parts/${part}`, owner)).photos
+    assert.deepEqual(catalogPhotos.map(row => [row.id, row.sha256]), [[catalogPhoto.photo, catalogPhoto.sha256]])
+    const photoDownload = await h.raw(`/api/gasket/v1/part-photos/${catalogPhoto.photo}/file`, { cookie: lead })
+    assert.equal(photoDownload.status, 200)
+    assert.deepEqual(Buffer.from(await photoDownload.arrayBuffer()), Buffer.concat([png, Buffer.alloc(100000)]))
+    assert.equal((await h.raw(`/api/gasket/v1/part-photos/${catalogPhoto.photo}/file`)).status, 401)
+    assert.equal((await h.raw('/api/gasket/v1/part-photos/synthetic-gasket-missing/file', { cookie: lead })).status, 404)
+    const commentBody = { ...example('comment.post'), asset: lifecycleAsset, mention: [(await h.api('me', owner)).id], photo: [file('synthetic-gasket-handoff.png', Buffer.concat([png, Buffer.alloc(100000)]))] }
+    const comment = await repeat('comment.post', commentBody, 'synthetic-gasket-comment', lead)
+    const editedCommentBody = { ...example('comment.edit'), comment: comment.comment }
+    await write('comment.edit', editedCommentBody, 'synthetic-gasket-foreign-comment', owner, 403)
+    await repeat('comment.edit', editedCommentBody, 'synthetic-gasket-comment-edit', lead)
+    assert.deepEqual((await write('comment.post', commentBody, 'synthetic-gasket-comment', lead)).result, comment)
+    const conversation = await h.api(`/v1/assets/${lifecycleAsset}/comments`, owner)
+    documented('CommentThread', conversation)
+    assert.equal(conversation.unread, 1)
+    assert.deepEqual(conversation.comments.map(row => [row.id, row.kind, row.body, row.revisions.map(revision => revision.body), row.mentions.map(mention => mention.name), row.photos.length]), [[comment.comment, 'handoff', 'Synthetic corrected handoff', ['Synthetic initial handoff', 'Synthetic corrected handoff'], ['Olive Owner'], 1]])
+    const mentionNotices = await h.api('/v1/notices', owner)
+    assert.equal(mentionNotices.filter(row => row.comment_id === comment.comment).length, 1)
+    const commentPhoto = conversation.comments[0].photos[0]
+    const commentDownload = await h.raw(`/api/gasket/v1/comment-photos/${commentPhoto.id}/file`, { cookie: lead })
+    assert.equal(commentDownload.status, 200)
+    assert.deepEqual(Buffer.from(await commentDownload.arrayBuffer()), Buffer.concat([png, Buffer.alloc(100000)]))
+    assert.equal((await h.raw(`/api/gasket/v1/comment-photos/${commentPhoto.id}/file`)).status, 401)
+    for (const action of ['comment.post', 'comment.edit']) assert.equal((await h.api('audit?action=' + action, owner)).rows.filter(row => row.subject === lifecycleAsset).length, 1)
+    await h.api('access.give', owner, { name: 'Synthetic API agent', email: 'synthetic-gasket-api-agent@example.test', role: 'agent' })
+    const agent = await h.signIn('synthetic-gasket-api-agent@example.test')
+    await write('comment.post', commentBody, 'synthetic-gasket-agent-comment', agent, 403)
+    await write('comment.edit', editedCommentBody, 'synthetic-gasket-agent-comment-edit', agent, 403)
+    await write('part.photo', { part, photo: file('synthetic-gasket-agent-photo.png', png) }, 'synthetic-gasket-agent-photo', agent, 403)
+    await write('comment.post', { ...commentBody, photo: Array(5).fill(file('synthetic-gasket-handoff.png', png)) }, 'synthetic-gasket-too-many-comment-photos', lead, 400)
+    for (const [action, subject] of [['part.price', part], ['part.substitute', part], ['part.photo', part], ['kit.create', kit.id], ['bom.revise', lifecycleAsset], ['workorder.reserve', work], ['reservation.release', work]]) assert.equal((await h.api('audit?action=' + action, owner)).rows.filter(row => row.subject === subject).length, 1, action + ' retains one business effect')
+    // Full-size document originals use the same file limits with retry keys.
+    const largeOriginal = Buffer.from('synthetic-gasket-1'.repeat(100000).slice(0, 1500000))
+    const largeBody = { ...example('document.add'), asset: lifecycleAsset, file: file('synthetic-gasket-large.txt', largeOriginal) }
+    const large = await repeat('document.add', largeBody, 'synthetic-gasket-large-original', lead)
+    const revisedOriginal = Buffer.from(largeOriginal).fill(65, 100000, 100010)
+    const largeRevision = await repeat('document.revise', { ...example('document.revise'), document: large.document, file: file('synthetic-gasket-revised.txt', revisedOriginal) }, 'synthetic-gasket-large-revision', lead)
+    for (const [id, bytes] of [[large.revisionId, largeOriginal], [largeRevision.revisionId, revisedOriginal]]) {
+      const response = await h.raw(`/api/gasket/v1/documents/${id}/file`, { cookie: lead })
+      assert.equal(response.status, 200)
+      assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes)
+    }
+    assert.equal((await h.api(`/v1/assets/${lifecycleAsset}`, owner)).documents.documents[0].revisions.length, 2)
+    await write('document.add', { ...largeBody, file: file('synthetic-gasket-oversize.txt', Buffer.alloc(1500001, 65)) }, 'synthetic-gasket-oversize-file', lead, 400)
+    await write('document.add', { ...largeBody, padding: 'a'.repeat(2064000) }, 'synthetic-gasket-oversize-body', lead, 413)
+    await write('asset.update', { ...assetBody, asset: lifecycleAsset, revision: 2, padding: 'a'.repeat(64000) }, 'synthetic-gasket-ordinary-body-limit', lead, 413)
+    for (const action of ['document.add', 'document.revise']) assert.equal((await h.api('audit?action=' + action, owner)).rows.filter(row => row.subject === lifecycleAsset).length, 1)
+    await write('asset.retire', { asset: parent, reason: 'Has an active child' }, 'synthetic-gasket-parent-retire', lead, 409)
+    await write('asset.retire', { asset, reason: 'Has active work' }, 'synthetic-gasket-busy-retire', lead, 409)
+    await maintain('asset.retire', { asset: lifecycleAsset })
+    lifecycleDetail = await h.api(`/v1/assets/${lifecycleAsset}`, owner)
+    documented('AssetDetail', lifecycleDetail)
+    assert.equal(lifecycleDetail.status, 'retired')
+    assert.equal(lifecycleDetail.lifecycle.facts.disposal_method, 'scrapped')
+    assert.equal(lifecycleDetail.lifecycle.facts.disposal_cents, 1000)
+    for (const { action } of maintenanceWrites) assert.equal((await h.api('audit?action=' + action, owner)).rows.filter(row => row.subject === lifecycleAsset).length, 1, action + ' retains one business effect')
+    // Custom definitions and retained values are part of the documented stock estate.
+    const fieldBody = example('customfield.save')
+    const custom = await repeat('customfield.save', fieldBody, 'synthetic-gasket-custom-definition', lead)
+    const customValue = { ...example('customvalue.set'), entityId: part, customValues: { [custom.id]: 240 } }
+    await repeat('customvalue.set', customValue, 'synthetic-gasket-custom-value', lead)
+    await write('customvalue.set', { ...customValue, customValues: { [custom.id]: 481 } }, 'synthetic-gasket-custom-invalid', lead, 400)
+    let stockDetail = await h.api(`/v1/parts/${part}`, owner)
+    assert.deepEqual(stockDetail.customFields.map(row => [row.id, row.value, row.history.length]), [[custom.id, 240, 1]])
+    const renamed = await repeat('customfield.save', { ...fieldBody, id: custom.id, revision: custom.revision, name: 'Synthetic rated voltage' }, 'synthetic-gasket-custom-rename', lead)
+    await repeat('part.category', { ...example('part.category'), part, revision: stockDetail.revision }, 'synthetic-gasket-category', lead)
+    assert.equal((await h.api(`/v1/parts/${part}`, owner)).category, 'Synthetic electrical')
+    await repeat('customfield.retire', { ...example('customfield.retire'), id: custom.id, revision: renamed.revision }, 'synthetic-gasket-custom-retire', lead)
+    stockDetail = await h.api(`/v1/parts/${part}`, owner)
+    documented('PartDetail', stockDetail)
+    assert.deepEqual(stockDetail.customFields.map(row => [row.id, row.name, row.value, row.archived, row.history.length]), [[custom.id, 'Synthetic rated voltage', 240, true, 1]])
+    assert.ok((await h.api('/v1/custom-fields', owner)).some(row => row.id === custom.id && row.retired === 1))
+    await write('customvalue.set', customValue, 'synthetic-gasket-retired-value', lead, 400)
     // Operate a complete procedure-bound job using the published request examples.
     const checklist = await repeat('checklist.create', example('checklist.create'), 'synthetic-gasket-procedure', lead)
     const revised = await repeat('checklist.revise', { ...example('checklist.revise'), checklist: checklist.id }, 'synthetic-gasket-procedure-revision', lead)
@@ -116,6 +278,21 @@ export async function apiJourney() {
     assert.equal(current.checklist_revision, 2)
     assert.equal(current.title, 'Synthetic revised procedure job')
     assert.deepEqual(current.items.map(row => row.text), ['Inspect guard', 'Inspect seal'])
+    const manual = await repeat('document.add', { ...example('document.add'), asset }, 'synthetic-gasket-document', lead)
+    await repeat('document.link', { ...example('document.link'), workOrder: job, document: manual.document }, 'synthetic-gasket-document-link', lead)
+    const manualUpdate = { ...example('document.revise'), document: manual.document }
+    const manualRevision = await repeat('document.revise', manualUpdate, 'synthetic-gasket-document-revision', lead)
+    await write('document.revise', { ...manualUpdate, note: 'Stale source revision' }, 'synthetic-gasket-document-stale', lead, 409)
+    await repeat('document.expiry', { ...example('document.expiry'), document: manual.document, owner: member }, 'synthetic-gasket-document-expiry', lead)
+    const manuals = (await h.api(`/v1/assets/${asset}`, owner)).documents.documents
+    assert.deepEqual(manuals.map(row => [row.id, row.current_revision, row.expires_on, row.owner_id, row.revisions.map(revision => revision.revision)]), [[manual.document, 2, '2027-01-01', member, [2, 1]]])
+    assert.deepEqual((await order(owner)).documents.map(row => [row.document_id, row.revision, row.newer]), [[manual.document, 1, true]])
+    for (const [revision, expected] of [[manual.revisionId, 'synthetic-gasket-1'], [manualRevision.revisionId, 'synthetic-gasket-2']]) {
+      const download = await h.raw(`/api/gasket/v1/documents/${revision}/file`, { cookie: lead })
+      assert.equal(download.status, 200)
+      assert.equal(await download.text(), expected)
+      assert.equal((await h.raw(`/api/gasket/v1/documents/${revision}/file`)).status, 401)
+    }
     const answers = { ...example('workorder.results'), workOrder: job }
     await write('workorder.results', answers, 'synthetic-gasket-wrong-assignee', owner, 403)
     await write('workorder.submit', { workOrder: job, version: current.version }, 'synthetic-gasket-incomplete-submit', lead, 409)
@@ -132,6 +309,67 @@ export async function apiJourney() {
     await repeat('workorder.return', { ...example('workorder.return'), workOrder: job, part }, 'synthetic-gasket-return', lead)
     assert.equal((await h.api(`/v1/parts/${part}`, owner)).onHand, '2')
     assert.deepEqual((await order(lead)).parts.map(row => [row.issued, row.returned, row.used]), [['2', '1', '1']])
+    // The documented execution doors retain one effect when their response is lost.
+    const meter = await repeat('meter.create', { ...example('meter.create'), asset }, 'synthetic-gasket-meter', lead)
+    assert.deepEqual((await h.api(`/v1/assets/${asset}`, owner)).meters.map(row => [row.id, row.name, row.unit]), [[meter.id, 'Run hours', 'h']])
+    const evidencePng = Buffer.concat([png, Buffer.alloc(1500000 - png.length)])
+    const photoBody = { ...example('workorder.evidence'), workOrder: job, file: file('synthetic-gasket-photo.png', evidencePng, ['image', 'png'].join('/')) }
+    await write('workorder.evidence', photoBody, 'synthetic-gasket-foreign-evidence', owner, 403)
+    const photo = await repeat('workorder.evidence', photoBody, 'synthetic-gasket-evidence', lead)
+    const annotation = await repeat('workorder.annotate', { ...example('workorder.annotate'), workOrder: job, evidence: photo.evidence }, 'synthetic-gasket-annotation', lead)
+    const timeBody = { ...example('workorder.time'), workOrder: job, version: (await order(lead)).version }
+    const time = await repeat('workorder.time', timeBody, 'synthetic-gasket-time', lead)
+    const readingsBody = { ...example('workorder.readings'), workOrder: job, meter: [meter.id] }
+    await repeat('workorder.readings', readingsBody, 'synthetic-gasket-reading', lead)
+    await write('workorder.readings', { ...readingsBody, value: ['41'] }, 'synthetic-gasket-backwards-reading', lead, 409)
+    const finding = await repeat('finding.record', { ...example('finding.record'), workOrder: job }, 'synthetic-gasket-finding', lead)
+    await repeat('downtime.start', { ...example('downtime.start'), workOrder: job }, 'synthetic-gasket-stop', lead)
+    const stopped = await order(owner)
+    assert.equal(stopped.downtime.length, 1)
+    assert.equal(stopped.downtime[0].ended_on, null)
+    assert.equal(stopped.downtime[0].planned, true)
+    await write('workorder.submit', { workOrder: job, version: stopped.version }, 'synthetic-gasket-open-stop-submit', lead, 409)
+    assert.equal((await repeat('downtime.end', { ...example('downtime.end'), workOrder: job }, 'synthetic-gasket-stop-end', lead)).minutes, 30)
+    current = await order(owner)
+    assert.deepEqual(current.evidence.map(row => [row.id, row.sha256, row.phase, row.annotations.map(note => note.id)]), [[photo.evidence, (await import('node:crypto')).createHash('sha256').update(evidencePng).digest('hex'), 'before', [annotation.annotation]]])
+    const evidenceDownload = await h.raw(`/api/gasket/v1/evidence/${photo.evidence}/file`, { cookie: lead })
+    assert.equal(evidenceDownload.status, 200)
+    assert.deepEqual(Buffer.from(await evidenceDownload.arrayBuffer()), evidencePng)
+    assert.deepEqual(current.timeEntries.map(row => [row.id, row.minutes, row.worked_on]), [[time.timeEntry, 25, '2026-10-26']])
+    assert.deepEqual(current.readings.map(row => [row.meter, row.value, row.unit]), [['Run hours', '42', 'h']])
+    assert.deepEqual(current.findings.map(row => [row.id, row.severity, row.follow_up_id]), [[finding.finding, 'low', null]])
+    assert.deepEqual(current.downtime.map(row => [row.started_on, row.ended_on, row.minutes]), [['2026-10-26T14:00', '2026-10-26T14:30', 30]])
+    const signBody = { ...example('workorder.sign'), workOrder: job, version: current.version }
+    await write('workorder.sign', signBody, 'synthetic-gasket-foreign-signature', owner, 403)
+    const signature = await repeat('workorder.sign', signBody, 'synthetic-gasket-signature', lead)
+    const markPng = Buffer.concat([png, Buffer.alloc(200000 - png.length)])
+    const customerSignature = await repeat('workorder.sign', { ...signBody, role: 'customer', name: 'Synthetic customer', mark: file('synthetic-gasket-mark.png', markPng, ['image', 'png'].join('/')) }, 'synthetic-gasket-customer-signature', lead)
+    assert.deepEqual((await order(lead)).signatures.map(row => [row.id, row.role, row.state]), [[signature.signature, 'technician', 'current'], [customerSignature.signature, 'customer', 'current']])
+    const markDownload = await h.raw(`/api/gasket/v1/signature-marks/${customerSignature.signature}/file`, { cookie: lead })
+    assert.equal(markDownload.status, 200)
+    assert.deepEqual(Buffer.from(await markDownload.arrayBuffer()), markPng)
+    assert.equal((await h.raw(`/api/gasket/v1/signature-marks/${customerSignature.signature}/file`)).status, 401)
+    assert.equal((await h.raw(`/api/gasket/v1/signature-marks/${signature.signature}/file`, { cookie: lead })).status, 404)
+
+    // Required tools survive schedule creation and reject submission until recorded.
+    const schedule = await repeat('schedule.create', { ...example('schedule.create'), asset, checklist: checklist.id, assignee: member }, 'synthetic-gasket-schedule', lead)
+    assert.equal((await h.api('/v1/schedules', owner)).filter(row => row.id === schedule.id).length, 1)
+    await h.api('/v1/workorders.generate', owner, {})
+    const toolJob = (await h.api('/v1/work', owner)).rows.find(row => row.title === 'Synthetic tool inspection')
+    assert.ok(toolJob)
+    const toolOrder = () => h.api(`/v1/work/${toolJob.id}`, lead)
+    assert.deepEqual((await toolOrder()).tools.map(row => [row.name, row.identifier]), [['Synthetic torque wrench', null]])
+    const toolBody = { ...example('workorder.tool'), workOrder: toolJob.id }
+    await write('workorder.tool', toolBody, 'synthetic-gasket-foreign-tool', owner, 403)
+    await repeat('workorder.tool', toolBody, 'synthetic-gasket-tool', lead)
+    assert.deepEqual((await toolOrder()).tools.map(row => [row.name, row.identifier]), [['Synthetic torque wrench', 'synthetic-gasket-tool-1']])
+    const cancelled = (await h.api('/v1/workorder.create', owner, { asset, title: 'Synthetic retry control', due: '2026-10-27', assignee: member })).id
+    await repeat('workorder.cancel', { ...example('workorder.cancel'), workOrder: cancelled }, 'synthetic-gasket-cancel', lead)
+    assert.equal((await h.api(`/v1/work/${cancelled}`, owner)).status, 'cancelled')
+    await write('workorder.cancel', { workOrder: cancelled, reason: 'Already cancelled' }, 'synthetic-gasket-cancel-again', lead, 409)
+    await repeat('workorder.reopen', { ...example('workorder.reopen'), workOrder: cancelled }, 'synthetic-gasket-reopen', lead)
+    assert.equal((await h.api(`/v1/work/${cancelled}`, owner)).status, 'open')
+    assert.deepEqual((await h.api(`/v1/work/${cancelled}`, owner)).control.map(row => row.action), ['workorder.cancel', 'workorder.reopen'])
     const reviewBody = { ...example('workorder.review'), workOrder: job, version: (await order(owner)).version }
     await write('workorder.review', reviewBody, 'synthetic-gasket-unsubmitted', owner, 409)
     await repeat('workorder.submit', { ...example('workorder.submit'), workOrder: job, version: reviewBody.version }, 'synthetic-gasket-submit', lead)
@@ -139,10 +377,19 @@ export async function apiJourney() {
     assert.equal(current.status, 'submitted')
     await write('workorder.review', { ...reviewBody, version: current.version }, 'synthetic-gasket-unauthorized-review', lead, 403)
     await write('workorder.review', reviewBody, 'synthetic-gasket-stale-review', owner, 409)
+    const supervisorSign = { ...example('workorder.sign'), workOrder: job, version: current.version, role: 'supervisor' }
+    await write('workorder.sign', supervisorSign, 'synthetic-gasket-self-supervisor', lead, 403)
+    await repeat('workorder.sign', supervisorSign, 'synthetic-gasket-supervisor-sign', owner)
+    assert.equal((await order(owner)).signatures.filter(row => row.role === 'supervisor').length, 1)
     await repeat('workorder.review', { ...reviewBody, version: current.version }, 'synthetic-gasket-review', owner)
     current = await order(owner)
     assert.equal(current.status, 'closed')
+    documented('WorkDetail', current)
     assert.deepEqual(current.reviews.map(row => [row.decision, row.reviewer]), [['approved', 'Olive Owner']])
+    for (const action of ['workorder.evidence', 'workorder.annotate', 'workorder.time', 'workorder.readings', 'workorder.sign', 'finding.record', 'downtime.start', 'downtime.end']) {
+      const entries = (await h.api(`audit?action=${action}`, owner)).rows
+      assert.equal(entries.filter(row => row.subject === (action.startsWith('downtime.') ? asset : job)).length, action === 'workorder.sign' ? 3 : 1, action + ' retains only original audit effects')
+    }
     for (const action of ['checklist.create', 'checklist.revise', 'template.save', 'workorder.assign', 'workorder.results', 'part.issue', 'part.return', 'workorder.submit', 'workorder.approve']) {
       const entries = (await h.api(`audit?action=${action}`, owner)).rows
       const subject = action.startsWith('checklist.') ? checklist.id : action === 'template.save' ? template.id : job
@@ -150,9 +397,14 @@ export async function apiJourney() {
     }
     const handedOff = (await h.api('/v1/workorder.create', owner, { asset, title: 'Synthetic receipt authority', due: '2026-10-27', assignee: member })).id
     await repeat('workorder.issue', { workOrder: handedOff, part, quantity: '1' }, 'synthetic-gasket-former-assignee', lead)
+    const keptFinding = { ...example('finding.record'), workOrder: handedOff }
+    await repeat('finding.record', keptFinding, 'synthetic-gasket-finding-authority', lead)
     await h.api('/v1/workorder.assign', owner, { workOrder: handedOff, assignee: (await h.api('me', owner)).id })
+    await write('finding.record', keptFinding, 'synthetic-gasket-finding-authority', lead, 403)
     await write('workorder.issue', { workOrder: handedOff, part, quantity: '1' }, 'synthetic-gasket-former-assignee', lead, 403)
     assert.equal((await h.api(`/v1/parts/${part}`, owner)).onHand, '1')
+    const former = { ...example('finding.record'), workOrder: handedOff }
+    await write('finding.record', former, 'synthetic-gasket-former-finding', lead, 403)
     const self = (await h.api('/v1/workorder.create', owner, { asset, title: 'Synthetic independent review', due: '2026-10-27', assignee: (await h.api('me', owner)).id })).id
     await h.api('/v1/workorder.submit', owner, { workOrder: self, version: (await h.api(`/v1/work/${self}`, owner)).version })
     await write('workorder.review', { workOrder: self, version: (await h.api(`/v1/work/${self}`, owner)).version, decision: 'approve' }, 'synthetic-gasket-own-review', owner, 403)
@@ -162,8 +414,16 @@ export async function apiJourney() {
     const history = await h.api(`/v1/assets/${asset}/history`, owner)
     assert.ok(JSON.stringify(history).includes('Synthetic API'))
     await h.api('access.role', owner, { member, role: 'maintainer' })
+    for (const { action, body, key } of maintenanceWrites) {
+      await write(action, body, key, lead, 403)
+      await write(action, body, key + '-new', lead, 403)
+    }
+    for (const { action, body, key } of stockWrites) {
+      await write(action, body, key, lead, 403)
+      await write(action, body, key + '-new', lead, 403)
+    }
     await write('asset.create', { ...assetBody, tag: 'synthetic-gasket-other-actor' }, 'synthetic-gasket-1', lead, 403)
-    assert.deepEqual((await h.api('/v1/work?limit=200', lead)).rows.map(row => row.id).sort(), [job, work].sort())
+    assert.deepEqual((await h.api('/v1/work?limit=200', lead)).rows.map(row => row.id).sort(), [cancelled, toolJob.id, job, work].sort())
     await h.api('workorder.review', lead, { workOrder: work, decision: 'approve' }, 403)
     await h.api('site.configure', lead, { name: 'Forbidden', timezone: 'UTC' }, 403)
     await h.api('site.technicianWork', owner, { allowed: false })
@@ -182,6 +442,9 @@ export async function apiJourney() {
       return response.json()
     }
     const serviceAsset = await scoped(complete.token, 'asset.create', { ...assetBody, tag: 'synthetic-gasket-complete' }, 'synthetic-gasket-complete-asset')
+    const forbiddenServiceSite = await h.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${complete.token}`, 'x-gasket-site': 'synthetic-gasket-unknown-site' } })
+    assert.equal(forbiddenServiceSite.status, 404)
+    assert.deepEqual(await forbiddenServiceSite.json(), { error: 'site_not_found' })
     const serviceUpdate = { ...assetBody, tag: 'synthetic-gasket-complete', name: 'Synthetic service update', asset: serviceAsset.id, revision: 1 }
     const serviceUpdated = await scoped(complete.token, 'asset.update', serviceUpdate, 'synthetic-gasket-complete-update')
     assert.equal(serviceUpdated.revision, 2)
@@ -249,9 +512,17 @@ export async function apiJourney() {
     assert.deepEqual(await service('asset.create', { ...assetBody, tag: 'synthetic-gasket-scoped' }, 200, 'synthetic-gasket-1'), serviceCreated)
     assert.equal((await service(`assets/${asset}`)).id, asset)
     assert.ok((await service('assets?limit=2')).next)
+    await service(`documents/${manual.revisionId}/file`, undefined, 403)
+    await service(`evidence/${photo.evidence}/file`, undefined, 403)
+    await service(`signature-marks/${customerSignature.signature}/file`, undefined, 403)
     for (const path of ['parts', `work/${work}`, 'service-credentials']) await service(path, undefined, 403)
-    for (const action of ['site.configure', 'checklist.create', 'checklist.revise', 'template.save', 'workorder.assign', 'workorder.results', 'workorder.issue', 'workorder.return', 'workorder.submit', 'workorder.review', 'service.create', 'service.revoke']) await service(action, {}, 403)
+    for (const action of ['site.configure', 'document.add', 'document.revise', 'document.expiry', 'document.link', 'customfield.save', 'customfield.retire', 'customvalue.set', 'part.category', 'meter.create', 'schedule.create', 'workorder.evidence', 'workorder.annotate', 'workorder.time', 'workorder.readings', 'workorder.tool', 'workorder.sign', 'finding.record', 'downtime.start', 'downtime.end', 'workorder.cancel', 'workorder.reopen', 'checklist.create', 'checklist.revise', 'template.save', 'workorder.assign', 'workorder.results', 'workorder.issue', 'workorder.return', 'workorder.submit', 'workorder.review', 'service.create', 'service.revoke']) await service(action, {}, 403)
     assert.equal((await h.raw('/app/assets', { headers: { authorization: `Bearer ${issued.token}` } })).status, 403)
+    for (const { action, body, key } of maintenanceWrites) await service(action, body, 403, key)
+    for (const { action, body, key } of stockWrites) await service(action, body, 403, key)
+    await service('comment.post', commentBody, 403, 'synthetic-gasket-comment')
+    await service('comment.edit', editedCommentBody, 403, 'synthetic-gasket-comment-edit')
+    for (const path of [`part-photos/${catalogPhoto.photo}/file`, `comment-photos/${commentPhoto.id}/file`]) await service(path, undefined, 403)
     const serviceEvents = (await h.api('audit?action=asset.create', owner)).rows.filter(row => row.subject === serviceCreated.id)
     assert.equal(serviceEvents.length, 1)
     assert.equal(serviceEvents[0].actor, (await h.api('me', owner)).id)
@@ -266,6 +537,7 @@ export async function apiJourney() {
     assert.ok(auditCsv.includes(`Owner, service credential ${issued.id}`))
     assert.ok(!auditCsv.includes(issued.token))
     const credentialList = await h.api('service-credentials', owner)
+    for (const entry of credentialList) documented('CredentialMetadata', entry)
     assert.ok(credentialList.some(row => row.id === issued.id))
     assert.ok(!JSON.stringify(credentialList).includes(issued.token), 'a credential secret is shown once')
     assert.ok(!JSON.stringify(credentialList).includes('token_hash'), 'metadata never includes bearer verifiers')
@@ -274,7 +546,6 @@ export async function apiJourney() {
     await service(`assets/${asset}`, undefined, 401)
     await service('asset.create', { ...assetBody, tag: 'synthetic-gasket-scoped' }, 401, 'synthetic-gasket-1')
     const expiring = await h.api('service.create', owner, { name: 'Synthetic expiring service', scopes: ['parts:read'], expiresAt: Date.UTC(2026, 9, 26, 16, 1), consent: true })
-    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
     // Losing owner authority is permanent for a bearer, even after reinstatement.
     const ownerSession = await (await h.raw('/auth/session', { cookie: owner })).json()
     assert.equal((await h.raw('/auth/invite', { cookie: owner, body: { email: 'synthetic-gasket-owner@example.test', displayName: 'Synthetic second owner', role: 'owner' } })).status, 202)
@@ -295,6 +566,11 @@ export async function apiJourney() {
     await scoped(promoted.token, 'assets', undefined, undefined, 401)
     const credential = () => h.api('service.create', owner, { name: 'Synthetic owner lifecycle', scopes: ['assets:read', 'asset.create'], expiresAt: Date.UTC(2026, 9, 27), consent: true })
     const lifecycle = await credential()
+    const otherOwnerId = (await h.api('me', otherOwner)).id
+    const lifecycleEvents = async id => (await h.api('audit?action=service.invalidate', otherOwner)).rows.filter(row => row.subject === id)
+    assert.deepEqual(await lifecycleEvents(lifecycle.id), [])
+    assert.equal((await h.raw('/auth/operator/role', { cookie: await h.signIn('synthetic-gasket-api@example.test'), body: { operatorId: ownerSession.operator.id, role: 'member' } })).status, 403)
+    assert.deepEqual(await lifecycleEvents(lifecycle.id), [], 'a refused account change has no credential lifecycle effect')
     const lifecycleBody = { ...assetBody, tag: 'synthetic-gasket-lifecycle' }
     const lifecycleRequest = (token, body) => h.raw('/api/gasket/v1/' + (body ? 'asset.create' : 'assets'), { body, headers: { authorization: `Bearer ${token}`, ...(body ? { 'idempotency-key': 'synthetic-gasket-lifecycle' } : {}) } })
     assert.equal((await lifecycleRequest(lifecycle.token, lifecycleBody)).status, 200)
@@ -303,19 +579,129 @@ export async function apiJourney() {
     assert.equal((await lifecycleRequest(lifecycle.token)).status, 401)
     assert.equal((await lifecycleRequest(lifecycle.token, lifecycleBody)).status, 401)
     assert.ok((await h.api('service-credentials', owner)).find(row => row.id === lifecycle.id).revoked_at)
+    const invalidated = await lifecycleEvents(lifecycle.id)
+    assert.equal(invalidated.length, 1, 'restoring owner authority never duplicates the original invalidation')
+    assert.equal(invalidated[0].actor, otherOwnerId)
+    assert.equal(invalidated[0].role, 'owner')
+    assert.equal(invalidated[0].site, 'Synthetic API estate')
+    assert.ok(Number.isSafeInteger(invalidated[0].at))
+    assert.deepEqual(JSON.parse(invalidated[0].detail), { credential: lifecycle.id, issuingOwner: (await h.api('me', owner)).id, cause: 'operator.role' })
+    assert.ok(!JSON.stringify(invalidated).includes(lifecycle.token))
     const replacement = await credential()
     assert.equal((await lifecycleRequest(replacement.token)).status, 200)
     for (const status of ['inactive', 'active']) assert.equal((await h.raw('/auth/operator/status', { cookie: otherOwner, body: { operatorId: ownerSession.operator.id, status } })).status, 200)
     owner = await h.signIn(h.vars.OWNER_EMAIL)
     assert.equal((await lifecycleRequest(replacement.token)).status, 401)
+    const deactivated = await lifecycleEvents(replacement.id)
+    assert.equal(deactivated.length, 1)
+    assert.equal(deactivated[0].actor, otherOwnerId)
+    assert.equal(JSON.parse(deactivated[0].detail).cause, 'operator.status')
+    const lifecycleCsv = await (await h.raw('/app/audit.csv', { cookie: otherOwner })).text()
+    assert.ok(lifecycleCsv.includes(lifecycle.id) && lifecycleCsv.includes(replacement.id))
+    assert.ok(!lifecycleCsv.includes(lifecycle.token) && !lifecycleCsv.includes(replacement.token))
     const fresh = await credential()
     assert.equal((await lifecycleRequest(fresh.token)).status, 200)
+    // A native owner can administer accounts before ever opening the workspace.
+    assert.equal((await h.raw('/auth/invite', { cookie: owner, body: { email: 'synthetic-gasket-direct-owner@example.test', displayName: 'Synthetic direct account owner', role: 'owner' } })).status, 202)
+    const directOwner = await h.signIn('synthetic-gasket-direct-owner@example.test')
+    for (const status of ['inactive', 'active']) assert.equal((await h.raw('/auth/operator/status', { cookie: directOwner, body: { operatorId: ownerSession.operator.id, status } })).status, 200)
+    owner = await h.signIn(h.vars.OWNER_EMAIL)
+    const directEvent = (await lifecycleEvents(fresh.id))[0]
+    assert.equal(directEvent.actor_name, 'Synthetic direct account owner')
+    assert.equal(directEvent.role, 'owner')
+    assert.equal((await lifecycleEvents(fresh.id)).length, 1)
+    await scoped(fresh.token, 'assets', undefined, undefined, 401)
+    const afterDirectChange = await credential()
     // Signing out alone does not revoke separately consented service authority.
     assert.equal((await h.raw('/auth/signout', { cookie: owner, body: {} })).status, 204)
-    assert.equal((await lifecycleRequest(fresh.token)).status, 200)
+    assert.equal((await lifecycleRequest(afterDirectChange.token)).status, 200)
     owner = await h.signIn(h.vars.OWNER_EMAIL)
     assert.equal((await h.api(`/v1/assets/${asset}`, owner)).name, 'Synthetic updated pump')
     assert.equal((await h.api(`/v1/work/${job}`, owner)).status, 'closed')
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id)
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, job, part, issued.id, [[`assets/${lifecycleAsset}`, 'Synthetic API pump']], 'lifecycle-')
+    {
+    // This member is independent of the authority-loss fixtures above.
+    const member = (await h.api('access.give', owner, { name: 'Synthetic retry lead', email: 'synthetic-gasket-retry@example.test', role: 'lead' })).id
+    const lead = await h.signIn('synthetic-gasket-retry@example.test')
+    // Documented schedule and labor writes preserve their decisions and exact amounts on retry.
+    const schedule = (await repeat('schedule.create', { ...example('schedule.create'), asset, checklist: checklist.id, firstDue: '2026-10-25', maxDeferDays: 10 }, 'synthetic-gasket-schedule-retry', lead)).id
+    const skip = await repeat('schedule.skip', { ...example('schedule.skip'), schedule }, 'synthetic-gasket-skip', lead)
+    await write('schedule.exception', { ...example('schedule.exception'), exception: skip.id }, 'synthetic-gasket-skip-forbidden', lead, 403)
+    const skipDecision = { ...example('schedule.exception'), exception: skip.id }
+    await repeat('schedule.exception', skipDecision, 'synthetic-gasket-skip-decision')
+    let scheduled = (await h.api('/v1/schedules', owner)).find(row => row.id === schedule)
+    documented('Schedule', scheduled)
+    assert.equal(scheduled.next_due_date, '2026-11-24')
+    const defer = await repeat('schedule.defer', { ...example('schedule.defer'), schedule, until: '2026-11-25' }, 'synthetic-gasket-defer', lead)
+    await repeat('schedule.exception', { ...example('schedule.exception'), exception: defer.id }, 'synthetic-gasket-defer-decision')
+    scheduled = (await h.api('/v1/schedules', owner)).find(row => row.id === schedule)
+    assert.equal(scheduled.next_due_date, '2026-11-25')
+    const edit = { ...example('schedule.edit'), schedule, revision: scheduled.revision }
+    await write('schedule.edit', { ...edit, preview: true }, 'synthetic-gasket-preview-key', lead, 400)
+    await repeat('schedule.edit', edit, 'synthetic-gasket-schedule-edit', lead)
+    scheduled = (await h.api('/v1/schedules', owner)).find(row => row.id === schedule)
+    assert.equal(scheduled.every_days, 14)
+    assert.deepEqual(scheduled.exceptions.map(row => [row.kind, row.decision]).sort(), [['defer', 'approved'], ['skip', 'approved']])
+    const closureBody = example('closure.add')
+    const closure = await repeat('closure.add', closureBody, 'synthetic-gasket-closure', lead)
+    assert.equal((await h.api('closures', owner)).find(row => row.id === closure.id).label, closureBody.label)
+    await repeat('closure.remove', { closure: closure.id }, 'synthetic-gasket-closure-remove', lead)
+    assert.equal((await h.api('closures', owner)).some(row => row.id === closure.id), false)
+    const pause = { ...example('automation.schedule'), schedule, revision: (await h.api('schedules', owner)).find(row => row.id === schedule).revision }
+    await write('automation.schedule', pause, 'synthetic-gasket-pause-forbidden', lead, 403)
+    await repeat('automation.schedule', pause, 'synthetic-gasket-pause')
+    assert.equal((await h.api('schedules', owner)).find(row => row.id === schedule).active, 0)
+    const expiry = (await h.api('automation', owner)).rules.find(row => row.id === 'expiry')
+    const catchup = { ...example('automation.catchup'), revision: expiry.revision }
+    await write('automation.catchup', catchup, 'synthetic-gasket-catchup-forbidden', lead, 403)
+    const jobsBefore = (await h.api('/automation/jobs', owner)).jobs.length
+    const caught = await repeat('automation.catchup', catchup, 'synthetic-gasket-catchup')
+    assert.equal(caught.state, 'completed')
+    const jobsAfter = (await h.api('/automation/jobs', owner)).jobs
+    assert.equal(jobsAfter.length, jobsBefore + 1)
+    assert.equal(jobsAfter.find(row => row.id === caught.job).state, 'completed')
+    const laborWork = (await h.api('workorder.create', lead, { asset, title: 'Synthetic API reviewed labor', due: '2026-10-26', assignee: member })).id
+    const laborActions = ['labor.rate','labor.entry','labor.review','labor.invoice','labor.timer']
+    exerciseKeyedActions(h, owner, laborActions)
+    await h.api('labor.rate', lead, { ...example('labor.rate'), person: member }, 403)
+    await h.api('labor.rate', owner, { ...example('labor.rate'), person: member })
+    await h.api('labor.entry', lead, { ...example('labor.entry'), workOrder: laborWork, person: (await h.api('me', owner)).id }, 403)
+    const labor = await h.api('labor.entry', lead, { ...example('labor.entry'), workOrder: laborWork })
+    await h.api('labor.review', lead, { ...example('labor.review'), entry: labor.id }, 403)
+    await h.api('labor.review', owner, { ...example('labor.review'), entry: labor.id })
+    const invoiceBody = { ...example('labor.invoice'), workOrder: laborWork }
+    await h.api('labor.invoice', lead, invoiceBody, 403)
+    const invoice = await h.api('labor.invoice', owner, invoiceBody)
+    const laborState = (await h.api(`v1/work/${laborWork}`, owner)).labor
+    documented('LaborView', laborState)
+    assert.equal(laborState.approvedMinutes, 60)
+    assert.deepEqual(laborState.entries.map(row => [row.id, row.state, row.cents]), [[labor.id, 'approved', 6000]])
+    assert.deepEqual(laborState.invoices.map(row => [row.id, row.cents, row.minutes]), [[invoice.id, 2500, 30]])
+    assert.equal((await h.api(`v1/work/${laborWork}`, lead)).labor.entries[0].cents, undefined)
+    await h.api('labor.timer', lead, { ...example('labor.timer'), workOrder: laborWork })
+    assert.equal((await h.api(`v1/work/${laborWork}`, lead)).labor.timer.state, 'running')
+    if (process.env.API_SCREENSHOTS) await browserProof(h, owner, asset, laborWork, part, issued.id, [[`work/${laborWork}`, 'Synthetic API reviewed labor']], 'labor-')
+    // A sole-owner decision receipt stops being available when independent review becomes possible.
+    const sole = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
+    try {
+      const soleOwner = await sole.owner()
+      await sole.api('site.configure', soleOwner, { name: 'Synthetic sole owner', timezone: 'UTC' })
+      const a = (await sole.api('asset.create', soleOwner, { tag: 'synthetic-gasket-sole', name: 'Synthetic sole pump', location: 'Shop' })).id
+      const c = (await sole.api('checklist.create', soleOwner, { name: 'Synthetic sole inspection', items: ['Inspect guard'] })).id
+      const schedule = (await sole.api('schedule.create', soleOwner, { asset: a, checklist: c, title: 'Synthetic sole PM', everyDays: 30, firstDue: '2026-10-25' })).id
+      const exception = (await sole.api('schedule.skip', soleOwner, { schedule, reason: 'Unavailable equipment' })).id
+      const body = { exception, decision: 'approve', singleApprover: true }, headers = { 'idempotency-key': 'synthetic-gasket-sole-decision' }
+      for (const replayed of ['false', 'true']) {
+        const response = await sole.raw('/api/gasket/v1/schedule.exception', { cookie: soleOwner, body, headers })
+        assert.equal(response.status, 200); assert.equal(response.headers.get('idempotency-replayed'), replayed)
+      }
+      await sole.api('access.give', soleOwner, { name: 'Synthetic independent reviewer', email: 'synthetic-gasket-sole-review@example.test', role: 'supervisor' })
+      const refused = await sole.raw('/api/gasket/v1/schedule.exception', { cookie: soleOwner, body, headers })
+      assert.equal(refused.status, 403); assert.equal((await refused.json()).error, 'not_independent')
+      assert.equal((await sole.api('schedules', soleOwner))[0].exceptions.length, 1)
+    } finally { await sole.close() }
+    }
     // Receipt and stock survive a complete Worker restart, without replaying writes.
     await h.stop()
     resumed = await harness({ vars: h.vars, installation: h.installation, clockInstant: Date.UTC(2026, 9, 26, 16) })
@@ -340,10 +726,11 @@ async function browserProof(h, owner, asset, work, part, credential, screens, pr
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
     await context.addCookies(owner.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
     const page = await context.newPage()
-    for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead']])) for (const width of [1440, 390]) {
+    for (const [path, expected] of (screens ?? [[`assets/${asset}`, 'Synthetic updated pump'], [`parts/${part}`, 'Synthetic API bearing'], [`work/${work}`, 'Synthetic revised procedure job'], ['audit?action=asset.create', `Owner, service credential ${credential}`], ['audit?action=rules.action', 'Maintenance lead'], ['audit?action=service.invalidate', 'Invalidated a service credential']])) for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
       const response = await page.goto(h.origin + '/app/' + path)
-      await page.getByText(expected, { exact: true }).first().waitFor()
+      if (path === 'audit?action=service.invalidate') await page.locator('tbody').getByText(expected, { exact: true }).first().waitFor()
+      else await page.getByText(expected, { exact: true }).first().waitFor()
       await page.evaluate(() => document.fonts.ready)
       if (width === (path.startsWith('audit') ? 390 : 1440)) {
         assert.equal(response.status(), 200)
