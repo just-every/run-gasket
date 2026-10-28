@@ -1,3 +1,4 @@
+import { messagesPage, conversationPage } from './ui/messages'
 import { recordErasurePage } from './ui/record-erasure'
 import { authorizeOperationalSite } from './site-access'
 import { withSiteAuthority } from './site-context'
@@ -284,6 +285,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 
 const pages: Record<string, Page> = {
   workCsv: async (env, actor, url) => new Response(await workCsv(env, actor, url), { headers: { 'content-type': ['text', 'csv'].join('/') + '; charset=utf-8', 'content-disposition': 'attachment; filename=work.csv', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
+  messages: messagesPage, conversation: conversationPage,
   spreadsheetReconciliation: reconciliationPage,
   spreadsheetTemplate: guarded(actor=>can(actor,'import.run'),async(_env,_actor,_url,id)=>{
     const [kind,format]=id.split('.') as [SheetKind,'csv'|'xls'|'xlsx']

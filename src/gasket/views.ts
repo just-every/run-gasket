@@ -1,3 +1,4 @@
+import { conversations, conversation, messagePeople } from './messages'
 import { resourceRecords } from './resource-records'
 import { publicRecordErasurePreview } from './record-erasure'
 import { siteDirectory } from './site-access'
@@ -75,6 +76,7 @@ import { workList, workPageRows, workOrderDetail } from './work'
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  conversations: (env,actor)=>conversations(env,actor), conversation:(env,actor,id)=>conversation(env,actor,id), messagePeople:(env,actor)=>messagePeople(env,actor),
   sites: (env, actor, id) => siteDirectory(env, actor, id || undefined),
   historyReport:(env,actor,_id,url)=>historyReport(env,actor,url),
   reportSchedules: (env,actor) => reportSchedules(env,actor),

@@ -1,4 +1,5 @@
 import { workPaginationJourney } from './work-pagination.mjs'
+import { messagesJourney } from './messages.mjs'
 import { siteAccessJourney } from './site-access.mjs'
 import { reportSchedulesJourney } from './report-schedules.mjs'
 import { genericMigrationJourney } from './generic-migration.mjs'
@@ -45,7 +46,7 @@ import { now, zone } from './clock.mjs'
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
 const independent = new Map([
-  [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
+  [workPaginationJourney, 'inventory'], [messagesJourney, 'automation'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [genericMigrationJourney,'inventory'],
   [safetyJourney,'inventory'],
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
@@ -89,6 +90,7 @@ const unzip = buffer => {
 
 try {
   await check('Complete authorized work pages and bounded CSV', workPaginationJourney)
+  await check('Retained direct messages and participant authority', messagesJourney)
   await check('Versioned API paging and durable write retries', apiJourney)
   await check('Isolation evidence and portable compliance pack',safetyJourney)
   await check('Qualification expiry and resource booking constraints',qualificationPlanningJourney)

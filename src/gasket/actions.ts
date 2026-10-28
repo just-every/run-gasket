@@ -1,3 +1,4 @@
+import { startConversation, sendMessage, readConversation } from './messages'
 import { saveResourceGrant } from './resource-authority'
 import { eraseRecord } from './record-erasure'
 import { createSite, updateSite, setSiteMembership } from './site-access'
@@ -91,6 +92,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'conversation.start': startConversation, 'message.send': sendMessage, 'conversation.read': readConversation,
   'report.schedule': saveReportSchedule,
   'service.create': createServiceCredential, 'service.revoke': revokeServiceCredential,
   'safety.publish': (env,actor,input) => publishSafety(env,actor,input),

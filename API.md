@@ -6,7 +6,7 @@ Every screen in Gasket uses the same handlers as this JSON API, so a person and 
 
 An agent gets its own sign-in: the owner gives an email address the **agent** role on *People and access*. The agent signs in with Base's ordinary email link (`POST /auth/magic-link`, then the emailed `/auth/confirm` link) and sends the session cookie it receives. A request without a live session answers `401 {"error":"authentication_required"}`; ended access answers `401` or `403`. Every `POST` must carry an `Origin` header equal to the installation's origin.
 
-Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **agent**. An agent can read everything below and call `proposal.prepare`; every other action answers `403 {"error":"forbidden"}` for it.
+Roles: **owner**, **lead**, **maintainer**, **supervisor** and **agent**. Role and record checks apply to each door. Direct conversations require human participation even for an owner; an agent and a service credential cannot access them. Agents retain their bounded proposal permissions.
 
 ## Reading
 
@@ -792,3 +792,16 @@ Older captured qualification inputs are matched by their recorded holder and
 qualification name as well as current evidence identities. New job captures
 exclude the obsolete shared identity. Unattributed older renewal notices refuse
 erasure until reconciled; the application does not guess which person owns them.
+
+## Online direct conversations
+
+This PLAN-008 slice supports retained text between two existing active human members of the operational primary site. It does not deliver external notifications or queue offline messages. Only the two fixed participants can list, open, send or mark their conversation read; an owner has no content-reading bypass. Current session, human role and primary-site membership are checked at every door and again within each write batch. An ended participant loses access; the remaining active participant can read retained history, but cannot send to the ended person.
+
+- `GET /api/gasket/message-people` supplies eligible people without private contacts.
+- `GET /api/gasket/conversations` supplies only the caller's conversations with message and unread totals.
+- `GET /api/gasket/conversations/ID` supplies original author, time and text in sequence order, and the caller's read marker. Reading JSON alone does not change that marker.
+- `POST /api/gasket/conversation.start` takes `member`. The same pair always returns the same conversation `id`.
+- `POST /api/gasket/message.send` takes `conversation`, `submissionKey` and `body`. Text is trimmed, line endings normalized, and bounded to 2,000 characters. Supply one stable key of 16 to 100 ASCII letters, digits or hyphens for each intended message. Retry with the same key and normalized text after a lost response: the original message and time return with `replayed: true`. Reusing that author's key with changed text or a different conversation refuses with `409` and changes nothing. Another participant has an independent key namespace.
+- `POST /api/gasket/conversation.read` takes `conversation` and `through`, the sequence of a message the caller has seen in that conversation. It advances only that person's marker. Old retries cannot move it backwards; a foreign or future message sequence is refused.
+
+The corresponding pages are `/app/messages` and `/app/messages/ID`; their labelled forms use the same actions. The composer keeps its submission key during failed-save recovery. Mark read explicitly acknowledges the displayed messages. Message bodies have no edit or delete door, remain outside audit metadata, and are retained with original attribution. Retained participant and author references prevent user erasure. Portable archives include conversations, original messages, read markers and retry identities; source sessions are excluded and restored automation stays inactive. Conversation-specific retention and legal-hold controls remain outstanding in PLAN-008.

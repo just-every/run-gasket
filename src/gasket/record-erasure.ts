@@ -69,6 +69,8 @@ export async function recordErasurePreview(env: Bindings, actor: Actor, kind: st
     const operator=await one(env,'SELECT status,role,version FROM oa_operators WHERE id=?',record.operator_id)
     if (record.role === 'owner' || record.status !== 'ended' || !operator || operator.status !== 'inactive' || operator.role === 'owner') blockers.push('End non-owner access first')
   }
+  // The census includes direct conversation participants, authors and read markers.
+  // Their retained identity references block user erasure, including after access ends.
   // Examine every current table for references, including JSON snapshots. Unknown
   // dependencies are refused rather than silently orphaned or partially erased.
   const ignored = new Set([...Object.keys(children), 'gk_audit','gk_record_erasure_results', kind === 'work' ? 'gk_work_orders' : 'gk_members', ...(kind === 'work' ? ['gk_connector_events'] : ['oa_operators','oa_auth_audit','oa_invitation_cancellations'])])

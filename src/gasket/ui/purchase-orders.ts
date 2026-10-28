@@ -28,10 +28,13 @@ async function choices(env: Bindings, actor: Actor) {
 
 function factsFields(data: any, actor: Actor, facts: any = null) {
   const rows = [...(facts?.lines ?? []), ...Array.from({ length: facts ? 1 : 3 }, () => ({}))]
+  // The bounded list may omit the saved link; keep it selected on unrelated edits.
+  const work = [...data.work]
+  if (facts?.work && !work.some(row => row.id === facts.work.id)) work.push(facts.work)
   return h`${select('Supplier', 'supplier', options(data.suppliers.filter((row: any) => row.active)), facts?.supplier.id ?? '', { blank: 'Choose an active supplier' })}
     ${select('Cost center', 'costCenter', data.costCenters.filter((row: any) => row.active).map((row: any) => ({ value: row.id, label: `${row.code} · ${row.name}` })), facts?.costCenter.id ?? '', { blank: 'Choose an active cost center' })}
     ${select('Asset', 'asset', data.assets.filter((row: any) => row.status !== 'retired').map((row: any) => ({ value: row.id, label: `${row.tag} · ${row.name}` })), facts?.asset?.id ?? '', { required: false, blank: 'No asset' })}
-    ${select('Work order', 'workOrder', data.work.map((row: any) => ({ value: row.id, label: `${woNumber(row.number)} · ${row.title}` })), facts?.work?.id ?? '', { required: false, blank: 'No work order' })}
+    ${select('Work order', 'workOrder', work.map((row: any) => ({ value: row.id, label: `${woNumber(row.number)} · ${row.title}` })), facts?.work?.id ?? '', { required: false, blank: 'No work order' })}
     ${field('Promised delivery', 'deliveryOn', { type: 'date', value: facts?.deliveryOn ?? actor.today })}
     <p class="gk-hint">USD prices allow two decimals; quantities allow three. Each extended line rounds half up to one cent.</p>
     ${rows.map((line: any, index: number) => h`<fieldset><legend>Line ${index + 1}</legend>${select('Kind', 'kind', Object.entries(ITEM_KINDS).map(([value, label]) => ({ value, label })), line.kind ?? 'part')}${field('Description', 'description', { value: line.description ?? '', required: index === 0 })}<div class="gk-grid">${field('Quantity', 'quantity', { value: line.quantity ?? '', required: index === 0, attrs: 'inputmode="decimal"' })}${field('Unit', 'unit', { value: line.unit ?? '', required: index === 0 })}${field('USD per unit', 'unitPrice', { value: dollars(line.unitPriceCents), required: index === 0, attrs: 'inputmode="decimal"' })}</div></fieldset>`)}

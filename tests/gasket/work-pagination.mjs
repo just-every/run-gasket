@@ -68,6 +68,7 @@ export async function workPaginationJourney() {
     const native = await traverse('work-page?state=open&limit=137', owner, allOpen)
     const own = await traverse('work-page?state=open&limit=137', tech, [...expected, collaboration])
     assert.ok(!own.some(row => row.id === hidden))
+    await purchaseRevisionProof(h, owner, native[104])
     await traverse(`work-page?team=${team}&limit=137`, owner, expected)
     await traverse('work-page?state=closed&limit=4', owner, closed)
     await traverse('work-page?state=closed&limit=4', tech, closed)
@@ -182,6 +183,59 @@ export async function workPaginationJourney() {
     assert.equal((await h.api(`work/${expected[0]}`, owner)).evidence[0].sha256, sha(evidenceBytes))
     console.log('Work completeness: 1205 imported orders, closed ties, authorized paging, JSON and CSV reconciliation, snapshot and limit refusals, current access and browser navigation passed')
   } finally { await h.close() }
+}
+
+// A date-only edit must retain a work link beyond the bounded choice page.
+async function purchaseRevisionProof(h, owner, work) {
+  const reviewerAddress = address(303)
+  await h.api('access.give', owner, { name: 'Synthetic reviewer', email: reviewerAddress, role: 'supervisor' })
+  const reviewer = await h.signIn(reviewerAddress)
+  const supplier = (await h.api('supplier.save', owner, { name: 'Synthetic supplier', contact: 'Synthetic contact', email: address(304), phone: '+1 216 555 0100', street: '100 Synthetic Road', city: 'Cleveland', state: 'OH', zip: '44114', taxTreatment: 'sales_tax', taxNote: 'Recorded only', paymentTerms: 'Net 30', leadDays: 1, active: true })).id
+  const costCenter = (await h.api('costcenter.save', owner, { code: 'synthetic-gasket-303', name: 'Synthetic purchasing', active: true })).id
+  const order = (await h.api('purchase.save', owner, { supplier, costCenter, workOrder: work.id, deliveryOn: '2026-10-20', taxTreatment: 'sales_tax', kind: ['service'], description: ['Synthetic inspection service'], quantity: ['1'], unit: ['visit'], unitPrice: ['10.00'], reason: 'Synthetic work commitment' })).id
+  const detail = () => h.api(`purchase-orders/${order}`, owner)
+  const commitment = async () => (await h.api(`costing?workOrder=${work.id}`, owner)).totals.amounts.commitment.cents
+  assert.ok(!(await h.api('work', owner)).some(row => row.id === work.id), 'linked work is outside the first choice page')
+  await h.api('purchase.approve', reviewer, { order, revision: 1 })
+  assert.equal(await commitment(), 1000)
+  const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+  try {
+    const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 1100 } })
+    await context.addCookies(owner.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
+    const page = await context.newPage()
+    assert.equal((await page.goto(`${h.origin}/app/purchase-orders/${order}`)).status(), 200)
+    const form = page.locator('form[action="/app/do/purchase.save"]')
+    await form.getByLabel('Promised delivery', { exact: true }).fill('2026-10-21')
+    await Promise.all([page.waitForNavigation(), form.getByRole('button', { name: 'Save next revision', exact: true }).click()])
+    let read = await detail()
+    assert.equal(read.current_revision, 2)
+    assert.equal(read.current.snapshot.deliveryOn, '2026-10-21')
+    assert.equal(read.current.snapshot.work?.id, work.id, 'date-only PO revision retains linked work beyond page one')
+    assert.equal(read.revisions[0].snapshot.work.id, work.id)
+    await h.api('purchase.approve', reviewer, { order, revision: 2 })
+    assert.equal(await commitment(), 1000, 'date-only revision retains the authorized work commitment')
+    await page.reload()
+    assert.equal(await form.getByLabel('Work order', { exact: true }).inputValue(), work.id)
+    if (process.env.WORK_SCREENSHOTS) {
+      await mkdir(process.env.WORK_SCREENSHOTS, { recursive: true })
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: 1100 })
+        await form.scrollIntoViewIfNeeded()
+        await page.screenshot({ path: `${process.env.WORK_SCREENSHOTS}/purchase-linked-work-${width}.png`, fullPage: true })
+      }
+    }
+    await page.setViewportSize({ width: 1440, height: 1100 })
+    // The owner can still deliberately remove the link; history stays intact.
+    await form.getByLabel('Work order', { exact: true }).selectOption('')
+    await Promise.all([page.waitForNavigation(), form.getByRole('button', { name: 'Save next revision', exact: true }).click()])
+    read = await detail()
+    assert.equal(read.current_revision, 3)
+    assert.equal(read.current.snapshot.work, null)
+    assert.equal(read.revisions[1].snapshot.work.id, work.id)
+    await h.api('purchase.approve', reviewer, { order, revision: 3 })
+    assert.equal(await commitment(), null, 'only deliberate unlink removes the work commitment')
+    await context.close()
+  } finally { await browser.close() }
 }
 
 async function browserProof(h, owner, totals) {
