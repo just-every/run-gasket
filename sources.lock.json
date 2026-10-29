@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "4bacaa485b6eb3bfe959b6dad8678a820dc065b87a8fec9b2920e7d54a62aad2",
+      "sha256": "1fbca66eaa1fc869183436e14f6f572b8b22c5dfeff066b5cb88f25566726f4c",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c1ef11bdca2a7df8942725b67e6185dd44f2185e90e927f9b049fbc05419709e",
+      "sha256": "b114a70296325dd9b394490f862098db3ebe4c74fd93e3a7195242ab596444b4",
       "executable": false
     },
     "DEMO.md": {
@@ -4312,7 +4312,7 @@
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {
-      "sha256": "542fd26c45caf53231ff30a47c7d8515e229da6763ced85a905b64a7cfd9a9fc",
+      "sha256": "a362a838f11b92b2cb7204a0c3cf0ee7eb06b26c5e15df1b5bedfffb367f076f",
       "executable": false
     },
     "tests/gasket/purchase-orders.mjs": {
