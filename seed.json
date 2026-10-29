@@ -61,7 +61,9 @@
     {
       "id": "parts-downtime-findings",
       "clauses": [
-        "GAS-08"
+        "GAS-08",
+        "GAS-14",
+        "GAS-15"
       ]
     },
     {

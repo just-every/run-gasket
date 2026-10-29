@@ -228,7 +228,7 @@ export async function addEvidence(env: Bindings, actor: Actor, input: Input, doo
     insist(item < steps.length, 'invalid_item')
     if (kindOf(steps[item]) === 'photo') insist(mediaType.startsWith('image/'), 'photo_required')
   }
-  // ASSET-008: a calibration's certificate is evidence marked as such, on calibration work only.
+  // ASSET-010: a calibration's certificate is evidence marked as such, on calibration work only.
   const certificate = input.flag('certificate')
   if (certificate) insist(order.schedule_id && await one(env, 'SELECT 1 FROM gk_schedules WHERE id = ? AND calibration = 1', order.schedule_id), 'not_calibration', 409)
   // FIELD-005: before or after the work, when it was taken (site time, never ahead of now) and the door it came through.
@@ -418,7 +418,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const comments = await thread(env, actor, 'work', id), costs = await workCosts(env, id, actor)
   // PLAN-001: custom field values, and what the fields and the template require before review.
   const fields = await fieldsOf(env, order)
-  // ASSET-008: the tools this work needs and which were used; a calibration's grace window and certificate.
+  // ASSET-008 / ASSET-010: the tools this work needs and which were used; a calibration's grace window and certificate.
   const tools = await toolsOf(env, id)
   // FIELD-005: each photo's annotations, and the work's signatures with their state against its version.
   const annotations = await annotationsOf(env, id)

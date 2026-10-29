@@ -289,7 +289,7 @@ try {
     assert.equal((await h.raw(`/app/evidence/${evidence.id}`)).status, 303, 'evidence is never public')
   })
 
-  await check('GAS-08 parts, downtime and findings', async () => {
+  await check('GAS-08, GAS-14 and GAS-15 parts, downtime and findings', async () => {
     await h.api('workorder.issue', cookie.max, { workOrder: ids.pm, part: ids.drier, quantity: '2' })
     await h.api('workorder.issue', cookie.max, { workOrder: ids.pm, part: ids.drier, quantity: '10' }, 409)
     await h.api('workorder.return', cookie.max, { workOrder: ids.pm, part: ids.drier, quantity: '1' })
@@ -317,7 +317,7 @@ try {
     const early = await h.api('workorder.submit', cookie.max, { workOrder: ids.pm, version: order.version }, 409)
     assert.equal(early.error, 'not_ready_for_review')
     await h.api('workorder.results', cookie.max, { workOrder: ids.pm, outcome: ['pass', 'pass', 'attention', 'fail'], note: ['', '', 'Light dust, cleaned', 'Loose terminal, tightened'] })
-    // Two non-passing steps and one finding (linked to step 4 in GAS-08): each step needs its own linked finding.
+    // Two non-passing steps and one finding (linked to step 4 in GAS-15): each step needs its own linked finding.
     order = await wo('max', ids.pm)
     assert.equal(order.missing.length, 1)
     assert.match(order.missing[0], /^step 3\b/)
@@ -2105,7 +2105,7 @@ try {
     for (const text of ['Inspection routes', 'Cold store round', 'Every 7 days', 'Tools: Probe thermometer', 'incomplete', 'Missed: Room 3 locked for stocktake', '1 follow-up']) assert.ok(page.includes(text), text)
   })
 
-  await check('ASSET-008 gauge calibration with tolerances, tools and certificate versions', async () => {
+  await check('ASSET-010 gauge calibration with tolerances, tools and certificate versions', async () => {
     // A calibration task on a pressure gauge: the procedure's limited number steps are its tolerances, two days' grace after due.
     const gauge = (await h.api('asset.create', cookie.lead, { tag: 'PG-7', name: 'Ammonia line pressure gauge', location: 'Plant room A' })).id
     const wipe = (await h.api('checklist.create', cookie.lead, { name: 'Gauge wipe', items: ['Face clean'] })).id

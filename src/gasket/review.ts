@@ -52,7 +52,7 @@ export async function review(env: Bindings, actor: Actor, input: Input) {
     // PART-002: closing ends what the work order still had reserved.
     ...(decision === 'approve' ? [releaseWithWork(env, actor, order.id, 'Work order approved and closed')] : []),
   ]
-  // ASSET-008: approved calibration work keeps its certificate as the instrument's next version.
+  // ASSET-010: approved calibration work keeps its certificate as the instrument's next version.
   if (decision === 'approve' && order.schedule_id) statements.push(...await certificateStatements(env, actor, order), ...await advanceStatements(env, order.schedule_id, actor.today))
   await commit(env, statements, { actor: actor.id, action: decision === 'approve' ? 'workorder.approve' : 'workorder.return', subject: order.id, detail: { review: id, version, reason } })
   return { id: order.id, status: decision === 'approve' ? 'closed' : 'returned' }

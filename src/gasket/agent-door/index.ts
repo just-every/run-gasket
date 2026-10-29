@@ -15,10 +15,9 @@ function trust(env: Bindings): Trust | null {
 }
 export const notTools = [
   { clauses: ['GAS-12','MIG-001','MIG-002','MIG-003','MIG-004','MIG-005','MIG-006','MIG-007','MIG-008'], reason: 'import-door' as const },
-  { clauses: ['HTTP-001','GAS-11','ADMIN-009','SAFE-003'], reason: 'installation' as const },
-  { clauses: ['FIELD-001','FIELD-002','FIELD-003'], reason: 'device' as const },
+  { clauses: ['HTTP-001','SAFE-003'], reason: 'installation' as const },
+  { clauses: ['FIELD-001','FIELD-002','FIELD-003','FIELD-010'], reason: 'device' as const },
   { clauses: ['ADMIN-011'], reason: 'screen' as const },
-  { clauses: ['INT-002','INT-003','INT-004','INT-005','INT-006','INT-007','INT-008','INT-009','INT-010','INT-011','INT-012','INT-013','INT-014','INT-015','INT-016','INT-017'], reason: 'connector' as const },
 ]
 export const capabilities = ['tools', 'policy', 'pause', 'audit', 'idempotency'] as const
 export function gasketAgentDoor(original: Bindings) {

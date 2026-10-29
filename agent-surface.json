@@ -221,8 +221,6 @@
     {
       "clauses": [
         "HTTP-001",
-        "GAS-11",
-        "ADMIN-009",
         "SAFE-003"
       ],
       "reason": "installation"
@@ -231,7 +229,8 @@
       "clauses": [
         "FIELD-001",
         "FIELD-002",
-        "FIELD-003"
+        "FIELD-003",
+        "FIELD-010"
       ],
       "reason": "device"
     },
@@ -240,27 +239,6 @@
         "ADMIN-011"
       ],
       "reason": "screen"
-    },
-    {
-      "clauses": [
-        "INT-002",
-        "INT-003",
-        "INT-004",
-        "INT-005",
-        "INT-006",
-        "INT-007",
-        "INT-008",
-        "INT-009",
-        "INT-010",
-        "INT-011",
-        "INT-012",
-        "INT-013",
-        "INT-014",
-        "INT-015",
-        "INT-016",
-        "INT-017"
-      ],
-      "reason": "connector"
     }
   ],
   "resources": [],
