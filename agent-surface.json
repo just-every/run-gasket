@@ -192,17 +192,6 @@
       ]
     },
     {
-      "name": "gasket.events.list",
-      "scope": "events:read",
-      "readOnly": true,
-      "classes": [
-        "standard"
-      ],
-      "clauses": [
-        "BASE-AGENT-010"
-      ]
-    },
-    {
       "name": "gasket.procedures.publish",
       "scope": "checklist.create",
       "readOnly": false,
@@ -274,12 +263,7 @@
       "reason": "connector"
     }
   ],
-  "resources": [
-    "gasket://assets/{id}",
-    "gasket://work/{id}",
-    "gasket://parts/{id}",
-    "gasket://procedures/{id}"
-  ],
+  "resources": [],
   "witness": {
     "tool": "gasket.workspace.snapshot",
     "args": {}
@@ -569,18 +553,6 @@
           "$from": "publish-procedure",
           "pointer": "/id"
         }
-      },
-      "expect": [
-        {
-          "class": "standard"
-        }
-      ]
-    },
-    {
-      "id": "events",
-      "tool": "gasket.events.list",
-      "args": {
-        "limit": 200
       },
       "expect": [
         {

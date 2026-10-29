@@ -34,13 +34,16 @@ cannot create an asset. Local Pause stops both company tokens and native service
 credentials while people keep access to their ordinary maintenance screens.
 Revoking an agent or its native credential stops its next call. No provider cost is registered or authorized by the door.
 
-Native events/subscriptions, resource refresh, multi-sponsor completion and
-queued continuations are undeclared in this Core adoption. The built-in event
-list remains in the 0.2.86 registry, but the verifier still requires native effect
-events even when that optional family is undeclared; Base subset support is
-needed for a green conformance result. Other native jobs, including purchasing,
-model calls and access administration, are not yet MCP tools. Their existing
-native doors keep their own purpose, permissions and evidence requirements.
+The door declares tools, policy, pause, audit and idempotency. Events,
+resources, prompts and subscriptions are undeclared: discovery omits them,
+their catalogues are empty and calls return `capability_not_declared` without
+native effects. Read tools remain available with current native visibility;
+records and imported text are untrusted. Multi-sponsor completion, outside mail,
+resource refresh and queued continuations remain unproved. Other native jobs,
+including purchasing, model calls and access administration, are not yet MCP
+tools. Their existing native doors retain their permissions and evidence
+requirements. The 0.2.88 subset journey checks the declared Core and typed
+refusals; it does not claim those wider jobs.
 
 ## Native agent proposals
 

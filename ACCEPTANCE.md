@@ -1364,7 +1364,7 @@ target · **partial**
 
 **Evidence.** `src/gasket/agent-door`; `agent-surface.json`; `tests/gasket/initialize-agent-owner.mjs`; `tests/gasket/agent-native-journey.mjs`; normal rer verify Core journey
 
-**Gap.** Resources cover assets, work, parts and procedures. Other primary families, byte budgets and resource refresh are undeclared; multi-sponsor visibility completion remains a gap.
+**Gap.** UNDECLARED family: public resources. Internal visibility adapters cover assets, work, parts and procedures but expose no resource catalogue or links. Other primary families, byte budgets, resource refresh and multi-sponsor visibility completion remain gaps.
 
 #### BASE-AGENT-004 — Business identity and short-lived, audience-bound tokens
 
@@ -1434,7 +1434,7 @@ target · **partial**
 
 **Evidence.** `src/gasket/agent-door`; `agent-surface.json`; `tests/gasket/initialize-agent-owner.mjs`; `tests/gasket/agent-native-journey.mjs`; normal rer verify Core journey
 
-**Gap.** UNDECLARED family: native maintenance events, subscriptions and webhook handoffs. rer 0.2.86 still requires BASE-AGENT-010.1.effects for a Core-only declaration; Base subset support is required. Built-in events.list remains for compatibility.
+**Gap.** UNDECLARED families: events and subscriptions, including native maintenance notifications and webhook handoffs. The Core subset exposes no events.list tool or stream; typed refusals are checked separately from native event completion.
 
 #### BASE-AGENT-011 — Limits are policy, and Pause stops everything
 
@@ -1464,7 +1464,7 @@ target · **partial**
 
 **Evidence.** `src/gasket/agent-door`; `agent-surface.json`; `tests/gasket/initialize-agent-owner.mjs`; `tests/gasket/agent-native-journey.mjs`; normal rer verify Core journey
 
-**Gap.** The registry-derived /docs/agents, specialist prompt and declared journey are present. Full specialist/native-job coverage and the undeclared families remain gaps; conformance retains the failing Base optional-event assertion.
+**Gap.** The registry-derived /docs/agents and declared journey are present. UNDECLARED family: specialist prompts. Full specialist/native-job coverage, stranger completion and the other undeclared families remain gaps.
 
 ## Push further
 
