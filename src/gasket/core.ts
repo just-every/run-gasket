@@ -1,3 +1,4 @@
+import { agentContext, agentPolicyFence } from './agent-door/context'
 import { siteAuthority } from './site-context'
 import { serviceAuthority, withServiceAuthority } from './service-context'
 // Shared primitives: typed errors, ids, D1 helpers, audited atomic commits and
@@ -47,15 +48,25 @@ export const AUDIT_INSERT = "INSERT INTO gk_audit (at, actor, role, action, subj
 /** Runs the statements atomically with their audit entries. A failed guard raises its code. */
 export async function commit(env: Bindings, statements: D1PreparedStatement[], audit: Audit | Audit[]) {
   const events = Array.isArray(audit) ? audit : [audit]
-  const authority = automationAuthority(), credential = serviceAuthority()
+  const authority = automationAuthority(), credential = serviceAuthority(), agent = agentContext()
   try {
     const results = await env.DB.batch([
       ...(authority ? [guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_automation_rules WHERE id=? AND revision=? AND paused=0)', authority.rule, authority.revision)] : []),
       ...(serviceAuthority() ? [guard(env, 'service_authority_ended', `EXISTS(SELECT 1 FROM gk_api_credentials c JOIN gk_members m ON m.id=c.member_id JOIN oa_operators o ON o.id=m.operator_id WHERE c.id=? AND c.revoked_at IS NULL AND c.expires_at>? AND m.status='active' AND o.status='active' AND o.role='owner')`, serviceAuthority(), now())] : []),
       ...(siteAuthority() && !siteAuthority()!.owner ? [guard(env, 'site_access_ended', "EXISTS(SELECT 1 FROM gk_site_memberships sm JOIN gk_members m ON m.id=sm.member_id WHERE sm.site_id='primary' AND sm.member_id=? AND sm.status='active' AND m.status='active')", siteAuthority()!.member)] : []),
+      ...(agent ? [guard(env, 'agent_authority_ended', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+        WHERE m.id=? AND m.status='active' AND o.status='active' AND CASE WHEN o.role='owner' THEN 'owner' ELSE m.role END=? AND (o.role='owner' OR m.role!='owner')
+        AND NOT EXISTS(SELECT 1 FROM agent_door_agents WHERE id=? AND revoked=1)
+        AND NOT EXISTS(SELECT 1 FROM agent_door_state WHERE id=1 AND local_paused=1))`, agent.person.id, agent.person.role, agent.agent.id)] : []),
+      ...(agent ? [guard(env, 'agent_policy_changed', `EXISTS(SELECT 1 FROM agent_door_state WHERE id=1
+        AND envelope IS ? AND local_document IS ? AND local_revision=? AND local_paused=0
+        AND (envelope IS NULL OR (COALESCE(json_extract(envelope,'$.paused'),0)=0 AND json_extract(envelope,'$.exp')*1000>?
+          AND NOT EXISTS(SELECT 1 FROM json_each(envelope,'$.revoked.consents') WHERE value=?)
+          AND NOT EXISTS(SELECT 1 FROM json_each(envelope,'$.revoked.agents') WHERE value=?))))`,
+        agentPolicyFence()!.envelope, agentPolicyFence()!.local_document, agentPolicyFence()!.local_revision, now(), agent.consent ?? '', agent.agent.id)] : []),
       ...statements,
       stmt(env, 'DELETE FROM gk_guard'),
-      ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority || credential ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), ...(authority ? { automation: authority } : {}), ...(credential ? { serviceCredential: credential } : {}) } : event.detail ?? {}))),
+      ...events.map(event => stmt(env, AUDIT_INSERT, now(), event.actor, event.actor, event.action, event.subject, JSON.stringify(authority || credential || agent ? { ...(event.detail && typeof event.detail === 'object' ? event.detail : { value: event.detail }), ...(authority ? { automation: authority } : {}), ...(credential ? { serviceCredential: credential } : {}), ...(agent ? { preparedBy: agent.actor, approvers: agent.approvers, operationId: agent.operationId, consent: agent.consent ?? null } : {}) } : event.detail ?? {}))),
     ])
     const relevant = events.some(event => /^(request\.submit|workorder\.(create|generate|schedule|trigger|submit|approve|return|cancel|reopen|merged|merge|readings|results|evidence|time|annotate)|asset\.(state|retire)|downtime\.(start|end)|meter\.feed|part\.(create|receive|count|issue|return|disposition)|finding\.record)$/.test(event.action))
     if (relevant) { const { dispatchRuleEvents } = await import('./rule-events'); await withServiceAuthority(undefined, () => dispatchRuleEvents(env, events, results.slice(results.length-events.length).map(result => result.meta.last_row_id))) }

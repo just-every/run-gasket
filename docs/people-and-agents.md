@@ -10,17 +10,44 @@ The owner manages access on **More → People and access**.
 
 A person without access, or whose access has ended, cannot read or change anything.
 
-## Agents prepare, a person approves
+## Company agents through the shared door
 
-An AI agent can help keep the plan up to date without changing anything itself. Give it its own access with the **Agent** role. It signs in like a person and uses the same JSON API as the screens ([the API reference](../API.md)).
+A company agent discovers Gasket at `/mcp` and reads the current registry at
+`/docs/agents`. Business subjects bind to the existing owner/operator and Gasket
+member IDs; an email claim never selects an account. Business admins become
+maintenance leads, members become maintainers, and a native promotion does not
+create Business policy-editing rights.
 
-An agent reads the register, parts, schedules and work orders, and prepares three kinds of proposal:
+The current Core door reads assets, work, parts, procedures and proposals;
+creates and updates assets, creates and assigns corrective work, creates parts,
+publishes the first immutable procedure revision and prepares source-bound
+maintenance proposals. Company policy decides each operation. An unanswered
+policy and Pause stop it. Standard internal work may run autonomously or enter
+review; procedure publication is a commitment and waits for the named approver
+when the policy requires one. Native maintenance roles and version checks apply
+in either case. `/agents` shows policy, calls, review and named approvals.
 
-- a **preventive schedule** for an asset;
-- a **corrective work order** for an asset;
-- a **parts count**.
+Native audit entries retain the agent as preparer, the sponsor and any named
+approver as separate fields, and display `<agent> for <person>`. Native service
+credentials keep their original scopes, expiry and revocation; a read credential
+cannot create an asset. No provider cost is registered or authorized by the door.
 
-Each proposal shows what it would do and the agent's reasoning. On **More → Proposals**, a lead or the owner presses **Approve and run** or **Reject**; the person who prepared a proposal can never decide it. Approving runs the ordinary action as the approver, and is refused if the records the proposal relied on changed since it was prepared.
+Native events/subscriptions, resource refresh, multi-sponsor completion and
+queued continuations are undeclared in this Core adoption. The built-in event
+list remains in the 0.2.86 registry, but the verifier still requires native effect
+events even when that optional family is undeclared; Base subset support is
+needed for a green conformance result. Other native jobs, including purchasing,
+model calls and access administration, are not yet MCP tools. Their existing
+native doors keep their own purpose, permissions and evidence requirements.
+
+## Native agent proposals
+
+The existing Agent maintenance role uses its own sign-in and the native JSON
+API. It can prepare schedule, corrective-work, physical-count, reassignment,
+interval and duplicate-part merge proposals. Each preserves reasoning and source
+versions. A different authorized lead or owner decides on **More → Proposals**;
+stale sources refuse execution. This legacy native agent/model-run path has not
+yet moved to shared-door invocation and is not claimed by the Core registry.
 
 ## Model runs the owner grants
 

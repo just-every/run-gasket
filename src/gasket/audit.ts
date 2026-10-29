@@ -13,6 +13,7 @@ const PAGE = 100, MAX_PAGE = 500
 /** What an entry acted on: its role, plus the proposal or move-in that carried it. */
 function authority(row: Row) {
   const detail = JSON.parse(row.detail), role = ROLE_LABELS[row.role as Role] ?? 'Former member'
+  if (detail.preparedBy?.label) return `${detail.preparedBy.label}, ${role}`
   if (detail.serviceCredential) return `${role}, service credential ${detail.serviceCredential}`
   if (row.role === 'agent') return `${role}, its own sign-in`
   if (row.action.startsWith('proposal.')) return `${role}, deciding proposal ${row.subject}`
@@ -62,7 +63,7 @@ export async function audit(env: Bindings, actor: Actor, url: URL, { every = fal
   insist(Number.isSafeInteger(size) && size >= 1 && size <= MAX_PAGE, 'invalid_limit')
   const rows = (await all(env, `SELECT a.seq, a.at, a.actor, m.name AS actor_name, COALESCE(a.role, m.role) AS role, a.action, a.subject, a.detail, gs.name AS site_name FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor LEFT JOIN gk_sites gs ON gs.id=json_extract(a.detail,'$.siteId')
     ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY a.seq DESC LIMIT ?`, ...args, every ? -1 : size + 1))
-    .map(({ site_name, ...row }) => ({ ...row, site: site_name ?? place?.name ?? null, authority: authority(row) }))
+    .map(({ site_name, ...row }) => ({ ...row, actor_name: JSON.parse(row.detail).preparedBy?.label ?? row.actor_name, site: site_name ?? place?.name ?? null, authority: authority(row) }))
   if (every) return { rows, next: null }
   return { rows: rows.slice(0, size), next: rows.length > size ? rows[size - 1].seq : null }
 }

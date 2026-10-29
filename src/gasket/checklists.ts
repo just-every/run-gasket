@@ -49,6 +49,12 @@ export async function checklistList(env: Bindings, _actor: Actor) {
 export async function checklistDetail(env: Bindings, _actor: Actor, id: string): Promise<{ id: string; name: string; revisions: { id: string; number: number; note: string | null; publishedAt: number; publishedBy: string | null; items: ChecklistItem[] }[]; rules: Awaited<ReturnType<typeof rules>> }> {
   const checklist = await one(env, 'SELECT id, name FROM gk_checklists WHERE id = ?', id)
   insist(checklist, 'checklist_not_found', 404)
-  const revisions = await all(env, 'SELECT r.id, r.number, r.items_json, r.note, r.published_at, m.name AS published_by FROM gk_checklist_revisions r LEFT JOIN gk_members m ON m.id = r.published_by WHERE r.checklist_id = ? ORDER BY r.number DESC', id)
+  const revisions = await all(env, `SELECT r.id, r.number, r.items_json, r.note, r.published_at,
+    COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a
+      WHERE a.subject=r.checklist_id AND a.actor=r.published_by
+        AND ((r.number=1 AND a.action='checklist.create') OR (a.action='checklist.revise' AND json_extract(a.detail,'$.number')=r.number))
+      ORDER BY a.seq DESC LIMIT 1),m.name) AS published_by
+    FROM gk_checklist_revisions r LEFT JOIN gk_members m ON m.id = r.published_by
+    WHERE r.checklist_id = ? ORDER BY r.number DESC`, id)
   return { ...checklist, revisions: revisions.map(row => ({ id: row.id, number: row.number, note: row.note, publishedAt: row.published_at, publishedBy: row.published_by, items: JSON.parse(row.items_json) as ChecklistItem[] })), rules: await rules(env, id) }
 }

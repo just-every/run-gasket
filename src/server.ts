@@ -1,3 +1,6 @@
+import { agentDocumentation } from './gasket/agent-door/docs'
+import { gasketAgentDoor } from './gasket/agent-door'
+import { gasketBusiness } from './gasket/agent-door/business'
 import { withDemo } from './modules/demo/index.mjs'
 import { seedDemo } from './demo'
 import start from '@tanstack/react-start/server-entry'
@@ -29,6 +32,15 @@ export default withDemo({
   async fetch(request, env, execution) {
     const asset = await staticAssetResponse(request, env)
     if (asset) return asset
+    const runtime = runtimeBindings(env)
+    const documentation = agentDocumentation(request, runtime)
+    if (documentation) return documentation
+    const path = new URL(request.url).pathname
+    const business = ['/api/rer/business-settings','/rer-business-logo','/rer-business.css'].includes(path) ? await gasketBusiness(runtime).handle(request) : null
+    if (business) return business
+    const agent = path === '/api/rer/agent-policy' || path === '/mcp' || path === '/agents' || path.startsWith('/agents/') || path === '/.well-known/oauth-protected-resource' || path === '/.well-known/oauth-protected-resource/mcp'
+      ? await gasketAgentDoor(runtime).handle(request) : null
+    if (agent) return agent
     const auth = await authResponse(request, env)
     if (auth) return auth
     // The installed variant: the Lobby at / and the public claim state it reads.
