@@ -1986,7 +1986,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-002, BASE
 2. Create the same corrective work through its UI action, API and MCP job; inspect equal maintenance state and source history.
 3. Run a bounded embedded maintenance proposal and find its corresponding registry job in the run lineage.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal `GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive` on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** Only the documented granular Core slice is registered. The aggregate jobs, remaining native verbs and embedded model-run invocation are incomplete.
 
 #### SURFACE-002 — Internal changes and outside maintenance exposure
@@ -2001,7 +2001,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-003, BASE
 3. Move an original into a vendor-visible record and inspect external even when no separate send occurs.
 4. Put a claimed internal recipient in imported text; the actual record audience and recipient still decide the class.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal `GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive` on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** Declared internal changes retain native visibility. Outside-send tools and audience-derived external journeys remain unimplemented; public resources are an UNDECLARED family.
 
 #### SURFACE-003 — Maintenance money and relied-on decisions
@@ -2016,7 +2016,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-006, BASE
 3. Run a purchase offer carrying both money and commitment under two company policies; the result follows the policy in force.
 4. Inspect usage-priced model cost separately from provider invoices, and an unknown charge as a reservation.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal `GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive` on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** First immutable procedure publication is commitment; purchasing/money and the complete bound-revision/value decision journeys remain unimplemented.
 
 #### SURFACE-004 — Authority, custody and operating-service classes
@@ -2034,7 +2034,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-005, BASE
 6. Change running PM, connector, gateway or reminder behavior, including site lead time and delivery preferences, and inspect live with service and scope.
 7. Try self-escalation through maintenance memberships, grants or policy; inspect unchanged authority under both policies.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal `GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive` on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** Detailed work reads compute sensitive personnel/pay facts. Access, security, destructive, live, accounts and gated adapters and their authority journeys remain unimplemented; spend and owner-native administration are unproved.
 
 #### SURFACE-005 — Maintenance resources and change handoffs
@@ -2049,7 +2049,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-003, BASE
 3. Revoke access to a work record, change it and inspect all subscribed channels for absence of its later evidence.
 4. Discover each specialist prompt and follow its referenced maintenance clauses.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal `GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive` on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** UNDECLARED families: resources, events, prompts and subscriptions. Their typed refusals do not prove native maintenance event delivery, resource refresh, webhook handoffs or the other target resource families.
 
 #### SURFACE-006 — Grounded maintenance actions and physical evidence
@@ -2064,7 +2064,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-005, BASE
 3. Read a malicious manual and a document claiming physical delivery; inspect unchanged authority and no invented isolation, receipt or safety certification.
 4. Under the held policy, approve an agent-prepared work action and inspect the person’s decision separately from the agent’s preparation.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal `GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive` on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** Declared writes retain native versions, source-bound proposals and physical-evidence limits. Complete qualified repair/window staging, proposal application, native Undo and queued continuation remain unproved.
 
 #### SURFACE-007 — A stranger specialist completes a maintenance week
@@ -2080,7 +2080,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-001, BASE
 4. Before policy setup, inspect no effect; complete the company’s answers and resume the same maintenance week.
 5. Pause the specialist mid-week, try its next call and inspect refusal without affecting the technician’s browser work.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal `GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive` on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** The declared maintenance slice has a native owner/scoped-credential journey. Full stranger-specialist fault-to-repair/purchasing/reliability work, multi-sponsor completion, outside mail and timed/dual-host journeys remain unproved.
 
 ## Later
