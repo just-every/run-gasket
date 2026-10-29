@@ -196,7 +196,7 @@
       "executable": false
     },
     "base-copies.json": {
-      "sha256": "6f4517a3f4ebff907233823bb2218f69013d85f0ba5b43fc1442c7b5403ac329",
+      "sha256": "1c325e5b8620326b750b411d3246e4d1b4fc5df8def9e9be222d9724d5a5570e",
       "executable": false
     },
     "CHANGELOG.md": {
@@ -1056,7 +1056,7 @@
       "executable": false
     },
     "rer-project.json": {
-      "sha256": "2d1d1dbfd5004a4d806c9627f7aa764b38b1b70a5ef96ae69eefd578191447a5",
+      "sha256": "b3ba7fc5509303d4f0d43c7aabd01aeb449c18fa32a7ba23d342fea125dff867",
       "executable": false
     },
     "rer-setup.json": {
@@ -1072,7 +1072,7 @@
       "executable": false
     },
     "scripts/build-deployment-spec.mjs": {
-      "sha256": "6d2e7c133723e3fdaec49b09a0cfa6cdf91d007c2a9df7398fb07a834b03607c",
+      "sha256": "5f8183d0d03052f9731b133e175f2b38f2ad90be8c078b5881f6d41a398a4fce",
       "executable": false
     },
     "scripts/ci/chromium-probe.mjs": {
@@ -1156,15 +1156,15 @@
       "executable": false
     },
     "scripts/delivery/base/schema/json-schema.mjs": {
-      "sha256": "243b8808b3a6540c8ccec586b69dc16c09d53c965863e5478d5dc1fbd229a5ae",
+      "sha256": "f964a1f8bab23bfad0c8b6552d8e717091619fa438e0d6e65a9801e1d97782bc",
       "executable": false
     },
     "scripts/delivery/base/schema/setup-validation.mjs": {
-      "sha256": "7ee1a46a742570cd5d3df605732c0777473f419f7b63b6c5ad1c238406a1625f",
+      "sha256": "89327f524f2e7cfcaf9c750e9a5aa7249c91199a9afd0c14afe9efcf444ad14a",
       "executable": false
     },
     "scripts/delivery/base/schema/SETUP.schema.json": {
-      "sha256": "946adc2e484ace3dfee960a58a6215fa55a600079aa7e2cf52264704ece74998",
+      "sha256": "ac52bac39e7e7e4dace1c22dce370f76df52e7f5bb167730ecfd96b0b7961c86",
       "executable": false
     },
     "scripts/delivery/base/setup-manifest.mjs": {
@@ -2617,6 +2617,10 @@
     },
     "src/modules/agent-door/page-style.ts": {
       "sha256": "7cb531ab768ff8f216cf72b606c1af560f22b2eae5a1144d8dfdef27e88fbdd1",
+      "executable": false
+    },
+    "src/modules/agent-door/page-words.ts": {
+      "sha256": "74ea381fb309e077771b5614cc491badfe54012b027e8148e9368778be7b280b",
       "executable": false
     },
     "src/modules/agent-door/pages.ts": {
