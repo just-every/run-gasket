@@ -591,7 +591,7 @@ FIELD-006 and REPORT-001 are independently proved by the public-door and 1440 an
 
 INT-002 is independently proved by the public-door and 1440/390 browser journeys cited in its row; the remaining audit baseline below is unchanged.
 
-The Base-delivered agent rows below judge the declared Core maintenance slice separately from the earlier product judgments. Optional events/subscriptions, multi-sponsor completion, outside mail, resource refresh and provider spend are undeclared. This preserves the full maintenance destination and the existing native-role and physical-evidence requirements.
+The Base-delivered agent rows below judge the declared Core maintenance slice separately from the earlier product judgments. Optional events/subscriptions, multi-sponsor completion, outside mail, resource refresh and provider spend are undeclared. This preserves the full maintenance destination and the existing native-role and physical-evidence requirements. Normal `GASKET_VERIFY_SHARD=foundation npx -y @runeditrun/rer verify --non-interactive` on 29 October 2026 passed 1,627 of 1,628 door points and the native specialist journey, including scoped-service refusals, local and Business Pause, agent and credential revocation, changed-key conflicts, stale revisions and native attribution. The sole failure is `BASE-AGENT-010.1.effects`: rer 0.2.86 requires native record events for this declared Core subset. The normal command retains exit 1; no clause is promoted by this result.
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |

@@ -30,7 +30,9 @@ in either case. `/agents` shows policy, calls, review and named approvals.
 Native audit entries retain the agent as preparer, the sponsor and any named
 approver as separate fields, and display `<agent> for <person>`. Native service
 credentials keep their original scopes, expiry and revocation; a read credential
-cannot create an asset. No provider cost is registered or authorized by the door.
+cannot create an asset. Local Pause stops both company tokens and native service
+credentials while people keep access to their ordinary maintenance screens.
+Revoking an agent or its native credential stops its next call. No provider cost is registered or authorized by the door.
 
 Native events/subscriptions, resource refresh, multi-sponsor completion and
 queued continuations are undeclared in this Core adoption. The built-in event

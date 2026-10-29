@@ -11,6 +11,11 @@ export default async function journey({ request, origin, cookie, tool }) {
     const response = await request(new URL('/mcp', origin).href, { method: 'POST', headers: { Authorization: `Bearer ${credential}`, Origin: origin, 'Content-Type': 'application/json', 'MCP-Protocol-Version': '2025-11-25', 'Mcp-Method': 'tools/call', 'Mcp-Name': name }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }) })
     return { status: response.status, body: await response.json() }
   }
+  const person = async (path, body) => {
+    const response = await request(new URL(path, origin).href, { method: 'POST', headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    assert.equal(response.status, 200, `native person door ${path}`)
+    return response.json()
+  }
   const scoped = await api('service.create', { name: 'Synthetic read-only stock coordinator', scopes: ['assets:read'], expiresAt: Date.now() + 3600000, consent: true })
   console.log('Native Core journey: credential issued')
   const before = await api('assets')
@@ -23,6 +28,19 @@ export default async function journey({ request, origin, cookie, tool }) {
   assert.equal(denied.body.error?.data?.code ?? denied.body.result?._meta?.['com.runeditrun/error']?.code, 'insufficient_scope')
   assert.deepEqual(await api('assets'), before)
   console.log('Native Core journey: scope refusal preserved native records')
+  await person('/agents/api/pause', { paused: true })
+  try {
+    const paused = await tool('gasket.assets.create', { tag: 'pause-must-refuse', name: 'Paused action', location: 'Workshop', idempotency_key: crypto.randomUUID() })
+    assert.equal(paused.result?._meta?.['com.runeditrun/error']?.code, 'agents_paused')
+    assert.equal((await mcp(scoped.token, 'gasket.assets.list', {})).body.result?._meta?.['com.runeditrun/error']?.code, 'agents_paused')
+    assert.deepEqual(await api('assets'), before)
+  } finally {
+    await person('/agents/api/pause', { paused: false })
+  }
+  console.log('Native Core journey: local Pause refused Business and service calls; native person access remained available')
+  await person(`/agents/api/agents/${encodeURIComponent(`gasket-service:${scoped.id}`)}/revoke`, {})
+  assert.equal((await mcp(scoped.token, 'gasket.assets.list', {})).status, 401)
+  console.log('Native Core journey: agent revocation stopped the next scoped call')
   await api('service.revoke', { credential: scoped.id })
   assert.equal((await mcp(scoped.token, 'gasket.assets.list', {})).status, 401)
   const malformed = await mcp('eyJhbGciOiJFUzI1NiIsInR5cCI6ImF0K2p3dCJ9.e30.invalid', 'gasket.assets.list', {})

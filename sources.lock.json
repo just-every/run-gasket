@@ -204,7 +204,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "ff2ee8903e467a61e8b93e1d0cc0315a2dd6e49e6ccee86f1a5f98a01ee5258a",
+      "sha256": "3c4c7c1b4ec8af2e8014a2cf7f4060d50886b096e2c9a8a511a60bc8fa1fe0ba",
       "executable": false
     },
     "DEMO.md": {
@@ -256,7 +256,7 @@
       "executable": false
     },
     "docs/people-and-agents.md": {
-      "sha256": "0cbe5ccf8c563b1d9e0cde6f4c9c71ccdb892fcd293fedcdc34addd1e8b1d81d",
+      "sha256": "48e9ad0e92a93e4bcff206e023693e3813fbdebce3a0351792d38fed9cc34a4e",
       "executable": false
     },
     "docs/preventive-work.md": {
@@ -4584,7 +4584,7 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "9b0af085158db0b36b99a6051ebb797c5c6f0aeb858095ceb576acae5d42cbcb",
+      "sha256": "68657027e0efe902b79cfe0b75b3299908398b4942b6ce029fda9e2174269c97",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
