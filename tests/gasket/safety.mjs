@@ -223,6 +223,12 @@ export async function safetyJourney() {
   assert.ok(entries['MANIFEST.csv'])
   const audit=JSON.stringify(await h.api('audit',owner));assert.ok(audit.includes('safety.attest'));assert.ok(audit.includes('compliance.export'))
   if(process.env.SAFETY_SCREENSHOTS)await browserProof(h,owner,who,checklist,work)
+  const planning=await h.api('planning',owner)
+  await h.api('planning.retire',owner,{kind:'qualification',member:tech,name:q.name,reason:'Training reference withdrawn',revision:planning.revision})
+  assert.ok((await state()).missing.includes('Qualification missing, expired or changed'),'retirement invalidates prior qualified sign-off without deleting it')
+  assert.equal((await state()).attestations.at(-1).qualification.reference,'synthetic-gasket-2')
+  const retiredPack=await download(owner,200)
+  assert.ok(JSON.parse(unzip(await retiredPack.arrayBuffer())['MANIFEST.json']).missing.includes('Qualification missing, expired or changed'))
   await h.stop()
   const future=await harness({vars:h.vars,installation:h.installation,clockInstant:Date.parse('2026-11-02T16:00:00Z')})
   try {
