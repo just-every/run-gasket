@@ -805,3 +805,21 @@ This PLAN-008 slice supports retained text between two existing active human mem
 - `POST /api/gasket/conversation.read` takes `conversation` and `through`, the sequence of a message the caller has seen in that conversation. It advances only that person's marker. Old retries cannot move it backwards; a foreign or future message sequence is refused.
 
 The corresponding pages are `/app/messages` and `/app/messages/ID`; their labelled forms use the same actions. The composer keeps its submission key during failed-save recovery. Mark read explicitly acknowledges the displayed messages. Message bodies have no edit or delete door, remain outside audit metadata, and are retained with original attribution. Retained participant and author references prevent user erasure. Portable archives include conversations, original messages, read markers and retry identities; source sessions are excluded and restored automation stays inactive. Conversation-specific retention and legal-hold controls remain outstanding in PLAN-008.
+
+## Private manual revision links
+
+An ordinary authenticated member may call `POST /api/gasket/document.privateLink`
+with a `revision` identifier. The response contains a relative `href`, `expiresAt`
+in epoch milliseconds, `filename`, `revision` and `asset`. The asset's Documents
+card also opens a private revision link page with the expiry and download action.
+Issuance is stateless and creates no delegated permission or stored credential.
+
+Links last five minutes and require the exact issuing browser session. Issuance
+and download both require current membership and record access in the operational
+primary site. A different actor, another session for the same actor, sign-out,
+revoked access, an altered revision or an altered expiry refuses the download.
+An expired link returns 410; fresh issuance requires current access again.
+Adding a new master revision preserves the linked original. Downloads preserve
+original bytes and use an attachment disposition, no-store caching, no-referrer,
+nosniff and a sandbox policy. Service credentials and other private-file kinds
+are outside this door. Cross-site file links remain unqualified under ADMIN-008.

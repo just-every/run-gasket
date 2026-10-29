@@ -2,6 +2,7 @@ import { printPacksJourney } from './print-packs.mjs'
 import { messagesJourney } from './messages.mjs'
 import { workPaginationJourney } from './work-pagination.mjs'
 import { languageJourney } from './languages.mjs'
+import { privateFileLinksJourney } from './private-file-links.mjs'
 import { siteAccessJourney } from './site-access.mjs'
 import { reportSchedulesJourney } from './report-schedules.mjs'
 import { genericMigrationJourney } from './generic-migration.mjs'
@@ -50,6 +51,7 @@ import { now, zone } from './clock.mjs'
 const independent = new Map([
   [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
+  [privateFileLinksJourney, 'automation'],
   [genericMigrationJourney,'inventory'],
   [safetyJourney,'inventory'],
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
@@ -96,6 +98,7 @@ try {
   await check('Retained direct messages and participant authority', messagesJourney)
   await check('Complete authorized work pages and bounded CSV', workPaginationJourney)
   await check('Intake language preferences and localized capture', languageJourney)
+  await check('Private manual links retain session and revision boundaries', privateFileLinksJourney)
   await check('Versioned API paging and durable write retries', apiJourney)
   await check('Isolation evidence and portable compliance pack',safetyJourney)
   await check('Qualification expiry and resource booking constraints',qualificationPlanningJourney)

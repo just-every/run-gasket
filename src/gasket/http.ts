@@ -3,6 +3,8 @@ import { paperOriginal, printPackPdf } from './print-packs'
 import { printError, printText } from './print-catalog'
 import { messagesPage, conversationPage } from './ui/messages'
 import { displayLocale, intakeLanguage, intakeError, intakeCompleteness, languageCookie, type IntakeLanguage } from './languages'
+import { downloadPrivateManual } from './private-file-links'
+import { privateManualLinkPage } from './ui/documents'
 import { recordErasurePage } from './ui/record-erasure'
 import { authorizeOperationalSite } from './site-access'
 import { withSiteAuthority } from './site-context'
@@ -316,6 +318,8 @@ const pages: Record<string, Page> = {
   workCsv: async (env, actor, url) => new Response(await workCsv(env, actor, url), { headers: { 'content-type': ['text', 'csv'].join('/') + '; charset=utf-8', 'content-disposition': 'attachment; filename=work.csv', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   language:languagePage,
   languageCatalog:async(env,actor)=>new Response(JSON.stringify(await intakeCompleteness(env,actor),null,2),{headers:{'content-type':['application','json'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=intake-catalog-completeness.json','x-content-type-options':'nosniff'}}),
+  privateManualLink: privateManualLinkPage,
+  privateManualFile: (env, actor, url, id) => downloadPrivateManual(env, actor, id, url),
   spreadsheetReconciliation: reconciliationPage,
   spreadsheetTemplate: guarded(actor=>can(actor,'import.run'),async(_env,_actor,_url,id)=>{
     const [kind,format]=id.split('.') as [SheetKind,'csv'|'xls'|'xlsx']
