@@ -153,6 +153,12 @@ export async function printPacksJourney() {
     await printBrowser(h,cookies.tech,owner,people.tech)
     const ownerWork=await printPackFixture(h,owner,(await h.api('me',owner)).id)
     const ownerPack=(await h.api('printpack.issue',owner,{workOrder:ownerWork.work,version:1})).id
+    const english=await h.api(`print-packs/${ownerPack}`,owner)
+    assert.equal(english.content.locale,'en-US','another member choosing Spanish does not change the owner preference')
+    const englishPage=await (await h.raw(`/app/print-packs/${ownerPack}`,{cookie:owner})).text()
+    assert.match(englishPage,/<h1>Controlled print packs<\/h1>/)
+    assert.ok(englishPage.includes(ownerWork.instructions),'localized labels preserve authored instructions')
+    assert.equal((await h.api(`print-packs/${issued.id}`,cookies.tech)).content.locale,'es-US','each issued pack retains its own display language')
     const ownerPreview=(await h.api('printpack.preview',owner,paperPayload(ownerWork,ownerPack,'2026-10-15T09:00'))).id
     const ownerDraft=await h.api(`print-previews/${ownerPreview}`,owner)
     await h.api('printpack.accept',owner,{preview:ownerPreview,digest:ownerDraft.digest,confirm:true})
@@ -198,8 +204,24 @@ export async function printPacksJourney() {
     await h.api('printpack.accept',cookies.tech,{preview:activePreview,digest:activeDraft.digest,confirm:true},409)
     const collaboratorPack=(await h.api('printpack.issue',cookies.tech,{workOrder:active.work,version:v})).id
     assert.equal((await h.api(`print-packs/${collaboratorPack}`,cookies.tech)).content.issuer,people.tech)
+    const collaboratorPayload=paperPayload({...active,detail:await h.api(`work/${active.work}`,owner)},collaboratorPack,'2026-10-15T10:00')
+    const collaboratorPreview=(await h.api('printpack.preview',cookies.tech,collaboratorPayload)).id
+    const collaboratorDraft=await h.api(`print-previews/${collaboratorPreview}`,cookies.tech)
+    const collaboratorAccept={preview:collaboratorPreview,digest:collaboratorDraft.digest,confirm:true}
+    const collaboratorReceipt=(await h.api('printpack.accept',cookies.tech,collaboratorAccept)).receipt
+    const collaborated=await h.api(`work/${active.work}`,owner)
+    assert.deepEqual([collaborated.version,collaborated.items[0].result.recorded_by,collaborated.items[0].result.note],[v+1,'Synthetic tech',collaboratorPayload.note[0]],'an active collaborator can accept attributed paper results')
+    assert.equal(collaboratorReceipt.entrant,people.tech)
+    assert.deepEqual(collaborated.evidence.map(row=>row.sha256),[sha(png)])
+    assert.deepEqual((await h.api('printpack.accept',cookies.tech,collaboratorAccept)).receipt,collaboratorReceipt)
+    assert.deepEqual(await h.api(`work/${active.work}`,owner),collaborated,'a collaborator replay duplicates no result or original')
     await h.api('workorder.collaborate',owner,{workOrder:active.work,member:people.tech,remove:true})
     await refuse(cookies.tech)
+    const removed=await h.api(`work/${active.work}`,owner)
+    await h.api(`print-previews/${collaboratorPreview}`,cookies.tech,undefined,403)
+    assert.equal((await h.raw(`/app/print-previews/${collaboratorPreview}/original`,{cookie:cookies.tech})).status,403)
+    await h.api('printpack.accept',cookies.tech,collaboratorAccept,403)
+    assert.deepEqual(await h.api(`work/${active.work}`,owner),removed,'removed collaboration refuses even an accepted receipt replay and preserves server history')
     await h.api('workorder.assign',owner,{workOrder:active.work,assignee:people.tech})
     const session=await (await h.raw('/auth/session',{cookie:cookies.tech})).json()
     assert.equal((await h.raw('/auth/session/revoke',{cookie:owner,body:{sessionId:session.id}})).status,204)
