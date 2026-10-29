@@ -2,6 +2,7 @@ import { issuePrintPack, previewPrintEntry, acceptPrintEntry } from './print-pac
 import { startConversation, sendMessage, readConversation } from './messages'
 import { saveLanguage, saveIntakeTranslation } from './languages'
 import { saveResourceGrant } from './resource-authority'
+import { issuePrivateManualLink } from './private-file-links'
 import { eraseRecord } from './record-erasure'
 import { createSite, updateSite, setSiteMembership } from './site-access'
 import { eraseQualification } from './qualification-erasure'
@@ -157,6 +158,7 @@ export const actions: Record<string, Handler> = {
   'asset.lifecycle': (env, actor, input) => setLifecycle(env, actor, input),
   'asset.agreement': (env, actor, input) => addAgreement(env, actor, input),
   'asset.contact': (env, actor, input) => addContact(env, actor, input),
+  'document.privateLink': (env, actor, input) => issuePrivateManualLink(env, actor, input.text('revision', { max: 100 })),
   'document.add': (env, actor, input) => addDocument(env, actor, input),
   'document.revise': (env, actor, input) => reviseDocument(env, actor, input),
   'document.expiry': (env, actor, input) => setExpiry(env, actor, input),

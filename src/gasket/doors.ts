@@ -57,6 +57,8 @@ export const PAGE_DOORS: [string, string][] = [
   ['^/app/work\\.csv$', 'workCsv'],
   ['^/app/settings/language$', 'language'],
   ['^/app/settings/language/catalog\\.json$', 'languageCatalog'],
+  ['^/app/manual-links/([\\w-]+)$', 'privateManualLink'],
+  ['^/app/private-manual-files/([\\w-]+)$', 'privateManualFile'],
   ['^/app/settings/erasure$', 'recordErasure'],
   ['^/app/move-in/templates/((?:assets|parts|work|locations|pms)\\.(?:csv|xls|xlsx))$', 'spreadsheetTemplate'],
   ['^/app/move-in/reconciliation/([\\w-]+)$', 'spreadsheetReconciliation'],

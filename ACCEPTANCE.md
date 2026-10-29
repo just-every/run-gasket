@@ -334,8 +334,8 @@ Core · target · **partial** · Cites BASE-SECRET-001, BASE-INPUT-003, BASE-ROL
 1. Connect/rotate/revoke a provider, upload a private manual and hostile file, then use unauthorized, expired and cross-site download links.
 2. Export and inspect logs/context for planted secrets; revoked connectors produce no new outbound requests.
 
-**Evidence.** `src/gasket/work.ts`; `src/gasket/actor.ts`
-**Gap.** Authenticated evidence access and safe response headers exist; connector secret lifecycle, scanning, scoped links and export/context redaction are unproved.
+**Evidence.** `tests/gasket/private-file-links.mjs` — privateFileLinksJourney: primary-site private-manual issuance and download, original-byte digests, immutable revision identity, expiry, forged-link refusal, other actor and session refusal, signed-out and revoked-session refusal, ended access, planned-site refusal and browser proof at 1440 and 390; existing authenticated evidence access in `src/gasket/work.ts` and `src/gasket/actor.ts`.
+**Gap.** Primary-site manual links last five minutes, remain bound to the issuing authenticated session and exact file revision, recheck current record access at issuance and download, and grant no delegated access. Remaining: cross-site record authorization and link proof under ADMIN-002; other private-file classes; installation-controlled encryption, narrow scope, rotation and revocation for provider tokens, sensor certificates and mobile credentials; provider disconnect stopping new sends; qualified object storage, resumable uploads and declared limits; malware handling and hostile-file safe-rendering qualification; bounded background telemetry aggregation; complete secret redaction from logs, exports and AI context.
 
 #### ADMIN-009 — Complete portable archive and inactive restore
 
