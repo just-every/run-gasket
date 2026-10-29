@@ -170,6 +170,13 @@ export async function cancel(env: Bindings, actor: Actor, input: Input) {
 /** Clause 7 and FIELD-004: an answer for each step of the pinned revision that applies, with a note; a number step naming a meter also keeps the value as that meter's reading. */
 export async function recordResults(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
+  const plan = await resultStatements(env, actor, input, order)
+  await commit(env, [...touch(env, order), ...plan.statements], plan.audits)
+  return { id: order.id }
+}
+
+/** Shared validation and atomic effects for ordinary and authenticated paper entry. */
+export async function resultStatements(env: Bindings, actor: Actor, input: Input, order: Row) {
   insist(order.checklist_revision_id, 'no_checklist', 409)
   const revision = await one(env, 'SELECT items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id)
   const steps = JSON.parse(revision!.items_json) as ChecklistItem[], count = steps.length
@@ -204,8 +211,7 @@ export async function recordResults(env: Bindings, actor: Actor, input: Input) {
   insist(recorded.length, 'invalid_outcome')
   // PM-004: results the checklist's failure rule covers raise their correction in the same batch.
   const correction = await correctionStatements(env, actor, order, recorded)
-  await commit(env, [...touch(env, order), ...statements, ...correction.statements], [{ actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded, statusChanged: order.status !== 'in_progress' } }, ...correction.audits])
-  return { id: order.id }
+  return { statements: [...statements, ...correction.statements], recorded, audits: [{ actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded, statusChanged: order.status !== 'in_progress' } }, ...correction.audits] }
 }
 
 export async function addEvidence(env: Bindings, actor: Actor, input: Input, door: Door) {

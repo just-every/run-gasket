@@ -1,3 +1,4 @@
+import { printPacksJourney } from './print-packs.mjs'
 import { messagesJourney } from './messages.mjs'
 import { workPaginationJourney } from './work-pagination.mjs'
 import { languageJourney } from './languages.mjs'
@@ -47,7 +48,7 @@ import { now, zone } from './clock.mjs'
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
 const independent = new Map([
-  [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
+  [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
   [genericMigrationJourney,'inventory'],
   [safetyJourney,'inventory'],
@@ -91,6 +92,7 @@ const unzip = buffer => {
 }
 
 try {
+  await check('Controlled print packs and authenticated paper entry', printPacksJourney)
   await check('Retained direct messages and participant authority', messagesJourney)
   await check('Complete authorized work pages and bounded CSV', workPaginationJourney)
   await check('Intake language preferences and localized capture', languageJourney)
