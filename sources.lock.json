@@ -4420,7 +4420,7 @@
       "executable": false
     },
     "tests/gasket/work-pagination.mjs": {
-      "sha256": "1c3491728c37396a812f68289b3a3f2bd695ccf17d0f6f190a2ae25f50a7a1b4",
+      "sha256": "9951051ce8976db113bc6f3f820379f8b0be35a1554a4ca29cc936266333c42c",
       "executable": false
     },
     "tests/gasket/work-pdf.mjs": {
