@@ -1,4 +1,4 @@
-# Completion audit — old reference [7ed5b256](https://github.com/just-every/run-gasket/commit/7ed5b2569614f5c0c061febbd2e45c50c04aadbd)
+# Completion audit — old reference [853809f9](https://github.com/just-every/run-gasket/commit/853809f99614f5c0c061febbd2e45c50c04aadbd)
 
 | Clause | Journey | Door | What it shows | Result |
 | --- | --- | --- | --- | --- |

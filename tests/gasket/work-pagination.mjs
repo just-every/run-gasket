@@ -249,6 +249,17 @@ async function browserProof(h, owner, totals, purchase) {
         await page.screenshot({ path: `${directory}/${name}-${width}.png`, fullPage: true })
       }
     }
+    // Deliberate unlink still removes the commitment without changing prior revisions.
+    await page.setViewportSize({ width: 1440, height: 1100 })
+    await page.goto(`${h.origin}/app/purchase-orders/${order}`)
+    await revision.getByLabel('Work order', { exact: true }).selectOption('')
+    await Promise.all([page.waitForNavigation(), revision.getByRole('button', { name: 'Save next revision', exact: true }).click()])
+    const unlinked = await h.api(`purchase-orders/${order}`, owner)
+    assert.equal(unlinked.current_revision, 3)
+    assert.equal(unlinked.current.snapshot.work, null)
+    assert.equal(unlinked.revisions[1].snapshot.work.id, purchase.work)
+    await h.api('purchase.approve', reviewer, { order, revision: 3 })
+    assert.equal(await commitment(), null, 'only deliberate unlink removes the work commitment')
     console.log('Delivery-only purchase revision retained work ranked 105 and its approved $10 commitment')
     await context.close()
   } finally { await browser.close() }

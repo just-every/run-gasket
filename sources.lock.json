@@ -232,15 +232,15 @@
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
-      "sha256": "aeb38c47aaef08418b2c432cdb59de813f4a94a410e671c857b50ee96a6fcccb",
+      "sha256": "1ccd70057b183468b0d3f146a3e0622758a98c7d0b4c2e9fcd626cd8fe1e1fe2",
       "executable": false
     },
     "docs/contract/DONE-AUDIT.md": {
-      "sha256": "65b6b63802ab6798a2488a8544c55af31e6f00b2540cac8e41b2e904b2cac4a5",
+      "sha256": "f1e8190f7f9f5393267e82de7ece52de695f72358359c8a2ed2cefb4cf96fb9e",
       "executable": false
     },
     "docs/contract/ID-MAP.json": {
-      "sha256": "bb38000462284bb140c32d7f214f8155bef55f98d9fe3f8224f6cd5002201694",
+      "sha256": "cd5f38681ecb24f03c7ce652b1b776da9008923c61ee01d7c2eb43ec0667aca1",
       "executable": false
     },
     "docs/doing-the-work.md": {
@@ -4452,7 +4452,7 @@
       "executable": false
     },
     "tests/gasket/work-pagination.mjs": {
-      "sha256": "1c3491728c37396a812f68289b3a3f2bd695ccf17d0f6f190a2ae25f50a7a1b4",
+      "sha256": "9951051ce8976db113bc6f3f820379f8b0be35a1554a4ca29cc936266333c42c",
       "executable": false
     },
     "tests/gasket/work-pdf.mjs": {
