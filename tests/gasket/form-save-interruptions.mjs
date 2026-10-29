@@ -6,7 +6,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { harness } from './harness.mjs'
-import { offset } from './clock.mjs'
 
 export async function saveSnapshot(h) {
   const root = await mkdtemp(join(tmpdir(), 'gasket-save-snapshot-'))
@@ -20,7 +19,7 @@ export async function saveSnapshot(h) {
         try {
           await mkdir(join(copy, '.wrangler'), { recursive: true })
           await cp(join(root, 'state'), join(copy, '.wrangler/state'), { recursive: true })
-          replica = await harness({ installation: { root: copy }, vars: h.vars, clockOffset: offset + 86_400_000, formSaveFault: true })
+          replica = await harness({ installation: { root: copy }, vars: h.vars, clockOffset: h.clockOffset, clockInstant: h.clockInstant, formSaveFault: true })
           const id = randomUUID(), form = new FormData()
           for (const [name, value] of fields) if (name !== '__gk_save') form.append(name, typeof value === 'string' ? value : new File([new Uint8Array(value.bytes)], value.name, { type: value.type }))
           form.set('__gk_save', id)
@@ -37,7 +36,7 @@ export async function saveSnapshot(h) {
           assert.deepEqual([receipt.id, receipt.state, receipt.batches], [id, 'failed', committed], `${action} reports the exact durable boundary`)
           const persisted = await replica.api(view, cookie)
           await replica.stop()
-          replica = await harness({ installation: { root: copy }, vars: h.vars, clockOffset: offset + 86_400_000, formSaveFault: true })
+          replica = await harness({ installation: { root: copy }, vars: h.vars, clockOffset: h.clockOffset, clockInstant: h.clockInstant, formSaveFault: true })
           const restarted = await (await replica.raw(failure.receipt, { cookie, headers: { accept: ['application', 'json'].join('/') } })).json()
           assert.deepEqual(restarted, receipt, `${action} its exact receipt survives a fresh Worker`)
           assert.deepEqual(await replica.api(view, cookie), persisted, `${action} confirmed records survive a fresh Worker`)

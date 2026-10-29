@@ -164,7 +164,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "fee469a7e7c6e1e13722e0f440396cc7440d998f4a64b3eb47f34da1c6e5e071",
+      "sha256": "aa3621ae1c7078717b0705c966e7b9f0e2753490fed558095e307e85735fb111",
       "executable": false
     },
     ".gitignore": {
@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "699e1e9c94f925c93ed54fc812bbeda62ce105389669889fcefc17bfdbe72ad2",
+      "sha256": "53da7e35bf41549059ca5f813f29e8ba72776669c58bab92d71a6e4fb82615db",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -188,7 +188,7 @@
       "executable": false
     },
     "API.md": {
-      "sha256": "5147035220ad31f0c7ba7b86533df30a801f1c5fc2c80be8bcba525de864d521",
+      "sha256": "b63d7e8ef2a3b71c30aa7adc6ccfc14ffb11768dabae086dbd0613f683a52022",
       "executable": false
     },
     "base-copies.json": {
@@ -204,7 +204,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "cc55131469779fb03cd0ef3f6af34a1f0fec20168826c3f41fe41a0e68e02809",
+      "sha256": "7ad577431fb16cb8d719d34fb1ed980c7d06ad7876979b808e084d99333f0223",
       "executable": false
     },
     "DEMO.md": {
@@ -1244,7 +1244,7 @@
       "executable": false
     },
     "scripts/verify-app.mjs": {
-      "sha256": "68ea7a9d85773a147c9a53d32f57b6bb8557b4966361ab2b997b8359cd20217b",
+      "sha256": "a1dd965922cceb7d58f7ac1d0ee54f8e722bea6d62bb5d1fae6d793768403158",
       "executable": false
     },
     "scripts/webhooks/receiver.mjs": {
@@ -2272,7 +2272,7 @@
       "executable": false
     },
     "src/gasket/ui/schedules.ts": {
-      "sha256": "f3845d9fee669f608cda2d669a90f957ff88137ae015add68c6d81f43174ac79",
+      "sha256": "f6144624b8a1a450ed4b5f55a69d2e1d8287b4361a479d6ce79562420e7ddb0b",
       "executable": false
     },
     "src/gasket/ui/settings.ts": {
@@ -4280,7 +4280,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "b0376f611608e8194145043494c04d8ca0a9a5b189a1f5e141fd88193802c3f1",
+      "sha256": "267b69fd858ea95b584da0b030b201e5867b36832e74350dab0340638c0acdee",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4288,7 +4288,7 @@
       "executable": false
     },
     "tests/gasket/form-save-interruptions.mjs": {
-      "sha256": "ea2873692deaefa374e7e554155ccc09c523d41f235401a1caa85227e5646077",
+      "sha256": "6053556d175241de85b70cff7117666eea602836c5a31fc9a9f614ee3f60521a",
       "executable": false
     },
     "tests/gasket/generic-migration.mjs": {
@@ -4296,7 +4296,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "e81e35b3ec7e8c85ccb13569be73c5d300f9cac23d2b5b9a7245d6bf07fdac87",
+      "sha256": "0da2737d657df067089b198ef727a28e4f9311c9d8e3a6bea78862cb0dab6edc",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4304,7 +4304,7 @@
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {
-      "sha256": "3c2b39469b4d972339a2550a340a4154dbe6ca98b8e7dd8859e4cd16fe191929",
+      "sha256": "386635ef1b65ddaeafd9f91b48ea237977257c8dd7f475f91e806560087df0f1",
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
@@ -4497,6 +4497,10 @@
     },
     "tests/gasket/work-returns.mjs": {
       "sha256": "2a2e4e07c493fae10d08936e61fd1ccdfad3ebbef6dcf6659443447eeff81d60",
+      "executable": false
+    },
+    "tests/gasket/workspace-conditional-saves.mjs": {
+      "sha256": "2267e0634eb99ee7593afbc1b86c2c364dae6f00342f3256b4d3450fd268f352",
       "executable": false
     },
     "tests/incremental-typecheck.test.mjs": {
