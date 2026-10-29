@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "53d7df6fa7902d0ec1251db25316adfc95762bffc456994953452e497ffa9e2e",
+      "sha256": "5c29a65332a5a7790b6596084b89bb780a64445335ba1d83557fdfdc1970dd08",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "b932ae6c0e26469c41099b5c52a27f706988a6c61dabfb033e7da2cf9bf3436e",
+      "sha256": "ae45fe56ec6ce0595b1521541ca407060b242639efb64cd7c3f5ae02d703a28e",
       "executable": false
     },
     "DEMO.md": {
@@ -316,7 +316,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "4094d1e95731fc22d5492d0ccca70a71c16cdf0ec450209ea969093accff68b0",
+      "sha256": "e3f2420bf4ef5ddea248518cb1430a0c7a378de62cf6ab48938327aecd59a478",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -1149,6 +1149,10 @@
     },
     "scripts/delivery/base/payloads.mjs": {
       "sha256": "da3a9d09860c33bdd0b287bca9abc6210b12d13439e569d178a5b31fec563ee5",
+      "executable": false
+    },
+    "scripts/delivery/base/schema/business-field-inputs.mjs": {
+      "sha256": "b028b576bc85758c4ed400d059d4aae4fdda7a29eeb290fd1032ea15aaf957d1",
       "executable": false
     },
     "scripts/delivery/base/schema/dependencies.mjs": {
