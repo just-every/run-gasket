@@ -1509,7 +1509,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 - **accounts:** an outside identity or paid connector resource is created; facts name provider and resource.
 - **gated:** the provider keeps consent, checkout, identity verification or personal terms for a person; facts name provider and step, including a provider response requiring that step.
 - **access:** an actual membership, delegation, staff/site right, device, resource stewardship, service/agent grant or automatic-order authorization changes standing authority; facts name people, rights and widening or narrowing. Automatic-order authority is computed from stored supplier, cost-center, date and amount bounds. Site name, time zone and lead time alone do not change authority.
-- **security:** provider credentials, independent-count thresholds, protective automatic-order envelopes or other protective maintenance settings change; facts name the stored setting, before/after limits and authority.
+- **security:** provider credentials, independent-count thresholds, protective automatic-order envelopes, purchasing approval limits, named approvers, budget ceilings or other protective maintenance settings change; facts name the stored setting, before/after limits and authority.
 - **destructive:** a record, original file or stock, asset, resource or field identity cannot be recovered through product Undo, including irreversible retirement even when history remains readable; facts name affected items. A reversible draft cancellation remains standard.
 - **sensitive:** authorized qualification, identity, bank or pay records contain regulated personal data; facts name record count and data kind.
 - **live:** a running scheduler, connector, rule or gateway configuration changes how the service behaves; facts name the service and scope.
@@ -1545,7 +1545,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 | `gasket.work.review` | Submit, return or independently sign off work | GAS-09, FIELD-007, SAFE-001, SAFE-002 | standard or commitment (+ external, sensitive, security, live) | No MCP tool exposed |
 | `gasket.work.print` | Print controlled work packs and PDFs | FIELD-008, REPORT-010 | standard (+ external, sensitive) | No MCP tool exposed |
 | `gasket.parts.manage` | Manage bins, parts, counts, reservations and valuations | GAS-03, GAS-08, PART-001, PART-002, PART-003, PART-004, PART-005, PART-006, PART-007, PART-008, PART-009 | standard (+ money, destructive, live, external, commitment, security, access) | No MCP tool exposed |
-| `gasket.purchasing.manage` | Manage suppliers, requisitions, POs, receipts and bills | BUY-001, BUY-002, BUY-003, BUY-004, BUY-005, BUY-006, BUY-007, BUY-008 | standard (+ money, commitment, external, access, live, sensitive) | No MCP tool exposed |
+| `gasket.purchasing.manage` | Manage suppliers, requisitions, POs, receipts and bills | BUY-001, BUY-002, BUY-003, BUY-004, BUY-005, BUY-006, BUY-007, BUY-008 | standard (+ money, commitment, external, access, live, sensitive, security) | No MCP tool exposed |
 | `gasket.reports.read` | Read maintenance measures and comparisons | GAS-10, REPORT-001, REPORT-002, REPORT-003, REPORT-004, REPORT-005, REPORT-007, REPORT-008, REPORT-009 | standard (+ external, sensitive, money, commitment, access) | No MCP tool exposed |
 | `gasket.reports.schedule` | Prepare and send scheduled report packs | REPORT-006 | standard or external (+ sensitive, access, live) | No MCP tool exposed |
 | `gasket.api.credentials` | Issue and revoke service credentials | INT-001 | access · security | No MCP tool exposed |
@@ -1627,7 +1627,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 **Acceptance.**
 1. Create an outside connector resource and inspect accounts with its provider; a provider-retained consent or identity step adds gated with provider and step.
 2. Change a membership, delegation or staff/site/device/resource right, including automatic-order authority, and inspect access with affected people, scope and widening or narrowing direction; a site name, time-zone or lead-time edit alone adds no access while retaining other applicable classes.
-3. Rotate a provider credential, change an independent-count threshold or protective automatic-order envelope, or authorize a scoped exception to the qualification/tool planning block; inspect security with its stored setting and changed safeguards.
+3. Rotate a provider credential; change an independent-count threshold, automatic-order safeguard, purchasing approval limit, named approver or budget ceiling; or authorize a qualification/tool planning exception. Inspect security from the stored setting and changed safeguards; an ordinary purchasing call adds it only when its facts meet this test.
 4. Erase eligible maintenance originals or irreversibly retire an asset, resource or field identity and inspect destructive with item counts; retained history stays readable and a reversible draft change remains standard.
 5. Read a regulated qualification, identity, bank or pay record and inspect sensitive with count and kind.
 6. Change running PM, connector, gateway or reminder behavior, including site lead time and delivery preferences, and inspect live with service and scope.
