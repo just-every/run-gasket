@@ -1912,7 +1912,7 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-005, BAS
 
 **Acceptance.**
 1. Leave a PM blocked on parts and a repair awaiting review, answer one agent query with a promised date and miss it.
-2. Inspect contextual escalation, proposed reassignment and refusal to mark either work or finding closed without technician evidence and supervisor decision.
+2. Inspect contextual escalation, proposed reassignment and refusal to mark either work or finding closed without the technician’s evidence; under the held company policy, closure waits for the supervisor’s decision.
 
 **Evidence.** `tests/gasket/agent-follow-up.mjs` — "agentFollowUpJourney"
 **Gap.** A public-door journey computing standard/commitment and executing reassignment/sign-off under company policy is missing. The cited journeys show questions, blockers/promises, fixed-gate reassignment and unsupported-closure refusal.

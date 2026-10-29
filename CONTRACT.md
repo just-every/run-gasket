@@ -1722,7 +1722,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 **Acceptance.**
 1. Leave a PM blocked on parts and a repair awaiting review, answer one agent query with a promised date and miss it.
-2. Inspect contextual escalation, proposed reassignment and refusal to mark either work or finding closed without technician evidence and supervisor decision.
+2. Inspect contextual escalation, proposed reassignment and refusal to mark either work or finding closed without the technician’s evidence; under the held company policy, closure waits for the supervisor’s decision.
 
 #### AGENT-006 — Reconcile spare-parts reality
 
