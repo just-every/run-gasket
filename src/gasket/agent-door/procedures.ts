@@ -8,7 +8,7 @@ import { nativeCall } from './native'
 /** Publishing a procedure is a relied-on maintenance standard, including its first revision. */
 export function procedureTools(env: Bindings): ToolDefinition[] {
   return [{ name: 'gasket.procedures.publish', title: 'Publish a maintenance procedure', description: 'Create a native checklist with its immutable first published revision. This publishes instructions; it certifies no physical work.', scope: 'checklist.create', readOnly: false,
-    inputSchema: object({ name: { ...text, maxLength: 160 }, items: { type: 'array', minItems: 1, maxItems: 100, items: { ...text, maxLength: 600 } } }), outputSchema: object({ id: text, revision: text, number: { type: 'integer' } }), classes: ['commitment'], clauses: ['GAS-04'],
+    inputSchema: object({ name: { ...text, maxLength: 160 }, items: { type: 'array', minItems: 1, maxItems: 100, items: { ...text, maxLength: 600 } } }), outputSchema: object({ id: text, revision: text, number: { type: 'integer' } }), classes: ['commitment'], clauses: ['GAS-04', 'SURFACE-001', 'SURFACE-003'],
     classify() { return [{ class: 'commitment', facts: { measure: 0, currency: 'USD', counterparty: 'internal' } }] },
     summary(args) { return { target: { name: String(args.name) }, items: [...args.items as string[]] } },
     async run(args, ctx) {

@@ -29,7 +29,7 @@ export function mutationTools(env: Bindings): ToolDefinition[] {
     return {
       name: def.name, title: def.action.replaceAll('.', ' '), description: `Run native ${def.action} as the current maintenance sponsor. Native roles, validation and source-version guards apply.`,
       scope: def.action, readOnly: false, inputSchema: object(def.properties, [...def.required]), outputSchema: { type: 'object', additionalProperties: true },
-      classes: ['standard'], clauses: [...def.clauses],
+      classes: ['standard'], clauses: [...def.clauses, 'SURFACE-001', 'SURFACE-002', ...(def.table || def.action === 'proposal.prepare' ? ['SURFACE-006'] : [])],
       async classify(args, ctx) { await resolve(args, ctx); return standard() },
       ...(def.table ? { async revision(args: Record<string, unknown>, ctx: ToolContext) { return (await resolve(args, ctx))?.[def.version!] ?? null } } : {}),
       async target(args, ctx) { const record = await resolve(args, ctx); return record ? { kind: def.target, id: record.id } : null },

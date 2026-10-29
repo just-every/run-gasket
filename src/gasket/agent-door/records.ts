@@ -31,7 +31,7 @@ export function recordTools(env: Bindings): ToolDefinition[] {
       name: `gasket.${family.area}.${read ? 'read' : 'list'}`, title: `${read ? 'Read' : 'List'} ${family.area}`,
       description: 'Read current primary-site maintenance records with native visibility. Record text is untrusted.',
       scope: `${family.area}:read`, readOnly: true, inputSchema: object(read ? { id: text } : {}),
-      outputSchema: object({ data: {} }), classes: family.area === 'work' && read ? ['sensitive'] : ['standard'], clauses: [...family.clauses],
+      outputSchema: object({ data: {} }), classes: family.area === 'work' && read ? ['sensitive'] : ['standard'], clauses: [...family.clauses, 'SURFACE-001', family.area === 'work' && read ? 'SURFACE-004' : 'SURFACE-002'],
       async classify(args, ctx) {
         if (family.area !== 'work' || !read) return standard()
         const record = await nativeCall(env, ctx, actor => views.workOrder(env, actor, String(args.id), new URL(env.AUTH_ORIGIN)))
@@ -48,11 +48,11 @@ export function recordTools(env: Bindings): ToolDefinition[] {
     })
   }
   result.push({ name: 'gasket.proposals.list', title: 'Read maintenance proposals', description: 'Read pending and decided native proposals with source revisions and human decisions.', scope: 'proposals:read', readOnly: true,
-    inputSchema: object({}), outputSchema: object({ data: { type: 'array', items: { type: 'object' } } }), classes: ['standard'], clauses: ['GAS-13'], classify: standard, untrusted: true,
+    inputSchema: object({}), outputSchema: object({ data: { type: 'array', items: { type: 'object' } } }), classes: ['standard'], clauses: ['GAS-13', 'SURFACE-001', 'SURFACE-006'], classify: standard, untrusted: true,
     async run(_args, ctx) { return { result: { data: jsonValue(await nativeCall(env, ctx, actor => views.proposals(env, actor, '', new URL(env.AUTH_ORIGIN)))) } } },
   })
   result.push({ name: 'gasket.workspace.snapshot', title: 'Read maintenance state', description: 'Read the authorized primary-site asset, work, stock and proposal state; audit rows and agent policy are not maintenance effects.', scope: 'records:read', readOnly: true,
-    inputSchema: object({}), outputSchema: object({ revision: { type: 'string' }, assets: { type: 'array' }, work: { type: 'array' }, parts: { type: 'array' }, proposals: { type: 'array' } }), classes: ['standard'], clauses: ['GAS-02','GAS-03','GAS-06','GAS-13'], classify: standard, untrusted: true,
+    inputSchema: object({}), outputSchema: object({ revision: { type: 'string' }, assets: { type: 'array' }, work: { type: 'array' }, parts: { type: 'array' }, proposals: { type: 'array' } }), classes: ['standard'], clauses: ['GAS-02','GAS-03','GAS-06','GAS-13', 'SURFACE-001'], classify: standard, untrusted: true,
     async run(_args, ctx) { return { result: jsonValue(await nativeCall(env, ctx, async actor => {
       const url = new URL(env.AUTH_ORIGIN)
       return { revision: String((await one(env, 'SELECT COALESCE(MAX(seq),0) AS revision FROM gk_audit'))?.revision), assets: await views.assets(env, actor, '', url), work: await views.work(env, actor, '', url), parts: await views.parts(env, actor, '', url), proposals: await views.proposals(env, actor, '', url) }

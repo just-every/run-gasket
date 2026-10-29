@@ -11,7 +11,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-02"
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -22,7 +24,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-02"
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -34,7 +38,9 @@
       ],
       "clauses": [
         "GAS-06",
-        "GAS-07"
+        "GAS-07",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -46,7 +52,9 @@
       ],
       "clauses": [
         "GAS-06",
-        "GAS-07"
+        "GAS-07",
+        "SURFACE-001",
+        "SURFACE-004"
       ]
     },
     {
@@ -57,7 +65,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-03"
+        "GAS-03",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -68,7 +78,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-03"
+        "GAS-03",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -79,7 +91,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-04"
+        "GAS-04",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -90,7 +104,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-04"
+        "GAS-04",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -101,7 +117,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-13"
+        "GAS-13",
+        "SURFACE-001",
+        "SURFACE-006"
       ]
     },
     {
@@ -115,7 +133,8 @@
         "GAS-02",
         "GAS-03",
         "GAS-06",
-        "GAS-13"
+        "GAS-13",
+        "SURFACE-001"
       ]
     },
     {
@@ -126,7 +145,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-02"
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -137,7 +158,10 @@
         "standard"
       ],
       "clauses": [
-        "GAS-02"
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
       ]
     },
     {
@@ -150,7 +174,9 @@
       "clauses": [
         "GAS-06",
         "PLAN-001",
-        "FIELD-009"
+        "FIELD-009",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -161,7 +187,10 @@
         "standard"
       ],
       "clauses": [
-        "GAS-06"
+        "GAS-06",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
       ]
     },
     {
@@ -172,7 +201,9 @@
         "standard"
       ],
       "clauses": [
-        "GAS-03"
+        "GAS-03",
+        "SURFACE-001",
+        "SURFACE-002"
       ]
     },
     {
@@ -188,7 +219,10 @@
         "AGENT-003",
         "AGENT-004",
         "AGENT-005",
-        "AGENT-006"
+        "AGENT-006",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
       ]
     },
     {
@@ -199,7 +233,9 @@
         "commitment"
       ],
       "clauses": [
-        "GAS-04"
+        "GAS-04",
+        "SURFACE-001",
+        "SURFACE-003"
       ]
     }
   ],
