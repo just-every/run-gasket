@@ -1510,49 +1510,49 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 - **gated:** the provider keeps consent, checkout, identity verification or personal terms for a person; facts name provider and step, including a provider response requiring that step.
 - **access:** a staff/site role, device, resource stewardship or service/agent grant changes; facts name people and widening or narrowing.
 - **security:** provider credentials or protective maintenance settings change; facts name the setting and authority.
-- **destructive:** a record, original file or stock identity cannot be recovered through product Undo; facts name affected items. A reversible draft cancellation remains standard.
+- **destructive:** a record, original file or stock, asset, resource or field identity cannot be recovered through product Undo, including irreversible retirement even when history remains readable; facts name affected items. A reversible draft cancellation remains standard.
 - **sensitive:** authorized qualification, identity, bank or pay records contain regulated personal data; facts name record count and data kind.
 - **live:** a running scheduler, connector, rule or gateway configuration changes how the service behaves; facts name the service and scope.
 
 | Tool | Does | Core clauses | Risk class | Today |
 | --- | --- | --- | --- | --- |
-| `gasket.site.configure` | Configure maintenance sites | GAS-01, ADMIN-001, ADMIN-002 | standard · access | No MCP tool exposed |
-| `gasket.resources.manage` | Grant scoped stewardship and maintain qualifications and tools | PLAN-010 | standard or access (+ sensitive) | No MCP tool exposed |
+| `gasket.site.configure` | Configure maintenance sites | GAS-01, ADMIN-001, ADMIN-002 | standard · access (+ external, money, live) | No MCP tool exposed |
+| `gasket.resources.manage` | Grant scoped stewardship and maintain qualifications and tools | PLAN-010 | standard or access (+ sensitive, destructive, live) | No MCP tool exposed |
 | `gasket.members.manage` | Manage maintenance roles and memberships | ADMIN-003, ADMIN-004 | access (+ external) | No MCP tool exposed |
 | `gasket.identity.configure` | Configure provider identity and sign-in | ADMIN-005, ADMIN-014, ADMIN-015 | access · security (+ external, accounts, gated) | No MCP tool exposed |
 | `gasket.audit.search` | Read maintenance audit | ADMIN-006 | standard (+ sensitive) | No MCP tool exposed |
-| `gasket.retention.manage` | Set maintenance holds and erase eligible records | ADMIN-007, ADMIN-016, PLAN-011 | destructive or standard (+ sensitive) | No MCP tool exposed |
-| `gasket.custody.configure` | Configure private maintenance storage and provider custody | ADMIN-008 | security (+ access, live) | No MCP tool exposed |
-| `gasket.archive.export` | Export or restore maintenance archives | GAS-11, ADMIN-009 | standard or destructive (+ sensitive, security) | No MCP tool exposed |
-| `gasket.operations.manage` | Inspect and control maintenance recovery | ADMIN-010, PM-008 | standard or live (+ security) | No MCP tool exposed |
-| `gasket.estate.search` | Search, save views and bulk edit the estate | ADMIN-012, PLAN-007 | standard (+ destructive) | No MCP tool exposed |
+| `gasket.retention.manage` | Set maintenance holds and erase eligible records | ADMIN-007, ADMIN-016, PLAN-011 | destructive or standard (+ sensitive, security) | No MCP tool exposed |
+| `gasket.custody.configure` | Configure private maintenance storage and provider custody | ADMIN-008 | security (+ external, gated, access, live) | No MCP tool exposed |
+| `gasket.archive.export` | Export or restore maintenance archives | GAS-11, ADMIN-009 | standard or destructive (+ sensitive, security, access, live) | No MCP tool exposed |
+| `gasket.operations.manage` | Inspect and control maintenance recovery | ADMIN-010, PM-008 | standard or live (+ external, security, destructive, access, sensitive) | No MCP tool exposed |
+| `gasket.estate.search` | Search, save views and bulk edit the estate | ADMIN-012, PLAN-007 | standard (+ external, money, destructive, sensitive) | No MCP tool exposed |
 | `gasket.language.choose` | Choose display language | ADMIN-013 | standard | No MCP tool exposed |
-| `gasket.assets.manage` | Maintain assets, hierarchy, states and lifecycle | GAS-02, ASSET-001, ASSET-004, ASSET-007 | standard (+ money) | No MCP tool exposed |
+| `gasket.assets.manage` | Maintain assets, hierarchy, states and lifecycle | GAS-02, ASSET-001, ASSET-004, ASSET-007 | standard (+ money, destructive, live) | No MCP tool exposed |
 | `gasket.labels.print` | Print labels and resolve maintenance targets | ASSET-002 | standard or external | No MCP tool exposed |
-| `gasket.documents.manage` | Version asset manuals and expiry | ASSET-003 | standard (+ sensitive, external) | No MCP tool exposed |
-| `gasket.meters.record` | Record and correct meter observations | ASSET-005 | standard | No MCP tool exposed |
-| `gasket.bom.manage` | Manage BOMs and compatible substitutes | ASSET-006 | standard | No MCP tool exposed |
-| `gasket.rounds.manage` | Plan and sign off inspection rounds | ASSET-008 | standard or commitment | No MCP tool exposed |
-| `gasket.calibration.manage` | Schedule calibration and retain certificates | ASSET-010 | standard or commitment | No MCP tool exposed |
-| `gasket.fields.manage` | Define typed fields and record values | ASSET-009 | standard | No MCP tool exposed |
-| `gasket.requests.manage` | Submit, triage, link and report maintenance requests | REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008 | standard (+ external, sensitive, gated, accounts, live) | No MCP tool exposed |
-| `gasket.work.plan` | Plan templates, teams, assignments and resource windows | GAS-06, PLAN-001, PLAN-002, PLAN-003, PLAN-004, PLAN-005 | standard | No MCP tool exposed |
-| `gasket.conversation.post` | Post record comments and team messages | PLAN-006, PLAN-008 | standard or external (+ sensitive) | No MCP tool exposed |
-| `gasket.rules.manage` | Manage maintenance automation rules | PLAN-009 | standard or live | No MCP tool exposed |
-| `gasket.pm.manage` | Manage procedures, cadence, thresholds and strategies | GAS-04, GAS-05, PM-001, PM-002, PM-003, PM-004, PM-006, PM-007, PM-009 | standard or commitment (+ live) | No MCP tool exposed |
-| `gasket.notice.send` | Send maintenance notices and manage delivery | PM-005, INT-004 | standard or external (+ security, accounts) | No MCP tool exposed |
-| `gasket.work.record` | Create work and record checklist/evidence/time | GAS-07, GAS-14, GAS-15, FIELD-004, FIELD-005, FIELD-006, FIELD-009 | standard (+ commitment, money, sensitive) | No MCP tool exposed |
-| `gasket.work.review` | Submit, return or independently sign off work | GAS-09, FIELD-007, SAFE-001, SAFE-002 | standard or commitment (+ sensitive) | No MCP tool exposed |
-| `gasket.work.print` | Print controlled work packs and PDFs | FIELD-008, REPORT-010 | standard (+ sensitive) | No MCP tool exposed |
+| `gasket.documents.manage` | Version asset manuals and expiry | ASSET-003 | standard (+ sensitive, external, commitment, live) | No MCP tool exposed |
+| `gasket.meters.record` | Record and correct meter observations | ASSET-005 | standard (+ security, live) | No MCP tool exposed |
+| `gasket.bom.manage` | Manage BOMs and compatible substitutes | ASSET-006 | standard (+ commitment, security) | No MCP tool exposed |
+| `gasket.rounds.manage` | Plan and sign off inspection rounds | ASSET-008 | standard or commitment (+ external, security, live) | No MCP tool exposed |
+| `gasket.calibration.manage` | Schedule calibration and retain certificates | ASSET-010 | standard or commitment (+ external, security, live) | No MCP tool exposed |
+| `gasket.fields.manage` | Define typed fields and record values | ASSET-009 | standard (+ destructive) | No MCP tool exposed |
+| `gasket.requests.manage` | Submit, triage, link and report maintenance requests | REQ-001, REQ-002, REQ-003, REQ-004, REQ-005, REQ-006, REQ-007, REQ-008 | standard (+ external, sensitive, gated, accounts, live, access, security, destructive) | No MCP tool exposed |
+| `gasket.work.plan` | Plan templates, teams, assignments and resource windows | GAS-06, PLAN-001, PLAN-002, PLAN-003, PLAN-004, PLAN-005 | standard (+ external, commitment, access, security, sensitive) | No MCP tool exposed |
+| `gasket.conversation.post` | Post record comments and team messages | PLAN-006, PLAN-008 | standard or external (+ sensitive, access) | No MCP tool exposed |
+| `gasket.rules.manage` | Manage maintenance automation rules | PLAN-009 | standard or live (+ external) | No MCP tool exposed |
+| `gasket.pm.manage` | Manage procedures, cadence, thresholds and strategies | GAS-04, GAS-05, PM-001, PM-002, PM-003, PM-004, PM-006, PM-007, PM-009 | standard or commitment (+ external, security, live) | No MCP tool exposed |
+| `gasket.notice.send` | Send maintenance notices and manage delivery | PM-005, INT-004 | standard or external (+ sensitive, security, accounts, gated, live) | No MCP tool exposed |
+| `gasket.work.record` | Create work and record checklist/evidence/time | GAS-07, GAS-14, GAS-15, FIELD-004, FIELD-005, FIELD-006, FIELD-009 | standard (+ external, commitment, money, sensitive, security) | No MCP tool exposed |
+| `gasket.work.review` | Submit, return or independently sign off work | GAS-09, FIELD-007, SAFE-001, SAFE-002 | standard or commitment (+ external, sensitive, security, live) | No MCP tool exposed |
+| `gasket.work.print` | Print controlled work packs and PDFs | FIELD-008, REPORT-010 | standard (+ external, sensitive) | No MCP tool exposed |
 | `gasket.parts.manage` | Manage bins, parts, counts, reservations and valuations | GAS-03, GAS-08, PART-001, PART-002, PART-003, PART-004, PART-005, PART-006, PART-007, PART-008, PART-009 | standard (+ money, destructive, live, external, commitment) | No MCP tool exposed |
-| `gasket.purchasing.manage` | Manage suppliers, requisitions, POs, receipts and bills | BUY-001, BUY-002, BUY-003, BUY-004, BUY-005, BUY-006, BUY-007, BUY-008 | standard (+ money, commitment, external, access, live) | No MCP tool exposed |
-| `gasket.reports.read` | Read maintenance measures and comparisons | GAS-10, REPORT-001, REPORT-002, REPORT-003, REPORT-004, REPORT-005, REPORT-007, REPORT-008, REPORT-009 | standard (+ sensitive, money, commitment) | No MCP tool exposed |
+| `gasket.purchasing.manage` | Manage suppliers, requisitions, POs, receipts and bills | BUY-001, BUY-002, BUY-003, BUY-004, BUY-005, BUY-006, BUY-007, BUY-008 | standard (+ money, commitment, external, access, live, sensitive) | No MCP tool exposed |
+| `gasket.reports.read` | Read maintenance measures and comparisons | GAS-10, REPORT-001, REPORT-002, REPORT-003, REPORT-004, REPORT-005, REPORT-007, REPORT-008, REPORT-009 | standard (+ external, sensitive, money, commitment, access) | No MCP tool exposed |
 | `gasket.reports.schedule` | Prepare and send scheduled report packs | REPORT-006 | standard or external (+ sensitive, access, live) | No MCP tool exposed |
 | `gasket.api.credentials` | Issue and revoke service credentials | INT-001 | access · security | No MCP tool exposed |
-| `gasket.connectors.configure` | Configure maintenance connectors and event delivery | INT-002, INT-003, INT-005, INT-006, INT-007, INT-008, INT-009, INT-010, INT-011, INT-012, INT-013, INT-014, INT-015, INT-016, INT-017 | standard (+ external, accounts, gated, access, security, live, money) | No MCP tool exposed |
-| `gasket.proposals.manage` | Prepare or apply maintenance proposals | GAS-13, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006 | standard (+ money, commitment, external, destructive) | No MCP tool exposed |
-| `gasket.assistance.prepare` | Retrieve manuals, translate and extract purchasing documents | AGENT-007, AGENT-008 | standard (+ external, sensitive, money, commitment) | No MCP tool exposed |
-| `gasket.runs.manage` | Manage bounded maintenance model runs and their cost lineage | AGENT-009 | standard (+ external, sensitive, security, access) | No MCP tool exposed |
+| `gasket.connectors.configure` | Configure maintenance connectors and event delivery | INT-002, INT-003, INT-005, INT-006, INT-007, INT-008, INT-009, INT-010, INT-011, INT-012, INT-013, INT-014, INT-015, INT-016, INT-017 | standard (+ external, accounts, gated, access, security, live, money, commitment, sensitive) | No MCP tool exposed |
+| `gasket.proposals.manage` | Prepare or apply maintenance proposals | GAS-13, AGENT-001, AGENT-002, AGENT-003, AGENT-004, AGENT-005, AGENT-006 | standard (+ money, commitment, external, destructive, security, live, sensitive) | No MCP tool exposed |
+| `gasket.assistance.prepare` | Retrieve manuals, translate and extract purchasing documents | AGENT-007, AGENT-008 | standard (+ external, sensitive, money, commitment, security, live) | No MCP tool exposed |
+| `gasket.runs.manage` | Manage bounded maintenance model runs and their cost lineage | AGENT-009 | standard (+ external, sensitive, security, access, money, gated) | No MCP tool exposed |
 
 **Resources.** `gasket://sites/{id}`, `gasket://assets/{id}`, `gasket://work/{id}`, `gasket://procedures/{id}`, `gasket://meters/{id}`, `gasket://requests/{id}`, `gasket://parts/{id}`, `gasket://purchases/{id}`, `gasket://qualifications/{id}`, `gasket://tools/{id}`, `gasket://reports/{id}` and `gasket://runs/{id}` retain source-linked maintenance evidence.
 
@@ -1614,7 +1614,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 **Acceptance.**
 1. Prepare a PO, valued stock adjustment and cost-policy change; inspect money with exact USD amount, supplier and source revision.
-2. Sign a maintenance record or publish an interval standard and inspect commitment with its exact revision and affected business scope.
+2. Sign a maintenance record, publish an interval standard or approve a scoped qualification/tool planning exception and inspect commitment with its exact revision and affected business scope.
 3. Run a purchase offer carrying both money and commitment under two company policies; the result follows the policy in force.
 4. Inspect usage-priced model cost separately from provider invoices, and an unknown charge as a reservation.
 
@@ -1627,10 +1627,10 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 **Acceptance.**
 1. Create an outside connector resource and inspect accounts with its provider; a provider-retained consent or identity step adds gated with provider and step.
 2. Change a staff/site/device/resource grant and inspect access with the affected people and widening or narrowing direction.
-3. Rotate a maintenance provider credential or protective setting and inspect security with its setting.
-4. Erase eligible maintenance originals and inspect destructive with item counts; a reversible draft change remains standard.
+3. Rotate a maintenance provider credential, change a protective maintenance setting or authorize a scoped exception to the qualification/tool planning block and inspect security with its setting.
+4. Erase eligible maintenance originals or irreversibly retire an asset, resource or field identity and inspect destructive with item counts; retained history stays readable and a reversible draft change remains standard.
 5. Read a regulated qualification, identity, bank or pay record and inspect sensitive with count and kind.
-6. Change running PM, connector or gateway behavior and inspect live with service and scope.
+6. Change running PM, connector, gateway or reminder behavior, including site lead time and delivery preferences, and inspect live with service and scope.
 7. Try self-escalation through maintenance memberships, grants or policy; inspect unchanged authority under both policies.
 
 #### SURFACE-005 — Maintenance resources and change handoffs

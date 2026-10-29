@@ -2012,7 +2012,7 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-006, BASE
 
 **Acceptance.**
 1. Prepare a PO, valued stock adjustment and cost-policy change; inspect money with exact USD amount, supplier and source revision.
-2. Sign a maintenance record or publish an interval standard and inspect commitment with its exact revision and affected business scope.
+2. Sign a maintenance record, publish an interval standard or approve a scoped qualification/tool planning exception and inspect commitment with its exact revision and affected business scope.
 3. Run a purchase offer carrying both money and commitment under two company policies; the result follows the policy in force.
 4. Inspect usage-priced model cost separately from provider invoices, and an unknown charge as a reservation.
 
@@ -2028,10 +2028,10 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-005, BASE
 **Acceptance.**
 1. Create an outside connector resource and inspect accounts with its provider; a provider-retained consent or identity step adds gated with provider and step.
 2. Change a staff/site/device/resource grant and inspect access with the affected people and widening or narrowing direction.
-3. Rotate a maintenance provider credential or protective setting and inspect security with its setting.
-4. Erase eligible maintenance originals and inspect destructive with item counts; a reversible draft change remains standard.
+3. Rotate a maintenance provider credential, change a protective maintenance setting or authorize a scoped exception to the qualification/tool planning block and inspect security with its setting.
+4. Erase eligible maintenance originals or irreversibly retire an asset, resource or field identity and inspect destructive with item counts; retained history stays readable and a reversible draft change remains standard.
 5. Read a regulated qualification, identity, bank or pay record and inspect sensitive with count and kind.
-6. Change running PM, connector or gateway behavior and inspect live with service and scope.
+6. Change running PM, connector, gateway or reminder behavior, including site lead time and delivery preferences, and inspect live with service and scope.
 7. Try self-escalation through maintenance memberships, grants or policy; inspect unchanged authority under both policies.
 
 **Evidence.** None.
