@@ -1,3 +1,4 @@
+import { printPackFixture, paperPayload } from './print-packs.mjs'
 import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 import { fileURLToPath } from 'node:url'
 // Portable inactive recovery through supported commands and authenticated HTTP.
@@ -61,7 +62,15 @@ export async function recoveryJourney() {
     const photo = (await h.api(`requests/${request}`, owner)).files[0].id
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
+    const paperWork=await printPackFixture(h,owner,member)
+    const paperPack=(await h.api('printpack.issue',owner,{workOrder:paperWork.work,version:1})).id
+    const paperPdf=Buffer.from(await (await h.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:owner})).arrayBuffer())
+    const paperPreview=(await h.api('printpack.preview',owner,paperPayload(paperWork,paperPack,`${today}T00:00`))).id
+    const paperDraft=await h.api(`print-previews/${paperPreview}`,owner)
+    const paperAccept={preview:paperPreview,digest:paperDraft.digest,confirm:true}
+    const paperReceipt=(await h.api('printpack.accept',owner,paperAccept)).receipt
     const erasedRecords=await erasureFixture(h,owner,asset)
+    const paperSnapshot=await h.api(`work/${paperWork.work}`,owner)
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'recovery.rer')
     await h.installation.rer('export', '--output', archive)
@@ -69,7 +78,7 @@ export async function recoveryJourney() {
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')
     assert.ok(!bytes.includes(Buffer.from(credential.token)), 'service bearer secrets are absent from exports')
     const records = bytes.toString().trim().split('\n').map(line => JSON.parse(line))
-    for(const table of ['gk_conversations','gk_messages','gk_message_reads']) assert.ok(records[0].tables.some(row=>row.name===table),'the archive inventories direct messaging records')
+    for(const table of ['gk_print_packs','gk_print_previews','gk_print_entries','gk_conversations','gk_messages','gk_message_reads']) assert.ok(records[0].tables.some(row=>row.name===table),'the archive inventories direct messaging records')
     const archivedMessages=records.flatMap(record=>record.items??[]).filter(item=>item.kind==='row'&&item.table==='gk_messages')
     assert.deepEqual(archivedMessages.map(item=>item.row.body).sort(),['synthetic-gasket-recovery-message','synthetic-gasket-recovery-reply'])
     const subscriptions = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_connector_subscriptions')
@@ -90,6 +99,11 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
+      assert.equal((await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:owner})).status,303,'source sessions cannot open restored packs')
+      assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:signed})).arrayBuffer()),paperPdf,'immutable pack bytes reconcile after inactive restore')
+      assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-previews/${paperPreview}/original`,{cookie:signed})).arrayBuffer()),png,'the original paper bytes and digest reconcile')
+      assert.deepEqual((await restored.api('printpack.accept',signed,paperAccept)).receipt,paperReceipt,'durable receipt survives restore and makes a replay inert')
+      assert.deepEqual(await restored.api(`work/${paperWork.work}`,signed),paperSnapshot,'restore and replay duplicate no result or original')
       const restoredPlanning=await restored.api('planning',signed)
       const restoredGrant=(await restored.api('resource-records',signed)).grants.find(g=>g.id===stewardship)
       assert.equal(restoredGrant.active,0,'restoring an archive never reactivates stewardship')
@@ -161,6 +175,7 @@ export async function recoveryJourney() {
       const unchanged = await harness({ vars: h.vars, installation: target })
       try {
         const stillOwner = await unchanged.signIn(h.vars.OWNER_EMAIL)
+        assert.deepEqual((await unchanged.api('printpack.accept',stillOwner,paperAccept)).receipt,paperReceipt,'paper receipt remains durable after restored Worker restart')
         assert.deepEqual(await unchanged.api(`conversations/${direct}`,stillOwner),directOwner,'restored messaging remains durable after another Worker restart')
         assert.deepEqual(await unchanged.api('work?state=open', stillOwner), before, 'nonempty refusal writes no work')
         assert.deepEqual(await unchanged.api('schedules', stillOwner), schedules, 'nonempty refusal changes no PMs')

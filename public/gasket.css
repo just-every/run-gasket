@@ -575,3 +575,21 @@ td .gk-inline .gk-actions { margin: 0; }
 .gk-message-thread li { min-width: 0; }
 .gk-message-thread time { color: var(--rer-muted); font-size: 13px; }
 .gk-message-body { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Controlled paper originals preserve authored spacing and readable provenance. */
+.gk-paper-authored { white-space: pre-wrap; overflow-wrap: anywhere; }
+.gk-paper-digest { overflow-wrap: anywhere; font-size: 13px; }
+
+.gk-print-sheet { padding: 24px; background: white; color: #202124; font-size: 14px; }
+.gk-print-sheet table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.gk-print-sheet td { padding: 10px 0; border: 0; overflow-wrap: anywhere; }
+.gk-print-sheet thead td { font-size: 13px; }
+.gk-print-sheet h1 { font-size: 20px; }
+.gk-print-sheet h2 { font-size: 16px; }
+@media print {
+  @page { size: A4; margin: 16mm; }
+  .gk-print-sheet { padding: 0; }
+  .gk-print-sheet thead { display: table-header-group; }
+  .gk-print-sheet tr { break-inside: avoid; }
+  .gk-print-back { display: none; }
+}

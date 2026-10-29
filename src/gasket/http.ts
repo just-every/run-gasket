@@ -1,3 +1,6 @@
+import { printPackPage, printPreviewPage, printSheetPage } from './ui/print-packs'
+import { paperOriginal, printPackPdf } from './print-packs'
+import { printError, printText } from './print-catalog'
 import { messagesPage, conversationPage } from './ui/messages'
 import { displayLocale, intakeLanguage, intakeError, intakeCompleteness, languageCookie, type IntakeLanguage } from './languages'
 import { recordErasurePage } from './ui/record-erasure'
@@ -164,8 +167,17 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
       const t=language.text
       return languageCookie(await page(env,t('error_title'),null,h`<h1>${t('error_title')}</h1><p role="alert">${intakeError(language,code)}</p><p><a href="/request/${publicRequest[1]}">${t('back')}</a></p>`,{url,status,language}),request,actor)
     }
+    // Refused site selections never render a feature page or its primary-site shell.
+    if (code === 'site_not_found' || code === 'site_not_operational') {
+      if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
+      return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+    }
+    if (/print-packs|print-previews|printpack[.]/.test(url.pathname)) {
+      const locale=await displayLocale(env,actor,request), message=printError(locale,code)
+      if(api)return json({error:code,message},status)
+      return page(env,printText(locale)('title'),actor,h`<h1>${printText(locale)('title')}</h1><p role="alert">${message}</p>`,{url,status,language:await intakeLanguage(env,locale)})
+    }
     if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
-    if (code === 'site_not_found' || code === 'site_not_operational') return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
     if (code === 'work_snapshot_changed' || code === 'work_export_limit_exceeded') {
       const restart = new URLSearchParams([...url.searchParams].filter(([key]) => ['state', 'mine', 'team', 'tab', 'limit', 'all'].includes(key)))
       const limits = detail as { total?: number; limit?: number } | undefined
@@ -245,11 +257,16 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
     const receipt = `/app/save-receipts/${id}`
     const claimed = await beginSave(env, actor, id, name!)
     try {
-      if (!claimed) throw new GasketError('save_already_attempted', 409)
+      if (!claimed) {
+        if (!['printpack.preview','printpack.accept'].includes(name!)) throw new GasketError('save_already_attempted', 409)
+        // A durable paper retry cannot borrow a different member's receipt or a different action.
+        const prior = await readSave(env, actor, id)
+        if (prior.action !== name) throw new GasketError('save_already_attempted', 409)
+      }
       const result = await action(saveBindings(env, id), actor, input, request) as { id?: string; job?: string } | Response | null
       if (result instanceof Response) { await finishSave(env, id, 'saved'); return result }
       const destination = returnTo.replace('{id}', encodeURIComponent(result?.id ?? ''))
-      const notice = name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.'
+      const notice = name?.startsWith('printpack.') ? printText(await displayLocale(env,actor,request))('saved') : name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.'
       await finishSave(env, id, 'saved', destination)
       if (enhanced) return json({ saved: true, destination, notice, receipt })
       return redirect(destination, 'notice', notice)
@@ -257,7 +274,8 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
       const { code, status } = failure(error)
       if (claimed) await finishSave(env, id, 'failed')
       const outcome = await readSave(env, actor, id)
-      const message = `Save failed: ${describeError(code)} ${saveMessage(outcome)}`
+      const printLocale=name?.startsWith('printpack.') ? await displayLocale(env,actor,request) : null
+      const message = printLocale ? printError(printLocale,code) + ' ' + printText(printLocale)(outcome.batches ? 'unconfirmed':'none') : `Save failed: ${describeError(code)} ${saveMessage(outcome)}`
       const retry = outcome.state === 'failed' && outcome.batches === 0
       if (enhanced) return json({ saved: false, error: message, receipt, retry, nextSaveId: retry ? newId() : null }, status)
       if (!input.has('__gk_save') && !request.headers.has('referer') && status < 500) return redirect(returnTo.replace('/{id}', ''), 'error', code)
@@ -265,7 +283,7 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
       const source = referer.origin === url.origin && (referer.pathname === '/app' || referer.pathname.startsWith('/app/')) ? referer : new URL('/app', url.origin)
       try {
         const original = await pageResponse(env, actor, new Request(source), source)
-        const recovered = await failedForm(original, path, input, message, receipt, retry, status)
+        const recovered = await failedForm(original, path, input, message, receipt, retry, status, printLocale ? await intakeLanguage(env,printLocale) : undefined)
         if (recovered) return recovered
       } catch { /* A changed permission must not render a now-forbidden source page. */ }
       return page(env, 'Save failed', actor, h`<h1>Save failed</h1>${await retainedForm(path,input,message,receipt,retry)}`, { status })
@@ -293,6 +311,7 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  printSheet:printSheetPage, printPack:printPackPage, printPreview:printPreviewPage, printPackPdf:(env,actor,_url,id)=>printPackPdf(env,actor,id), paperOriginal:(env,actor,_url,id)=>paperOriginal(env,actor,id),
   messages: messagesPage, conversation: conversationPage,
   workCsv: async (env, actor, url) => new Response(await workCsv(env, actor, url), { headers: { 'content-type': ['text', 'csv'].join('/') + '; charset=utf-8', 'content-disposition': 'attachment; filename=work.csv', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
   language:languagePage,
