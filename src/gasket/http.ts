@@ -167,13 +167,17 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
       const t=language.text
       return languageCookie(await page(env,t('error_title'),null,h`<h1>${t('error_title')}</h1><p role="alert">${intakeError(language,code)}</p><p><a href="/request/${publicRequest[1]}">${t('back')}</a></p>`,{url,status,language}),request,actor)
     }
+    // Refused site selections never render a feature page or its primary-site shell.
+    if (code === 'site_not_found' || code === 'site_not_operational') {
+      if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
+      return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+    }
     if (/print-packs|print-previews|printpack[.]/.test(url.pathname)) {
       const locale=await displayLocale(env,actor,request), message=printError(locale,code)
       if(api)return json({error:code,message},status)
       return page(env,printText(locale)('title'),actor,h`<h1>${printText(locale)('title')}</h1><p role="alert">${message}</p>`,{url,status,language:await intakeLanguage(env,locale)})
     }
     if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
-    if (code === 'site_not_found' || code === 'site_not_operational') return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
     if (code === 'work_snapshot_changed' || code === 'work_export_limit_exceeded') {
       const restart = new URLSearchParams([...url.searchParams].filter(([key]) => ['state', 'mine', 'team', 'tab', 'limit', 'all'].includes(key)))
       const limits = detail as { total?: number; limit?: number } | undefined
