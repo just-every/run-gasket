@@ -42,7 +42,7 @@ records and imported text are untrusted. Multi-sponsor completion, outside mail,
 resource refresh and queued continuations remain unproved. Other native jobs,
 including purchasing, model calls and access administration, are not yet MCP
 tools. Their existing native doors retain their permissions and evidence
-requirements. The 0.2.88 subset journey checks the declared Core and typed
+requirements. The 0.2.91 subset journey checks the declared Core and typed
 refusals; it does not claim those wider jobs.
 
 ## Native agent proposals

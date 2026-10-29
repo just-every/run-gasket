@@ -28,7 +28,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     '## Limits',
     '',
-    'This Core adoption exposes the listed software jobs. It does not expose native purchasing, provider model runs, role administration, physical attestations, import, deployment or device operations as MCP jobs. Existing native screens and their permissions remain authoritative. Native maintenance events, resources, prompts and subscriptions are undeclared. Resource refresh, multi-sponsor completion, outside mail and queued continuations remain unproved. No cost reservation or provider call is registered. The 0.2.88 conformance journey checks Core jobs and typed refusals for omitted families.',
+    'This Core adoption exposes the listed software jobs. It does not expose native purchasing, provider model runs, role administration, physical attestations, import, deployment or device operations as MCP jobs. Existing native screens and their permissions remain authoritative. Native maintenance events, resources, prompts and subscriptions are undeclared. Resource refresh, multi-sponsor completion, outside mail and queued continuations remain unproved. No cost reservation or provider call is registered. The 0.2.91 conformance journey checks Core jobs and typed refusals for omitted families.',
     '',
     'The maintenance coordinator reads source records and stages proposals through the listed tools. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
     '',
