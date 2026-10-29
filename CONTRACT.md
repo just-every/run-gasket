@@ -1508,7 +1508,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 - **commitment:** a relied-on maintenance standard, work sign-off, signature, purchasing offer or accepted terms bind the business; facts include the record revision, value and counterparty.
 - **accounts:** an outside identity or paid connector resource is created; facts name provider and resource.
 - **gated:** the provider keeps consent, checkout, identity verification or personal terms for a person; facts name provider and step, including a provider response requiring that step.
-- **access:** a staff/site role, device, resource stewardship or service/agent grant changes; facts name people and widening or narrowing.
+- **access:** an actual membership, delegation, staff/site right, device, resource stewardship or service/agent grant changes standing authority; facts name people, rights and widening or narrowing. Site name, time zone and lead time alone do not change authority.
 - **security:** provider credentials or protective maintenance settings change; facts name the setting and authority.
 - **destructive:** a record, original file or stock, asset, resource or field identity cannot be recovered through product Undo, including irreversible retirement even when history remains readable; facts name affected items. A reversible draft cancellation remains standard.
 - **sensitive:** authorized qualification, identity, bank or pay records contain regulated personal data; facts name record count and data kind.
@@ -1516,7 +1516,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 | Tool | Does | Core clauses | Risk class | Today |
 | --- | --- | --- | --- | --- |
-| `gasket.site.configure` | Configure maintenance sites | GAS-01, ADMIN-001, ADMIN-002 | standard · access (+ external, money, live) | No MCP tool exposed |
+| `gasket.site.configure` | Configure maintenance sites | GAS-01, ADMIN-001, ADMIN-002 | standard (+ access, external, money, live) | No MCP tool exposed |
 | `gasket.resources.manage` | Grant scoped stewardship and maintain qualifications and tools | PLAN-010 | standard or access (+ sensitive, destructive, live) | No MCP tool exposed |
 | `gasket.members.manage` | Manage maintenance roles and memberships | ADMIN-003, ADMIN-004 | access (+ external) | No MCP tool exposed |
 | `gasket.identity.configure` | Configure provider identity and sign-in | ADMIN-005, ADMIN-014, ADMIN-015 | access · security (+ external, accounts, gated) | No MCP tool exposed |
@@ -1626,7 +1626,7 @@ Inherits BASE-AGENT-001 to BASE-AGENT-013. The company’s policy decides every 
 
 **Acceptance.**
 1. Create an outside connector resource and inspect accounts with its provider; a provider-retained consent or identity step adds gated with provider and step.
-2. Change a staff/site/device/resource grant and inspect access with the affected people and widening or narrowing direction.
+2. Change a membership, delegation or staff/site/device/resource right and inspect access with the affected people and widening or narrowing direction; edit only the site name, time zone or lead time and inspect no access while retaining each other applicable class.
 3. Rotate a maintenance provider credential, change a protective maintenance setting or authorize a scoped exception to the qualification/tool planning block and inspect security with its setting.
 4. Erase eligible maintenance originals or irreversibly retire an asset, resource or field identity and inspect destructive with item counts; retained history stays readable and a reversible draft change remains standard.
 5. Read a regulated qualification, identity, bank or pay record and inspect sensitive with count and kind.

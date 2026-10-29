@@ -2027,7 +2027,7 @@ Agent surface · target · **missing** · From new · Cites BASE-AGENT-005, BASE
 
 **Acceptance.**
 1. Create an outside connector resource and inspect accounts with its provider; a provider-retained consent or identity step adds gated with provider and step.
-2. Change a staff/site/device/resource grant and inspect access with the affected people and widening or narrowing direction.
+2. Change a membership, delegation or staff/site/device/resource right and inspect access with the affected people and widening or narrowing direction; edit only the site name, time zone or lead time and inspect no access while retaining each other applicable class.
 3. Rotate a maintenance provider credential, change a protective maintenance setting or authorize a scoped exception to the qualification/tool planning block and inspect security with its setting.
 4. Erase eligible maintenance originals or irreversibly retire an asset, resource or field identity and inspect destructive with item counts; retained history stays readable and a reversible draft change remains standard.
 5. Read a regulated qualification, identity, bank or pay record and inspect sensitive with count and kind.
