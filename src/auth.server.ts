@@ -1,3 +1,4 @@
+import { attributedDatabase, withAccountAuthority } from './gasket/authority-audit'
 import { createDependencies } from './modules/dependencies/index.mjs'
 import { createIdpOwnerClaimHandler, createOwnerClaimHandler } from './modules/owner-claim/index.mjs'
 import { firstRunResponse } from './base/setup'
@@ -48,7 +49,16 @@ export interface Bindings {
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env
 export const authConfig = (env: Bindings): AuthConfig => ({ dependencies: true, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true', OWNER_EMAIL: env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN, MAIL_FROM: env.MAIL_FROM, branding: { productName: branding.name, accentColor: branding.primaryColor, signInPath: '/signin', theme: theme.href } })
 export function operatorAuth(env: Bindings) {
- return createOperatorAuth({ db: env.DB, config: authConfig(env), mailSender: operatorMail(env), clientIp: request => request.headers.get('CF-Connecting-IP') ?? '' })
+ const auth = createOperatorAuth({ db: attributedDatabase(env.DB), config: authConfig(env), mailSender: operatorMail(env), clientIp: request => request.headers.get('CF-Connecting-IP') ?? '' })
+ const attributed = async <T,>(request: Request, action: string, run: () => Promise<T>) => {
+  const session = await auth.getSession(request)
+  if (!session) return run()
+  return withAccountAuthority(env.DB, session.operator.id, action, run)
+ }
+ return { ...auth,
+  setRole: (request: Request, operator: string, role: 'owner' | 'member') => attributed(request, 'operator.role', () => auth.setRole(request, operator, role)),
+  setOperatorStatus: (request: Request, operator: string, status: 'active' | 'inactive') => attributed(request, 'operator.status', () => auth.setOperatorStatus(request, operator, status)),
+ }
 }
 
 const privateHeaders = { 'cache-control': 'no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex, nofollow' }
