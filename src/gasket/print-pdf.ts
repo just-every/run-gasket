@@ -2,8 +2,7 @@ import { PDFDocument, rgb } from 'pdf-lib'
 import fontkit from '@pdf-lib/fontkit'
 import fontData from '../../public/fonts/inter/inter-report.ttf?inline'
 import { insist } from './core'
-import { printText } from './print-catalog'
-import { lineOf } from './steps'
+import { printText, printStepLine } from './print-catalog'
 import type { PackContent } from './print-packs'
 
 /** Fixed printable pages repeat the immutable identity; authored text is wrapped, never truncated. */
@@ -29,7 +28,7 @@ export async function printPdf(content: PackContent, digest: string) {
   line(`${t('issued')}: ${new Date(content.issuedAt).toISOString()}`)
   line(t('warning')); line(t('limitations'))
   line(t('instructions'),15); line(content.instructions)
-  for (const [i,step] of content.steps.entries()) { line(`${i+1}. ${lineOf(step,content.steps)}`); line(`${t('notes')}: ______________________________________`); line('____________________________________________________') }
+  for (const [i,step] of content.steps.entries()) { line(`${i+1}. ${printStepLine(content.locale,step,content.steps)}`); line(`${t('notes')}: ______________________________________`); line('____________________________________________________') }
   line(`${t('performed')}: ___________________________________`)
   const pages=pdf.getPages()
   for(const [i,p] of pages.entries()) {

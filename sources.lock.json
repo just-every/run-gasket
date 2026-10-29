@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "4bacaa485b6eb3bfe959b6dad8678a820dc065b87a8fec9b2920e7d54a62aad2",
+      "sha256": "ec11ec8e462f42dbd1e621f57aa1eef9f891b030ca671959d59a93bbc5521f35",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -200,7 +200,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c1ef11bdca2a7df8942725b67e6185dd44f2185e90e927f9b049fbc05419709e",
+      "sha256": "cc99b1de976e348467556a671c1404199f9092faa1c6b5aa749f48ec87c9f62f",
       "executable": false
     },
     "DEMO.md": {
@@ -1744,7 +1744,7 @@
       "executable": false
     },
     "src/gasket/print-catalog.ts": {
-      "sha256": "550a9f259aa9354cc18d779f264807e133f2774fc949822958531c04ae684f18",
+      "sha256": "9c393782fe528c77cbe335d6ac5e633f98174b3ab7fa153a2335a400a8508255",
       "executable": false
     },
     "src/gasket/print-packs.ts": {
@@ -1752,7 +1752,7 @@
       "executable": false
     },
     "src/gasket/print-pdf.ts": {
-      "sha256": "6678b1b6f9eecb1db8185a5aa04c5b80956d39203a7df6deded10def712f94e8",
+      "sha256": "44c0586f482f61cf2890abd5b8cc789419e33946f2fb641b958ac658d43b2407",
       "executable": false
     },
     "src/gasket/proposals.ts": {
@@ -2168,7 +2168,7 @@
       "executable": false
     },
     "src/gasket/ui/print-packs.ts": {
-      "sha256": "bfb4ff6dd2186142e2f104937936c0fcd180f616a68e9c862a8835d5d6b0e497",
+      "sha256": "87aee37f5533a128927371f5bfac787dd1eef8b6121d9a673f8f1341880ee934",
       "executable": false
     },
     "src/gasket/ui/proposals.ts": {
@@ -4312,7 +4312,7 @@
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {
-      "sha256": "542fd26c45caf53231ff30a47c7d8515e229da6763ced85a905b64a7cfd9a9fc",
+      "sha256": "07960d97d5de526afc82b080d8f941dfcdde83238b83c63eb7217d1d2448f4e9",
       "executable": false
     },
     "tests/gasket/purchase-orders.mjs": {
@@ -4444,7 +4444,7 @@
       "executable": false
     },
     "tests/gasket/work-pagination.mjs": {
-      "sha256": "1c3491728c37396a812f68289b3a3f2bd695ccf17d0f6f190a2ae25f50a7a1b4",
+      "sha256": "9951051ce8976db113bc6f3f820379f8b0be35a1554a4ca29cc936266333c42c",
       "executable": false
     },
     "tests/gasket/work-pdf.mjs": {

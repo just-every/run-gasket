@@ -1,4 +1,5 @@
 import type { Locale } from './languages'
+import { kindOf, type ChecklistItem } from './steps'
 const en = {
   printView:'Browser print view', title: 'Controlled print packs', issue: 'Issue print pack', open: 'Open print pack', download: 'Download printable PDF',
   entry: 'Enter paper results', preview: 'Preview paper entry', confirm: 'Accept paper entry', back: 'Back to work',
@@ -19,6 +20,10 @@ const en = {
   error_invalid: 'Check the results, performed time and supported paper original. No paper entry was accepted.',
   error_generic: 'The paper action could not be confirmed. Inspect its receipt before retrying.',
   page: 'Page', instructions: 'Instructions', notes: 'Results and notes',
+  step_check: 'Pass, needs attention or fail', step_text: 'Text', step_photo: 'Photo required',
+  step_number: 'Number in {unit}', step_range: ', {min} to {max}', step_min: ', at least {min}', step_max: ', at most {max}',
+  step_options: 'One of: {options}', step_failure: '; fails: {options}', step_when: '; only when step {step} is {answer}',
+  step_inside: 'within its limits', step_outside: 'outside its limits',
 } as const
 const es: Record<keyof typeof en, string> = {
   printView:'Vista de impresión del navegador',title:'Paquetes de impresión controlados',issue:'Emitir paquete impreso',open:'Abrir paquete impreso',download:'Descargar PDF imprimible',
@@ -40,9 +45,36 @@ const es: Record<keyof typeof en, string> = {
   error_invalid:'Revise los resultados, la hora de realización y el original en papel admitido. No se aceptó ninguna entrada en papel.',
   error_generic:'No se pudo confirmar la acción en papel. Consulte su recibo antes de reintentar.',
   page:'Página',instructions:'Instrucciones',notes:'Resultados y notas',
+  step_check:'Aprobado, requiere atención o falló',step_text:'Texto',step_photo:'Foto obligatoria',
+  step_number:'Número en {unit}',step_range:', de {min} a {max}',step_min:', al menos {min}',step_max:', como máximo {max}',
+  step_options:'Una de: {options}',step_failure:'; falla: {options}',step_when:'; condición del paso {step}: {answer}',
+  step_inside:'dentro de sus límites',step_outside:'fuera de sus límites',
 }
 export type PrintKey = keyof typeof en
 export const printText = (locale: Locale) => (key: PrintKey) => (locale === 'es-US' ? es : en)[key]
+
+/** Translate interface guidance while retaining authored step labels, units and choices. */
+export function printStepSummary(locale: Locale, step: ChecklistItem, steps: ChecklistItem[]) {
+  const t=printText(locale)
+  const format=(key:PrintKey,values:Record<string,string>)=>t(key).replace(/\{(\w+)\}/g,(_,name)=>values[name])
+  const kind=kindOf(step)
+  let summary:string=kind==='check'?t('step_check'):kind==='photo'?t('step_photo'):kind==='text'?t('step_text'):
+    kind==='option'?format('step_options',{options:step.options!.join(', ')}):format('step_number',{unit:step.unit!})
+  if(kind==='number') {
+    if(step.min!==undefined&&step.max!==undefined)summary+=format('step_range',{min:step.min,max:step.max})
+    else if(step.min!==undefined)summary+=format('step_min',{min:step.min})
+    else if(step.max!==undefined)summary+=format('step_max',{max:step.max})
+  }
+  if(step.failOn?.length)summary+=format('step_failure',{options:step.failOn.join(', ')})
+  if(step.when) {
+    const at=steps.findIndex(other=>other.key===step.when!.step),earlier=kindOf(steps[at]),value=step.when.is
+    const answer=earlier==='option'?value:earlier==='number'?t(value==='pass'?'step_inside':'step_outside'):
+      t(value==='attention'?'attention':value==='pass'?'pass':'fail')
+    summary+=format('step_when',{step:String(at+1),answer})
+  }
+  return summary
+}
+export const printStepLine=(locale:Locale,step:ChecklistItem,steps:ChecklistItem[])=>`${step.text} · ${printStepSummary(locale,step,steps)}`
 export function printError(locale: Locale, code: string) {
   const key = /access|forbidden|not_your_work|authentication|not_a_member|save_receipt_not_found/.test(code) ? 'error_access'
     : /stale|pack_mismatch|work_order_not_open/.test(code) ? 'error_stale'

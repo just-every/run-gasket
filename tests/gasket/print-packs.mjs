@@ -12,7 +12,7 @@ const address=name=>[name,'example.test'].join(String.fromCharCode(64))
 const instant=Date.parse('2026-10-15T12:00:00Z')
 export async function printPackFixture(h,owner,assignee,{rich=false}={}) {
   const label=randomUUID().slice(0,8),today=(await h.api('me',owner)).today
-  const steps=rich?['Inspect guard','Describe the work | text','Measure clearance | number mm 0..10','Photograph fitted guard | photo']:['Inspect guard']
+  const steps=rich?['Inspect guard','Describe the work | text','Measure clearance | number mm 0..10','Photograph fitted guard | photo','Choose condition | options Ready as authored, Inspect again | fail on Inspect again | when step 3 is pass']:['Inspect guard']
   const checklist=(await h.api('checklist.create',owner,{name:`Paper inspection ${label}`,items:steps})).id
   const instructions=rich?('Inspect without altering the authored instruction: válvula, 12 USD, 7 mm.\n'.repeat(22)).trim():'Keep the authored instruction: válvula, 12 USD, 7 mm.'
   const template=(await h.api('template.save',owner,{name:`Paper template ${label}`,title:'Synthetic paper inspection',instructions,checklist})).id
@@ -23,7 +23,7 @@ export async function printPackFixture(h,owner,assignee,{rich=false}={}) {
 export function paperPayload(fixture,pack,performedOn) {
   const count=fixture.detail.items.length
   return {pack,workOrder:fixture.work,version:fixture.detail.version,submissionKey:randomUUID(),performedOn,
-    outcome:Array.from({length:count},(_,i)=>i===0?'pass':''),value:Array.from({length:count},(_,i)=>i===1?'Authored paper result: válvula.':i===2?'5':''),
+    outcome:Array.from({length:count},(_,i)=>i===0?'pass':''),value:Array.from({length:count},(_,i)=>i===1?'Authored paper result: válvula.':i===2?'5':i===4?'Ready as authored':''),
     note:Array.from({length:count},(_,i)=>i===0?'Original paper note.':''),original:file('synthetic-gasket-paper.png',png,['image','png'].join('/'))}
 }
 async function pdfText(bytes) {
@@ -69,6 +69,15 @@ export async function printPacksJourney() {
     }
     assert.ok(pages.join(' ').includes('válvula, 12 USD, 7 mm.'))
     assert.ok(pages.join(' ').includes('no concede acceso'))
+    const spanishHints=['Aprobado, requiere atención o falló','Texto','Número en mm, de 0 a 10','Foto obligatoria','Una de: Ready as authored, Inspect again; falla: Inspect again; condición del paso 3: dentro de sus límites']
+    for(const hint of spanishHints)assert.ok(pages.join(' ').replace(/\s/g,'').includes(hint.replace(/\s/g,'')),`the issued Spanish PDF explains ${hint} without translating authored choices`)
+    const packPage=await (await h.raw(`/app/print-packs/${issued.id}`,{cookie:cookies.tech})).text()
+    for(const hint of spanishHints)assert.ok(packPage.includes(hint),'Spanish online re-entry explains each supported checklist kind')
+    await h.api('language.preference',cookies.tech,{locale:'en-US'})
+    const englishPage=await (await h.raw(`/app/print-packs/${issued.id}`,{cookie:cookies.tech})).text()
+    assert.ok(englishPage.includes('Number in mm, 0 to 10')&&englishPage.includes('only when step 3 is within its limits'))
+    assert.deepEqual(Buffer.from(await (await h.raw(pdfPath,{cookie:cookies.tech})).arrayBuffer()),bytes,'a later display preference never changes issued printable content')
+    await h.api('language.preference',cookies.tech,{locale:'es-US'})
     await h.api('checklist.revise',owner,{checklist:f.checklist,items:['Replacement instruction'],note:'New master revision'})
     await h.api('template.save',owner,{template:f.template,revision:1,name:(await h.api('templates',owner)).find(t=>t.id===f.template).name,title:'Replacement title',instructions:'Replacement instructions',checklist:f.checklist})
     assert.deepEqual(Buffer.from(await (await h.raw(pdfPath,{cookie:cookies.tech})).arrayBuffer()),bytes,'master edits never change issued printable bytes')
@@ -83,7 +92,7 @@ export async function printPacksJourney() {
     assert.match(invalid.message,/Revise los resultados/)
     const preview=(await h.api('printpack.preview',cookies.tech,payload)).id
     assert.equal((await h.api('printpack.preview',cookies.tech,payload)).id,preview)
-    await h.api('printpack.preview',cookies.tech,{...payload,note:['changed','','','']},409)
+    await h.api('printpack.preview',cookies.tech,{...payload,note:payload.note.map((note,i)=>i===0?'changed':note)},409)
     await h.api('printpack.preview',cookies.tech,{...payload,original:file('synthetic-gasket-paper.png',Buffer.from('different paper'))},409)
     const draft=await h.api(`print-previews/${preview}`,cookies.tech)
     assert.equal(draft.originalDigest,sha(png));assert.equal(draft.payload.performedOn,'2026-10-15T10:30')
@@ -231,9 +240,23 @@ async function nativePrintBrowser(h,cookie,id,pack) {
     await context.addCookies(cookie.split('; ').map(pair=>{const at=pair.indexOf('=');return{name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
     const page=await context.newPage();await page.goto(h.origin+`/app/print-packs/${id}/print`)
     assert.equal(await page.locator('.gk-paper-authored').allTextContents().then(lines=>lines.join('\n')),pack.content.instructions)
+    assert.match(await page.locator('tbody').innerText(),/Número en mm, de 0 a 10/)
+    assert.match(await page.locator('tbody').innerText(),/condición del paso 3: dentro de sus límites/)
     const printed=await page.pdf({format:'A4',printBackground:true,preferCSSPageSize:true}),pages=await pdfText(printed)
     assert.ok(pages.length>1)
     for(const text of pages)assert.ok(text.includes(id)&&text.includes(pack.content.workNumber)&&text.includes('Versión del trabajo 1')&&text.includes('Revisión de la lista 1'))
+    assert.ok(pages.join(' ').includes('Una de: Ready as authored, Inspect again'))
+    if(process.env.PRINT_SCREENSHOTS) {
+      await mkdir(process.env.PRINT_SCREENSHOTS,{recursive:true})
+      await writeFile(`${process.env.PRINT_SCREENSHOTS}/typed-browser-print.pdf`,printed)
+      for(const width of [1440,390]) {
+        await page.setViewportSize({width,height:1000})
+        await page.screenshot({path:`${process.env.PRINT_SCREENSHOTS}/typed-browser-print-${width}.png`,fullPage:true})
+        await page.goto(h.origin+`/app/print-packs/${id}`)
+        await page.screenshot({path:`${process.env.PRINT_SCREENSHOTS}/typed-paper-entry-${width}.png`,fullPage:true})
+        await page.goto(h.origin+`/app/print-packs/${id}/print`)
+      }
+    }
     await context.close()
   }finally {await browser.close()}
 }

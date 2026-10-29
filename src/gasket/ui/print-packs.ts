@@ -2,9 +2,9 @@ import type { Bindings } from '../../auth.server'
 import type { Actor } from '../actor'
 import { newId } from '../core'
 import { languagePreferences, intakeLanguage } from '../languages'
-import { printText } from '../print-catalog'
+import { printText, printStepLine, printStepSummary } from '../print-catalog'
 import { readPrintPack, readPrintPreview, workPrintPacks } from '../print-packs'
-import { kindOf, lineOf } from '../steps'
+import { kindOf } from '../steps'
 import { h, card, form, hidden, field, area, fileField, select, backLink } from './html'
 import { page } from './shell'
 
@@ -17,7 +17,7 @@ export async function printPackCard(env: Bindings, actor: Actor, work: {id:strin
 export async function printPackPage(env: Bindings, actor: Actor, url: URL, id: string) {
   const pack=await readPrintPack(env,actor,id), c=pack.content, locale=(await languagePreferences(env,actor)).effective,
     t=printText(locale),language=await intakeLanguage(env,locale)
-  const fields=c.steps.map((step,i)=>h`<fieldset><legend>${i+1}. ${step.text}</legend><p>${lineOf(step,c.steps)}</p>
+  const fields=c.steps.map((step,i)=>h`<fieldset><legend>${i+1}. ${step.text}</legend><p>${printStepSummary(locale,step,c.steps)}</p>
     ${kindOf(step)==='photo'?'':kindOf(step)==='check'?select(t('result'),`outcome-${i}`,[{value:'pass',label:t('pass')},{value:'attention',label:t('attention')},{value:'fail',label:t('fail')}],'',{required:false,blank:t('blank')}):kindOf(step)==='option'?select(t('value'),`value-${i}`,step.options!.map(value=>({value,label:value})),'',{required:false,blank:t('blank')}):field(t('value'),`value-${i}`,{required:false})}
     ${kindOf(step)==='photo'?'':area(t('note'),`note-${i}`,{required:false})}</fieldset>`)
   return page(env,t('title'),actor,h`${backLink(`/app/work/${c.work}`,t('back'))}<h1>${t('title')}</h1>
@@ -25,7 +25,7 @@ export async function printPackPage(env: Bindings, actor: Actor, url: URL, id: s
     <p><code>${id}</code></p><p>${t('issuer')}: ${c.issuerName} · ${t('issued')}: ${new Date(c.issuedAt).toISOString()}</p>
     <p>${t('digest')}: <code class="gk-paper-digest">${pack.contentDigest}</code></p>
     <p><a class="gk-button gk-secondary" href="/app/print-packs/${id}/pack.pdf">${t('download')}</a> · <a href="/app/print-packs/${id}/print">${t('printView')}</a></p>
-    ${card(c.title,h`<div class="gk-paper-authored">${c.instructions}</div><ol>${c.steps.map(step=>h`<li>${lineOf(step,c.steps)}</li>`)}</ol>`)}
+    ${card(c.title,h`<div class="gk-paper-authored">${c.instructions}</div><ol>${c.steps.map(step=>h`<li>${printStepLine(locale,step,c.steps)}</li>`)}</ol>`)}
     <p>${t('warning')}</p><p>${t('limitations')}</p>
     ${pack.canEnter?card(t('entry'),form('printpack.preview','/app/print-previews/{id}',h`${hidden('pack',id)}${hidden('workOrder',c.work)}${hidden('version',c.workVersion)}${hidden('submissionKey',newId())}${fields}
       ${field(t('performed'),'performedOn',{type:'datetime-local',hint:t('performedHint')})}${fileField(t('paper'),'original',{required:true,accept:'.pdf,.png,.jpg,.jpeg',hint:'PDF, PNG, JPEG · 1.5 MB'})}`,t('preview'),{multipart:true})):
@@ -52,7 +52,7 @@ export async function printSheetPage(env: Bindings, actor: Actor, _url: URL, id:
     <body class="gk-print-sheet"><a class="gk-print-back" href="/app/print-packs/${id}">${t('open')}</a><table><thead><tr><td>${identity}</td></tr></thead><tbody>
     <tr><td><h1>${c.title}</h1><p>${t('issuer')}: ${c.issuerName} · ${new Date(c.issuedAt).toISOString()}</p><p>${t('warning')}</p><p>${t('limitations')}</p></td></tr>
     ${c.instructions.replace(/\r\n?/g,'\n').split('\n').map(line=>h`<tr><td class="gk-paper-authored">${line}</td></tr>`)}
-    ${c.steps.map((step,i)=>h`<tr><td><h2>${i+1}. ${step.text}</h2><p>${lineOf(step,c.steps)}</p><p>${t('notes')}: ___________________________________</p><p>________________________________________________</p></td></tr>`)}
+    ${c.steps.map((step,i)=>h`<tr><td><h2>${i+1}. ${step.text}</h2><p>${printStepSummary(c.locale,step,c.steps)}</p><p>${t('notes')}: ___________________________________</p><p>________________________________________________</p></td></tr>`)}
     <tr><td><p>${t('performed')}: ___________________________________</p></td></tr></tbody></table></body></html>`
   return new Response(body.html,{headers:{'content-type':['text','html'].join('/')+'; charset=utf-8','cache-control':'private, no-store','x-content-type-options':'nosniff','content-security-policy':"default-src 'none'; style-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'"}})
 }
