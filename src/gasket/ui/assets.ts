@@ -28,7 +28,7 @@ type Level = { key: string; label: string; retired: boolean }
 const levels = (catalog: Level[], kept?: string) => catalog.filter(level => !level.retired || level.key === kept).map(level => ({ value: level.key, label: level.retired ? `${level.label} (retired)` : level.label }))
 const identityFields = (catalog: Level[], asset: Record<string, any> = {}) => h`<div class="gk-grid">
   ${field('Asset tag', 'tag', { value: asset.tag ?? '', hint: 'The label on the equipment.' })}${field('Name', 'name', { value: asset.name ?? '' })}
-  ${field('Serial', 'serial', { value: asset.serial ?? '', required: false })}${field('Location', 'location', { value: asset.location ?? '' })}
+  ${field('Model', 'model', { value: asset.model ?? '', required: false })}${field('Serial', 'serial', { value: asset.serial ?? '', required: false })}${field('Location', 'location', { value: asset.location ?? '' })}
   ${field('Custodian', 'custodian', { value: asset.custodian ?? '', required: false, hint: 'The person responsible for it day to day.' })}${field('Category', 'category', { value: asset.category ?? '', required: false })}
   ${select('Criticality', 'criticality', levels(catalog, asset.criticality), asset.criticality ?? 'normal')}</div>${area('Notes', 'notes', { value: asset.notes ?? '', required: false })}`
 
@@ -41,7 +41,7 @@ export async function assetsPage(env: Bindings, actor: Actor, url: URL) {
   const catalog = await codeList(env, 'criticality')
   const list = rows.length ? table(['Asset', 'Location', 'Custodian', 'Criticality', 'Status', 'Next due', 'Last sighting'], rows.map(row => {
     const [outcome, at] = (row.last_sighting ?? '').split('|')
-    return [h`<span class="gk-with-art">${assetMark(row)}<span><a href="/app/assets/${row.id}">${row.name}</a><span class="gk-sub">${row.tag}${row.serial ? ` · ${row.serial}` : ''} · ${LEVEL_LABELS[row.level as Tier]}${row.parent_tag ? ` in ${row.parent_tag}` : ''}${row.origin === 'import' ? ' · moved in' : ''}</span></span></span>`, row.location, row.custodian ?? '—',
+    return [h`<span class="gk-with-art">${assetMark(row)}<span><a href="/app/assets/${row.id}">${row.name}</a><span class="gk-sub">${row.tag}${row.model ? ` · ${row.model}` : ''}${row.serial ? ` · ${row.serial}` : ''} · ${LEVEL_LABELS[row.level as Tier]}${row.parent_tag ? ` in ${row.parent_tag}` : ''}${row.origin === 'import' ? ' · moved in' : ''}</span></span></span>`, row.location, row.custodian ?? '—',
       row.criticality_label ?? row.criticality, h`${tag(STATUS[row.status])}${row.conflicts ? h`<span class="gk-sub">${tag('Evidence disagrees')}</span>` : ''}`, showDate(row.next_due),
       outcome ? h`${tag(outcome === 'found' ? 'Found' : outcome === 'elsewhere' ? 'Found elsewhere' : 'Missing')}<span class="gk-sub">${showInstant(Number(at), actor.zone)}</span>` : h`<span class="gk-muted">Never</span>`]
   }), 'Assets', { wrap: [1, 2] }) : h`<div class="gk-empty"><img src="/brand/assets/plinth.svg" alt="" width="360" height="244"><h2>No assets yet</h2><p>${manage ? 'Register the equipment you maintain below, or move in your MaintainX asset export.' : 'A maintenance lead registers the site\'s equipment.'}</p>${manage ? h`<p><a class="gk-button gk-secondary" href="/app/move-in">Move in from MaintainX</a></p>` : ''}</div>`
@@ -58,7 +58,7 @@ export async function assetPage(env: Bindings, actor: Actor, id: string, url: UR
   // PLAN-006: opening the page reads its thread; the card still marks what was unread.
   await readThread(env, actor, 'asset', asset.id)
   const band = headerBand({ id: 'asset-name', eyebrow: `${asset.tag}${asset.category ? ` · ${asset.category}` : ''}`, title: asset.name,
-    facts: [`Serial ${asset.serial ?? '—'}`, asset.location, `Custodian: ${asset.custodian ?? '—'}`], status: tag(STATUS[asset.status]),
+    facts: [`Model ${asset.model ?? 'unknown'}`, `Serial ${asset.serial ?? '—'}`, asset.location, `Custodian: ${asset.custodian ?? '—'}`], status: tag(STATUS[asset.status]),
     meta: [{ label: 'Criticality', value: asset.criticality_label ?? asset.criticality }, { label: 'Downtime recorded', value: `${downtimeMinutes} minutes` }],
     art: machine(asset, 'band') })
   const meters = card('Meters', h`${asset.meters.length ? table(['Meter', 'Latest'], asset.meters.map((meter: any) => [h`${meter.name}<span class="gk-sub">${meter.kind === 'counter' ? 'Counter' : meter.kind === 'gauge' ? 'Gauge' : 'Condition'}</span>`,
