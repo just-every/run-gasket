@@ -791,6 +791,10 @@
       "sha256": "ef3e9f959f969fd6d977691e44f1ff4546aeffd394275ff64125f221f398aca7",
       "executable": false
     },
+    "migrations/core/0110_agent_asset_undo.sql": {
+      "sha256": "98eea7460426c7ca10df8dcf6b13bd598ef2a056cff74c87209ca64410a62aa4",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "5d20f1bd0c24def0cd6c1165d1a58d0472ad0f02f2b60047014bda962eaf4274",
       "executable": false
@@ -1419,6 +1423,10 @@
       "sha256": "ffd53df4f9f76d6357570bf637763088ee683dcd510630636ddb80b73db3a428",
       "executable": false
     },
+    "src/gasket/agent-door/asset-undo.ts": {
+      "sha256": "8cd2a553cb38fe3325b6fe003b0e70ea313e9ef0c0da6be0d8cd99631bc1e870",
+      "executable": false
+    },
     "src/gasket/agent-door/business.ts": {
       "sha256": "b1580a0c6b0d27372917b4f09f86d3dfe142c09b78e597d95b6f6fbd179ca6fa",
       "executable": false
@@ -1432,11 +1440,11 @@
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
-      "sha256": "2aecf42793ec5aebfcac0b304214b87445fbb9145823a4c455e428d5a18c36e1",
+      "sha256": "20a595d3b462a45f4ff98540b7aebff25a0f3f7a9030763811178479dab814c0",
       "executable": false
     },
     "src/gasket/agent-door/native.ts": {
-      "sha256": "fb8de1b851b3ff1633b4ad7ff70452f60142f707bd5611ee1dd2b778dfa16c89",
+      "sha256": "f18ae30db336222aee973eafa780513e093544bfccefa2933a277faac28238c5",
       "executable": false
     },
     "src/gasket/agent-door/people.ts": {
@@ -1452,7 +1460,7 @@
       "executable": false
     },
     "src/gasket/agent-door/tools.ts": {
-      "sha256": "02a0ebe9ebf0eac37f99df3c7847fbf8f1924152c77dfa6c4ebdbcb4423a2a50",
+      "sha256": "ec573aa30a277b5ad016e2f5177e9f6263b2a537628940d280d8d32da5f92124",
       "executable": false
     },
     "src/gasket/agent-follow-up.ts": {
@@ -1488,7 +1496,7 @@
       "executable": false
     },
     "src/gasket/assets.ts": {
-      "sha256": "3fd56040fef0b14885627769238b04b6f834195e8d024842ad12215931e4b625",
+      "sha256": "2c1bd97a8b065a98ae962131c60327ae6b974abcc9c9600611e55eff082f2333",
       "executable": false
     },
     "src/gasket/attachment-erasure.ts": {
@@ -1656,7 +1664,7 @@
       "executable": false
     },
     "src/gasket/history.ts": {
-      "sha256": "bf9b63eb501d6f41260931497820601f5b3dfc18b4d4b44881470f5067093b43",
+      "sha256": "9c41101af03cf24319b093a438c7b90b0d7881c7ac85a77c550c9aaf19410336",
       "executable": false
     },
     "src/gasket/http.ts": {

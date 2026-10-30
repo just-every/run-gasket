@@ -5,6 +5,7 @@ import { actions } from '../actions'
 import { Input } from '../input'
 import { one } from '../core'
 import { object, text, standard } from './records'
+import { undoAssetEffect } from './asset-undo'
 import { nativeCall } from './native'
 
 const identity = { tag: text, name: text, location: text, serial: text, custodian: text, category: text, criticality: { type: 'string', enum: ['normal','important','critical'] }, notes: text }
@@ -37,12 +38,14 @@ export function mutationTools(env: Bindings): ToolDefinition[] {
         const record = await resolve(args, ctx)
         return { target: { ...(record?.id ? { id: record.id } : {}), name: String(record?.name ?? record?.title ?? args.name ?? args.title ?? def.target) }, items: Object.keys(def.properties).filter(key => args[key] !== undefined && !['asset','workOrder','revision'].includes(key)).map(key => `${key}: ${typeof args[key] === 'string' ? args[key] : JSON.stringify(args[key])}`), ...(args.assignee ? { recipients: [String(args.assignee)] } : {}) }
       },
+      ...(def.action === 'asset.update' ? { undo: (saved, ctx) => undoAssetEffect(env, saved, ctx) } satisfies Pick<ToolDefinition, 'undo'> : {}),
       async run(args, ctx) {
         // Pick only the declared native arguments; neither policy hints nor door metadata reach the action.
         const input = Object.fromEntries(Object.keys(def.properties).filter(key => args[key] !== undefined).map(key => [key, args[key]]))
         const result = await nativeCall(env, ctx, actor => actions[def.action](env, actor, Input.of(input), new Request(`${env.AUTH_ORIGIN}/api/gasket/${def.action}`, { method: 'POST', headers: { origin: env.AUTH_ORIGIN } })), true)
-        const id = (result as { id?: string })?.id
-        return { result, ...(id && ['asset','work','part'].includes(def.target) ? { resources: [{ uri: `gasket://${def.target === 'asset' ? 'assets' : def.target === 'part' ? 'parts' : 'work'}/${id}`, name: def.target }] } : {}) }
+        const { undo, ...nativeResult } = result as { id?: string; undo?: unknown }
+        const id = nativeResult.id
+        return { result: nativeResult, ...(undo ? { undo } : {}), ...(id && ['asset','work','part'].includes(def.target) ? { resources: [{ uri: `gasket://${def.target === 'asset' ? 'assets' : def.target === 'part' ? 'parts' : 'work'}/${id}`, name: def.target }] } : {}) }
       },
     }
   })

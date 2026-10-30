@@ -1,7 +1,9 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
+import type { UndoContext } from '../../modules/agent-door/index.ts'
 import type { ToolContext, Person } from '../../modules/agent-door/index.ts'
 import { ToolRefusal } from '../../modules/agent-door/index.ts'
 import type { Bindings } from '../../auth.server'
-import { type Actor, type Role, siteZone } from '../actor'
+import { currentActor, requireCapability, type Actor, type Role, siteZone } from '../actor'
 import { GasketError, one } from '../core'
 import { today } from '../dates'
 import { authorizeOperationalSite } from '../site-access'
@@ -33,6 +35,25 @@ export async function nativeCall<T>(env: Bindings, ctx: ToolContext, run: (actor
     if (effect && envelope?.revoked?.consents?.includes(ctx.consent)) throw new ToolRefusal('consent_revoked')
     if (effect && envelope?.revoked?.agents?.includes(ctx.agent.id)) throw new ToolRefusal('unauthenticated')
     return await withAgentContext(ctx, policy ?? { envelope: null, local_document: null, local_revision: 0 }, () => withSiteAuthority(actor, () => withServiceAuthority(credential, () => run(actor))))
+  } catch (error) {
+    if (error instanceof GasketError) throw new ToolRefusal(error.code)
+    throw error
+  }
+}
+
+// The shared Undo context deliberately contains no agent authority. Retain only
+// the current HTTP request in this seed, so its native session can be fenced.
+const personRequest = new AsyncLocalStorage<Request>()
+export const withNativeRequest = <T>(request: Request, run: () => Promise<T>) => personRequest.run(request, run)
+export async function nativeUndoCall<T>(env: Bindings, ctx: UndoContext, run: (actor: Actor) => Promise<T>): Promise<T> {
+  try {
+    const request = personRequest.getStore()
+    if (!request || request.headers.has('authorization') || ctx.agent !== null) throw new ToolRefusal('person_session_required')
+    const actor = await currentActor(env, request)
+    if (!actor || actor.id !== ctx.person.id || actor.service || actor.role === 'agent') throw new ToolRefusal('unauthenticated')
+    requireCapability(actor, 'register.manage')
+    await authorizeOperationalSite(env, actor, request)
+    return await withSiteAuthority(actor, () => run(actor))
   } catch (error) {
     if (error instanceof GasketError) throw new ToolRefusal(error.code)
     throw error

@@ -24,6 +24,7 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
     const detail = JSON.parse(row.detail)
     const labels: Record<string, string> = {
       'asset.create': 'Asset registered',
+      'asset.undo': `Asset name and notes restored from agent change (revision ${detail.appliedRevision} to ${detail.revision})`,
       // ASSET-001: a move shows on the entry and on the parents it left and joined.
       'asset.move': row.subject === id ? `Moved from ${detail.fromTag ?? 'the site'} to ${detail.toTag ?? 'the site'}` : detail.to === id ? `${detail.tag} moved here from ${detail.fromTag ?? 'the site'}` : `${detail.tag} moved to ${detail.toTag ?? 'the site'}`, 'asset.update': 'Asset details changed', 'asset.retire': `Asset retired: ${detail.reason ?? ''}${detail.disposal ? ` (${detail.disposal.method} on ${detail.disposal.disposedOn})` : ''}`,
       'asset.lifecycle': `Lifecycle record revision ${detail.revision} saved`, 'asset.agreement': `Service agreement recorded: ${detail.provider ?? ''} ${detail.startsOn ?? ''} to ${detail.endsOn ?? ''}`,
