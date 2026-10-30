@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import procedureRevisions from './agent-procedure-revisions.mjs'
+export { beforeStep, afterStep } from './agent-procedure-revisions.mjs'
 
 /** Additional Core proof uses native sessions and issued credentials; no fixture authority enters production. */
 export default async function journey({ request, origin, cookie, tool }) {
@@ -61,7 +63,8 @@ export default async function journey({ request, origin, cookie, tool }) {
   assert.equal(stale.result?._meta?.['com.runeditrun/error']?.code, 'revision_conflict')
   assert.deepEqual(await api(`assets/${asset.id}`), after)
   console.log('Native Core journey: changed-key and stale-revision refusals preserved native records')
-  const work = first.result.structuredContent.work[0]
+  const work = first.result.structuredContent.work.find(work => work.title === 'Synthetic inspect the pump')
+  assert.ok(work, 'the MCP-created work remains visible among native issued-work fixtures')
   assert.ok((await api(`work/${work.id}`)).created_by_name.includes(' for '))
   const procedures = await api('checklists')
   assert.ok((await api(`checklists/${procedures[0].id}`)).revisions[0].publishedBy.includes(' for '))
@@ -70,4 +73,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   const audit = await api('audit')
   assert.ok(audit.rows.some(row => JSON.parse(row.detail).preparedBy?.label?.includes(' for ') && row.actor_name.includes(' for ')))
   console.log('Native Core journey: native audit attribution passed')
+  await procedureRevisions({ request, origin, cookie, tool })
 }
