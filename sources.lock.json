@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "cfd285911c1898cbbb37cbb4e6fc6c5ba3dea7df3f9e7ca0b20dc0ccfa55d1e3",
+      "sha256": "3b0a8800b8b63bab5899d87887da6ba16234132d69c9da412bcfb518677a793b",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "944ed6b4af950a2214748f401988dc0645bf284f4d52eaf9a953fa0a347f43cb",
+      "sha256": "feb602e454a5db7d197ac71e646d9c7a4dc3f2e3b45f864e6373596884448bdd",
       "executable": false
     },
     "DEMO.md": {
@@ -232,7 +232,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "1309d61e0b47254f67f42fab00873cd4085ce4e744488183526fc8f74b34055c",
+      "sha256": "06cffe8c3574145cce57991e41ef953ef2b44d47054b8887db1acb8d939c65f4",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
@@ -4728,7 +4728,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "aa057a0bf6c114a4bae68698da32938cab505b4f51594f2bee9f45f7d8434931",
+      "sha256": "40795ada5f261f08fb64f25369507df8c51bce5f7a07261be719a940058b32c4",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4805,6 +4805,10 @@
     },
     "tests/gasket/planning.mjs": {
       "sha256": "3388f1479c72e30cfe0f86c6839370d1ca7f7f36eb0015db6b5c23e10960a1b8",
+      "executable": false
+    },
+    "tests/gasket/pm-restarts.mjs": {
+      "sha256": "e4a4e99e8dc8ad4cb8d054b4b61e7e2a531bd6bf69dfc00ba745a435dd9d4251",
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {

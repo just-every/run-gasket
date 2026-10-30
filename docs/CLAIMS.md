@@ -6,7 +6,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 
 | # | Claim | Clauses | Status |
 | --- | --- | --- | --- |
-| 1 | Gasket turns operator requests, PM schedules and sensor readings into work with parts and people. | `REQ-001` partial; `REQ-003` done; `PM-001` partial; `PM-002` done; `PLAN-004` partial; `INT-010` missing | partial |
+| 1 | Gasket turns operator requests, PM schedules and sensor readings into work with parts and people. | `REQ-001` partial; `REQ-003` done; `PM-001` done; `PM-002` done; `PLAN-004` partial; `INT-010` missing | partial |
 | 2 | Keeps technicians working offline. | `FIELD-001` missing; `FIELD-002` missing; `FIELD-003` missing | missing |
 | 3 | Spots failing machines before breakdown. | `AGENT-001` missing | missing |
 | 4 | 100% free, open source alternative to MaintainX, UpKeep and Fiix; MIT licensed. | `HTTP-001` partial; `ADMIN-009` partial | partial |
@@ -17,7 +17,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 9 | The reliability agent reads live vibration beside repair history and explains the developing failure. | `AGENT-001` missing; `INT-012` missing | missing |
 | 10 | The agent stages a repair around the shutdown with parts, person, procedure and tools. | `AGENT-002` partial; `PLAN-004` partial; `PLAN-005` partial | partial |
 | 11 | Two bearings transfer from Mesa to Dayton. | `PART-006` missing; `ADMIN-002` partial | partial |
-| 12 | Calendar, meter and route schedules create work overnight and chase overdue work to completion. | `PM-001` partial; `PM-002` done; `ASSET-008` partial; `PM-006` done; `AGENT-005` partial | partial |
+| 12 | Calendar, meter and route schedules create work overnight and chase overdue work to completion. | `PM-001` done; `PM-002` done; `ASSET-008` partial; `PM-006` done; `AGENT-005` partial | partial |
 | 13 | A scan reports a leak with evidence and becomes linked corrective work. | `REQ-002` partial; `REQ-003` done; `FIELD-009` partial | partial |
 | 14 | The bill goes to QuickBooks once it matches the delivery. | `BUY-004` done; `BUY-005` missing; `INT-003` missing | partial |
 | 15 | The agent reads invoice lines and retains the recorded purchasing decision. | `AGENT-008` missing; `BUY-003` done; `BUY-005` missing | partial |
