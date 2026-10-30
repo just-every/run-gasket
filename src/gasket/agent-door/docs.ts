@@ -25,7 +25,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '| --- | --- | --- |',
     ...resources.map(resource => `| ${resource.uriTemplate} | ${resource.scope} | ${resource.classes.join(', ')} |`),
     '',
-    'Discover templates with resources/templates/list and follow returned resource links with resources/read. Each read retrieves current primary-site native facts and rechecks sponsor, credential, scope, consent and policy. Detailed work computes sensitive personnel and pay facts from the current record; approval policy withholds content. Native service credentials retain their existing route restrictions and cannot read procedures. No additional credential scope is issued.',
+    'Discover resource templates through MCP and follow the returned links with its resource read method. Each read retrieves current primary-site native facts and rechecks sponsor, credential, scope, consent and policy. Detailed work computes sensitive personnel and pay facts from the current record; approval policy withholds content. Native service credentials retain their existing route restrictions and cannot read procedures. No additional credential scope is issued.',
     '',
     '## Declared door',
     '',

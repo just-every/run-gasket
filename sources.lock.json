@@ -1424,7 +1424,7 @@
       "executable": false
     },
     "src/gasket/agent-door/docs.ts": {
-      "sha256": "60d42807573b2b7393d53e520bdaa0c764dbca454efecc9f906f3609af698ed6",
+      "sha256": "d4fc2afafdd0d207a67cece375628498cd2aad1567765e39178345fe28f44c34",
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
@@ -4684,7 +4684,7 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "9eea5f2bff8333a7aec6142159de39b44949b157c537602ce893c1c1001187da",
+      "sha256": "c176bb1ea6d1fa5a7cdaf29b52b9667bc474164dbcae643898febfa64da98ad7",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
