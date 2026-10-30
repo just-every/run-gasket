@@ -372,7 +372,7 @@ export type WorkView = Row & { requestSources: Awaited<ReturnType<typeof request
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
   // Work at a location with no asset (PLAN-001) shows the location where an asset's name and place would be.
-  const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
+  const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, a.model AS asset_model, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
     m.name AS assignee_name, COALESCE((SELECT json_extract(audit.detail,'$.preparedBy.label') FROM gk_audit audit WHERE audit.subject=w.id AND audit.action='workorder.create' ORDER BY audit.seq LIMIT 1),cr.name) AS created_by_name, s.calibration AS calibration_task, s.grace_days, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
     FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_members cr ON cr.id = w.created_by LEFT JOIN gk_work_templates t ON t.id = w.template_id LEFT JOIN gk_work_statuses ws ON ws.id = w.waiting_status
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
@@ -398,7 +398,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     .map(row => ({ ...row, obligation: obligation(row) }))
   const reserved = await reservations(env, 'r.work_order_id = ?', id)
   // ASSET-006: the asset's current bill of materials, with stock and fit, for planning.
-  const bom = order.asset_id ? await bomOf(env, { id: order.asset_id, serial: order.asset_serial }, await partList(env, actor)) : null
+  const bom = order.asset_id ? await bomOf(env, { id: order.asset_id, serial: order.asset_serial, model: order.asset_model }, await partList(env, actor)) : null
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
     LEFT JOIN gk_members h ON h.id = json_extract(a.detail, '$.holder') LEFT JOIN gk_members t ON t.id = json_extract(a.detail, '$.to') WHERE a.action = 'workorder.plan' AND a.subject = ? ORDER BY a.at DESC, a.seq DESC`, id))

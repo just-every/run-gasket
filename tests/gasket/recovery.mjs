@@ -21,7 +21,18 @@ export async function recoveryJourney() {
     const lead = await h.signIn('synthetic-gasket-recovery@example.test')
     await h.api('recovery', lead, undefined, 403)
     await h.api('recovery.drill', lead, { receipt: 'synthetic-gasket-1', confirm: true }, 403)
-    const asset = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-recovery', name: 'Recovery pump', location: 'Plant' })).id
+    const asset = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-recovery', name: 'Recovery pump', serial: 'R-150', model: 'P-150', location: 'Plant' })).id
+    await h.submit('asset.update', lead, { asset, revision: 1, tag: 'synthetic-gasket-recovery', name: 'Recovery pump', serial: 'R-150', model: 'P-175', location: 'Plant' }, `/app/assets/${asset}`)
+    const bearing = (await h.api('part.create', lead, { number: 'synthetic-gasket-bearing', name: 'Recovery bearing', unit: 'each' })).id
+    const alternate = (await h.api('part.create', lead, { number: 'synthetic-gasket-alternate', name: 'Recovery substitute', unit: 'each' })).id
+    await h.api('part.receive', lead, { part: alternate, quantity: '3' })
+    const applicability = { asset, part: [bearing], quantity: ['1'], serialFrom: ['R-100'], serialTo: ['R-199'], modelFrom: ['P-100'], modelTo: ['P-199'], alternateFor: [bearing], alternate: [alternate], alternateFrom: ['R-100'], alternateTo: ['R-199'], alternateModelFrom: ['P-100'], alternateModelTo: ['P-199'], tool: ['Bearing puller'] }
+    await h.api('bom.revise', lead, { ...applicability, note: 'Original model approval' })
+    await h.api('bom.revise', lead, { ...applicability, revision: 1, quantity: ['2'], note: 'Two bearings per repair' })
+    const modelFacts = async (client, signed) => {
+      const row = await client.api(`assets/${asset}`, signed)
+      return { model: row.model, serial: row.serial, versions: row.versions, bom: row.bom }
+    }
     const checklist = (await h.api('checklist.create', owner, { name: 'Recovery inspection', items: ['Listen for noise'] })).id
     const today = (await h.api('me', owner)).today
     const member=(await h.api('me',owner)).id
@@ -57,12 +68,20 @@ export async function recoveryJourney() {
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
     await h.api('webhook.control', owner, { subscription: subscription.id, revision: 1, paused: false, reason: 'Receiver confirmed' })
     const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today, assignee: (await h.api('me', owner)).id })
+    await h.api('workorder.reserve', lead, { workOrder: accepted.id, part: alternate, insteadOf: bearing, quantity: '2' })
+    const retainedModels = await modelFacts(h, owner)
+    assert.deepEqual([retainedModels.model, retainedModels.versions[0].value.model], ['P-175', 'P-150'])
+    assert.deepEqual(retainedModels.bom.revisions.map(row => [row.number, row.createdBy, row.lines[0].model_from, row.alternates[0].model_to]), [[2, 'Recovery lead', 'P-100', 'P-199'], [1, 'Recovery lead', 'P-100', 'P-199']])
     const workPhoto = (await h.api('workorder.evidence', owner, { workOrder: accepted.id, version: 1, file: file('synthetic-gasket-private-photo.png', png, 'image/png') })).evidence
+    const retainedReservations = (await h.api(`work/${accepted.id}`, owner)).reservations
     const portal = (await h.api('request.portal', owner, { name: 'Recovery intake', fields: [] })).id
     const intakeTarget = (await h.api('request.target', owner, { portal, kind: 'asset', asset, name: 'Recovery pump', publishConsent: true })).id
     assert.equal((await h.raw(`/request/${portal}`, { cookie: owner, body: { target: intakeTarget, submissionKey: randomUUID(), description: 'synthetic-gasket-private-fault', urgency: 'normal', contact: 'synthetic-gasket-private-contact', photo: file('request.png', png, 'image/png') } })).status, 303)
     const request = (await h.api('search?kind=request&q=synthetic-gasket-private-fault', owner)).rows[0].id
     const photo = (await h.api(`requests/${request}`, owner)).files[0].id
+    const mismatched = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-mismatch', name: 'Different recovery model', serial: 'R-150', model: 'P-250', location: 'Plant' })).id
+    await h.api('bom.revise', owner, { ...applicability, asset: mismatched })
+    const refusedWork = (await h.api('workorder.create', owner, { asset: mismatched, title: 'Restored model refusal', due: today, assignee: member })).id
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
     const paperWork=await printPackFixture(h,owner,member)
@@ -105,6 +124,13 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
+      assert.deepEqual(await modelFacts(restored, signed), retainedModels, 'inactive restore preserves model identity history and both BOM restriction revisions with attribution')
+      assert.deepEqual((await restored.api(`work/${accepted.id}`, signed)).reservations, retainedReservations, 'inactive restore preserves approved substitute commitments')
+      const beforeRefusal = { parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }
+      assert.equal((await restored.api('workorder.reserve', signed, { workOrder: refusedWork, part: alternate, insteadOf: bearing, quantity: '1' }, 409)).error, 'substitute_not_compatible')
+      assert.deepEqual({ parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }, beforeRefusal)
+      console.log('PROBE ASSET-006 inactive restore: rer export and import then authenticated JSON -> model history, BOM restrictions and substitute reservations reconcile; mismatched reservation remains refused without effects')
+
       assert.equal((await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:owner})).status,303,'source sessions cannot open restored packs')
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:signed})).arrayBuffer()),paperPdf,'immutable pack bytes reconcile after inactive restore')
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-previews/${paperPreview}/original`,{cookie:signed})).arrayBuffer()),png,'the original paper bytes and digest reconcile')

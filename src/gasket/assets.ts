@@ -17,13 +17,14 @@ import { disposalStatements, lifecycleOf } from './lifecycle'
 import { documentsOf } from './documents'
 
 export const METER_KINDS = ['counter', 'gauge', 'condition']
-const IDENTITY = ['tag', 'name', 'serial', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
+const IDENTITY = ['tag', 'name', 'serial', 'model', 'location', 'custodian', 'category', 'criticality', 'notes'] as const
 
-function identity(input: Input) {
+function identity(input: Input, keptModel: string | null = null) {
   const value = {
     tag: input.text('tag', { max: 60 }),
     name: input.text('name', { max: 160 }),
     serial: input.text('serial', { optional: true, max: 120 }) || null,
+    model: input.present('model') ? input.text('model', { optional: true, max: 120 }) || null : keptModel,
     location: input.text('location', { max: 160 }),
     custodian: input.text('custodian', { optional: true, max: 120 }) || null,
     category: input.text('category', { optional: true, max: 80 }) || null,
@@ -49,7 +50,7 @@ export async function createAsset(env: Bindings, actor: Actor, input: Input) {
   // ASSET-001: its level and parent (none: directly under the site).
   const place = await placement(env, input)
   const custom = await customStatements(env, actor, input, 'asset', id, value.category, true)
-  await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, location, custodian, category, criticality, notes, level, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, place.level, place.parent, at, at), ...custom],
+  await commit(env, [stmt(env, 'INSERT INTO gk_assets (id, tag, name, serial, model, location, custodian, category, criticality, notes, level, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', id, value.tag, value.name, value.serial, value.model, value.location, value.custodian, value.category, value.criticality, value.notes, place.level, place.parent, at, at), ...custom],
     { actor: actor.id, action: 'asset.create', subject: id, detail: { ...value, ...place } })
   return { id }
 }
@@ -61,7 +62,7 @@ export async function updateAsset(env: Bindings, actor: Actor, input: Input) {
   insist(!asset.retired_at, 'asset_retired', 409)
   const revision = input.integer('revision', { min: 1, max: 1_000_000 })
   insist(revision === asset.revision, 'stale', 409)
-  const value = identity(input)
+  const value = identity(input, asset.model)
   await checkCriticality(env, value.criticality, asset.criticality)
   const custom = await customStatements(env, actor, input, 'asset', asset.id, value.category)
   const before = Object.fromEntries(IDENTITY.map(key => [key, asset[key]]))
@@ -69,7 +70,7 @@ export async function updateAsset(env: Bindings, actor: Actor, input: Input) {
     ...custom,
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND revision = ?)', asset.id, revision),
     stmt(env, 'INSERT INTO gk_asset_versions (asset_id, revision, value_json, changed_by, changed_at) VALUES (?, ?, ?, ?, ?)', asset.id, asset.revision, JSON.stringify(before), actor.id, now()),
-    stmt(env, 'UPDATE gk_assets SET tag = ?, name = ?, serial = ?, location = ?, custodian = ?, category = ?, criticality = ?, notes = ?, revision = revision + 1, updated_at = ? WHERE id = ?', value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, now(), asset.id),
+    stmt(env, 'UPDATE gk_assets SET tag = ?, name = ?, serial = ?, model = ?, location = ?, custodian = ?, category = ?, criticality = ?, notes = ?, revision = revision + 1, updated_at = ? WHERE id = ?', value.tag, value.name, value.serial, value.model, value.location, value.custodian, value.category, value.criticality, value.notes, now(), asset.id),
   ], { actor: actor.id, action: 'asset.update', subject: asset.id, detail: { before, after: value } })
   return { id: asset.id, revision: revision! + 1 }
 }
@@ -125,7 +126,7 @@ export async function recordSighting(env: Bindings, actor: Actor, input: Input) 
 export async function assetList(env: Bindings, _actor: Actor, url?: URL) {
   const filter = url?.searchParams.get('field'), value = url?.searchParams.get('value')
   const selected = filter && value ? new Set((await all(env, "SELECT v.entity_id FROM gk_custom_values v JOIN gk_custom_fields f ON f.id=v.field_id WHERE v.entity_type='asset' AND v.field_id=? AND f.retired=0 AND (CAST(json_extract(v.value,'$') AS TEXT)=? OR (json_type(v.value)='array' AND EXISTS(SELECT 1 FROM json_each(v.value) j WHERE CAST(j.value AS TEXT)=?)))", filter, value, value)).map(v=>v.entity_id)) : null
-  const rows = (await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.location, a.custodian, a.category, a.criticality, ${CRITICALITY_LABEL}, a.origin, ${ASSET_STATUS} AS status, a.level, a.parent_id, (SELECT p.tag FROM gk_assets p WHERE p.id = a.parent_id) AS parent_tag,
+  const rows = (await all(env, `SELECT a.id, a.tag, a.name, a.serial, a.model, a.location, a.custodian, a.category, a.criticality, ${CRITICALITY_LABEL}, a.origin, ${ASSET_STATUS} AS status, a.level, a.parent_id, (SELECT p.tag FROM gk_assets p WHERE p.id = a.parent_id) AS parent_tag,
     (SELECT s.outcome || '|' || s.recorded_at FROM gk_sightings s WHERE s.asset_id = a.id ORDER BY s.recorded_at DESC LIMIT 1) AS last_sighting,
     (SELECT MIN(w.due_date) FROM gk_work_orders w WHERE w.asset_id = a.id AND w.status NOT IN ('closed', 'cancelled')) AS next_due
     FROM gk_assets a ORDER BY a.retired_at IS NOT NULL, a.tag`)).filter(row=>!selected || selected.has(row.id))
@@ -143,6 +144,6 @@ export async function assetDetail(env: Bindings, actor: Actor, id: string) {
   const sightings = await all(env, 'SELECT outcome, seen_location, note, recorded_by, recorded_at FROM gk_sightings WHERE asset_id = ? ORDER BY recorded_at DESC', id)
   const schedules = await all(env, 'SELECT id, title, every_days, every_units, meter_id, next_due_date, next_due_meter, active FROM gk_schedules WHERE asset_id = ? ORDER BY title', id)
   const states = await stateHistory(env, id)
-  const bom = await bomOf(env, { id: asset.id, serial: asset.serial }, await partList(env, actor))
+  const bom = await bomOf(env, { id: asset.id, serial: asset.serial, model: asset.model }, await partList(env, actor))
   return { ...asset, customFields: await customValues(env, 'asset', id, asset.category), bom, lifecycle: await lifecycleOf(env, actor, id), documents: await documentsOf(env, actor, id), states, conflicts: await stateConflicts(env, asset, states), hierarchy: await hierarchyOf(env, asset), comments: await thread(env, actor, 'asset', id), meters, versions: versions.map(row => ({ ...row, value: JSON.parse(row.value_json), value_json: undefined })), sightings, schedules }
 }

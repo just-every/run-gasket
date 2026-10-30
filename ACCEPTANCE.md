@@ -529,7 +529,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 1. Create a motor BOM with two approved bearings and a serial restriction, plan a repair with one out of stock and select a substitute.
 2. Inspect compatibility and quantities on the resulting work/parts reservation.
 
-**Evidence.** `tests/gasket/flows.mjs` — "ASSET-006 bill of materials and interchangeable spares"
+**Evidence.** `tests/gasket/flows.mjs` — "ASSET-006 bill of materials and interchangeable spares"; `tests/gasket/recovery.mjs` — "recoveryJourney"; `migrations/core/0112_bom_models.sql`
 **Gap.** A public-door journey model compatibility and stock per eligible storeroom is missing. The cited journeys show serial-range refusal, revisions, named tools and compatible reservations.
 
 #### ASSET-007 — Asset lifecycle and replacement decision
