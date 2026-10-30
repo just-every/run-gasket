@@ -61,7 +61,7 @@ export async function agentCommentsJourney() {
     const thread = () => h.api(`work/${work.id}/comments`, owner)
     const effects = async () => (await h.api('audit', owner)).rows.filter(row => row.action === 'comment.post' && row.subject === work.id)
     const snapshot = async () => ({ thread: await thread(), effects: await effects(), reviews: (await person('/agents/api/reviews')).reviews })
-    const original = 'Synthetic Gasket observation: inspect <bearing> & retain original text.\nNo physical maintenance is asserted.'
+    const original = '\n  Synthetic Gasket observation: inspect <bearing> & retain original text.\n    No physical maintenance is asserted.  \n'
     const args = { workOrder: work.id, body: original, idempotency_key: randomUUID() }
     await adopt(autonomousPolicy())
     const posted = await mcp(args)
@@ -122,8 +122,10 @@ export async function agentCommentsJourney() {
 
     await adopt(autonomousPolicy())
     // A retry must not overwrite a later human correction or lose its attribution.
-    const correction = 'Synthetic Gasket human correction: bearing checked, original observation retained.'
-    await h.api('comment.edit', owner, { comment: first.id, body: correction })
+    const correction = '\n  Synthetic Gasket human correction: bearing checked, original observation retained.  \n'
+    const editedAt = await h.submit('comment.edit', owner, { comment: first.id, body: correction.replaceAll('\n', '\r\n') }, `/app/work/${work.id}`)
+    assert.equal(editedAt.pathname, `/app/work/${work.id}`)
+    assert.equal(editedAt.searchParams.has('error'), false)
     const edited = (await thread()).comments[0]
     assert.equal(edited.body, correction)
     assert.deepEqual(edited.revisions.map(row => [row.number, row.body, row.by]), [[1, original, first.author], [2, correction, sponsor.name]])
@@ -150,6 +152,8 @@ export async function agentCommentsJourney() {
     }
     await refused('other sponsor edit', () => h.api('comment.edit', memberCookie, { comment: first.id, body: 'Synthetic Gasket unauthorized correction' }, 403), answer => assert.equal(answer.error, 'not_your_comment'))
     const fresh = () => ({ ...args, idempotency_key: randomUUID() })
+    await refused('blank authored text', () => mcp({ ...fresh(), body: ' \n\t ' }), answer => assert.equal(answer.code, 'missing_body'))
+    await refused('oversized authored text', () => mcp({ ...fresh(), body: 'x'.repeat(2001) }), answer => assert.equal(answer.code, 'invalid_arguments'))
     const blocked = autonomousPolicy()
     blocked.rules = [{ id: 'all', class: '*', do: 'blocked' }]
     await adopt(blocked)
@@ -196,15 +200,29 @@ export async function agentCommentsJourney() {
     await adopt(autonomousPolicy())
     const memberClaims = { sub: memberSub, email: memberEmail, act: { sub: 'synthetic-gasket-member-agent', name: 'Synthetic Gasket member agent' } }
     const memberArgs = { ...fresh(), body: 'Synthetic Gasket member observation' }
-    const byMember = await mcp(memberArgs, memberClaims)
-    assert.equal(byMember.result?.isError, false, `active member comment: HTTP ${byMember.status}, code ${byMember.code}`)
+    const beforeMember = await snapshot()
+    const competing = await Promise.all([mcp(memberArgs, memberClaims), mcp(memberArgs, memberClaims)])
+    assert.ok(competing.some(answer => answer.result?.isError === false), 'one simultaneous comment submission completes')
+    for (const answer of competing) if (answer.result?.isError !== false) assert.ok(['decision_busy', 'call_in_progress'].includes(answer.code), `concurrent retry: ${answer.code}`)
+    const byMember = competing.find(answer => answer.result?.isError === false)
+    const memberSaved = await snapshot()
+    assert.equal(memberSaved.thread.comments.length, beforeMember.thread.comments.length + 1)
+    assert.equal(memberSaved.effects.length, beforeMember.effects.length + 1)
+    assert.deepEqual(memberSaved.reviews, beforeMember.reviews, 'concurrent autonomous comments invent no review')
+    for (const answer of competing) if (answer.result?.isError === false) assert.deepEqual(answer.result.structuredContent, byMember.result.structuredContent)
+    assert.deepEqual((await mcp(memberArgs, memberClaims)).result.structuredContent, byMember.result.structuredContent)
+    assert.deepEqual(await snapshot(), memberSaved, 'simultaneous submissions and their retry retain one comment, original revision and native audit effect')
+    console.log('PROBE PLAN-006 concurrent replay: simultaneous public MCP submissions with one identity -> one comment and original revision, one native audit effect and the same result on retry')
     const memberNote = (await thread()).comments.at(-1)
     assert.equal(memberNote.author_id, member.id)
+    assert.deepEqual(memberNote.revisions.map(row => [row.number, row.body, row.by]), [[1, memberArgs.body, memberNote.author]])
     assert.equal(memberNote.unread, true, 'another sponsor sees the new member comment as unread')
-    await h.api('comment.edit', memberCookie, { comment: memberNote.id, body: 'Synthetic Gasket corrected member observation' })
+    const memberCorrection = '  Synthetic Gasket corrected member observation  \n'
+    await h.api('comment.edit', memberCookie, { comment: memberNote.id, body: memberCorrection })
     const corrected = (await thread()).comments.at(-1)
     assert.equal(corrected.author, 'Synthetic Gasket member agent for Synthetic Gasket maintainer')
-    assert.deepEqual(corrected.revisions.map(row => [row.number, row.body, row.by]), [[1, 'Synthetic Gasket member observation', corrected.author], [2, 'Synthetic Gasket corrected member observation', 'Synthetic Gasket maintainer']])
+    assert.equal(corrected.body, memberCorrection)
+    assert.deepEqual(corrected.revisions.map(row => [row.number, row.body, row.by]), [[1, 'Synthetic Gasket member observation', corrected.author], [2, memberCorrection, 'Synthetic Gasket maintainer']])
     await h.api('comment.read', owner, { workOrder: work.id })
     assert.equal((await thread()).unread, 0)
     await h.api('access.role', owner, { member: member.id, role: 'agent' })
@@ -236,8 +254,9 @@ export async function agentCommentsJourney() {
       if (width === 1440) {
         assert.equal(response.status(), 200)
         assert.ok((await note.innerText()).includes(first.author))
-        assert.ok((await note.innerText()).includes(correction))
-        assert.ok((await note.innerText()).replace(/\s+/g, ' ').includes(original.replace(/\s+/g, ' ')), 'the original agent observation remains in visible history')
+        assert.ok((await note.innerText()).includes(correction.trim()))
+        assert.equal(await note.locator('textarea[name="body"]').inputValue(), correction, 'the native edit form retains authored spacing')
+        assert.ok((await note.innerText()).replace(/\s+/g, ' ').includes(original.replace(/\s+/g, ' ').trim()), 'the original agent observation remains in visible history')
         assert.equal(await note.locator('bearing').count(), 0, 'authored markup remains plain text')
       }
       if (width === 390) {

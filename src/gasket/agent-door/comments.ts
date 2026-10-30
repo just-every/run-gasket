@@ -20,7 +20,7 @@ export function commentTools(env: Bindings): ToolDefinition[] {
     name: 'gasket.comments.post', title: 'Post an internal work comment',
     description: 'Post plain text on existing primary-site work as agent for the current human sponsor. Native comment rights and company policy apply. Photos, mentions, edits and handoff summaries are separate native operations.',
     scope: 'comment.post', readOnly: false, classes: ['standard'], clauses: ['PLAN-006', 'SURFACE-001', 'SURFACE-002'],
-    inputSchema: object({ workOrder: { ...text, maxLength: 100 }, body: text }),
+    inputSchema: object({ workOrder: { ...text, maxLength: 100 }, body: { ...text, maxLength: 2000 } }),
     outputSchema: object({ id: text, comment: text }),
     async classify(args, ctx) { await resolve(args, ctx); return standard() },
     async target(args, ctx) { return { kind: 'work', id: (await resolve(args, ctx)).id } },

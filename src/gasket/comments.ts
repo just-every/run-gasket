@@ -26,7 +26,7 @@ type Kind = 'work' | 'asset'
 const COLUMN: Record<Kind, string> = { work: 'work_order_id', asset: 'asset_id' }
 
 /** A comment's text; a form's CRLF line breaks are kept as plain newlines. */
-const said = (input: Input) => input.text('body', { max: 2000 }).replace(/\r\n?/g, '\n')
+const said = (input: Input) => input.text('body', { max: 2000, trim: false }).replace(/\r\n?/g, '\n')
 
 async function subject(env: Bindings, input: Input): Promise<{ kind: Kind; id: string; label: string }> {
   const work = input.text('workOrder', { optional: true, max: 100 }), asset = input.text('asset', { optional: true, max: 100 })

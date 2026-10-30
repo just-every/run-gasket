@@ -87,7 +87,8 @@ export function field(label: string, name: string, { type = 'text', value = '', 
 
 export function area(label: string, name: string, { value = '', required = true, hint = '' }: { value?: unknown; required?: boolean; hint?: string } = {}) {
   const id = uid(name)
-  return h`<div class="gk-field"><label for="${id}">${label}</label>${hint ? h`<p class="gk-hint" id="${id}-hint">${hint}</p>` : ''}<textarea id="${id}" name="${name}"${required ? raw(' required') : ''}${hint ? raw(` aria-describedby="${esc(id)}-hint"`) : ''}>${value}</textarea></div>`
+  // HTML consumes the first newline after this opening tag, so supply one of our own.
+  return h`<div class="gk-field"><label for="${id}">${label}</label>${hint ? h`<p class="gk-hint" id="${id}-hint">${hint}</p>` : ''}<textarea id="${id}" name="${name}"${required ? raw(' required') : ''}${hint ? raw(` aria-describedby="${esc(id)}-hint"`) : ''}>${'\n'}${value}</textarea></div>`
 }
 
 export function select(label: string, name: string, options: { value: string; label: string }[], selected = '', { required = true, blank = '' } = {}) {

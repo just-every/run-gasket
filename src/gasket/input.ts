@@ -58,14 +58,15 @@ export class Input {
     return value !== undefined && value !== null && value !== ''
   }
 
-  text(name: string, { max = 200, optional = false } = {}): string {
+  text(name: string, { max = 200, optional = false, trim = true } = {}): string {
     const value = this.raw(name)
     if ((value === undefined || value === null || value === '') && optional) return ''
     insist(typeof value === 'string', `missing_${name}`)
-    const trimmed = value.trim()
-    insist(optional || trimmed.length > 0, `missing_${name}`)
-    insist(trimmed.length <= max, `too_long_${name}`)
-    return trimmed
+    // Authored prose can retain its spacing while still refusing blank input.
+    const content = trim ? value.trim() : value
+    insist(optional || content.trim().length > 0, `missing_${name}`)
+    insist(content.length <= max, `too_long_${name}`)
+    return content
   }
 
   integer(name: string, { min = 0, max = 100_000, optional = false } = {}): number | null {
