@@ -90,6 +90,10 @@ export default async function proposalPolicyJourney() {
     assert.equal(effects.length, 1)
     const receipt = JSON.parse(effects[0].detail)
     assert.deepEqual([receipt.hash, receipt.assetRevision, receipt.result, receipt.approvedBy], [allowed.hash, 1, work.id, []])
+    const admission = (await person('/agents/api/audit')).rows.find(row => row.id === receipt.admission)
+    assert.deepEqual(admission.resource, { kind: 'proposal', id: allowed.proposal })
+    assert.deepEqual([receipt.admission, receipt.policyRevision, receipt.operationId, receipt.agent.agent.id, receipt.agent.for.id],
+      [applied.result._meta['com.runeditrun/decision'].id, revision, admission.operation_id, context.agentId, owner.id])
     assert.equal((await native()).work.length, before.work.length + 1)
     const after = await native(), replay = await call(allowed)
     assert.deepEqual(replay.result.structuredContent, result)
@@ -216,6 +220,10 @@ export default async function proposalPolicyJourney() {
     const independent = await prepare('Synthetic genuine policy approval', leadCookie)
     const independentCall = await call(independent)
     const independentHandle = independentCall.result._meta['com.runeditrun/error'].approval
+    const { approval: independentView } = await person(`/agents/api/approvals/${independentHandle.id}`)
+    assert.deepEqual(independentView.summary.nativeTarget, { kind: 'proposal', id: independent.proposal })
+    assert.ok(independentView.summary.items.includes(`Payload hash: ${independent.hash}`))
+    assert.ok(independentView.summary.items.includes(`Asset: ${asset.id}; revision: ${assetRevision}`))
     assert.equal((await approve(independentHandle)).approval.state, 'executed')
     const independentRow = (await api('proposals')).find(row => row.id === independent.proposal)
     assert.deepEqual([independentRow.status, independentRow.decided_by], ['approved', owner.id])
