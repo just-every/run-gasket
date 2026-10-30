@@ -4708,7 +4708,7 @@
       "executable": false
     },
     "tests/gasket/agent-outcome-policy.mjs": {
-      "sha256": "3ed5fea7aba279e716731b9c733c85d7d5ab2041b3fa6e1b69a9f7522a6b630b",
+      "sha256": "d5355d83648399290bff0794d77f41523334243f4ec8b24d3a0a78b79f2fdca5",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
@@ -4848,7 +4848,7 @@
       "executable": false
     },
     "tests/gasket/proposal-application-gate.mjs": {
-      "sha256": "31c4baf35dcffeb2f816b83ac7993533934077b954049f2a23bebc65bec88a95",
+      "sha256": "07b976f82c54535eb5ef423104c632ce5e6775834330ff32e1be8b0f33111f89",
       "executable": false
     },
     "tests/gasket/purchase-orders.mjs": {
