@@ -164,7 +164,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "9a3c3804d632e46d50a310041f539ee8acce148a375eb6ea206dfc66fddc274e",
+      "sha256": "9a921d0047dd6db6b3ef1d01c0d75ac707d0f381488d7e2338f7132a626cca46",
       "executable": false
     },
     ".gitignore": {
@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "8d22f8a036ba576cc4b7bbe71cb6b3cf11f44ccd424457d2c7432eb3f51ee635",
+      "sha256": "9773043cd1d49eea392368956944e07d22223d5b7a2691b62b9d41e8a1fe97d8",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "c216c39e56a5192e046c7438ddef28741bc912e21471825bc5317171839e5235",
+      "sha256": "93115a14dfce6a11cf0fb2786d0112ef63379eadf5c8ca4b4289b2f0475defa2",
       "executable": false
     },
     "DEMO.md": {
@@ -4732,7 +4732,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "9e95f4d69e55f214a9a757526eb77f29457eb4bb97184e875a7dd7391779b544",
+      "sha256": "3c245f03608f68b01d404549da1902c1238a387e0590a4e78a1909b514253054",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {

@@ -62,12 +62,12 @@ const independent = new Map([
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [conditionalWorkspaceJourney, 'inventory'],
+  [conditionalWorkspaceJourney, 'workspace'],
   [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
-assert.ok(['all', 'core', 'automation', 'inventory', 'reports'].includes(shard), `Unknown flows shard: ${shard}`)
+assert.ok(['all', 'core', 'automation', 'inventory', 'reports', 'workspace'].includes(shard), `Unknown flows shard: ${shard}`)
 const h = shard === 'all' || shard === 'core' ? await harness() : null
 let passed = 0
 const check = async (id, run) => {
