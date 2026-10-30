@@ -229,7 +229,13 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const RESERVATION: Record<string, string> = { open: 'Reserved', issued: 'Issued', released: 'Released' }
   const held = w.reservations.length ? table(['Reserved', 'Quantity', 'Still needed', 'State'], w.reservations.map(row => [h`${row.part.name}<span class="gk-sub">${row.part.number}${row.insteadOf ? ` · instead of ${row.insteadOf.number}` : ''}${row.kit ? ` · ${row.kit}` : ''}</span>`,
     amount(row.quantity, row.part.unit), amount(row.stillNeeded, row.part.unit), h`${tag(RESERVATION[row.state])}${row.releaseReason ? h`<span class="gk-sub">${row.releaseReason}</span>` : ''}`]), 'Reservations', { wrap: [0, 3] }) : ''
-  const kits = planning ? await kitList(env) : [], swaps = planning ? await substituteList(env) : []
+  const kits = planning ? await kitList(env) : []
+  // BOM approvals belong in the same planning form as site-wide approvals.
+  const bomSwaps = (w.bom?.lines ?? []).flatMap(line => line.alternates.map(alt => ({
+    part_id: line.part.id, part_number: line.part.number, part_name: line.part.name,
+    substitute_id: alt.part.id, substitute_number: alt.part.number, substitute_name: alt.part.name,
+  })))
+  const swaps = planning ? [...new Map([...await substituteList(env), ...bomSwaps].map(row => [`${row.part_id}:${row.substitute_id}`, row])).values()] : []
   const reserveForms = planning && stock.length ? h`<div class="gk-split">${post('workorder.reserve', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.available, part.unit)} available)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}
       ${swaps.length ? select('Instead of', 'insteadOf', [...new Map(swaps.map(row => [row.part_id, { value: row.part_id, label: `${row.part_number} ${row.part_name}` }])).values()], '', { required: false, blank: 'The part itself' }) : ''}`, 'Reserve part', { secondary: true })}
     ${kits.length ? post('workorder.reserve', h`${select('Repair kit', 'kit', kits.map(kit => ({ value: kit.id, label: `${kit.name}: ${kit.lines.map(line => `${line.quantity} ${line.number}`).join(', ')}` })), '', { blank: 'Choose a kit' })}

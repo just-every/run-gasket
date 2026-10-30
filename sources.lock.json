@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "76a838db4911b3363b6f21f3470002e5cf4428b9173d930013d9ea26e5f6fcdf",
+      "sha256": "854f29a0e97aacc084a35dc7617ecb55f592f70ec59c03fe85f8a801f5745c35",
       "executable": false
     },
     "DEMO.md": {
@@ -2364,7 +2364,7 @@
       "executable": false
     },
     "src/gasket/ui/work.ts": {
-      "sha256": "c435e962cbdf675067ed3e28d0bdbcbda02afe23bc4888d2c8756c6f136821e9",
+      "sha256": "95ce2342b82ba27f38bf013ee5b9ffabb717e84601821b81af4e9e15760e159c",
       "executable": false
     },
     "src/gasket/valuation.ts": {
@@ -4736,7 +4736,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "3b969bbbe22c773350b77a44c2bca38e425873f3962331ba4dd1f1846294645e",
+      "sha256": "f329fe6134947ceab9450ae39ccf11cfcaacfc38fe7568cfb93ae985714ac57a",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
