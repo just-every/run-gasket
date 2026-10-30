@@ -237,6 +237,21 @@
         "SURFACE-001",
         "SURFACE-003"
       ]
+    },
+    {
+      "name": "gasket.proposals.apply",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "AGENT-004",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
     }
   ],
   "notTools": [
@@ -507,6 +522,32 @@
         ],
         "confirmExternal": true,
         "internal": false
+      }
+    },
+    {
+      "id": "apply-corrective",
+      "tool": "gasket.proposals.apply",
+      "args": {
+        "proposal": {
+          "$from": "proposal",
+          "pointer": "/id"
+        },
+        "hash": {
+          "$from": "proposal",
+          "pointer": "/hash"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "target": {
+        "kind": "proposal",
+        "id": {
+          "$from": "proposal",
+          "pointer": "/id"
+        }
       }
     },
     {
