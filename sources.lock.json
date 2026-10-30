@@ -264,7 +264,7 @@
       "executable": false
     },
     "docs/maintenance-semantics.md": {
-      "sha256": "c73d414a83e9c169cadfba5bc53a133d33d5ba3469f8c900df87d9f182a47cd1",
+      "sha256": "07fd0234b84c9ff2a1e6aa2049768d1a8b955a5a263ef9d7f3ac06588c69e6bb",
       "executable": false
     },
     "docs/migration-sources.md": {
@@ -4700,7 +4700,7 @@
       "executable": false
     },
     "tests/gasket/agent-interval-fixtures.mjs": {
-      "sha256": "30a90385304f7de223497622e94d0a1097ef2be15372da38c3438812738341a9",
+      "sha256": "754463c0859706415d99a6ed912e15a6c3f8ac3c089dce1af8a549244183fa9f",
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
@@ -4712,7 +4712,7 @@
       "executable": false
     },
     "tests/gasket/agent-outcome-reversal.mjs": {
-      "sha256": "97f9435b1c28606baec97f841d59261cfe7f2c4e6fc134bd764c8d30fbc93e53",
+      "sha256": "1fefb0289e91e6825caff5fed14472d3fac3b461da4b21fde5ae51185c844259",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {

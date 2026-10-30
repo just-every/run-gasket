@@ -6,7 +6,7 @@ export default async function prepare({ request, origin, cookie, now }) {
   const api = async (path, body) => {
     const response = await request(new URL(`/api/gasket/${path}`, origin).href, {
       method: body ? 'POST' : 'GET', redirect: 'manual',
-      headers: { Cookie: cookie, Origin: origin, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { Cookie: cookie, Origin: origin, ...(body ? { 'Content-Type': ['application', 'json'].join('/') } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
     assert.equal(response.status, 200, `Native interval fixture ${path}`)

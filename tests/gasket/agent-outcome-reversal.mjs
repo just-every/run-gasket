@@ -97,6 +97,8 @@ export async function agentOutcomeReversalJourney() {
       assert.deepEqual(approval.summary.nativeTarget, { kind: 'schedule', id: schedule })
       assert.ok(approval.summary.items.some(item => item.includes(candidate.report.source.sourceHash)))
       assert.ok(approval.summary.items.some(item => item.includes(candidate.report.id)))
+      assert.ok(approval.summary.items.some(item => item.includes(candidate.report.source.windows.baseline.from) && item.includes(candidate.report.source.windows.baseline.to)))
+      assert.ok(approval.summary.items.some(item => item.includes(candidate.report.source.windows.post.from) && item.includes(candidate.report.source.windows.post.to)))
       assert.ok(approval.summary.items.some(item => item.includes(String(candidate.proposal.basis.schedule.revision))))
       return { path, approval, exact: { revision: approval.revision, summary_sha256: approval.summary_sha256 } }
     }
@@ -183,7 +185,35 @@ export async function agentOutcomeReversalJourney() {
     assert.equal(lostRole.approval.code, 'independent_decision_required')
     assert.deepEqual(await state(), removedBefore)
     await h.api('access.role', cookie.owner, { member: decisionLead.id, role: 'lead' })
-    console.log('PROBE AGENT-004 pending reversal: source change or loss of lead authority before decision -> failed approval with unchanged cadence and work')
+    const constrained = await fresh(), constrainedApproval = await pending(constrained)
+    const siteLimit = constrained.proposal.basis.limits.find(row => row.source === 'site')
+    await h.api('interval.limit', cookie.lead, { schedule, source: 'site', revision: siteLimit.revision, minDays: siteLimit.min_days, maxDays: 21, reference: 'Revised site limit excludes the proposed restoration' })
+    const constrainedBefore = await state()
+    const refusedLimit = await person(`${constrainedApproval.path}/approve`, constrainedApproval.exact, decisionCookie)
+    assert.equal(refusedLimit.approval.state, 'refused')
+    assert.equal(refusedLimit.approval.code, 'execution_failed')
+    assert.deepEqual(await state(), constrainedBefore)
+    await h.api('interval.limit', cookie.lead, { schedule, source: 'site', revision: siteLimit.revision + 1, minDays: siteLimit.min_days, maxDays: siteLimit.max_days, reference: siteLimit.reference })
+    for (const reason of ['Pause', 'consent', 'agent']) {
+      const waiting = await fresh(), waitingApproval = await pending(waiting), snapshot = await state()
+      if (reason === 'Pause') await person('/agents/api/pause', { paused: true })
+      if (reason === 'consent') await adopt(held(), { revoked: { agents: [], consents: [context.consent] } })
+      if (reason === 'agent') await person(`/agents/api/agents/${encodeURIComponent(context.agentId)}/revoke`, {})
+      const deniedResponse = await h.raw(`${waitingApproval.path}/approve`, { cookie: decisionCookie, body: waitingApproval.exact })
+      const denied = await deniedResponse.json()
+      assert.equal(deniedResponse.status, reason === 'consent' ? 409 : 200)
+      if (reason === 'consent') {
+        assert.equal(denied.code, 'approval_expired', 'consent withdrawal permanently expires the prepared approval')
+        assert.equal((await person(waitingApproval.path)).approval.state, 'expired')
+      } else assert.equal(denied.approval.state, 'refused', `a waiting reversal cannot execute after ${reason}`)
+      assert.deepEqual(await state(), snapshot)
+      assert.equal((await proposals()).find(row => row.id === waiting.proposal.id).status, 'pending')
+      assert.equal((await audit()).rows.filter(row => row.action === 'proposal.apply' && row.subject === waiting.proposal.id).length, 0)
+      if (reason === 'Pause') await person('/agents/api/pause', { paused: false })
+      if (reason === 'agent') context.agentId = `synthetic-gasket-${randomUUID()}`
+      await adopt(held())
+    }
+    console.log('PROBE AGENT-004 pending reversal: changed source, lead authority, maintenance limit, Pause, consent or agent revocation before decision -> refusal with unchanged cadence and work')
     await adopt(autonomousPolicy())
     for (const changed of ['source', 'policy']) {
       const fenced = await fresh(), snapshot = await state()
@@ -202,6 +232,8 @@ export async function agentOutcomeReversalJourney() {
       assert.deepEqual(await state(), snapshot)
       assert.equal((await proposals()).find(row => row.id === fenced.proposal.id).status, 'pending')
       assert.equal((await audit()).rows.filter(row => row.action === 'proposal.apply' && row.subject === fenced.proposal.id).length, 0)
+      const retainedComparison = await assess(plans.worsening)
+      assert.equal(retainedComparison.source.records.intervention.later.some(row => row.proposal_id === fenced.proposal.id), false, 'a refused atomic application retains no interval history')
       await adopt(autonomousPolicy())
       console.log(`PROBE AGENT-004 reversal atomic ${changed}: changed at emitted Worker D1 boundary -> schedule, interval history, receipt and audit rolled back`)
     }
