@@ -87,7 +87,8 @@ export async function fieldRetirementJourney() {
     assert.equal(paired.status, 200, 'signed Business pairing')
     await paired.body?.cancel()
     const techCookie = await h.signIn(techEmail)
-    assert.equal((await h.api('me', techCookie)).role, 'maintainer')
+    const technician = await h.api('me', techCookie)
+    assert.equal(technician.role, 'maintainer')
     async function adopt(document, extra = {}) {
       const signed = await policyEnvelope(c, document, extra)
       const response = await h.raw('/api/rer/agent-policy', { body: { policy: signed.policy } })
@@ -108,12 +109,12 @@ export async function fieldRetirementJourney() {
       assert.equal(response.status, status, `${path}: ${JSON.stringify(value)}`)
       return value
     }
-    const approvalFor = async answer => {
+    const approvalFor = async (answer, cookie = owner) => {
       const id = answer.result?._meta?.['com.runeditrun/approval']?.id ?? answer.body?.error?.data?.approval?.id
       assert.ok(id, 'held call returns genuine approval')
-      return (await person(`/agents/api/approvals/${id}`)).approval
+      return (await person(`/agents/api/approvals/${id}`, undefined, 200, cookie)).approval
     }
-    const decide = approval => person(`/agents/api/approvals/${approval.id}/approve`, { revision: approval.revision, summary_sha256: approval.summary_sha256 })
+    const decide = (approval, cookie = owner) => person(`/agents/api/approvals/${approval.id}/approve`, { revision: approval.revision, summary_sha256: approval.summary_sha256 }, 200, cookie)
     const unchanged = async (fixture, run) => {
       const snapshot = async () => ({ field: (await api('custom-fields')).find(f => f.id === fixture.id), asset: await api(`assets/${fixture.asset}`), otherAsset: await api(`assets/${fixture.otherAsset}`), audit: await api('audit?action=customfield.retire') })
       const before = await snapshot()
@@ -191,6 +192,61 @@ export async function fieldRetirementJourney() {
       await retained(api, fixture)
       console.log(`PROBE SURFACE-004 irreversible-${held ? 'held' : 'allowing'}: native rename, second retirement and value replacement; completed MCP replay after scope removal, Pause and consent revocation -> all refused, both archived records unchanged`)
       console.log(`PROBE SURFACE-004 policy-${held ? 'held' : 'allowing'}: populated native field -> exact destructive facts, retained values and history, one attributed retirement; scope, authority, Pause, consent and revocation refusals change nothing`)
+
+      // Native schema authority must still exist when an old result is requested.
+      await adopt(held ? heldPolicy() : autonomousPolicy())
+      await api('access.role', { member: technician.id, role: 'lead' })
+      const lead = { sub: 'synthetic-gasket-maintainer', email: techEmail, act: { sub: `synthetic-gasket-${randomUUID()}`, name: 'Synthetic field coordinator', specialist: c.surface.specialist } }
+      const leadFixture = await populated(api), leadInput = args(leadFixture)
+      const leadAnswer = await call(leadInput, lead)
+      assert.equal(leadAnswer.decision.disposition, held ? 'approval' : 'autonomous')
+      if (held) assert.equal((await decide(await approvalFor(leadAnswer, techCookie), techCookie)).approval.state, 'executed')
+      else assert.equal(leadAnswer.result.structuredContent.id, leadFixture.id)
+      await retained(api, leadFixture)
+      const leadAudit = (await api('audit?action=customfield.retire')).rows.filter(row => row.subject === leadFixture.id)
+      assert.equal(leadAudit.length, 1)
+      const attribution = JSON.parse(leadAudit[0].detail)
+      assert.equal(attribution.preparedBy.for.id, technician.id)
+      assert.equal(attribution.preparedBy.agent.id, lead.act.sub)
+      assert.deepEqual(attribution.approvers.map(person => person.id), held ? [technician.id] : [])
+      await api('access.role', { member: technician.id, role: 'maintainer' })
+      await unchanged(leadFixture, async () => {
+        const denied = await call(leadInput, lead)
+        assert.equal(errorCode(denied), 'forbidden')
+        assert.equal(denied.result?.structuredContent, undefined)
+      })
+      console.log(`PROBE SURFACE-004 native-authority-${held ? 'held' : 'allowing'}: active lead retires through MCP with native attribution; native role removed then same completed key -> forbidden, no cached result and no new retirement`)
+    }
+
+    // Approval is a live execution door, so an earlier proposal cannot outlive its authority.
+    for (const boundary of ['pause', 'consent', 'agent']) {
+      await adopt(heldPolicy())
+      const fixture = await populated(api), input = args(fixture)
+      const identity = { act: { sub: `synthetic-gasket-${randomUUID()}`, name: 'Synthetic pending coordinator', specialist: c.surface.specialist } }
+      const pending = await approvalFor(await call(input, identity))
+      if (boundary === 'pause') await person('/agents/api/pause', { paused: true })
+      else if (boundary === 'consent') await adopt(heldPolicy(), { revoked: { agents: [], consents: [c.consent] } })
+      else await person(`/agents/api/agents/${identity.act.sub}/revoke`, {})
+      await unchanged(fixture, async () => {
+        if (boundary === 'consent') {
+          // Policy adoption expires the request before the human can execute it.
+          assert.equal((await person(`/agents/api/approvals/${pending.id}`)).approval.state, 'expired')
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const refusal = await person(`/agents/api/approvals/${pending.id}/approve`, { revision: pending.revision, summary_sha256: pending.summary_sha256 }, 409)
+            assert.equal(refusal.code, 'approval_expired')
+          }
+          const refused = await call(input, identity)
+          assert.equal(refused.status, 401)
+          assert.equal(refused.result?.structuredContent, undefined)
+        } else {
+          const decision = (await decide(pending)).approval
+          assert.equal(decision.state, 'refused')
+          assert.equal(decision.code, { pause: 'agents_paused', agent: 'sponsor_unavailable' }[boundary])
+          assert.deepEqual((await decide(pending)).approval, decision)
+        }
+      })
+      if (boundary === 'pause') await person('/agents/api/pause', { paused: false })
+      console.log(`PROBE SURFACE-004 pending-${boundary}: genuine held proposal then ${boundary} refusal at human approval -> no field retirement or lost values, repeat approval has no effect`)
     }
     await adopt(heldPolicy())
     const stale = await populated(api), staleInput = args(stale), pending = await call(staleInput), approval = await approvalFor(pending)

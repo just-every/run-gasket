@@ -29,8 +29,8 @@ import { runJob, type AutomationRule, type Source } from './automation-jobs'
 export const SCHEDULER = { id: 'scheduler', name: 'Gasket scheduler', cron: '*/15 * * * *', missedAfterMinutes: 45 }
 
 /** A bounded current job; cron, explicit catch-up and reading-triggered PM share its grant. */
-export async function executeRule(env: Bindings, rule: AutomationRule, day: string, source: Source, { revision, instant = now() }: { revision?: number; instant?: number } = {}) {
-  const input = await automationInputs(env, rule, day)
+export async function executeRule(env: Bindings, rule: AutomationRule, day: string, source: Source, { revision, instant = now(), schedulerRun }: { revision?: number; instant?: number; schedulerRun?: string } = {}) {
+  const input = { ...await automationInputs(env, rule, day), ...(schedulerRun ? { schedulerRun } : {}) }
   return await runJob<{ created: any[]; runs: any[]; notices: any[] }>(env, rule, source, input, async () => {
     if (rule === 'connectors') return await runConnectors(env, input.connectors!)
     if (rule === 'replenishment') return await runReplenishment(env, day)
@@ -51,7 +51,7 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
     const day = today(current.timezone, at), id = newId(), gap = previous ? Math.round((at - previous.ran_at) / 60_000) : null
     await env.DB.batch([stmt(env, "INSERT INTO gk_scheduler_runs (id,cron,ran_at,created,gap_minutes,finished_at,state) VALUES (?,?,?,0,?,?,'running')", id, cron, at, gap !== null && gap > SCHEDULER.missedAfterMinutes ? gap : null, at)])
     try {
-      const pm = await executeRule(env, 'pm', day, 'cron', { instant: at })
+      const pm = await executeRule(env, 'pm', day, 'cron', { instant: at, schedulerRun: id })
       const routes = await executeRule(env, 'routes', day, 'cron', { instant: at })
       await executeRule(env, 'chase', day, 'cron', { instant: at })
       await executeRule(env, 'expiry', day, 'cron', { instant: at })
@@ -62,10 +62,10 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
       await runReportSchedules(env)
       const created = pm.output?.created.length ?? 0
       const runs = routes.output && 'runs' in routes.output ? routes.output.runs : []
-      await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET created=?,finished_at=?,state='completed' WHERE id=?", created + runs.reduce((sum: number, run: any) => sum + run.workOrders.length, 0), now(), id)])
+      await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET created=?,finished_at=?,state='completed' WHERE id=? AND state='running'", created + runs.reduce((sum: number, run: any) => sum + run.workOrders.length, 0), now(), id)])
       return { created, runs: runs.length }
     } catch (error) {
-      await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET finished_at=?,state='failed',error='job_failed' WHERE id=?", now(), id)])
+      await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET finished_at=?,state='failed',error='job_failed' WHERE id=? AND state='running'", now(), id)])
       throw error
     }
   })
@@ -74,7 +74,7 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
 /** The scheduler's health: its recent runs, the gaps when it did not run, and calendar work it issued late. */
 export async function schedulerView(env: Bindings, actor: Actor) {
   requireCapability(actor, 'board.read')
-  const runs = await all(env, 'SELECT ran_at, cron, created, gap_minutes FROM gk_scheduler_runs ORDER BY ran_at DESC LIMIT 20')
+  const runs = await all(env, 'SELECT id,ran_at,cron,created,gap_minutes,finished_at,state,error FROM gk_scheduler_runs ORDER BY ran_at DESC LIMIT 20')
   const gaps = await all(env, 'SELECT ran_at, gap_minutes FROM gk_scheduler_runs WHERE gap_minutes IS NOT NULL ORDER BY ran_at DESC LIMIT 20')
   const issued = await all(env, `SELECT w.id, w.number, w.title, w.due_date, w.occurrence, w.created_at FROM gk_work_orders w WHERE w.created_by = ? AND w.schedule_id IS NOT NULL AND w.due_meter IS NULL AND w.trigger_reading_id IS NULL ORDER BY w.created_at DESC`, SCHEDULER.id)
   const late = issued.map(row => ({ ...row, issued_on: today(actor.zone, row.created_at) })).filter(row => row.issued_on > row.due_date)
