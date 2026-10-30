@@ -178,7 +178,9 @@ jobs:
           pnpm run test:requests
 
   # Preserve the shared fixture and archive comparison together; standalone
-  # journeys use separate installations in required parallel shards.
+  # journeys use separate installations in required parallel shards. Workspace
+  # conditional save recovery owns a shard so its browser journeys do not consume
+  # the core journeys' 15-minute budget. Every matrix entry is required.
   flows:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
@@ -187,7 +189,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, automation, inventory, reports]
+        shard: [core, automation, inventory, reports, workspace]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
