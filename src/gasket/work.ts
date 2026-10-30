@@ -113,6 +113,7 @@ export async function assign(env: Bindings, actor: Actor, input: Input, { also }
   requireCapability(actor, 'work.assign')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
   insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  if (input.has('version')) insist(input.integer('version', { min: 1 }) === order.version, 'stale', 409)
   const assignee = input.text('assignee', { max: 100 }), note = input.text('note', { optional: true, max: 1000 }) || null
   const crew = await crewChoice(env, input, order)
   await assigneeFits(env, assignee, crew.team)
