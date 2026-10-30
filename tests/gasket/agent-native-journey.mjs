@@ -184,6 +184,9 @@ export async function resourceJourney() {
       console.log('PROBE SURFACE-005 populated-' + family + ': MCP discovery and result link -> current native record, untrusted content')
     }
     const original = await call('gasket.work.read', { id: work.id })
+    const originalResource = await mcp(token, 'resources/read', { uri })
+    assert.equal(originalResource.body.result._meta['com.runeditrun/decision'].classes[0].facts.measure, 1, 'one person without pay records')
+    await api('labor.rate', { person: me.id, amount: '25.00', overtimeAfterMinutes: 480, overtimeMultiplier: 150 })
     const stableLink = original.content.find(item => item.type === 'resource_link').uri
     const before = await api('work/' + work.id)
     await call('gasket.work.assign', { workOrder: work.id, assignee: me.id, version: before.version, expected_revision: before.version, idempotency_key: randomUUID() })
@@ -193,8 +196,9 @@ export async function resourceJourney() {
     assert.deepEqual(JSON.parse(changed.body.result.contents[0].text), after, 'old result link follows current work revision')
     const classes = changed.body.result._meta['com.runeditrun/decision'].classes
     assert.deepEqual(classes.map(({ class: id, facts }) => ({ class: id, facts })), [{ class: 'sensitive', facts: {
-      kind: 'personnel_and_pay', measure: new Set([after.created_by, after.assignee_id].filter(Boolean)).size + after.labor.rates.length + after.labor.entries.length,
+      kind: 'personnel_and_pay', measure: 2,
     } }])
+    assert.equal(after.labor.rates[0].cents_per_hour, 2500, 'the sensitive projection includes the native private rate')
     const unchanged = structuredClone(after)
     await adopt(heldPolicy())
     const held = await mcp(token, 'resources/read', { uri })
@@ -250,6 +254,9 @@ export async function resourceJourney() {
     await api('service.revoke', { credential: assetsOnly.id })
     const revokedCredential = await mcp(assetsOnly.token, 'resources/read', { uri: 'gasket://assets/' + asset.id })
     assert.equal(revokedCredential.status, 401); assert.equal(revokedCredential.body.result, undefined)
+    await person('/agents/api/agents/' + encodeURIComponent('gasket-service:' + scoped.id) + '/revoke', {})
+    const revokedAgent = await mcp(scoped.token, 'resources/read', { uri })
+    assert.equal(revokedAgent.status, 401); assert.equal(revokedAgent.body.result, undefined)
     console.log('PROBE SURFACE-005 refusals: scope, credential, sponsor, client, local and Business Pause, revoked consent -> no record content; native work unchanged')
 
     // A real second sponsor loses native membership; its still-signed token cannot read records.
@@ -264,6 +271,8 @@ export async function resourceJourney() {
     const memberToken = await accessToken(c, { sub: memberSub, email: memberEmail, act: { sub: 'synthetic-gasket-member-agent', name: 'Synthetic member agent', specialist: surface.specialist } })
     const allowedMember = await mcp(memberToken, 'resources/read', { uri: 'gasket://assets/' + asset.id })
     assert.equal(allowedMember.body.result?.contents?.length, 1, 'active native member may read a maintenance resource')
+    const borrowed = await accessToken(c, { sub: memberSub, email: memberEmail, client_id: 'gasket-service:' + scoped.id, act: { sub: 'synthetic-gasket-borrowed-client', name: 'Synthetic borrowed client', specialist: surface.specialist } })
+    refused(await mcp(borrowed, 'resources/read', { uri: 'gasket://assets/' + asset.id }), 'resource_unavailable')
     await api('access.end', { member: member.id })
     const ended = await mcp(memberToken, 'resources/read', { uri: 'gasket://assets/' + asset.id })
     assert.equal(ended.status, 401); assert.equal(ended.body.result, undefined)
