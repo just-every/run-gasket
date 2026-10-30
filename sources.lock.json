@@ -264,7 +264,7 @@
       "executable": false
     },
     "docs/maintenance-semantics.md": {
-      "sha256": "d0e49e31448c585fc2c0c824c4151aaffc847971e7d14ca2ab195e85421457a1",
+      "sha256": "c309c8a11db0fdbcaa21c0a59214e292689d036b2d0a972df75c4646ed4dfd3b",
       "executable": false
     },
     "docs/migration-sources.md": {
@@ -1508,7 +1508,7 @@
       "executable": false
     },
     "src/gasket/automation-jobs.ts": {
-      "sha256": "449cfa8019ad3696eef5d7a2d1912f6438d9acffc4225c32b034b51354d92fcc",
+      "sha256": "5f4668485cfac3d47a6540177adb34e8a41081fc49a44c566aa7087af762b25a",
       "executable": false
     },
     "src/gasket/automation.ts": {
@@ -2032,7 +2032,7 @@
       "executable": false
     },
     "src/gasket/scheduler.ts": {
-      "sha256": "bb5365463a9df172a4409751beb844a010bb1c7f00374ba61b5cd1174c513b44",
+      "sha256": "8e4d5d22744e972d7c0e094a4515e86080a69159f0b4def88d91a83b0c220626",
       "executable": false
     },
     "src/gasket/schedules.ts": {
@@ -4816,7 +4816,7 @@
       "executable": false
     },
     "tests/gasket/pm-interruption.mjs": {
-      "sha256": "3f44706059579dbcd73c8b617d60cfe368efb100a9593a18fec32a154e6036a0",
+      "sha256": "e63ef7ee1ff7b42ef49b407f7e3bea41e9a91a59d19675c5889529f9f4b214d1",
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {
