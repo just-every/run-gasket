@@ -160,6 +160,17 @@ export async function agentReassignmentPolicyJourney() {
     assert.deepEqual(await retained(pm), replayBefore)
     assert.equal((await api('audit?action=proposal.apply', cookie.owner)).rows.filter(row => row.subject === args.proposal).length, 1)
     const completedArgs = { ...args }
+    // A lost client response can be retried against a restarted Worker. The
+    // accepted native effect and its receipt must come from durable storage.
+    await h.stop()
+    h = await harness({ vars, installation: initial.installation, clockInstant: tick, reassignmentGate: true })
+    context.origin = protocol.origin = h.origin
+    await adopt(autonomousPolicy())
+    assert.deepEqual((await call(completedArgs)).result.structuredContent, allowed.result.structuredContent)
+    assert.deepEqual(await retained(pm), replayBefore, 'restart replay changes neither work nor queues')
+    assert.deepEqual(await savedProposal(completedArgs), applied, 'restart retains the original proposal evidence and receipt')
+    assert.deepEqual((await api('audit?action=proposal.apply', cookie.owner)).rows.filter(row => row.subject === args.proposal), effect)
+    console.log('PROBE AGENT-005 durable-replay: same MCP submission after Worker restart -> original receipt, one retained handoff and unchanged queues')
     await person('/agents/api/pause', 'owner', { paused: true })
     await refuse(completedArgs, ['agents_paused'], 'completed replay during Pause')
     await person('/agents/api/pause', 'owner', { paused: false })

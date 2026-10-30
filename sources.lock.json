@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1f3c0a8d3b8bc99f364f67349b078559553af6521cc8522bc80af94402dc7d52",
+      "sha256": "2aa62d827b97d8edffd4f2014fc5165795cf5d2d528414eab5c949a636ed5705",
       "executable": false
     },
     "DEMO.md": {
@@ -4700,7 +4700,7 @@
       "executable": false
     },
     "tests/gasket/agent-reassignment-policy.mjs": {
-      "sha256": "b42b3a98a7eec31222b512e67642c8be8ec6350acfc2c392d9adb38cc5cb81cc",
+      "sha256": "5b0d99f15807e97fd4f1d659a60f57b1d7d704d26c45983c2dc4c57fa4e923fc",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
