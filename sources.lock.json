@@ -180,7 +180,7 @@
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "77bfa6278412af5eb3a06339bc2c28665094a91b5cf653043dbb3f0e2361cbbc",
+      "sha256": "fdf1e84d77782d315e7302e7a36ae03889850a75bf63052a8ccb66fd40dce6d6",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -1436,7 +1436,7 @@
       "executable": false
     },
     "src/gasket/agent-door/docs.ts": {
-      "sha256": "72a839bde8980c25f7e79e7c54477b392e9571daf12d05b228f065c301eabc76",
+      "sha256": "e7937c635b3137d3e33a0f94a9e40cb6c948e636186b13a51fd2a6a54836b834",
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
@@ -4687,6 +4687,10 @@
       "sha256": "a7929b367870168546ce0445520a7fee9b77837f7c800523d909b444f510c903",
       "executable": false
     },
+    "tests/gasket/agent-asset-undo.mjs": {
+      "sha256": "520674a8ee60a3a9d67e6010a726db051840b9951c6736684a41e11ce1b202d3",
+      "executable": false
+    },
     "tests/gasket/agent-follow-up-browser.mjs": {
       "sha256": "adaa5b2a034b878a4ceccca76e90b903918a36fe8cf627153cf53351ad540be4",
       "executable": false
@@ -4696,7 +4700,7 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "68657027e0efe902b79cfe0b75b3299908398b4942b6ce029fda9e2174269c97",
+      "sha256": "8da49143b238a1cfab1153db85d7d7d9eb969d4415b2702d3c6e5c2cfcb471d8",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
