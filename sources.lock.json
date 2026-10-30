@@ -180,7 +180,7 @@
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "77bfa6278412af5eb3a06339bc2c28665094a91b5cf653043dbb3f0e2361cbbc",
+      "sha256": "303425e92c7fcf2c6c6b5205e2d18a193662143c5b524dea485a82a457927889",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "465d0e1b17a2a20ea9ced0d347e9ebc43bfd9550f8ee5221c1f8f5cd6afdd927",
+      "sha256": "b88152032bbaec4d0af1f79bdb45c2bc58a333935aead833b6a7487baea6afd7",
       "executable": false
     },
     "DEMO.md": {
@@ -1432,19 +1432,19 @@
       "executable": false
     },
     "src/gasket/agent-door/context.ts": {
-      "sha256": "e9d9252721a51a0442b0e286d46c52da254b554ea2ea1bc6ed31a69e29949e67",
+      "sha256": "64f97cc65dd2e42e65aecffbf1c5756e28ab2c5d622afc51a7f424f845260b7f",
       "executable": false
     },
     "src/gasket/agent-door/docs.ts": {
-      "sha256": "72a839bde8980c25f7e79e7c54477b392e9571daf12d05b228f065c301eabc76",
+      "sha256": "5fdb219202c610af4fffcf8e8f769a47f9c34ff8a8120ef06b7a99ff20027800",
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
-      "sha256": "2aecf42793ec5aebfcac0b304214b87445fbb9145823a4c455e428d5a18c36e1",
+      "sha256": "a29429a8b0947d89dcfa2387b59c1e0b593eecd62a5ba54477b32879e4e47603",
       "executable": false
     },
     "src/gasket/agent-door/native.ts": {
-      "sha256": "fb8de1b851b3ff1633b4ad7ff70452f60142f707bd5611ee1dd2b778dfa16c89",
+      "sha256": "bdfbaecf242e83486e8ef1af01fa5119ed9c5383b6e896824723846c91db94e2",
       "executable": false
     },
     "src/gasket/agent-door/people.ts": {
@@ -1453,6 +1453,10 @@
     },
     "src/gasket/agent-door/procedures.ts": {
       "sha256": "71bcfab20b71955034f4584defad6304646cfe1cecf469b24f3d4ae03ee596db",
+      "executable": false
+    },
+    "src/gasket/agent-door/proposals.ts": {
+      "sha256": "e0b125319969e35f4ab120a2d97d85be17b3588aa0c8886aeb44a56563e2f67b",
       "executable": false
     },
     "src/gasket/agent-door/records.ts": {
@@ -1872,7 +1876,7 @@
       "executable": false
     },
     "src/gasket/proposals.ts": {
-      "sha256": "1bc93a29237c47b9f496e416b52e91c4e3cd6b4f7a7aade2b7022f3c495b78fb",
+      "sha256": "d128b5bec78650406d279d516cce0de5d19dca20af293d80d67b983c70434ab5",
       "executable": false
     },
     "src/gasket/purchase-authority.ts": {
@@ -2288,7 +2292,7 @@
       "executable": false
     },
     "src/gasket/ui/proposals.ts": {
-      "sha256": "52bf8d2b7ca5ee55f883500d4b029827039e7b33e34192d2950d7a61cfb35e54",
+      "sha256": "10891dc409a0f3192680d0d9d1b2cc19448a8866d3ac759dbab87d6ee5753094",
       "executable": false
     },
     "src/gasket/ui/purchase-approval.ts": {
@@ -2416,7 +2420,7 @@
       "executable": false
     },
     "src/gasket/work.ts": {
-      "sha256": "a63fbc65f2451185ab05d4083b2f21355272097e7b43ca05d36884753c6d5dbb",
+      "sha256": "454f7416f195623ec1cf3178d8497f653ffe5f0ccbe5faf1e89ee37461cedc1b",
       "executable": false
     },
     "src/gasket/zip.ts": {
@@ -4700,7 +4704,11 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "68657027e0efe902b79cfe0b75b3299908398b4942b6ce029fda9e2174269c97",
+      "sha256": "09a9c88e3d3f6beb4c32c241cf419bd32a572bc65a4e0104f1d603be1a91002e",
+      "executable": false
+    },
+    "tests/gasket/agent-proposal-policy.mjs": {
+      "sha256": "447315a47ab020a149cb59985f7340d90084fc5bd04aee10aed6b9e36a25da24",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
