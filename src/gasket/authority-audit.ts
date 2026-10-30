@@ -13,20 +13,27 @@ export function authorityStatements(db: D1Database, event: Authority) {
 }
 
 export function attributedDatabase(db: D1Database): D1Database {
+  const originals = new WeakMap<D1PreparedStatement, D1PreparedStatement>()
   const batch = async <T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> => {
+    // Delegate original statements so another database adapter can recognize its own handles.
+    statements = statements.map(statement => originals.get(statement) ?? statement)
     const event = authority.getStore()
     if (!event) return db.batch<T>(statements)
     const [before, after] = authorityStatements(db, event)
     return (await db.batch<T>([before, ...statements, after])).slice(1, -1)
   }
-  const prepared = (statement: D1PreparedStatement): D1PreparedStatement => new Proxy(statement, {
-    get(target, key) {
-      if (key === 'bind') return (...args: unknown[]) => prepared(target.bind(...args))
-      if (key === 'run') return async () => (await batch([target]))[0]
-      const value = Reflect.get(target, key, target)
-      return typeof value === 'function' ? value.bind(target) : value
-    },
-  })
+  const prepared = (statement: D1PreparedStatement): D1PreparedStatement => {
+    const wrapped = new Proxy(statement, {
+      get(target, key) {
+        if (key === 'bind') return (...args: unknown[]) => prepared(target.bind(...args))
+        if (key === 'run') return async () => (await batch([target]))[0]
+        const value = Reflect.get(target, key, target)
+        return typeof value === 'function' ? value.bind(target) : value
+      },
+    })
+    originals.set(wrapped, statement)
+    return wrapped
+  }
   return new Proxy(db, {
     get(target, key) {
       if (key === 'prepare') return (sql: string) => prepared(target.prepare(sql))
