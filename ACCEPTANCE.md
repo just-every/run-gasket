@@ -8,10 +8,10 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 52 | 55 | 37 | 144 |
+| Core | 53 | 54 | 37 | 144 |
 | Agent surface | 0 | 7 | 0 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 52 | 62 | 37 | 151 |
+| Full target | 53 | 61 | 37 | 151 |
 
 Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
@@ -245,6 +245,8 @@ Core · target · **partial**
 
 **Requirement.** One organization manages sites, buildings, lines and storerooms with local calendars and shared asset/part standards. Owners delegate site managers; site membership scopes every list, attachment, report and write. Cross-site transfers retain identity and history. Reparenting a hierarchy entry (ASSET-001) under another site's parent needs management rights at both sites and is otherwise refused. The technician create-work right (FIELD-009) is turned off and on per site by its owner or site manager: that site's technicians are refused at every door while other sites' technicians still create work. The stores report (PART-009) filters by any site the reader may see. Before additional sites ship, this clause scopes REQ-001/REQ-002 portals, published targets and intake and REQ-003 queues, duplicate groups, source photos and work conversion to the authorized site. REPORT-006 multi-site authorization applies at every report, schedule, draft, preview, dispatch and download door before additional sites become operational.
 
+CT policy ruling, 27 October 2026: APPROVE WITH RIDERS owner-only custody of planned-site metadata and membership. Only the active owner maintains these records, with exact revisions, attributed changes and current authority rechecked when persisted. A recorded manager gains no additional operational role, personnel access or authority over the primary site. Planned selection never serves another site's estate, and ending membership takes effect on the next authorized operation. Additional sites remain visibly planned until their operational boundaries are implemented. ADMIN-002 retains delegated site management, operational multi-site records, transfers preserving identity and history, destination hierarchy authority, local calendars, organization rollups and independently controlled technician rights. The complete US mobile CMMS and USD cost target remains required. This policy ruling accepts no completion.
+
 **Acceptance.**
 1. Create two sites with distinct managers, move an asset with its meter history, then call each private door using the other site's member.
 2. Inspect denied access, correct local dates and organization rollups.
@@ -252,7 +254,7 @@ Core · target · **partial**
 4. Turn the technician create-work right off at one site and see that site's technicians refused at the web, API and app doors while the other site's technicians still create work (FIELD-009).
 
 **Evidence.** `tests/gasket/flows.mjs` GAS-01 site and access, extended by `tests/gasket/site-access.mjs` siteAccessJourney: owner-created planned sites with distinct recorded managers; metadata visibility and private roster refusal; stale metadata and membership refusal; current-session planned membership revocation; no operational fallback across enumerated JSON, page and download doors and representative form writes for planned or unauthorized site selection; ended-member exclusion; attributed site audit with scoped search and download. `src/gasket/site-access.ts`; `src/gasket/site-context.ts`; `migrations/core/0099_site_registry.sql`.
-**Gap.** Only the primary site is operational. Additional sites hold planned metadata and membership only; there is no activation door. Remaining: site-scoped estate records at every list, record, attachment, report, write and download door; asset moves preserving meter and maintenance history; destination hierarchy authority; correct operational local dates and organization rollups; independent technician create-work rights at each site across web, API and app; operational membership revocation in background jobs; complete multi-site archive reconciliation. Conservative default adopted pending CT approval: only the active owner maintains site metadata and membership; recorded managers gain no extra role permissions or personnel access. PLAN-004 qualification and tool records, REQ-001 through REQ-003 intake and source evidence, REPORT-006 preview, dispatch and download, and existing recovery duties remain subject to this full site boundary before additional sites become operational.
+**Gap.** Only the primary site is operational. Additional sites hold planned metadata and membership only; there is no activation door. Remaining: site-scoped estate records at every list, record, attachment, report, write and download door; asset moves preserving meter and maintenance history; destination hierarchy authority; correct operational local dates and organization rollups; independent technician create-work rights at each site across web, API and app; operational membership revocation in background jobs; complete multi-site archive reconciliation. RL-105 reconciles the existing 27 October 2026 CT approval of owner-only planned-site metadata and membership custody; recorded managers gain no extra role permissions or personnel access. Delegated site governance, complete inherited additional-site journeys and owner-revocation proof at persistence remain unproved. PLAN-004 qualification and tool records, REQ-001 through REQ-003 intake and source evidence, REPORT-006 preview, dispatch and download, and existing recovery duties remain subject to this full site boundary before additional sites become operational.
 
 #### ADMIN-003 — Role rights and separation of duties
 
@@ -558,7 +560,7 @@ Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INP
 
 #### ASSET-010 — Calibration tasks and certificate versions
 
-Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INPUT-001
+Core · target · **done** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INPUT-001
 
 **Requirement.** Leads publish calibration tasks with due tolerances, required tools, certificate attachments and failed-reading follow-up. The procedure pins numeric tolerances; an out-of-tolerance reading needs a linked corrective finding. Review retains certificate versions, tool identities and on-time status without claiming equipment certification. [Maintenance semantics](docs/maintenance-semantics.md#asset-010) defines the calibration calculation.
 
@@ -567,7 +569,7 @@ Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INP
 2. Try missing or expired calibration evidence, complete and review the work, then inspect retained certificate versions and on-time status.
 
 **Evidence.** `tests/gasket/flows.mjs` — "ASSET-010 gauge calibration with tolerances, tools and certificate versions"
-**Gap.** A calibration journey attempting submission with a missing required certificate and reading unchanged work is missing. The cited calibration journey reads missing-evidence messages, records tools and certificate originals, approves two versions and reads tolerances, dates and retained results.
+**Gap.** None.
 
 #### ASSET-009 — Custom asset and part fields
 
