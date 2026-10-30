@@ -16,7 +16,7 @@ const span = (row: { serialFrom: string | null; serialTo: string | null; modelFr
 const fit = (row: Omit<Line, 'alternates' | 'quantity'>, serial: string | null, model: string | null) => row.fits ? '' : h` ${tag('Does not fit')}<span class="gk-sub">Fits ${span(row)}; this asset is ${serial ?? 'without a serial'}${row.modelFrom || row.modelTo ? `, model ${model ?? 'unknown'}` : ''}</span>`
 
 export function bomCard(bom: Bom | null, zone: string, form_: unknown = '') {
-  const body = bom ? h`<p class="gk-sub">Revision ${bom.revision}${bom.note ? ` · ${bom.note}` : ''} · ${bom.createdBy ?? '—'} · ${showInstant(bom.createdAt, zone)}</p>
+  const body = bom ? h`<p>Asset model: ${bom.model ?? 'unknown'} · Serial: ${bom.serial ?? 'unknown'}</p><p class="gk-sub">Revision ${bom.revision}${bom.note ? ` · ${bom.note}` : ''} · ${bom.createdBy ?? '—'} · ${showInstant(bom.createdAt, zone)}</p>
     ${table(['Part', 'Needed', 'Available', 'Approved alternates'], bom.lines.map(line => [h`${line.part.name}<span class="gk-sub">${line.part.number} · ${span(line)}</span>${fit(line, bom.serial, bom.model)}`, amount(line.quantity, line.part.unit),
       h`${amount(line.available, line.part.unit)}${line.short ? h` ${tag('Out of stock')}` : ''}`,
       line.alternates.length ? h`${line.alternates.map(alt => h`<span class="gk-sub">${alt.part.number} ${alt.part.name}: ${amount(alt.available, alt.part.unit)} available · ${span(alt)}${alt.fits ? '' : ` · does not fit this ${!alt.serialFits && !alt.modelFits ? 'serial and model' : !alt.modelFits ? 'model' : 'serial'}`}</span>`)}` : h`<span class="gk-muted">None</span>`]), 'Bill of materials', { wrap: [0, 3] })}

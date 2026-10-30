@@ -1688,6 +1688,7 @@ try {
           await screen.evaluate(async () => { await document.fonts.ready })
           if (width === 1440) {
             assert.match(await screen.locator('#bom').innerText(), /models DRV-100 to DRV-199/)
+            assert.match(await screen.locator('#bom').innerText(), new RegExp(`Asset model: ${name === 'model-refusal' ? 'DRV-250' : 'DRV-150'} · Serial: M-1500`), 'planning displays the actual identity alongside its applicable ranges')
             if (name === 'asset') {
               assert.equal(await screen.locator('input[name="model"]').inputValue(), 'DRV-150')
               assert.equal(await screen.locator('input[name="modelFrom"]').first().inputValue(), 'DRV-100')
