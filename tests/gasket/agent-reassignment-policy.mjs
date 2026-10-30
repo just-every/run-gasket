@@ -64,7 +64,7 @@ export async function agentReassignmentPolicyJourney() {
     await api('agent.answer', cookie.max, { query: query.id, nextAction: 'Collect the bearing and inspect', promisedOn: day(0) })
     await h.stop()
     tick += 2 * 86400000
-    h = await harness({ vars, installation: initial.installation, clockInstant: tick })
+    h = await harness({ vars, installation: initial.installation, clockInstant: tick, reassignmentGate: true })
     cookie.owner = await h.signIn(vars.OWNER_EMAIL)
     for (const key of ['lead','max','mo','sam','agent']) cookie[key] = await h.signIn(email(`synthetic-gasket-${key}`))
     const state = await api(`agent-follow-up/${pm}`, cookie.agent)
@@ -94,11 +94,11 @@ export async function agentReassignmentPolicyJourney() {
     }
     const savedProposal = async args => (await api('proposals', cookie.owner)).find(row => row.id === args.proposal)
     const refuse = async (args, codes, label, options) => {
-      const before = await retained(pm), proposal = await savedProposal(args)
+      const proposal = await savedProposal(args), before = await retained(proposal.payload.workOrder)
       const answer = await call(args, options)
       if (codes.includes('unauthenticated')) assert.equal(answer.status, 401, `${label} HTTP refusal`)
       assert.ok(codes.includes(errorCode(answer)) || codes.includes('unauthenticated') && errorCode(answer) === -32001, `${label}: ${errorCode(answer)} ${JSON.stringify(answer.body)}`)
-      assert.deepEqual(await retained(pm), before, `${label} preserves work and both queues`)
+      assert.deepEqual(await retained(proposal.payload.workOrder), before, `${label} preserves work and both queues`)
       assert.deepEqual(await savedProposal(args), proposal, `${label} preserves proposal`)
       return answer
     }
@@ -177,6 +177,58 @@ export async function agentReassignmentPolicyJourney() {
     assert.equal((await api('audit?action=proposal.apply', cookie.owner)).rows.filter(row => row.subject === concurrent.proposal).length, 1)
     assert.ok(parallelQuery.id)
     console.log('PROBE AGENT-005 allowing: MCP existing missed-promise proposal -> standard, one attributed handoff, reset acknowledgment, both queues and retained source receipt; replay unchanged')
+    // Hold the actual native batch after classification, summary, policy admission
+    // and all source reads. Concurrent changes use ordinary public doors.
+    await api('chase.rule', cookie.owner, { remindBeforeDays: 1, responseWithinDays: 0, leadAfterDays: 0, supervisorAfterDays: 1 })
+    for (const change of ['blocker','query','rule','linked outcome','work revision','eligible team','policy','Pause','consent']) {
+      const racedWork = (await api('workorder.create', cookie.owner, { asset, title: `Synthetic guarded ${change}`, due: day(-10), assignee: ids.max })).id
+      let linked, team
+      if (change === 'linked outcome') {
+        linked = (await api('finding.record', cookie.max, { workOrder: racedWork, severity: 'high', text: 'Inspect linked repair', followUp: true })).followUp
+        await api('workorder.assign', cookie.owner, { workOrder: linked, assignee: ids.mo })
+        await api('finding.record', cookie.mo, { workOrder: linked, severity: 'low', text: 'Repair evidence retained' })
+        await api('workorder.submit', cookie.mo, { workOrder: linked, version: (await work(linked)).version })
+      }
+      if (change === 'eligible team') {
+        team = (await api('team.create', cookie.owner, { name: 'Synthetic guarded crew', trade: 'Mechanical', member: [ids.max, ids.mo] })).id
+        await api('workorder.assign', cookie.owner, { workOrder: racedWork, assignee: ids.max, team })
+      }
+      const raced = await draft(racedWork), proposal = await savedProposal(raced)
+      let entered, release, timeout
+      const ready = new Promise(resolve => { entered = resolve })
+      const held = new Promise(resolve => { release = resolve })
+      h.setReassignmentHook(async () => { h.setReassignmentHook(undefined); entered(); await held })
+      const applying = call(raced)
+      try {
+        await Promise.race([ready, new Promise((_, reject) => { timeout = setTimeout(() => reject(Error(`Reassignment boundary not reached: ${change}`)), 15_000) })])
+        clearTimeout(timeout)
+        if (change === 'blocker') await api('blocker.raise', cookie.max, { workOrder: racedWork, kind: 'parts', nextAction: 'Collect replacement', promisedOn: day(0) })
+        if (change === 'query') await api('agent.query', cookie.agent, { workOrder: racedWork, version: (await work(racedWork)).version, question: 'Has the next action changed?' })
+        if (change === 'rule') await api('chase.rule', cookie.owner, { remindBeforeDays: 2, responseWithinDays: 0, leadAfterDays: 0, supervisorAfterDays: 1 })
+        if (change === 'linked outcome') await api('workorder.review', cookie.sam, { workOrder: linked, version: (await work(linked)).version, decision: 'approve' })
+        if (change === 'work revision') await api('workorder.acknowledge', cookie.max, { workOrder: racedWork })
+        if (change === 'eligible team') await api('team.member', cookie.owner, { team, member: ids.mo, remove: true })
+        if (change === 'policy') await adopt(heldPolicy())
+        if (change === 'Pause') await person('/agents/api/pause', 'owner', { paused: true })
+        if (change === 'consent') await adopt(autonomousPolicy(), { revoked: { agents: [], consents: [context.consent] } })
+        const preserved = await retained(racedWork)
+        const effects = () => api(`audit?action=proposal.apply&subject=${raced.proposal}`, cookie.owner)
+        const beforeEffects = await effects()
+        release()
+        const refused = await applying
+        assert.ok(['stale','assignee_not_assignable','agent_policy_changed','agent_authority_ended','precondition_failed'].includes(errorCode(refused)), `${change} during admitted execution: ${JSON.stringify(refused.body)}`)
+        assert.deepEqual(await retained(racedWork), preserved, `${change} rolls back the handoff and queue changes`)
+        assert.deepEqual(await savedProposal(raced), proposal, `${change} retains the unapplied proposal and evidence`)
+        assert.deepEqual(await effects(), beforeEffects, `${change} retains no application receipt`)
+        if (linked) assert.equal((await work(linked)).status, 'closed', 'the independently accepted concurrent outcome survives')
+        console.log(`PROBE AGENT-005 atomic-${change}: change through native door after policy admission -> ${errorCode(refused)}, no handoff, queue change or application receipt`)
+      } finally {
+        clearTimeout(timeout); release(); h.setReassignmentHook(undefined)
+        await applying
+        if (change === 'Pause') await person('/agents/api/pause', 'owner', { paused: false })
+        if (['policy','consent'].includes(change)) await adopt(autonomousPolicy())
+      }
+    }
     // A held standard policy executes with a genuine review record, separately from human sign-off.
     await adopt(heldPolicy())
     args = await draft(pm, ids.max)

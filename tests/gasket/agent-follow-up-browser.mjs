@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { chromium } from '@playwright/test'
 
 async function withPage(h,cookie,run) {
-  const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+  const browser=await chromium.launch({headless:true,executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH||undefined,args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
   try {
     const context=await browser.newContext({ignoreHTTPSErrors:true})
     await context.addCookies(cookie.split('; ').map(pair=>{const at=pair.indexOf('=');return {name:pair.slice(0,at),value:pair.slice(at+1),url:h.origin}}))
