@@ -18,7 +18,9 @@ async function populated(api) {
   const field = await api('customfield.save', { name: `Synthetic retained field ${randomUUID()}`, entityType: 'asset', type: 'text', scope: 'site' })
   const asset = await api('asset.create', { tag: `synthetic-gasket-${randomUUID()}`, name: 'Synthetic retained asset', location: 'Workshop', customValues: { [field.id]: 'Original maintenance value' } })
   await api('customvalue.set', { entityType: 'asset', entityId: asset.id, customValues: { [field.id]: 'Current maintenance value' } })
-  return { ...field, asset: asset.id, before: (await api(`assets/${asset.id}`)).customFields.find(item => item.id === field.id) }
+  const other = await api('asset.create', { tag: `synthetic-gasket-${randomUUID()}`, name: 'Synthetic second retained asset', location: 'Workshop', customValues: { [field.id]: 'Other original maintenance value' } })
+  await api('customvalue.set', { entityType: 'asset', entityId: other.id, customValues: { [field.id]: 'Other current maintenance value' } })
+  return { ...field, asset: asset.id, before: (await api(`assets/${asset.id}`)).customFields.find(item => item.id === field.id), otherAsset: other.id, otherBefore: (await api(`assets/${other.id}`)).customFields.find(item => item.id === field.id) }
 }
 async function retained(api, fixture) {
   const archived = (await api(`assets/${fixture.asset}`)).customFields.find(item => item.id === fixture.id)
@@ -30,6 +32,14 @@ async function retained(api, fixture) {
   assert.equal(archived.history.length, 2)
   assert.deepEqual(archived.history.map(item => item.value), ['Current maintenance value', 'Original maintenance value'])
   assert.ok(archived.history.every(item => item.actor && item.changed_at))
+  const other = (await api(`assets/${fixture.otherAsset}`)).customFields.find(item => item.id === fixture.id)
+  assert.equal(other.retired, 1)
+  assert.equal(other.archived, true)
+  assert.equal(other.revision, fixture.revision + 1)
+  assert.equal(other.value, 'Other current maintenance value')
+  assert.deepEqual(other.history, fixture.otherBefore.history)
+  assert.deepEqual(other.history.map(item => item.value), ['Other current maintenance value', 'Other original maintenance value'])
+  assert.ok(other.history.every(item => item.actor && item.changed_at))
 }
 
 /** Fresh populated identities for every required Core policy phase. */
@@ -56,7 +66,7 @@ export async function afterStep(context) {
   assert.deepEqual(await audit(), before)
   await retained(api, fixture)
   assert.equal(errorCode(await context.tool(name, { ...context.args, revision: 2 })), 'idempotency_conflict')
-  console.log(`PROBE SURFACE-004 retirement-${context.phase}: MCP -> one retired identity, two retained value revisions, attributed policy decision and no second native effect`)
+  console.log(`PROBE SURFACE-004 retirement-${context.phase}: MCP -> one retired identity across two populated records, four retained value revisions, attributed policy decision and no second native effect`)
 }
 
 /** One public-door safety journey covers stale approvals, native authority and completed replay. */
@@ -105,9 +115,10 @@ export async function fieldRetirementJourney() {
     }
     const decide = approval => person(`/agents/api/approvals/${approval.id}/approve`, { revision: approval.revision, summary_sha256: approval.summary_sha256 })
     const unchanged = async (fixture, run) => {
-      const before = { field: (await api('custom-fields')).find(f => f.id === fixture.id), asset: await api(`assets/${fixture.asset}`), audit: await api('audit?action=customfield.retire') }
+      const snapshot = async () => ({ field: (await api('custom-fields')).find(f => f.id === fixture.id), asset: await api(`assets/${fixture.asset}`), otherAsset: await api(`assets/${fixture.otherAsset}`), audit: await api('audit?action=customfield.retire') })
+      const before = await snapshot()
       await run()
-      assert.deepEqual({ field: (await api('custom-fields')).find(f => f.id === fixture.id), asset: await api(`assets/${fixture.asset}`), audit: await api('audit?action=customfield.retire') }, before)
+      assert.deepEqual(await snapshot(), before)
     }
     for (const held of [false, true]) {
       await adopt(held ? heldPolicy() : autonomousPolicy())
@@ -142,28 +153,43 @@ export async function fieldRetirementJourney() {
         assert.equal(replay.decision.classes[0].facts.measure, 1)
         assert.equal(errorCode(await call({ ...input, revision: 2 })), 'idempotency_conflict')
         assert.equal(errorCode(await call({ ...input, idempotency_key: randomUUID() })), 'revision_conflict')
+        assert.equal((await api('customfield.save', { id: fixture.id, revision: 2, name: 'Attempted revival', entityType: 'asset', type: 'text', scope: 'site' }, 409)).error, 'custom_field_retired')
+        assert.equal((await api('customfield.retire', { id: fixture.id, revision: 2 }, 409)).error, 'stale')
+        assert.equal((await api('customvalue.set', { entityType: 'asset', entityId: fixture.asset, customValues: { [fixture.id]: 'Attempted replacement' } }, 400)).error, 'custom_field_out_of_scope')
       })
       // Authority remains native under either company policy, including after completed replay.
       const untouched = await populated(api)
       await unchanged(untouched, async () => {
+        assert.equal(errorCode(await call({ ...input, id: untouched.id })), 'idempotency_conflict')
         const beforeAuthority = { me: await api('me'), team: await api('members'), credentials: await api('service-credentials'), state: await person('/agents/api/state') }
         for (const proposed of ['gasket.memberships.change', 'gasket.grants.create', 'gasket.policy.change', 'gasket.fields.save']) {
           assert.equal(errorCode(await mcp('tools/call', { name: proposed, arguments: { subject: c.person.sub, role: 'owner', scope: '*', idempotency_key: randomUUID() } })), 'tool_not_found')
         }
         assert.deepEqual({ me: await api('me'), team: await api('members'), credentials: await api('service-credentials'), state: await person('/agents/api/state') }, beforeAuthority)
         assert.equal(errorCode(await call(args(untouched), { scope: 'assets:read' })), 'insufficient_scope')
+        const unscopedReplay = await call(input, { scope: 'assets:read' })
+        assert.equal(errorCode(unscopedReplay), 'insufficient_scope')
+        assert.equal(unscopedReplay.result?.structuredContent, undefined)
         assert.equal(errorCode(await call(args(untouched), { sub: 'synthetic-gasket-maintainer', email: techEmail, act: { sub: `synthetic-gasket-${randomUUID()}`, name: 'Synthetic maintainer agent', specialist: c.surface.specialist } })), 'forbidden')
         await person('/agents/api/pause', { paused: true })
         assert.equal(errorCode(await call(args(untouched))), 'agents_paused')
+        const pausedReplay = await call(input)
+        assert.equal(errorCode(pausedReplay), 'agents_paused')
+        assert.equal(pausedReplay.result?.structuredContent, undefined)
         await person('/agents/api/pause', { paused: false })
         await adopt(held ? heldPolicy() : autonomousPolicy(), { revoked: { agents: [], consents: [c.consent] } })
         assert.equal((await call(args(untouched))).status, 401)
+        const revokedReplay = await call(input)
+        assert.equal(revokedReplay.status, 401)
+        assert.equal(revokedReplay.result?.structuredContent, undefined)
         await adopt(held ? heldPolicy() : autonomousPolicy())
         const revokedAgent = `synthetic-gasket-${randomUUID()}`
         await mcp('tools/list', {}, { act: { sub: revokedAgent, name: 'Synthetic revocable agent', specialist: c.surface.specialist } })
         await person(`/agents/api/agents/${revokedAgent}/revoke`, {})
         assert.equal((await call(args(untouched), { act: { sub: revokedAgent, name: 'Synthetic revocable agent', specialist: c.surface.specialist } })).status, 401)
       })
+      await retained(api, fixture)
+      console.log(`PROBE SURFACE-004 irreversible-${held ? 'held' : 'allowing'}: native rename, second retirement and value replacement; completed MCP replay after scope removal, Pause and consent revocation -> all refused, both archived records unchanged`)
       console.log(`PROBE SURFACE-004 policy-${held ? 'held' : 'allowing'}: populated native field -> exact destructive facts, retained values and history, one attributed retirement; scope, authority, Pause, consent and revocation refusals change nothing`)
     }
     await adopt(heldPolicy())

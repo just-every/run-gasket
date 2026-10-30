@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "303baab706f852539eb5f4981e5d74e04ecaea418dd4fae459613d4d4a1e4161",
+      "sha256": "cfd285911c1898cbbb37cbb4e6fc6c5ba3dea7df3f9e7ca0b20dc0ccfa55d1e3",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "3c298d4dc81fc49bdb30e35e74a69586dc592aa9c3b3dd7778f2d275fa9392fb",
+      "sha256": "9cf31e2036975dcca23edcb3f296eb0c835de6d65de2ddb7c7010b31485aa8c3",
       "executable": false
     },
     "DEMO.md": {
@@ -4680,7 +4680,7 @@
       "executable": false
     },
     "tests/gasket/agent-field-retirement.mjs": {
-      "sha256": "782c388bd38bf7078238f0340d44ac23fcc4d5f12ba2ad54823465243356bf19",
+      "sha256": "aabd7aa8e9b1bfbac15205f12ab332338720d788fb998955fed058d8c069329e",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
