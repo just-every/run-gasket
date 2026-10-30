@@ -8,12 +8,12 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 50 | 57 | 37 | 144 |
+| Core | 51 | 56 | 37 | 144 |
 | Agent surface | 0 | 7 | 0 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 50 | 64 | 37 | 151 |
+| Full target | 51 | 63 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). ASSET-010 is judged from the code and tests in the current candidate commit (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -558,7 +558,7 @@ Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INP
 
 #### ASSET-010 — Calibration tasks and certificate versions
 
-Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INPUT-001
+Core · target · **done** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INPUT-001
 
 **Requirement.** Leads publish calibration tasks with due tolerances, required tools, certificate attachments and failed-reading follow-up. The procedure pins numeric tolerances; an out-of-tolerance reading needs a linked corrective finding. Review retains certificate versions, tool identities and on-time status without claiming equipment certification. [Maintenance semantics](docs/maintenance-semantics.md#asset-010) defines the calibration calculation.
 
@@ -566,8 +566,8 @@ Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INP
 1. Schedule gauge calibration with required tools, fail a reading and inspect its independent corrective work.
 2. Try missing or expired calibration evidence, complete and review the work, then inspect retained certificate versions and on-time status.
 
-**Evidence.** `tests/gasket/flows.mjs` — "ASSET-010 gauge calibration with tolerances, tools and certificate versions"
-**Gap.** A calibration journey attempting submission with a missing required certificate and reading unchanged work is missing. The cited calibration journey reads missing-evidence messages, records tools and certificate originals, approves two versions and reads tolerances, dates and retained results.
+**Evidence.** `tests/gasket/flows.mjs` — "ASSET-010 gauge calibration with tolerances, tools and certificate versions": schedules a gauge with pinned tolerances and required tools, retains the failed reading and independent corrective work, refuses current-revision submission with only the certificate missing and preserves work and certificate history, then uploads the original, independently approves both calibrations and reads both retained certificate versions, tools and on-time status.
+**Gap.** None.
 
 #### ASSET-009 — Custom asset and part fields
 
