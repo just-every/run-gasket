@@ -228,12 +228,36 @@ try {
     assert.equal((await h.api('work?mine=1', cookie.mo)).length, 0)
     await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.mo })
     assert.equal((await h.api('work?mine=1', cookie.mo))[0].id, ids.pm)
-    await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.agent }, 409)
-    await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.sam }, 409)
+    assert.equal((await h.api('work?mine=1', cookie.max)).length, 0)
+    const ended = (await h.api('access.give', cookie.owner, { name: 'Synthetic Gasket maintainer', email: ['synthetic-gasket-26', 'example.test'].join(String.fromCharCode(64)), role: 'maintainer' })).id
+    const active = (await h.api('members', cookie.owner)).find(person => person.id === ended)
+    assert.deepEqual([active.role, active.status], ['maintainer', 'active'])
+    assert.ok((await (await h.raw(`/app/work/${ids.pm}`, { cookie: cookie.lead })).text()).includes(`value="${ended}"`), 'the active maintainer is offered for assignment')
+    await h.api('access.end', cookie.owner, { member: ended })
+    const people = await h.api('members', cookie.owner)
+    assert.deepEqual([people.find(person => person.id === ended).role, people.find(person => person.id === ended).status], ['maintainer', 'ended'])
+    const unknown = 'synthetic-gasket-26-unknown'
+    assert.ok(!people.some(person => person.id === unknown), 'the unknown assignee has no membership')
+    const assignment = async () => {
+      const order = await wo('lead', ids.pm)
+      return {
+        work: { id: order.id, number: order.number, asset: order.asset_id, kind: order.kind, title: order.title, status: order.status, assignee: order.assignee_id, version: order.version, handoffs: order.crew.handoffs },
+        max: await h.api('work?mine=1', cookie.max),
+        mo: await h.api('work?mine=1', cookie.mo),
+      }
+    }
+    const beforeRefusal = await assignment()
+    assert.equal(beforeRefusal.work.assignee, ids.mo)
+    assert.deepEqual(beforeRefusal.work.handoffs.map(row => [row.from, row.to]), [['Max Ortiz', 'Mo Haddad']])
+    for (const [reason, assignee] of [['ended member', ended], ['unknown person', unknown], ['agent', ids.agent], ['supervisor', ids.sam]]) {
+      const refused = await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee }, 409)
+      assert.equal(refused.error, 'assignee_not_assignable', reason)
+      assert.deepEqual(await assignment(), beforeRefusal, `${reason} refusal preserves work identity, assignee, version, handoffs and both queues`)
+    }
     await h.api('workorder.assign', cookie.max, { workOrder: ids.pm, assignee: ids.max }, 403)
     await h.submit('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.max }, `/app/work/${ids.pm}`)
     assert.equal((await wo('max', ids.pm)).assignee_id, ids.max)
-    ids.corrective = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Replace fryer thermostat', due: addDays(today, -2), assignee: ids.mo })).id
+    ids.corrective = (await h.submit('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Replace fryer thermostat', due: addDays(today, -2), assignee: ids.mo }, '/app/work/{id}')).pathname.split('/').pop()
     assert.equal((await wo('mo', ids.corrective)).kind, 'corrective')
     // The Work panel's decision on overdue work: keeping it with its holder is offered first and chosen, the person
     // deciding is never offered to take it, and once decided the panel shows the decision instead of the plans.
