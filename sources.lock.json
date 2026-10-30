@@ -176,11 +176,11 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "6a1af7b550c667102390bb8c9a56d95961a94aa76551b3e47de48cf8b63940df",
+      "sha256": "c1b7b005f02ac733584b1667f4f4eb8c839ffdc40cd57065202e20dea4b3dc9b",
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "65ec44d5c8517e4f424082eb1f38d05fc0684b332fffe79fe33438789cde00ab",
+      "sha256": "db10198ed0a366fbb8ea47eba1a28aa87531badff0b07be01a331c859d213805",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "55def1331ae438c6d8a951f58fef54089503fc9c4c4e774c1dcbe506a7bb392b",
+      "sha256": "0ebd8b57d7985900f5f7c585a804c768b597954a750c7948f4762bd0abcd9180",
       "executable": false
     },
     "DEMO.md": {
@@ -1436,7 +1436,7 @@
       "executable": false
     },
     "src/gasket/agent-door/docs.ts": {
-      "sha256": "60d42807573b2b7393d53e520bdaa0c764dbca454efecc9f906f3609af698ed6",
+      "sha256": "8e082a02d24af42e6330faac5e33082f6a6ad5bc4c64d245209e4927a25f11c4",
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
@@ -1452,7 +1452,7 @@
       "executable": false
     },
     "src/gasket/agent-door/procedures.ts": {
-      "sha256": "71bcfab20b71955034f4584defad6304646cfe1cecf469b24f3d4ae03ee596db",
+      "sha256": "d2a3ad6894879fdc5783e982edc915cc21479ad9baca698b9c592f77ea0c38f6",
       "executable": false
     },
     "src/gasket/agent-door/records.ts": {
@@ -1568,7 +1568,7 @@
       "executable": false
     },
     "src/gasket/checklists.ts": {
-      "sha256": "455049ed15d6ba79cae9f26011be364c27c7a313d26d8e5a53f51b55294c34c5",
+      "sha256": "6f5f56e7ca4c72ba28c875c8e6f24fd42eb4035a75adea4af5bda54a964b475f",
       "executable": false
     },
     "src/gasket/codes.ts": {
@@ -4700,7 +4700,11 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "9eea5f2bff8333a7aec6142159de39b44949b157c537602ce893c1c1001187da",
+      "sha256": "352bfe9827be077805292992fd172aa82e5a4db29b3d7c275e6b6b606cd9c6e2",
+      "executable": false
+    },
+    "tests/gasket/agent-procedure-revisions.mjs": {
+      "sha256": "0d365cb324e127c29c4151426ce2710e8770c747f44fe56b35b05fb531809324",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {

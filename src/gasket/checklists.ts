@@ -2,7 +2,7 @@
 // the revision current when it was created.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
-import { all, commit, insist, newId, now, one, stmt } from './core'
+import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import { rules } from './corrections'
 import type { Input } from './input'
 import { parseSteps, type ChecklistItem } from './steps'
@@ -30,11 +30,13 @@ export async function reviseChecklist(env: Bindings, actor: Actor, input: Input)
   requireCapability(actor, 'register.manage')
   const checklist = await one(env, 'SELECT id FROM gk_checklists WHERE id = ?', input.text('checklist', { max: 100 }))
   insist(checklist, 'checklist_not_found', 404)
-  const latest = (await one<{ number: number; items_json: string }>(env, 'SELECT number, items_json FROM gk_checklist_revisions WHERE checklist_id = ? ORDER BY number DESC LIMIT 1', checklist.id))!
+  const latest = (await one<{ id: string; number: number; items_json: string }>(env, 'SELECT id, number, items_json FROM gk_checklist_revisions WHERE checklist_id = ? ORDER BY number DESC LIMIT 1', checklist.id))!
+  const sourceRevision = input.text('sourceRevision', { max: 100, optional: true }) || latest.id
+  insist(sourceRevision === latest.id, 'revision_conflict', 409)
   const list = items(input, JSON.parse(latest.items_json)), note = input.text('note', { max: 300 }), revision = newId()
   const number = latest.number + 1
-  await commit(env, [stmt(env, 'INSERT INTO gk_checklist_revisions (id, checklist_id, number, items_json, note, published_by, published_at) VALUES (?, ?, ?, ?, ?, ?, ?)', revision, checklist.id, number, JSON.stringify(list), note, actor.id, now())],
-    { actor: actor.id, action: 'checklist.revise', subject: checklist.id, detail: { number, items: list.length, note } })
+  await commit(env, [guard(env, 'revision_conflict', '(SELECT id FROM gk_checklist_revisions WHERE checklist_id=? ORDER BY number DESC LIMIT 1)=?', checklist.id, sourceRevision), stmt(env, 'INSERT INTO gk_checklist_revisions (id, checklist_id, number, items_json, note, published_by, published_at) VALUES (?, ?, ?, ?, ?, ?, ?)', revision, checklist.id, number, JSON.stringify(list), note, actor.id, now())],
+    { actor: actor.id, action: 'checklist.revise', subject: checklist.id, detail: { number, sourceRevision, items: list.length, note } })
   return { id: checklist.id, revision, number }
 }
 
