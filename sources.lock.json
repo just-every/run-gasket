@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "6a1af7b550c667102390bb8c9a56d95961a94aa76551b3e47de48cf8b63940df",
+      "sha256": "96bc9957ae1d0143c8894ae5dbc0331cb1ed5943b1a67299cca9b65ff5a71916",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "465d0e1b17a2a20ea9ced0d347e9ebc43bfd9550f8ee5221c1f8f5cd6afdd927",
+      "sha256": "6f3460808bd20f182840324c2f95baabe3cbda87c7e78dc743ef8c694563353b",
       "executable": false
     },
     "DEMO.md": {
@@ -4744,7 +4744,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "af8dc71ebee8884906fd209e4bbbc6cdd303cec5cf5b2c21b74c6e7556026731",
+      "sha256": "8e9b12486819a5fc4e22553a5f3df31228b109bb414a5ae00b2d66ce393b6082",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4829,6 +4829,10 @@
     },
     "tests/gasket/pm-interruption.mjs": {
       "sha256": "e40fd30ba31cc7e17a0c6671a201f49f9e7fde60bb080e6ef1057414b1d687ed",
+      "executable": false
+    },
+    "tests/gasket/pm-restarts.mjs": {
+      "sha256": "e4a4e99e8dc8ad4cb8d054b4b61e7e2a531bd6bf69dfc00ba745a435dd9d4251",
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {

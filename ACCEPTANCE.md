@@ -862,8 +862,8 @@ Core · target · **partial** · Cites BASE-OPS-003, BASE-OPS-004 · Rules D-3
 1. Save a monthly PM through the schedule door, leave the app, cross its due window and restart the scheduler twice.
 2. Open one generated order, its due occurrence and any missed-run warning without invoking manual generation.
 
-**Evidence.** `tests/gasket/flows.mjs` — "PM-001 unattended calendar generation"
-**Gap.** A public-door journey interrupting and restarting a scheduler across a due occurrence is missing. The cited journeys show repeated scheduled invocations, one occurrence, late issue and missed-run warnings without worker interruption.
+**Evidence.** `tests/gasket/flows.mjs` — "PM-001 unattended calendar generation"  Additional candidate evidence: `tests/gasket/pm-restarts.mjs` — "pmRestartsJourney" (schedule form, actual Worker stop across lead and due windows, two restarts, one pinned occurrence, retained gap and late warning in JSON and browser); registered in the existing automation flow shard.
+**Gap.** A public-door journey interrupting and restarting a scheduler across a due occurrence is missing. The cited journeys show repeated scheduled invocations, one occurrence, late issue and missed-run warnings without worker interruption.  The added interruption/restart proof awaits fresh ct judgment; main's partial status is retained.
 
 #### PM-002 — Automatic meter and condition triggers
 
