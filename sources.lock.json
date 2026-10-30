@@ -176,11 +176,11 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "cfd285911c1898cbbb37cbb4e6fc6c5ba3dea7df3f9e7ca0b20dc0ccfa55d1e3",
+      "sha256": "e5eadc9a12a004689994c97da70d306161e4ab4d92bce1bf5f2e20204ae88ae4",
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "77bfa6278412af5eb3a06339bc2c28665094a91b5cf653043dbb3f0e2361cbbc",
+      "sha256": "65ec44d5c8517e4f424082eb1f38d05fc0684b332fffe79fe33438789cde00ab",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "944ed6b4af950a2214748f401988dc0645bf284f4d52eaf9a953fa0a347f43cb",
+      "sha256": "89370fecfeb90a5825885005b3eb373a2c55518a566c8e03529f6d56b4897310",
       "executable": false
     },
     "DEMO.md": {
@@ -1428,15 +1428,15 @@
       "executable": false
     },
     "src/gasket/agent-door/docs.ts": {
-      "sha256": "72a839bde8980c25f7e79e7c54477b392e9571daf12d05b228f065c301eabc76",
+      "sha256": "60d42807573b2b7393d53e520bdaa0c764dbca454efecc9f906f3609af698ed6",
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
-      "sha256": "2aecf42793ec5aebfcac0b304214b87445fbb9145823a4c455e428d5a18c36e1",
+      "sha256": "e955edd779075efdf0562f751c946c9188dee7bc97b8e7c03d2252c04eb23745",
       "executable": false
     },
     "src/gasket/agent-door/native.ts": {
-      "sha256": "fb8de1b851b3ff1633b4ad7ff70452f60142f707bd5611ee1dd2b778dfa16c89",
+      "sha256": "a5a5b74f0e9e16f988bad103b2e6af4e5ee94dbf3c7937d9b346183d6aae3a64",
       "executable": false
     },
     "src/gasket/agent-door/people.ts": {
@@ -1448,7 +1448,7 @@
       "executable": false
     },
     "src/gasket/agent-door/records.ts": {
-      "sha256": "a250db1566b2d3e7b689178fbe175b03378e8272bae45ae12be56e884440ef00",
+      "sha256": "3b5a4afea722db0fff421fe76f3a96dfa61963975115dd3cd673a8371c22ffa0",
       "executable": false
     },
     "src/gasket/agent-door/tools.ts": {
@@ -4688,7 +4688,7 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "68657027e0efe902b79cfe0b75b3299908398b4942b6ce029fda9e2174269c97",
+      "sha256": "9eea5f2bff8333a7aec6142159de39b44949b157c537602ce893c1c1001187da",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {

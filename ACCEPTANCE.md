@@ -13,7 +13,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 | Later | 0 | 0 | 0 | 0 |
 | Full target | 52 | 62 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). SURFACE-005 resource proof is judged from the candidate commit `HEAD` (30 October 2026); its remaining obligations stay partial. Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -2049,8 +2049,8 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-003, BASE
 3. Revoke access to a work record, change it and inspect all subscribed channels for absence of its later evidence.
 4. Discover each specialist prompt and follow its referenced maintenance clauses.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
-**Gap.** UNDECLARED families: resources, events, prompts and subscriptions. Their typed refusals do not prove native maintenance event delivery, resource refresh, webhook handoffs or the other target resource families.
+**Evidence.** `tests/gasket/agent-native-journey.mjs` — "resourceJourney": populated asset, work, part and procedure discovery; native fact reconciliation; stable result links and changed work refresh; computed sensitive work classification and policy withholding; current scope, credential, sponsor, client, Pause and consent refusals without record content. `agent-surface.json` enables the complete applicable resources conformance in normal foundation verification.
+**Gap.** Remaining maintenance resource families, events, feed and webhook reconciliation, subscriptions and channel-revocation proof, and specialist prompts are unproved. Operational multi-site access retains ADMIN-002 and its conservative custody default awaiting CT approval. Shared Base modules, delegated authority, provider capabilities, native device obligations and the existing Base hold remain unchanged.
 
 #### SURFACE-006 — Grounded maintenance actions and physical evidence
 
