@@ -1851,13 +1851,13 @@ Core and typed refusals, not the full aggregate jobs or undeclared families.
 
 ## Status
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 and the ASSET-006 model compatibility slice are judged from the candidate commit `HEAD` (30 October 2026).
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06, MIG-007 and the ASSET-006 model compatibility slice are judged from the candidate commit `HEAD` (30 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 13 | 3 | 0 | 16 |
-| Target and push further | 38 | 60 | 37 | 135 |
-| All | 51 | 63 | 37 | 151 |
+| Target and push further | 39 | 59 | 37 | 135 |
+| All | 52 | 62 | 37 | 151 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1991,7 +1991,7 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | `MIG-004` | Fiix complete maintenance migration | target | missing |  | No Fiix report/database/file importer, schema mapping or historical reconciliation. |
 | `MIG-005` | Limble complete maintenance migration | target | missing |  | No Limble entity/task importer, original-file/meter extraction or audit mapping. |
 | `MIG-006` | Tractian complete maintenance migration | target | missing |  | No Tractian export/API migration adapter, source manifest or full-history reconciliation. |
-| `MIG-007` | Open-work CSV and Excel migration | target | partial | `tests/gasket/generic-migration.mjs` — "genericMigrationJourney" | A public-door journey the stated 2,000-row scale in exact-candidate Verify is missing. The cited journeys show default-sized templates, errors, source mappings, native values, replay and no historic stock/notices; scale mode is separate from Verify. |
+| `MIG-007` | Open-work CSV and Excel migration | target | done | `tests/gasket/generic-migration.mjs` — "genericMigrationJourney": 2,000 open and historical rows through CSV, XLS and XLSX preview; leading-zero identifiers, mixed dates, custom values, explicit asset, user and team mappings, corrected preview errors, bounded apply and durable resume, every accepted native row, replay, unchanged stock and no historical notices; template and import authority refusals; migration screens at 1440 and 390. `tests/gasket/flows.mjs` — "2,000-row spreadsheet migration and source reconciliation", required in the inventory shard with small-fixture refusal. |  |
 | `MIG-008` | Reconciled cutover and a complete exit | target | partial | `src/gasket/movein/maintainx.ts`; `src/gasket/history.ts` | Register preview and history CSV exist; no all-entity reconciliation, shadow/delta cutover, activation controls or complete neutral exit pack. |
 | `SAFE-001` | Hazard, isolation and permit evidence | target | done | `tests/gasket/safety.mjs` — "safetyJourney" |  |
 | `SAFE-002` | Compliance templates and calibration evidence | target | done | `tests/gasket/safety.mjs` — "safetyJourney" |  |

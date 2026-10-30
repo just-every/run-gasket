@@ -192,6 +192,7 @@ jobs:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
       GASKET_FLOWS_SHARD: ${{ matrix.shard }}
+      GASKET_MIGRATION_ROWS: '2000'
       API_SCREENSHOTS: /tmp/gasket-api
       PLANNING_SCREENSHOTS: /tmp/gasket-planning
       REPORT_SCREENSHOTS: /tmp/gasket-reports

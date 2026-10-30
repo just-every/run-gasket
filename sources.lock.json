@@ -164,7 +164,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "fee469a7e7c6e1e13722e0f440396cc7440d998f4a64b3eb47f34da1c6e5e071",
+      "sha256": "9a3c3804d632e46d50a310041f539ee8acce148a375eb6ea206dfc66fddc274e",
       "executable": false
     },
     ".gitignore": {
@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "674af709a688ec5ced5a0a372909a16b06381a74a5e380c48cf1d132d98cc9ae",
+      "sha256": "ffdbb748d0475ea31ba9d02b1d004ed58416c951321935d87c077db0c193708d",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "67378c252299d3cba62f829d79d90bc97fb0cab2b7b47b9a24012fdb1a1bc7c2",
+      "sha256": "76a838db4911b3363b6f21f3470002e5cf4428b9173d930013d9ea26e5f6fcdf",
       "executable": false
     },
     "DEMO.md": {
@@ -232,7 +232,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "f1f8bee0e28c35e77cd0e0e3c69cee0c315f6217770b6e0177f5e0d117a16030",
+      "sha256": "1309d61e0b47254f67f42fab00873cd4085ce4e744488183526fc8f74b34055c",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
@@ -2208,7 +2208,7 @@
       "executable": false
     },
     "src/gasket/ui/html.ts": {
-      "sha256": "af0409c29a9d51d46bc2c0c6fc20baac79b60fb7d07b667fa1c0cabbbe28045d",
+      "sha256": "557fc0d134e0489308e985057786b96d2e53f668e225f0a342907915faa79740",
       "executable": false
     },
     "src/gasket/ui/icons.ts": {
@@ -4732,7 +4732,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "a01ad6b6cbfb1bbfc3388651c80163ef8338b54cc42f12d3004d54596360e0ef",
+      "sha256": "2ea0a132f8041e7097c91228c445549c3a2d1b044ff797444193df15373d4b62",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4744,7 +4744,7 @@
       "executable": false
     },
     "tests/gasket/generic-migration.mjs": {
-      "sha256": "ffa155b5331aee9bdbcb0e0afb9b5b5e9f4a4e8a688625b02004d8ff9cb96595",
+      "sha256": "30893b7d5167b9f7e2c03bd3df8319b56e332b43c8bbf9adbda7628fa252033b",
       "executable": false
     },
     "tests/gasket/harness.mjs": {

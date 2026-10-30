@@ -50,11 +50,12 @@ import { now, zone } from './clock.mjs'
 
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
+const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
   [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
   [privateFileLinksJourney, 'automation'],
-  [genericMigrationJourney,'inventory'],
+  [requiredMigrationJourney,'inventory'],
   [safetyJourney,'inventory'],
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
@@ -1598,6 +1599,7 @@ try {
       assert.deepEqual({ parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }, before, 'refusal changes neither stock nor work reservations')
     }
     await unchangedRefusal(twinJob, { part: belt, quantity: '1' }, 'part_not_compatible')
+    let modelRefusalPage
     for (const [tag, model] of [['HK-062', 'DRV-250'], ['HK-063', '']]) {
       const asset = (await h.api('asset.create', cookie.lead, { tag, name: `Conveyor ${tag}`, serial: 'M-1500', model, location: 'Dock' })).id
       assert.equal((await h.api(`assets/${asset}`, cookie.max)).model, model || null)
@@ -1608,6 +1610,17 @@ try {
       assert.equal((await wo('lead', workOrder)).bom.lines[0].alternates[0].fits, false)
       await unchangedRefusal(workOrder, { part: belt, quantity: '1' }, 'part_not_compatible')
       await unchangedRefusal(workOrder, { part: c3, insteadOf: belt, quantity: '1' }, 'substitute_not_compatible')
+      // A planner using the work form must see model applicability in the refusal too.
+      for (const [fields, error] of [[{ part: belt, quantity: '1' }, 'part_not_compatible'], [{ part: c3, insteadOf: belt, quantity: '1' }, 'substitute_not_compatible']]) {
+        const before = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+        const refused = await h.submit('workorder.reserve', cookie.lead, { workOrder, ...fields }, `/app/work/${workOrder}`)
+        assert.equal(refused.searchParams.get('error'), error)
+        const page = await (await h.raw(refused.pathname + refused.search, { cookie: cookie.lead })).text()
+        const alert = page.match(/<p[^>]*role="alert"[^>]*>([^<]*)<\/p>/)?.[1]
+        assert.match(alert ?? '', /model/i, 'a model-incompatible reservation explains model applicability')
+        assert.deepEqual({ parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }, before, 'form refusal changes neither stock nor reservations')
+        if (model) modelRefusalPage = refused.pathname + refused.search
+      }
       if (!model) {
         await h.api('bom.revise', cookie.lead, { asset, revision: 1, part: [c3], quantity: ['1'] })
         await h.api('workorder.reserve', cookie.lead, { workOrder, part: c3, quantity: '1' })
@@ -1656,7 +1669,7 @@ try {
         const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
         await context.addCookies(cookie.lead.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
         const screen = await context.newPage()
-        for (const [name, path] of [['asset', `/app/assets/${motor}`], ['work', `/app/work/${laterRepair}`]]) {
+        for (const [name, path] of [['asset', `/app/assets/${motor}`], ['work', `/app/work/${laterRepair}`], ['model-refusal', modelRefusalPage]]) {
           await screen.goto(h.origin + path)
           await screen.locator('#bom').waitFor()
           await screen.evaluate(async () => { await document.fonts.ready })
@@ -1666,7 +1679,8 @@ try {
               assert.equal(await screen.locator('input[name="model"]').inputValue(), 'DRV-150')
               assert.equal(await screen.locator('input[name="modelFrom"]').first().inputValue(), 'DRV-100')
               assert.equal(await screen.locator('input[name="alternateModelTo"]').first().inputValue(), 'DRV-199')
-            } else assert.match(await screen.locator('main').innerText(), /Shielded bearing/)
+            } else if (name === 'work') assert.match(await screen.locator('main').innerText(), /Shielded bearing/)
+            else assert.match(await screen.getByRole('alert').innerText(), /model/i)
             assert.equal(await screen.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${name} fits the desktop`)
           }
           if (process.env.GASKET_BOM_SCREENSHOTS) {
@@ -1677,7 +1691,7 @@ try {
         await context.close()
       }
     } finally { await browser.close() }
-    console.log('PROBE ASSET-006 screens: built asset and work pages -> current model, restrictions, stock and substitute displayed')
+    console.log('PROBE ASSET-006 screens: built asset and work pages -> current model, restrictions, stock, substitute and model refusal displayed')
 
   })
 
@@ -2522,7 +2536,7 @@ try {
   await check('REPORT-009 definitions and data quality', async () => { await metricsJourney(h, cookie, ids) })
 
   await check('Weekly report delivery and recipient authorization', reportSchedulesJourney)
-  await check('Spreadsheet migration and source reconciliation', genericMigrationJourney)
+  await check('2,000-row spreadsheet migration and source reconciliation', requiredMigrationJourney)
   await check('REPORT-010 work PDF and bulk ZIP', workPdfJourney)
   let laborContext
   await check('Reviewed person time and protected labor costs', async () => { laborContext = await laborJourney(h,cookie,ids) })
