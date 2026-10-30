@@ -1,3 +1,4 @@
+import { assetUndoEffect } from './agent-door/asset-undo'
 import { customStatements, customValues } from './custom-fields'
 // Clause 2: the asset register. Edits write the previous identity to
 // gk_asset_versions; retiring keeps every record. Sightings reconcile the
@@ -65,13 +66,15 @@ export async function updateAsset(env: Bindings, actor: Actor, input: Input) {
   await checkCriticality(env, value.criticality, asset.criticality)
   const custom = await customStatements(env, actor, input, 'asset', asset.id, value.category)
   const before = Object.fromEntries(IDENTITY.map(key => [key, asset[key]]))
+  const undo = assetUndoEffect(env, asset, before, value)
   await commit(env, [
     ...custom,
     guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND revision = ?)', asset.id, revision),
     stmt(env, 'INSERT INTO gk_asset_versions (asset_id, revision, value_json, changed_by, changed_at) VALUES (?, ?, ?, ?, ?)', asset.id, asset.revision, JSON.stringify(before), actor.id, now()),
     stmt(env, 'UPDATE gk_assets SET tag = ?, name = ?, serial = ?, location = ?, custodian = ?, category = ?, criticality = ?, notes = ?, revision = revision + 1, updated_at = ? WHERE id = ?', value.tag, value.name, value.serial, value.location, value.custodian, value.category, value.criticality, value.notes, now(), asset.id),
-  ], { actor: actor.id, action: 'asset.update', subject: asset.id, detail: { before, after: value } })
-  return { id: asset.id, revision: revision! + 1 }
+    ...(undo?.statements ?? []),
+  ], { actor: actor.id, action: 'asset.update', subject: asset.id, detail: { before, after: value, ...(undo ? { effect: undo.saved.effect } : {}) } })
+  return { id: asset.id, revision: revision! + 1, ...(undo ? { undo: undo.saved } : {}) }
 }
 
 export async function retireAsset(env: Bindings, actor: Actor, input: Input) {
