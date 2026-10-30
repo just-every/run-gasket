@@ -96,7 +96,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -135,18 +135,13 @@ jobs:
           name: gasket-built-worker
           path: dist
       - run: pnpm run verify
-      - name: Verify archive recovery
-        run: |
-          export GASKET_RECOVERY_SCREENSHOTS="$RUNNER_TEMP/gasket-recovery"
-          mkdir -p "$GASKET_RECOVERY_SCREENSHOTS"
-          node tests/gasket/recovery.mjs
 
   # All four intake/label/triage journeys remain required on every push.
   requests:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
@@ -190,7 +185,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -231,8 +226,46 @@ jobs:
       - run: pnpm run test:flows
 
 
+  archive-recovery:
+    needs: plan
+    if: needs.plan.outputs.skip != 'true'
+    runs-on: ubuntu-24.04
+    # Retain every inactive restore and erasure-journal reconciliation on the expanded estate.
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      WRANGLER_SEND_METRICS: 'false'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1; action runtime Node 24
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0; action runtime Node 24
+        with:
+          node-version: '22.20.0'
+          package-manager-cache: false
+      - run: npm install --global pnpm@10.12.4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run deps
+      - name: Install Chromium
+        run: |
+          set -euo pipefail
+          pnpm exec playwright install chromium
+          # Hosted ubuntu-24.04 already carries Chromium's libraries. Use apt only when a real launch fails.
+          node scripts/ci/chromium-probe.mjs || {
+            timeout 420 pnpm exec playwright install-deps chromium
+            node scripts/ci/chromium-probe.mjs
+          }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: gasket-built-worker
+          path: dist
+      - run: |
+          export GASKET_RECOVERY_SCREENSHOTS="$RUNNER_TEMP/gasket-recovery"
+          mkdir -p "$GASKET_RECOVERY_SCREENSHOTS"
+          node tests/gasket/recovery.mjs
+
   verify:
-    needs: [plan, foundation, requests, flows]
+    needs: [plan, foundation, requests, flows, archive-recovery]
     if: ${{ always() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 1
