@@ -1851,13 +1851,13 @@ Core and typed refusals, not the full aggregate jobs or undeclared families.
 
 ## Status
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026).
+Judged from the code and tests at commit `9f3535b538170281e8ed6d2ed89c1e1ac5f5b8d2` (30 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 12 | 4 | 0 | 16 |
-| Target and push further | 38 | 60 | 37 | 135 |
-| All | 50 | 64 | 37 | 151 |
+| Target and push further | 39 | 59 | 37 | 135 |
+| All | 51 | 63 | 37 | 151 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1900,7 +1900,7 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | `ASSET-005` | Meters, units and counter corrections | target | done | `tests/gasket/flows.mjs` — "ASSET-005 meters, units and counter corrections" |  |
 | `ASSET-006` | Bill of materials and interchangeable spares | target | partial | `tests/gasket/flows.mjs` — "ASSET-006 bill of materials and interchangeable spares" | A public-door journey model compatibility and stock per eligible storeroom is missing. The cited journeys show serial-range refusal, revisions, named tools and compatible reservations. |
 | `ASSET-007` | Asset lifecycle and replacement decision | target | done | `tests/gasket/flows.mjs` — "ASSET-007 asset lifecycle and replacement decision" |  |
-| `ASSET-008` | Multi-asset inspection rounds | target | partial | `tests/gasket/flows.mjs` — "ASSET-008 scheduled inspection routes across assets" | A journey completing and successfully signing an inspection run after refusing incomplete sign-off is missing. The cited route journey issues pinned stops, records a failure and a missed stop, reads its reason and refuses incomplete sign-off; it never finishes and signs the run. |
+| `ASSET-008` | Multi-asset inspection rounds | target | done | `tests/gasket/flows.mjs` — "ASSET-008 scheduled inspection routes across assets" |  |
 | `ASSET-010` | Calibration tasks and certificate versions | target | partial | `tests/gasket/flows.mjs` — "ASSET-010 gauge calibration with tolerances, tools and certificate versions" | A calibration journey attempting submission with a missing required certificate and reading unchanged work is missing. The cited calibration journey reads missing-evidence messages, records tools and certificate originals, approves two versions and reads tolerances, dates and retained results. |
 | `ASSET-009` | Custom asset and part fields | target | partial | `tests/gasket/custom-fields.mjs` customFieldsJourney (registered in `tests/gasket/flows.mjs`): typed text, unit-bearing number, choice, multiple choice, date, yes or no and link values; organization, current-site and category definitions; required and invalid-choice refusal; asset, part and location values through forms and JSON; actor and time history; rename retention and archived values; asset and part custom-field search, saved filters, filtered CSV and MaintainX custom-column preview, apply, replay and edited-value undo refusal. customBrowser: field Settings, register pages, signed-in scan edits, location register and import mapping at 1440 and 390. | The cited journey shows current-installation typed schema administration, register values, rename/retirement and a register import. Native app values, multi-site scope and complete search, API, import, dashboard and export coverage remain unproved under RL-102. |
 | `REQ-001` | Web operator request portal | target | partial | `tests/gasket/requests.mjs` — requestPortalJourney: configured typed fields, signed-in and opted-in public faults, required answer refusal, persisted answers, invalid target and file bounds, receipt privacy and creator-only access. `tests/gasket/request-privacy.mjs` — photoPrivacy: content-selected PNG and JPEG, metadata stripping, malformed images and photo count refusal; installationLimit: installation ceiling and private-data-free limit logs; erasePrivateRequest: confirmed owner erasure, private data removal and stale retry refusal. requestScreens: settings, queue, detail, erased detail and form at 1440 and 390. `tests/gasket/requests.mjs` — requestTriageJourney: scoped converted photo evidence and converted-detail erasure. | Ct approved defaults and riders on 23 October 2026 at 08:42Z, explicitly retaining PARTIAL. Rider implementation and public-door proof are complete; ct DONE ruling requested. ADMIN-013 inherits portal language; ADMIN-004 inherits future requester identities. |

@@ -8,12 +8,12 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 50 | 57 | 37 | 144 |
+| Core | 51 | 56 | 37 | 144 |
 | Agent surface | 0 | 7 | 0 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 50 | 64 | 37 | 151 |
+| Full target | 51 | 63 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `9f3535b538170281e8ed6d2ed89c1e1ac5f5b8d2` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -545,7 +545,7 @@ Core · target · **done** · Cites BASE-ROLE-001, BASE-INPUT-001
 
 #### ASSET-008 — Multi-asset inspection rounds
 
-Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INPUT-001
+Core · target · **done** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INPUT-001
 
 **Requirement.** Leads publish ordered multi-asset inspection routes. Each stop retains its asset, pinned procedure and independently open missed or failed work; route sign-off cannot close missing work. Recurrence preserves one run per occurrence even when earlier runs remain open. [Maintenance semantics](docs/maintenance-semantics.md#asset-008) defines task issue and tool requirements.
 
@@ -554,7 +554,7 @@ Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INP
 2. Attempt route sign-off while work is missing; inspect refusal, then finish the stops and read the retained run.
 
 **Evidence.** `tests/gasket/flows.mjs` — "ASSET-008 scheduled inspection routes across assets"
-**Gap.** A journey completing and successfully signing an inspection run after refusing incomplete sign-off is missing. The cited route journey issues pinned stops, records a failure and a missed stop, reads its reason and refuses incomplete sign-off; it never finishes and signs the run.
+**Gap.** None.
 
 #### ASSET-010 — Calibration tasks and certificate versions
 
