@@ -78,7 +78,7 @@ export async function bomOf(env: Bindings, asset: { id: string; serial: string |
   const parts = new Map(identities.map(part => [part.id,{...part,...currentStock.get(part.canonical_id),id:part.id,number:part.number,name:part.name,canonical_id:part.canonical_id}]))
   const describe = (id: string, row: Row, quantity: number) => {
     const part = parts.get(id)!
-    return { part: { id, canonicalId:part.canonical_id, number: part.number, name: part.name, unit: part.unit }, onHand: part.onHand, available: part.available, serialFrom: row.serial_from, serialTo: row.serial_to, modelFrom: row.model_from, modelTo: row.model_to, fits: compatible(asset, row), short: Number(part.available) < quantity / 1000 }
+    return { part: { id, canonicalId:part.canonical_id, number: part.number, name: part.name, unit: part.unit }, onHand: part.onHand, available: part.available, serialFrom: row.serial_from, serialTo: row.serial_to, modelFrom: row.model_from, modelTo: row.model_to, serialFits: fits(asset.serial, row.serial_from, row.serial_to), modelFits: fits(asset.model, row.model_from, row.model_to), fits: compatible(asset, row), short: Number(part.available) < quantity / 1000 }
   }
   const allAlternates = await all(env, 'SELECT * FROM gk_bom_alternates WHERE revision_id IN (SELECT id FROM gk_bom_revisions WHERE asset_id = ?) ORDER BY position', asset.id)
   const allLines = await all(env, 'SELECT * FROM gk_bom_lines WHERE revision_id IN (SELECT id FROM gk_bom_revisions WHERE asset_id = ?) ORDER BY position', asset.id)

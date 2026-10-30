@@ -67,15 +67,18 @@ export async function recoveryJourney() {
     const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today, assignee: (await h.api('me', owner)).id })
     await h.api('workorder.reserve', lead, { workOrder: accepted.id, part: alternate, insteadOf: bearing, quantity: '2' })
     const retainedModels = await modelFacts(h, owner)
-    const retainedReservations = (await h.api(`work/${accepted.id}`, owner)).reservations
     assert.deepEqual([retainedModels.model, retainedModels.versions[0].value.model], ['P-175', 'P-150'])
     assert.deepEqual(retainedModels.bom.revisions.map(row => [row.number, row.createdBy, row.lines[0].model_from, row.alternates[0].model_to]), [[2, 'Recovery lead', 'P-100', 'P-199'], [1, 'Recovery lead', 'P-100', 'P-199']])
     const workPhoto = (await h.api('workorder.evidence', owner, { workOrder: accepted.id, version: 1, file: file('synthetic-gasket-private-photo.png', png, 'image/png') })).evidence
+    const retainedReservations = (await h.api(`work/${accepted.id}`, owner)).reservations
     const portal = (await h.api('request.portal', owner, { name: 'Recovery intake', fields: [] })).id
     const intakeTarget = (await h.api('request.target', owner, { portal, kind: 'asset', asset, name: 'Recovery pump', publishConsent: true })).id
     assert.equal((await h.raw(`/request/${portal}`, { cookie: owner, body: { target: intakeTarget, submissionKey: randomUUID(), description: 'synthetic-gasket-private-fault', urgency: 'normal', contact: 'synthetic-gasket-private-contact', photo: file('request.png', png, 'image/png') } })).status, 303)
     const request = (await h.api('search?kind=request&q=synthetic-gasket-private-fault', owner)).rows[0].id
     const photo = (await h.api(`requests/${request}`, owner)).files[0].id
+    const mismatched = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-mismatch', name: 'Different recovery model', serial: 'R-150', model: 'P-250', location: 'Plant' })).id
+    await h.api('bom.revise', owner, { ...applicability, asset: mismatched })
+    const refusedWork = (await h.api('workorder.create', owner, { asset: mismatched, title: 'Restored model refusal', due: today, assignee: member })).id
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
     const paperWork=await printPackFixture(h,owner,member)
@@ -117,9 +120,6 @@ export async function recoveryJourney() {
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
       assert.deepEqual(await modelFacts(restored, signed), retainedModels, 'inactive restore preserves model identity history and both BOM restriction revisions with attribution')
       assert.deepEqual((await restored.api(`work/${accepted.id}`, signed)).reservations, retainedReservations, 'inactive restore preserves approved substitute commitments')
-      const mismatched = (await restored.api('asset.create', signed, { tag: 'synthetic-gasket-mismatch', name: 'Different recovery model', serial: 'R-150', model: 'P-250', location: 'Plant' })).id
-      await restored.api('bom.revise', signed, { ...applicability, asset: mismatched })
-      const refusedWork = (await restored.api('workorder.create', signed, { asset: mismatched, title: 'Restored model refusal', due: today, assignee: member })).id
       const beforeRefusal = { parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }
       assert.equal((await restored.api('workorder.reserve', signed, { workOrder: refusedWork, part: alternate, insteadOf: bearing, quantity: '1' }, 409)).error, 'substitute_not_compatible')
       assert.deepEqual({ parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }, beforeRefusal)

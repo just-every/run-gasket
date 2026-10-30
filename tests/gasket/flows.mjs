@@ -1561,6 +1561,8 @@ try {
     const open = await part('BRG-6306', 'Open bearing'), shielded = await part('BRG-6306-ZZ', 'Shielded bearing', '2'), c3 = await part('BRG-6306-C3', 'C3 clearance bearing', '2'), belt = await part('BELT-A42', 'Drive belt A42', '1'), other = await part('BRG-9999', 'Unrelated bearing', '1')
     const revision = { asset: motor, part: [open, belt], quantity: ['2', '1'], serialFrom: ['', 'M-1000'], serialTo: ['', 'M-1999'], modelFrom: ['DRV-100', 'DRV-100'], modelTo: ['DRV-199', 'DRV-199'], alternateFor: [open, open], alternate: [shielded, c3], alternateFrom: ['', 'M-2000'], alternateTo: ['', 'M-2999'], alternateModelFrom: ['DRV-100', 'DRV-100'], alternateModelTo: ['DRV-199', 'DRV-199'], tool: ['Bearing puller', 'Torque wrench'], note: 'From the OEM manual' }
     await h.api('bom.revise', cookie.max, revision, 403)
+    assert.equal((await h.api('bom.revise', cookie.temp, revision, 401)).error, 'authentication_required')
+    assert.equal((await h.raw('/api/gasket/bom.revise', { body: revision })).status, 401)
     await h.api('bom.revise', cookie.lead, { ...revision, alternateFor: [belt, other] }, 400)
     await h.api('bom.revise', cookie.lead, { ...revision, serialFrom: ['', 'M-2000'], serialTo: ['', 'M-1000'] }, 400)
     assert.equal((await h.api('bom.revise', cookie.lead, { ...revision, modelFrom: ['DRV-300', ''], modelTo: ['DRV-100', ''] }, 400)).error, 'invalid_model_range')
@@ -1624,6 +1626,9 @@ try {
     await unchangedRefusal(laterRepair, { part: belt, quantity: '1' }, 'part_not_compatible')
     assert.deepEqual((await wo('lead', repair)).reservations, planned.reservations, 'existing commitments survive identity corrections')
     await h.api('asset.update', cookie.lead, { ...identity, model: 'DRV-150', revision: changed.revision })
+    const { model: _model, ...olderClient } = identity
+    await h.api('asset.update', cookie.lead, { ...olderClient, revision: (await h.api(`assets/${motor}`, cookie.lead)).revision })
+    assert.equal((await h.api(`assets/${motor}`, cookie.lead)).model, 'DRV-150', 'an older identity client preserves the model when omitted')
     // A new BOM revision can make a previously compatible substitute incompatible, even with site approval.
     await h.api('part.substitute', cookie.lead, { part: open, substitute: shielded, reason: 'General bearing approval' })
     await h.api('bom.revise', cookie.lead, { ...revision, revision: 2, alternateModelFrom: ['DRV-200', 'DRV-100'], alternateModelTo: ['DRV-299', 'DRV-199'], note: 'Shielded model restriction corrected' })
@@ -1648,7 +1653,7 @@ try {
     const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
     try {
       for (const width of process.env.GASKET_BOM_SCREENSHOTS ? [1440, 390] : [1440]) {
-        const context = await browser.newContext({ viewport: { width, height: 1000 } })
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
         await context.addCookies(cookie.lead.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
         const screen = await context.newPage()
         for (const [name, path] of [['asset', `/app/assets/${motor}`], ['work', `/app/work/${laterRepair}`]]) {
