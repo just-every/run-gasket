@@ -19,7 +19,7 @@ export function bomCard(bom: Bom | null, zone: string, form_: unknown = '') {
   const body = bom ? h`<p class="gk-sub">Revision ${bom.revision}${bom.note ? ` · ${bom.note}` : ''} · ${bom.createdBy ?? '—'} · ${showInstant(bom.createdAt, zone)}</p>
     ${table(['Part', 'Needed', 'Available', 'Approved alternates'], bom.lines.map(line => [h`${line.part.name}<span class="gk-sub">${line.part.number} · ${span(line)}</span>${fit(line, bom.serial, bom.model)}`, amount(line.quantity, line.part.unit),
       h`${amount(line.available, line.part.unit)}${line.short ? h` ${tag('Out of stock')}` : ''}`,
-      line.alternates.length ? h`${line.alternates.map(alt => h`<span class="gk-sub">${alt.part.number} ${alt.part.name}: ${amount(alt.available, alt.part.unit)} available · ${span(alt)}${alt.fits ? '' : ` · does not fit this serial${alt.modelFrom || alt.modelTo ? ' and model' : ''}`}</span>`)}` : h`<span class="gk-muted">None</span>`]), 'Bill of materials', { wrap: [0, 3] })}
+      line.alternates.length ? h`${line.alternates.map(alt => h`<span class="gk-sub">${alt.part.number} ${alt.part.name}: ${amount(alt.available, alt.part.unit)} available · ${span(alt)}${alt.fits ? '' : ` · does not fit this ${!alt.serialFits && !alt.modelFits ? 'serial and model' : !alt.modelFits ? 'model' : 'serial'}`}</span>`)}` : h`<span class="gk-muted">None</span>`]), 'Bill of materials', { wrap: [0, 3] })}
     <p><b>Tools:</b> ${bom.tools.length ? bom.tools.join(', ') : 'none listed'}.</p>
     ${bom.revisions.length > 1 ? h`<p class="gk-sub">Earlier revisions: ${bom.revisions.slice(1).map(row => `${row.number} (${row.createdBy ?? '—'}${row.note ? `, ${row.note}` : ''})`).join('; ')}</p>` : ''}`
     : h`<p class="gk-muted">No bill of materials yet.</p>`
