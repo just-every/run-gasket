@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1bfab0a0b1f30f01d14065f7858477fcde6cf4f389ac7b16f5e46de2ffd97347",
+      "sha256": "3c521205f09007da269f541471752f7d51219da8b0fce3dc388ec33400206a7f",
       "executable": false
     },
     "DEMO.md": {
@@ -4712,7 +4712,7 @@
       "executable": false
     },
     "tests/gasket/agent-work-parity.mjs": {
-      "sha256": "c8e273ef5bdc4aef093e8884ce9e1c226ec09e09c61befa413b4af850aa98571",
+      "sha256": "d1f35c4a6a730c9cab47916d00d5b9c86f32aa7aa3408043713e89867a3d22c1",
       "executable": false
     },
     "tests/gasket/api.mjs": {

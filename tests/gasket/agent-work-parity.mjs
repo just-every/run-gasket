@@ -138,6 +138,7 @@ export default async function workParity({ request, origin, cookie, mail }) {
   assert.deepEqual(await state(), beforeRetry, 'completed MCP retry adds no work or native source audit')
   const conflict = await mcp(writer.token, { ...args, description: 'Changed instructions on the completed key' })
   assert.equal(failure(conflict.body), 'idempotency_conflict')
+  assert.deepEqual(await api(`work/${created.result.structuredContent.id}`), accepted.at(-1), 'conflicting replay preserves the complete accepted maintenance record')
   assert.deepEqual(await state(), beforeRetry, 'changed-payload replay cannot alter accepted work or history')
   console.log('PROBE SURFACE-001 MCP: equivalent inputs and completed retry -> equal maintenance facts, genuine agent attribution, no duplicate work or source audit')
 
