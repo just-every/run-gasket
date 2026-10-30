@@ -3,8 +3,29 @@ import { mkdirSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { PAGE_DOORS, match } from '../../src/gasket/doors.ts'
 import { saveSnapshot } from './form-save-interruptions.mjs'
+import { conditionalSaves } from './workspace-conditional-saves.mjs'
 import { png } from './fixtures.mjs'
 import { chromium } from '@playwright/test'
+import { harness } from './harness.mjs'
+import { now, zone } from './clock.mjs'
+
+export async function conditionalWorkspaceJourney() {
+  const h=await harness({formSaveFault:true,clockInstant:now()+86_400_000})
+  let browser
+  try {
+    const cookie={owner:await h.owner()}
+    await h.api('site.configure',cookie.owner,{name:'Synthetic workshop',timezone:zone})
+    for (const [key,role,name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['sam','supervisor','Rosa Alvarez']]) {
+      await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})
+      cookie[key]=await h.signIn(`${key}@example.test`)
+    }
+    const directory=process.env.INTERVAL_SCREENSHOTS || `/tmp/gasket-workspace-conditional-${process.pid}`
+    mkdirSync(directory,{recursive:true})
+    browser=await chromium.launch({headless:true,...(process.env.GASKET_CHROMIUM?{executablePath:process.env.GASKET_CHROMIUM}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
+    await workspaceBrowser(h,cookie,browser,directory,{conditionalOnly:true})
+    console.log('Conditional workspace retained drafts and durable save receipts passed')
+  } finally {await browser?.close();await h.close()}
+}
 export async function intervalBrowser(h,cookie,proposal) {
   const directory = process.env.INTERVAL_SCREENSHOTS || `/tmp/gasket-workspace-${process.pid}`
   mkdirSync(directory,{recursive:true})
@@ -33,7 +54,7 @@ export async function intervalBrowser(h,cookie,proposal) {
 }
 
 // ADMIN-011: all six implemented core doors, with actual edits and independent reads.
-export async function workspaceBrowser(h, cookie, browser, directory) {
+export async function workspaceBrowser(h, cookie, browser, directory, {conditionalOnly=false}={}) {
   const context = await browser.newContext({ignoreHTTPSErrors:true})
   const use = async who => {
     await context.clearCookies()
@@ -51,6 +72,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
   async function proof(name) {
     for (const width of [1440,390]) {
       await page.setViewportSize({width,height:1100})
+      await page.evaluate(()=>window.scrollTo({top:0,left:0,behavior:'instant'}))
       await page.screenshot({path:`${directory}/workspace-${name}-${width}.png`,fullPage:true})
     }
     await page.setViewportSize({width:1440,height:1100})
@@ -81,7 +103,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     await proof(name)
   }
   const open = async(path,name)=>{assert.equal((await page.goto(h.origin+path)).status(),200,`${name} ${path} opens`);await inspect(name)}
-  const submit = async (form, notice = /Saved/) => {
+  const submit = async (form, notice = /Saved/, confirmedView) => {
     const action = await form.getAttribute('action')
     exercisedActions.add(action)
     console.log('workspace save proof',action)
@@ -94,7 +116,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     }
     const record = before.find(([key])=>key==='workOrder')?.[1]
     const count = before.find(([key])=>key==='count')?.[1]
-    const view = reads[action.slice('/app/do/'.length)] || (count ? `counts/${count}` : `work/${record}`)
+    const view = confirmedView || reads[action.slice('/app/do/'.length)] || (count ? `counts/${count}` : `work/${record}`)
     const who = (await context.cookies()).map(item=>`${item.name}=${item.value}`).join('; ')
     const submitted = await form.evaluate(async el=>Promise.all([...new FormData(el)].map(async([key,value])=>[key,typeof value==='string'?value:{name:value.name,type:value.type,bytes:[...new Uint8Array(await value.arrayBuffer())]}])))
     const unchanged = await h.api(view,who)
@@ -110,14 +132,25 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     const failedPath = new URL(await refusal.getByRole('link').getAttribute('href'),h.origin).pathname
     // The displayed failed receipt must refer to the attempted id, even after preparing a new retry id.
     const failedReceipt = await (await h.raw(failedPath,{cookie:who,headers:{accept:['application','json'].join('/')}})).json()
+    assert.equal(failedReceipt.id,before.find(([key])=>key==='__gk_save')[1],`${action} refusal identifies this submission`)
+    assert.equal(failedReceipt.action,action.slice('/app/do/'.length),`${action} refusal identifies this action`)
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
+    await proof('refused-'+action.slice('/app/do/'.length))
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
     let confirmation
     // Keep interception active until receipt readback finishes; tearing it down at abort can strand the next request.
     await page.route('**'+action,async route=>{confirmation=await (await route.fetch()).json();await route.abort('failed')})
-    await form.getByRole('button',{name:/./}).last().focus()
-    await page.keyboard.press('Enter')
+    // Captures change the viewport and scroll position. Target the keyboard event at
+    // the submitter, and observe this submission leaving the browser before its feedback.
+    const submitter = form.getByRole('button',{name:/./}).last()
+    await submitter.scrollIntoViewIfNeeded()
+    assert.deepEqual(await form.evaluate(el=>el.noValidate?[]:[...el.elements].filter(control=>control.validity&&!control.validity.valid).map(control=>({name:control.name,error:control.validationMessage}))),[],`${action} retained retry is valid`)
+    const retryId = retryDraft.find(([key])=>key==='__gk_save')[1]
+    await Promise.all([
+      page.waitForRequest(request=>request.method()==='POST'&&new URL(request.url()).pathname===action&&request.postData()?.includes(retryId)),
+      submitter.press('Enter'),
+    ])
     const error = form.getByRole('alert').filter({hasText:/connection ended.*Saved. The server confirmed/s})
     await error.waitFor()
     assert.match(await error.innerText(),/connection ended.*Saved. The server confirmed/s,`${action} confirms a lost reply`)
@@ -128,9 +161,12 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     const response = await h.raw(receiptPath,{cookie:who,headers:{accept:['application','json'].join('/')}})
     assert.equal(response.status,200)
     const receipt = await response.json()
+    assert.equal(receipt.id,retryDraft.find(([key])=>key==='__gk_save')[1],`${action} confirmation identifies this submission`)
+    assert.equal(receipt.action,action.slice('/app/do/'.length),`${action} confirmation identifies this action`)
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
     await page.unroute('**'+action)
+    await proof('confirmed-'+action.slice('/app/do/'.length))
     await snapshot.interrupt({action,fields:submitted,cookie:who,view,steps:receipt.batches})
     await snapshot.close()
     assert.equal(confirmation.saved,true)
@@ -295,6 +331,14 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
     } finally {await native.close()}
   }
   try {
+    if (conditionalOnly) {
+      const part=(await h.api('part.create',cookie.lead,{number:'ACCESS-CONDITIONAL',name:'Guard fastener for maintenance workshop inspections',unit:'each'})).id
+      await h.api('part.receive',cookie.lead,{part,quantity:'5',unitPrice:'2.00'})
+      await page.setViewportSize({width:1440,height:1100})
+      await conditionalSaves({h,cookie,page,use,open,submit,proof,day,technician,longName,part})
+      console.log('conditional workspace save coverage distinct='+exercisedActions.size+' actions='+JSON.stringify([...exercisedActions].sort()))
+      return
+    }
     for(const width of [1440]) {
       await page.setViewportSize({width,height:1100})
       await use('owner')
@@ -687,6 +731,7 @@ export async function workspaceBrowser(h, cookie, browser, directory) {
         await open(destination, `linked-record-${inspected.size}`)
       }
       console.log('workspace action inventory unexercised='+JSON.stringify([...visibleActions].filter(action=>!exercisedActions.has(action)).sort()))
+      console.log('workspace save coverage distinct='+exercisedActions.size+' actions='+JSON.stringify([...exercisedActions].sort()))
       console.log(`workspace pages proof fixed=${fixed} linked=${inspected.size-fixed-downloads} downloads=${downloads} assistive-names=present keyboard=usable`)
 
     }
