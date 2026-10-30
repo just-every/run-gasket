@@ -4816,7 +4816,7 @@
       "executable": false
     },
     "tests/gasket/pm-interruption.mjs": {
-      "sha256": "e63ef7ee1ff7b42ef49b407f7e3bea41e9a91a59d19675c5889529f9f4b214d1",
+      "sha256": "e40fd30ba31cc7e17a0c6671a201f49f9e7fde60bb080e6ef1057414b1d687ed",
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {
