@@ -470,6 +470,8 @@ td .gk-inline .gk-actions { margin: 0; }
   .gk-roles { padding: 20px 0 0; border-left: 0; border-top: 1px solid var(--gk-hairline); }
 }
 @media (max-width: 640px) {
+  #comments .gk-details dl { grid-template-columns: minmax(0, 1fr); }
+  #comments .gk-details dd { margin-bottom: 8px; }
   h1 { font-size: 32px; line-height: 36px; }
   h2 { font-size: 19px; line-height: 25px; }
   .gk-lede { font-size: 16px; line-height: 24px; }

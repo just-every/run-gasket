@@ -240,6 +240,14 @@ export async function agentCommentsJourney() {
         assert.ok((await note.innerText()).replace(/\s+/g, ' ').includes(original.replace(/\s+/g, ' ')), 'the original agent observation remains in visible history')
         assert.equal(await note.locator('bearing').count(), 0, 'authored markup remains plain text')
       }
+      if (width === 390) {
+        const layout = await note.locator('dl').evaluate(history => ({
+          bodyWidth: history.querySelector('dd').getBoundingClientRect().width,
+          historyWidth: history.getBoundingClientRect().width,
+          pageWidth: document.documentElement.scrollWidth, viewport: innerWidth,
+        }))
+        assert.ok(layout.pageWidth <= layout.viewport && layout.bodyWidth > layout.historyWidth / 2, 'phone comment history keeps attributed revisions readable without horizontal overflow')
+      }
       await page.screenshot({ fullPage: true, path: join(directory, `native-thread-${width}.png`) })
     }
     console.log('PROBE PLAN-006 native thread: built work page -> attributed plain text at 1440 and 390; photos, mentions and handoff adapter operations remain omitted')

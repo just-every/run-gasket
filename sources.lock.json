@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "154dbc00bf292481fd55fadac7fdd7f253214f9be044f1e7c534aecf8dccad03",
+      "sha256": "62c98dcacb9c357b426d4cae04002bb10dbad85eeba996fef0edeeffbd9d6b98",
       "executable": false
     },
     "DEMO.md": {
@@ -896,7 +896,7 @@
       "executable": false
     },
     "public/gasket.css": {
-      "sha256": "3e1886df43ee16f06b96dae0a348763f460461dc9b2717672db42ee977280d49",
+      "sha256": "a43c92149b29c9ce5967ca2d05c3c216e4356f4f680a8e0ef1d5bc402551f90a",
       "executable": false
     },
     "public/label-scan.js": {
@@ -4684,7 +4684,7 @@
       "executable": false
     },
     "tests/gasket/agent-comments.mjs": {
-      "sha256": "47c356504719b410bcc8382b18e5cf72e2ae7f53d72e44b389df6e3745e96987",
+      "sha256": "6989f4ef20183f29296b37b78b11b4c861527e6b8c87af646e347a8c362ad492",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
