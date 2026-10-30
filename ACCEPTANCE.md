@@ -566,8 +566,8 @@ Core · target · **partial** · From ASSET-008 · Cites BASE-ROLE-001, BASE-INP
 1. Schedule gauge calibration with required tools, fail a reading and inspect its independent corrective work.
 2. Try missing or expired calibration evidence, complete and review the work, then inspect retained certificate versions and on-time status.
 
-**Evidence.** `tests/gasket/flows.mjs` — "ASSET-010 gauge calibration with tolerances, tools and certificate versions"
-**Gap.** A calibration journey attempting submission with a missing required certificate and reading unchanged work is missing. The cited calibration journey reads missing-evidence messages, records tools and certificate originals, approves two versions and reads tolerances, dates and retained results.
+**Evidence.** `tests/gasket/flows.mjs` — "ASSET-010 gauge calibration with tolerances, tools and certificate versions": schedules a gauge with pinned tolerances and required tools, retains the failed reading and independent corrective work, refuses current-revision submission with only the certificate missing and preserves work and certificate history, then uploads the original, independently approves both calibrations and reads both retained certificate versions, tools and on-time status.
+**Gap.** Main retains the partial judgment; the missing-certificate refusal and unchanged-work/certificate-history assertions are now covered by the cited journey. Acceptance of the completed clause remains for contract review.
 
 #### ASSET-009 — Custom asset and part fields
 
