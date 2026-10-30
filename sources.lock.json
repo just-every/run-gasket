@@ -4716,7 +4716,7 @@
       "executable": false
     },
     "tests/gasket/agent-specialist-continuity.mjs": {
-      "sha256": "b71ddb160c1f14321fb7cbcd7805850bbe1c8883c21f039a7fbcc94a170f77a2",
+      "sha256": "193ef315bea140de73cd6d0a05a76de9149e3260901a34b83ddaacec9ae103d7",
       "executable": false
     },
     "tests/gasket/agent-stock-browser.mjs": {
