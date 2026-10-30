@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import { join } from 'node:path'
 import { readFile, writeFile, copyFile, chmod } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { harness, file } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { installation } from './installation.mjs'
@@ -51,6 +51,9 @@ export async function recoveryJourney() {
     const stewardship=(await h.api('planning.grant',owner,{grantee:recoveryLead,site:'primary',kind:'tool',target:'',name:'Recovery gauge',revision:0,enabled:true,consent:true,reason:'Maintain the recovery gauge'})).id
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
     const credential = await h.api('service.create', owner, { name: 'Synthetic recovery service', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
+    const bearerHash = createHash('sha256').update(credential.token).digest('hex')
+    const serviceUse = () => h.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })
+    assert.equal((await serviceUse()).status, 200)
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
     await h.api('webhook.control', owner, { subscription: subscription.id, revision: 1, paused: false, reason: 'Receiver confirmed' })
     const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today, assignee: (await h.api('me', owner)).id })
@@ -81,6 +84,9 @@ export async function recoveryJourney() {
     for(const table of ['gk_print_packs','gk_print_previews','gk_print_entries','gk_conversations','gk_messages','gk_message_reads']) assert.ok(records[0].tables.some(row=>row.name===table),'the archive inventories direct messaging records')
     const archivedMessages=records.flatMap(record=>record.items??[]).filter(item=>item.kind==='row'&&item.table==='gk_messages')
     assert.deepEqual(archivedMessages.map(item=>item.row.body).sort(),['synthetic-gasket-recovery-message','synthetic-gasket-recovery-reply'])
+    assert.ok(!bytes.includes(Buffer.from(bearerHash)), 'archives exclude the usable bearer verifier as well as its token')
+    const credentials = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_api_credentials')
+    assert.deepEqual(credentials.map(item => [item.row.id, item.row.token_hash, item.row.revoked_at]), [[credential.id, `inactive-${credential.id}`, null]])
     const subscriptions = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_connector_subscriptions')
     assert.equal(subscriptions.length, 1)
     assert.equal(subscriptions[0].row.secret_cipher, '', 'encrypted signing keys are also excluded')
@@ -136,6 +142,16 @@ export async function recoveryJourney() {
       assert.ok(drill.drill_at)
       await restored.api('recovery.drill', signed, { receipt: recovery.restore.id, confirm: true })
       assert.equal((await restored.api('audit?action=recovery.drill', signed)).rows.length, 1, 'drill confirmation is idempotent')
+      const replacement = await restored.api('service.create', signed, { name: 'Synthetic restored replacement', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
+      assert.notEqual(replacement.id, credential.id)
+      const replacementUse = await restored.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${replacement.token}` } })
+      assert.equal(replacementUse.status, 200, 'deliberate replacement issuance restores only fresh authority')
+      assert.ok((await replacementUse.json()).rows.some(row => row.id === asset))
+      assert.equal((await restored.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })).status, 401)
+      await restored.api('service.revoke', signed, { credential: replacement.id })
+      assert.equal((await restored.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${replacement.token}` } })).status, 401)
+      assert.ok((await restored.api('service-credentials', signed)).find(row => row.id === replacement.id).revoked_at !== null)
+
       const schedules = await restored.api('schedules', signed)
       assert.ok(schedules.length); assert.ok(schedules.every(row => !row.active))
       assert.ok((await restored.api('automation' + '/jobs', signed)).rules.every(row => row.paused))
@@ -149,7 +165,7 @@ export async function recoveryJourney() {
       assert.equal(restored.mails.length, mailCount, 'restored jobs send no mail')
       if (process.env.GASKET_RECOVERY_SCREENSHOTS) {
         const { chromium } = await import('@playwright/test')
-        const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain','--password-store=basic'] })
+        const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
         try {
           for (const width of [1440,390]) {
             const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
@@ -185,6 +201,7 @@ export async function recoveryJourney() {
     try {
       const signed = await source.signIn(h.vars.OWNER_EMAIL)
       assert.deepEqual(await source.api(`conversations/${direct}`,signed),directOwner,'export leaves source messages and read state unchanged')
+      assert.equal((await source.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })).status, 200, 'export leaves the source credential active')
       const backup = await source.api('recovery', signed)
       assert.equal(backup.backup.kind, 'backup')
       assert.equal(backup.backup.recovery_point, records[0].exportedAt)
@@ -281,7 +298,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) await recoveryJourney()
 
 export async function backupBrowser(h, cookie) {
   const { chromium } = await import('@playwright/test')
-  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain','--password-store=basic'] })
+  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
   try {
     for (const width of [1440,390]) {
       const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })

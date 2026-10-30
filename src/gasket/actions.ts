@@ -222,7 +222,7 @@ export const actions: Record<string, Handler> = {
   'comment.edit': (env, actor, input) => editComment(env, actor, input),
   'comment.read': (env, actor, input) => markRead(env, actor, input),
   'workorder.time': recordTime,
-  'workorder.readings': async (env, actor, input) => { const kept = await recordReadings(env, actor, input); const created = []; for (const meter of kept.meters) created.push(...await evaluateMeter(env, actor, meter)); return { id: kept.id, created } },
+  'workorder.readings': async (env, actor, input) => { const kept = await recordReadings(env, actor, input); const created = []; for (const meter of kept.meters) created.push(...await evaluateMeter(env, actor, meter)); return { id: kept.id, meters: kept.meters, created } },
   'workorder.issue': (env, actor, input) => issue(env, actor, input),
   'workorder.return': (env, actor, input) => giveBack(env, actor, input),
   'downtime.start': (env, actor, input) => downtimeStart(env, actor, input),
