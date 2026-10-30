@@ -13,7 +13,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 | Later | 0 | 0 | 0 | 0 |
 | Full target | 52 | 62 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). SURFACE-004 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -2034,8 +2034,8 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-005, BASE
 6. Change running PM, connector, gateway or reminder behavior, including site lead time and delivery preferences, and inspect live with service and scope.
 7. Try self-escalation through maintenance memberships, grants or policy; inspect unchanged authority under both policies.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
-**Gap.** Detailed work reads compute sensitive personnel/pay facts. Access, security, destructive, live, accounts and gated adapters and their authority journeys remain unimplemented; spend and owner-native administration are unproved.
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; `tests/gasket/agent-field-retirement.mjs` — "fieldRetirementJourney" and "afterStep": populated primary-site custom-field retirement under allowing and held company policies; exact destructive count, target, revision and approval summary; archived values and both historical values retained; native preparation and approval attribution; stale approval, changed request, completed replay, concurrent retirement, scope, forbidden sponsor, revoked agent and consent, Pause and self-escalation refusal. Required foundation verification loads these journeys and all applicable Core conformance points. Existing detailed work reads compute sensitive personnel and pay facts.
+**Gap.** Other destructive adapters, membership and delegation and staff and site and device and resource access changes, protective-setting and provider-credential security changes, running-service live changes, outside-resource accounts and gated flows, complete sensitive-record coverage, spend and owner-native administration remain unimplemented or unproved. Existing ADMIN-002 custody approval hold, ASSET-009 role and site and device prerequisites, broader erasure and retention obligations, provider and account qualification, shared Base changes and the Base0.2.84 hold remain unchanged.
 
 #### SURFACE-005 — Maintenance resources and change handoffs
 

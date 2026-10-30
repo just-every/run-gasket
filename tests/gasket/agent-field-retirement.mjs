@@ -64,19 +64,20 @@ export async function fieldRetirementJourney() {
   const instant = Date.parse('2030-01-10T12:00:00Z'), pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
   const kid = 'synthetic-gasket', issuer = 'https://synthetic-gasket.invalid', installationId = 'synthetic-gasket-installation'
   const email = ['synthetic-gasket-owner', 'example.test'].join(String.fromCharCode(64))
-  const h = await harness({ clockInstant: instant, vars: { OWNER_EMAIL: email, SESSION_SECRET: randomBytes(32).toString('base64url'), SETUP_TOKEN: randomBytes(32).toString('base64url'), RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId, RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify({ [kid]: await webcrypto.subtle.exportKey('jwk', pair.publicKey) }) } })
+  const publicKeys = { [kid]: await webcrypto.subtle.exportKey('jwk', pair.publicKey) }
+  const h = await harness({ clockInstant: instant, bindingsForOrigin: origin => ({ RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: origin, subject: installationId, email, keys: publicKeys }) }), vars: { OWNER_EMAIL: email, SESSION_SECRET: randomBytes(32).toString('base64url'), SETUP_TOKEN: randomBytes(32).toString('base64url'), RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId, RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(publicKeys) } })
   try {
     const owner = await h.owner()
     const api = (path, body, status) => h.api(path, owner, body, status)
     await api('site.configure', { name: 'Synthetic workshop', timezone: 'UTC' })
     const techEmail = ['synthetic-gasket-maintainer', 'example.test'].join(String.fromCharCode(64))
-    const tech = await api('access.give', { name: 'Synthetic maintainer', email: techEmail, role: 'maintainer' })
-    const techCookie = await h.signIn(techEmail)
     const c = { origin: h.origin, signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { sub: 'synthetic-gasket-owner', email }, agentId: `synthetic-gasket-${randomUUID()}`, business: 'synthetic-gasket-business', consent: randomUUID(), now: instant, seq: 0, revision: 0, surface: { specialist: 'maintenance coordinator', tools: [{ scope: 'customfield.retire' }] } }
     const settings = await signJws(pair.privateKey, kid, 'rer-business-settings+jwt', { v: 1, iss: issuer, aud: h.origin, sub: installationId, business: c.business, email, owner_id: c.person.sub, jti: randomUUID(), iat: instant / 1000, exp: instant / 1000 + 300, rev: 1, values: {}, logo: null, team: [{ id: 'synthetic-gasket-maintainer', email: techEmail, name: 'Synthetic maintainer', role: 'member', invite: 1 }] })
     const paired = await h.raw('/api/rer/business-settings', { body: { settings } })
     assert.equal(paired.status, 200, 'signed Business pairing')
     await paired.body?.cancel()
+    const techCookie = await h.signIn(techEmail)
+    assert.equal((await h.api('me', techCookie)).role, 'maintainer')
     async function adopt(document, extra = {}) {
       const signed = await policyEnvelope(c, document, extra)
       const response = await h.raw('/api/rer/agent-policy', { body: { policy: signed.policy } })
@@ -85,7 +86,7 @@ export async function fieldRetirementJourney() {
       c.seq = signed.payload.seq; c.revision = signed.payload.revision
     }
     async function mcp(method, params, overrides) {
-      const response = await h.raw('/mcp', { body: { jsonrpc: '2.0', id: 1, method, params }, headers: { Authorization: `Bearer ${await accessToken(c, overrides)}`, 'MCP-Protocol-Version': '2025-11-25', 'Mcp-Method': method, ...(params.name ? { 'Mcp-Name': params.name } : {}) } })
+      const response = await h.raw('/mcp', { body: { jsonrpc: '2.0', id: 1, method, params: { ...params, _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': { elicitation: { url: {} } }, 'io.modelcontextprotocol/clientInfo': { name: 'synthetic-gasket', version: '1' } } } }, headers: { Authorization: `Bearer ${await accessToken(c, overrides)}`, 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': method, ...(params.name ? { 'Mcp-Name': params.name } : {}) } })
       const body = await response.json()
       return { status: response.status, body, message: body, result: body.result, decision: body.result?._meta?.['com.runeditrun/decision'] }
     }
@@ -98,7 +99,7 @@ export async function fieldRetirementJourney() {
       return value
     }
     const approvalFor = async answer => {
-      const id = answer.result?._meta?.['com.runeditrun/approval']?.id
+      const id = answer.result?._meta?.['com.runeditrun/approval']?.id ?? answer.body?.error?.data?.approval?.id
       assert.ok(id, 'held call returns genuine approval')
       return (await person(`/agents/api/approvals/${id}`)).approval
     }
@@ -182,6 +183,13 @@ export async function fieldRetirementJourney() {
       const { expected_revision, ...nativeRevision } = staleInput
       assert.equal(errorCode(await call({ ...nativeRevision, idempotency_key: randomUUID() })), 'revision_conflict')
     })
+    const concurrent = await populated(api)
+    const contenders = await Promise.all([call(args(concurrent)), call(args(concurrent))])
+    assert.equal(contenders.filter(answer => answer.result?.structuredContent?.id === concurrent.id).length, 1)
+    assert.ok(contenders.some(answer => ['revision_conflict', 'custom_field_retired', 'stale', 'decision_busy'].includes(errorCode(answer))))
+    await retained(api, concurrent)
+    assert.equal((await api('audit?action=customfield.retire')).rows.filter(row => row.subject === concurrent.id).length, 1)
+    console.log('PROBE SURFACE-004 concurrency: two MCP retirement attempts at one native revision -> one retirement and one refusal; values and both history entries retained')
     const service = await api('service.create', { name: 'Synthetic limited reader', scopes: ['assets:read'], expiresAt: instant + 3600000, consent: true })
     await unchanged(stale, async () => {
       const response = await h.raw('/mcp', { body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args(stale) } }, headers: { Authorization: `Bearer ${service.token}`, 'MCP-Protocol-Version': '2025-11-25', 'Mcp-Method': 'tools/call', 'Mcp-Name': name } })
@@ -199,7 +207,7 @@ async function browserProof(h, cookie, fixture, approval) {
   await mkdir(process.env.GASKET_FIELD_SCREENSHOTS, { recursive: true })
   const browser = await chromium.launch({ headless: true, ...(process.env.CHROMIUM_EXECUTABLE ? { executablePath: process.env.CHROMIUM_EXECUTABLE } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
   try {
-    const context = await browser.newContext()
+    const context = await browser.newContext({ ignoreHTTPSErrors: true })
     await context.addCookies(cookie.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
     const page = await context.newPage()
     for (const [screen, path] of [['field-retirement', `/agents/approvals/${approval.id}`], ['retained-values', `/app/assets/${fixture.asset}`]]) {
