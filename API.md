@@ -825,7 +825,7 @@ Adding a new master revision preserves the linked original. Downloads preserve
 original bytes and use an attachment disposition, no-store caching, no-referrer,
 nosniff and a sandbox policy. Service credentials and other private-file kinds
 are outside this door. Cross-site file links remain unqualified under ADMIN-008.
-### Retained execution records and original files
+## Retained execution records and original files
 
 OpenAPI request examples now cover meters, calendar schedules with required tools,
 small evidence uploads, annotations, original time entries, readings, findings,
