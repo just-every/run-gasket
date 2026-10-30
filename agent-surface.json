@@ -239,20 +239,6 @@
       ]
     },
     {
-      "name": "gasket.proposals.apply_corrective",
-      "scope": "proposal.decide",
-      "readOnly": false,
-      "classes": [
-        "standard"
-      ],
-      "clauses": [
-        "GAS-13",
-        "SURFACE-001",
-        "SURFACE-002",
-        "SURFACE-006"
-      ]
-    },
-    {
       "name": "gasket.procedures.amend",
       "scope": "checklist.revise",
       "readOnly": false,
@@ -263,6 +249,20 @@
         "GAS-04",
         "SURFACE-001",
         "SURFACE-003",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.proposals.apply_corrective",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "SURFACE-001",
+        "SURFACE-002",
         "SURFACE-006"
       ]
     }
@@ -377,6 +377,66 @@
           }
         }
       ]
+    },
+    {
+      "id": "procedure-source",
+      "tool": "gasket.procedures.read",
+      "args": {
+        "id": {
+          "$from": "publish-procedure",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "amend-procedure",
+      "tool": "gasket.procedures.amend",
+      "args": {
+        "checklist": {
+          "$from": "publish-procedure",
+          "pointer": "/id"
+        },
+        "sourceRevision": {
+          "$from": "procedure-source",
+          "pointer": "/data/revisions/0/id"
+        },
+        "expected_revision": {
+          "$from": "procedure-source",
+          "pointer": "/data/revisions/0/id"
+        },
+        "amendments": [
+          {
+            "step": {
+              "$from": "procedure-source",
+              "pointer": "/data/revisions/0/items/0/key"
+            },
+            "text": "Inspect reported vibration and record its location; physical inspection remains with the technician."
+          }
+        ],
+        "note": "Clarify the inspection instruction without certifying work."
+      },
+      "expect": [
+        {
+          "class": "commitment",
+          "facts": {
+            "measure": 0,
+            "currency": "USD",
+            "counterparty": "internal"
+          }
+        }
+      ],
+      "target": {
+        "kind": "procedure",
+        "id": {
+          "$from": "publish-procedure",
+          "pointer": "/id"
+        }
+      }
     },
     {
       "id": "asset-read",
@@ -632,66 +692,6 @@
           "class": "standard"
         }
       ]
-    },
-    {
-      "id": "procedure-source",
-      "tool": "gasket.procedures.read",
-      "args": {
-        "id": {
-          "$from": "publish-procedure",
-          "pointer": "/id"
-        }
-      },
-      "expect": [
-        {
-          "class": "standard"
-        }
-      ]
-    },
-    {
-      "id": "amend-procedure",
-      "tool": "gasket.procedures.amend",
-      "args": {
-        "checklist": {
-          "$from": "publish-procedure",
-          "pointer": "/id"
-        },
-        "sourceRevision": {
-          "$from": "procedure-source",
-          "pointer": "/data/revisions/0/id"
-        },
-        "expected_revision": {
-          "$from": "procedure-source",
-          "pointer": "/data/revisions/0/id"
-        },
-        "amendments": [
-          {
-            "step": {
-              "$from": "procedure-source",
-              "pointer": "/data/revisions/0/items/0/key"
-            },
-            "text": "Inspect reported vibration and record its location; physical inspection remains with the technician."
-          }
-        ],
-        "note": "Clarify the inspection instruction without certifying work."
-      },
-      "expect": [
-        {
-          "class": "commitment",
-          "facts": {
-            "measure": 0,
-            "currency": "USD",
-            "counterparty": "internal"
-          }
-        }
-      ],
-      "target": {
-        "kind": "procedure",
-        "id": {
-          "$from": "publish-procedure",
-          "pointer": "/id"
-        }
-      }
     }
   ],
   "capabilities": [
