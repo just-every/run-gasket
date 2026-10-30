@@ -8,12 +8,12 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 50 | 57 | 37 | 144 |
+| Core | 51 | 56 | 37 | 144 |
 | Agent surface | 0 | 7 | 0 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 50 | 64 | 37 | 151 |
+| Full target | 51 | 63 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -85,7 +85,7 @@ Core · published · **done** · Cites BASE-ROLE-001, BASE-INPUT-001 · Rules D-
 
 #### GAS-06 — Assign work
 
-Core · published · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
+Core · published · **done** · Cites BASE-ROLE-001, BASE-INPUT-001
 
 **Requirement.** Leads create corrective work against an asset and assign or reassign work to active maintainers, leads or the owner; technicians also create and self-assign their own unplanned work under FIELD-009. Maintainers have their own work list; assigning a supervisor, ended member or unknown person is refused; agent preparation never represents an agent as the physical maintainer.
 
@@ -94,7 +94,7 @@ Core · published · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 2. Attempt each ineligible assignee through the JSON door and inspect unchanged assignment.
 
 **Evidence.** `tests/gasket/flows.mjs` — "GAS-06 assign work"
-**Gap.** A public-door journey assigning an ended and an unknown person and reading unchanged assignment is missing. The cited journeys show eligible reassignment, own queues and supervisor/agent refusal.
+**Gap.** None.
 
 #### GAS-07 — Capture the inspection
 

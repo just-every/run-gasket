@@ -1851,13 +1851,13 @@ Core and typed refusals, not the full aggregate jobs or undeclared families.
 
 ## Status
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026).
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Published | 12 | 4 | 0 | 16 |
+| Published | 13 | 3 | 0 | 16 |
 | Target and push further | 38 | 60 | 37 | 135 |
-| All | 50 | 64 | 37 | 151 |
+| All | 51 | 63 | 37 | 151 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1866,7 +1866,7 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | `GAS-03` | Keep the parts list and reconcile counts | published | done | `tests/gasket/flows.mjs` — "GAS-03 parts and physical counts" |  |
 | `GAS-04` | Write checklists with revisions | published | done | `tests/gasket/flows.mjs` — "GAS-04 checklist revisions"; `tests/gasket/flows.mjs` — "ASSET-008 scheduled inspection routes across assets" |  |
 | `GAS-05` | Schedule preventive work | published | done | `tests/gasket/flows.mjs` — "GAS-05 schedules create due work once"; `tests/gasket/flows.mjs` — "ASSET-005 meters, units and counter corrections" |  |
-| `GAS-06` | Assign work | published | partial | `tests/gasket/flows.mjs` — "GAS-06 assign work" | A public-door journey assigning an ended and an unknown person and reading unchanged assignment is missing. The cited journeys show eligible reassignment, own queues and supervisor/agent refusal. |
+| `GAS-06` | Assign work | published | done | `tests/gasket/flows.mjs` — "GAS-06 assign work" |  |
 | `GAS-07` | Capture the inspection | published | done | `tests/gasket/flows.mjs` — "GAS-07 inspection, evidence and readings" |  |
 | `GAS-08` | Issue and return work parts | published | done | `tests/gasket/flows.mjs` — "GAS-08, GAS-14 and GAS-15 parts, downtime and findings" |  |
 | `GAS-14` | Record asset downtime | published | done | `tests/gasket/flows.mjs` — "GAS-08, GAS-14 and GAS-15 parts, downtime and findings" |  |

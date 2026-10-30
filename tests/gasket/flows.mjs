@@ -229,7 +229,10 @@ try {
     await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.mo })
     assert.equal((await h.api('work?mine=1', cookie.mo))[0].id, ids.pm)
     assert.equal((await h.api('work?mine=1', cookie.max)).length, 0)
-    const ended = (await h.api('access.give', cookie.owner, { name: 'Synthetic Gasket maintainer', email: ['synthetic-gasket-26', 'example.test'].join(String.fromCharCode(64)), role: 'maintainer' })).id
+    const email = ['synthetic-gasket-26', 'example.test'].join(String.fromCharCode(64))
+    const ended = (await h.api('access.give', cookie.owner, { name: 'Synthetic Gasket maintainer', email, role: 'maintainer' })).id
+    const endedCookie = await h.signIn(email)
+    assert.equal((await h.api('me', endedCookie)).role, 'maintainer')
     const active = (await h.api('members', cookie.owner)).find(person => person.id === ended)
     assert.deepEqual([active.role, active.status], ['maintainer', 'active'])
     assert.ok((await (await h.raw(`/app/work/${ids.pm}`, { cookie: cookie.lead })).text()).includes(`value="${ended}"`), 'the active maintainer is offered for assignment')
