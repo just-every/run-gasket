@@ -1903,7 +1903,7 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-005, BAS
 1. Approve a PM change, provide post-change operation with lower downtime and then a telemetry gap/production reduction.
 2. Inspect exposure-normalized results, stated uncertainty and a reversal proposal approved under the held company policy when failures worsen.
 
-**Evidence.** `tests/gasket/outcomes.mjs` — "outcomeJourney"
+**Evidence.** `tests/gasket/outcomes.mjs` — "outcomeJourney"; `tests/gasket/agent-outcome-policy.mjs` — "agentOutcomePolicyJourney", loaded by `tests/gasket/agent-native-journey.mjs`
 **Gap.** A public-door journey executing authorized restoration/investigation under company policy is missing. The cited journeys show measured windows, matched peers, unknowns, warnings and fixed-gate follow-up.
 
 #### AGENT-005 — Follow overdue work through verified closure
