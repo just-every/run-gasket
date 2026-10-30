@@ -12,14 +12,15 @@ export async function agentCommentsJourney() {
   const kid = randomUUID(), installationId = randomUUID(), issuer = 'https://synthetic-gasket.invalid'
   const email = ['synthetic-gasket-1', 'example.test'].join('@')
   const keys = { [kid]: { ...await webcrypto.subtle.exportKey('jwk', pair.publicKey), kid, alg: 'ES256', use: 'sig' } }
-  const h = await harness({ clockOffset: 0, vars: {
+  let h = await harness({ clockOffset: 0, vars: {
     OWNER_EMAIL: email, SESSION_SECRET: randomUUID(), SETUP_TOKEN: randomUUID(),
     RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId, RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys),
     RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: 'self-host', subject: installationId, email, keys }),
   } })
+  const installation = h.installation, vars = h.vars
   let browser
   try {
-    const owner = await h.owner()
+    let owner = await h.owner()
     await h.api('site.configure', owner, { name: 'Synthetic Gasket workshop', timezone: 'UTC' })
     const sponsor = await h.api('me', owner)
     const memberEmail = ['synthetic-gasket-2', 'example.test'].join('@')
@@ -59,7 +60,7 @@ export async function agentCommentsJourney() {
     const work = await h.api('workorder.create', owner, { title: 'Synthetic Gasket inspect bearing', location: 'Workshop', due: '2030-01-10', assignee: sponsor.id })
     const thread = () => h.api(`work/${work.id}/comments`, owner)
     const effects = async () => (await h.api('audit', owner)).rows.filter(row => row.action === 'comment.post' && row.subject === work.id)
-    const snapshot = async () => ({ thread: await thread(), effects: await effects() })
+    const snapshot = async () => ({ thread: await thread(), effects: await effects(), reviews: (await person('/agents/api/reviews')).reviews })
     const original = 'Synthetic Gasket observation: inspect <bearing> & retain original text.\nNo physical maintenance is asserted.'
     const args = { workOrder: work.id, body: original, idempotency_key: randomUUID() }
     await adopt(autonomousPolicy())
@@ -115,12 +116,35 @@ export async function agentCommentsJourney() {
     assert.equal((await person('/agents/api/reviews')).reviews.length, 1)
     console.log('PROBE PLAN-006 held policy: public MCP -> review disposition, native comment and one genuine human-marked review; replay creates no duplicate')
 
+    await adopt(autonomousPolicy())
+    // A retry must not overwrite a later human correction or lose its attribution.
+    const correction = 'Synthetic Gasket human correction: bearing checked, original observation retained.'
+    await h.api('comment.edit', owner, { comment: first.id, body: correction })
+    const edited = (await thread()).comments[0]
+    assert.equal(edited.body, correction)
+    assert.deepEqual(edited.revisions.map(row => [row.number, row.body, row.by]), [[1, original, first.author], [2, correction, sponsor.name]])
+    const correctedSaved = await snapshot()
+    assert.deepEqual((await mcp(args)).result.structuredContent, posted.result.structuredContent)
+    assert.deepEqual(await snapshot(), correctedSaved, 'completed replay cannot overwrite a human correction')
+    // Restart the emitted Worker against the same durable installation, then retry both policy outcomes.
+    const retainedReviews = (await person('/agents/api/reviews')).reviews
+    await h.stop()
+    h = await harness({ installation, vars, clockOffset: 0 })
+    ctx.origin = h.origin
+    owner = await h.signIn(email)
+    assert.deepEqual((await mcp(args)).result.structuredContent, posted.result.structuredContent)
+    assert.deepEqual((await mcp(heldArgs)).result.structuredContent, held.result.structuredContent)
+    assert.deepEqual(await snapshot(), correctedSaved, 'restart and replay keep comments, revisions and native audit effects unchanged')
+    assert.deepEqual((await person('/agents/api/reviews')).reviews, retainedReviews, 'restart retains the genuine review and creates no new review')
+    console.log('PROBE PLAN-006 durable replay: human correction then emitted Worker restart and MCP retries -> retained original and corrected revisions, one native effect per comment and unchanged human-marked review')
+
     const refused = async (label, run, check) => {
       const before = await snapshot(), result = await run()
       check(result)
       assert.deepEqual(await snapshot(), before, `${label} changes no native comment, revision or audit effect`)
       console.log(`PROBE PLAN-006 ${label}: public MCP or native comment door -> refused without native effects`)
     }
+    await refused('other sponsor edit', () => h.api('comment.edit', memberCookie, { comment: first.id, body: 'Synthetic Gasket unauthorized correction' }, 403), answer => assert.equal(answer.error, 'not_your_comment'))
     const fresh = () => ({ ...args, idempotency_key: randomUUID() })
     await adopt(autonomousPolicy())
     await refused('signed-out', () => mcp(fresh(), {}, null), answer => assert.equal(answer.status, 401))
@@ -142,9 +166,11 @@ export async function agentCommentsJourney() {
     await refused('Pause replay', () => mcp(args), answer => assert.equal(answer.code, 'agents_paused'))
     await adopt(autonomousPolicy(), { revoked: { agents: [], consents: [ctx.consent] } })
     await refused('consent revoked', () => mcp(fresh()), answer => assert.equal(answer.status, 401))
+    await refused('consent revoked replay', () => mcp(args), answer => assert.equal(answer.status, 401))
     await adopt(autonomousPolicy())
     const memberClaims = { sub: memberSub, email: memberEmail, act: { sub: 'synthetic-gasket-member-agent', name: 'Synthetic Gasket member agent' } }
-    const byMember = await mcp({ ...fresh(), body: 'Synthetic Gasket member observation' }, memberClaims)
+    const memberArgs = { ...fresh(), body: 'Synthetic Gasket member observation' }
+    const byMember = await mcp(memberArgs, memberClaims)
     assert.equal(byMember.result?.isError, false, `active member comment: HTTP ${byMember.status}, code ${byMember.code}`)
     const memberNote = (await thread()).comments.at(-1)
     assert.equal(memberNote.author_id, member.id)
@@ -157,13 +183,16 @@ export async function agentCommentsJourney() {
     assert.equal((await thread()).unread, 0)
     await h.api('access.role', owner, { member: member.id, role: 'agent' })
     await refused('removed human role', () => mcp(fresh(), memberClaims), answer => assert.ok([401, 403].includes(answer.status)))
+    await refused('removed human role replay', () => mcp(memberArgs, memberClaims), answer => assert.ok([401, 403].includes(answer.status)))
     await h.api('access.role', owner, { member: member.id, role: 'maintainer' })
     console.log('PROBE PLAN-006 native history: human edit and read doors -> original agent attribution, separate human correction and cleared unread state')
     await h.api('access.end', owner, { member: member.id })
     await refused('ended member', () => mcp(fresh(), memberClaims), answer => assert.ok([401, 403].includes(answer.status)))
+    await refused('ended member replay', () => mcp(memberArgs, memberClaims), answer => assert.ok([401, 403].includes(answer.status)))
     await refused('ended native session', async () => { const response = await h.raw('/api/gasket/comment.post', { cookie: memberCookie, body: { workOrder: work.id, body: original } }); return { status: response.status, text: await response.text() } }, answer => { assert.ok([401, 403].includes(answer.status)); assert.ok(!answer.text.includes(original)) })
     await person(`/agents/api/agents/${encodeURIComponent(ctx.agentId)}/revoke`, {})
     await refused('agent revoked', () => mcp(fresh()), answer => assert.equal(answer.status, 401))
+    await refused('agent revoked replay', () => mcp(args), answer => assert.equal(answer.status, 401))
     await h.api('service.revoke', owner, { credential: service.id })
     await refused('credential revoked', () => mcp(fresh(), {}, service.token), answer => assert.equal(answer.status, 401))
 
@@ -180,7 +209,9 @@ export async function agentCommentsJourney() {
         assert.equal(response.status(), 200)
         const note = page.locator(`#comment-${first.id}`)
         assert.ok((await note.innerText()).includes(first.author))
-        assert.ok((await note.innerText()).includes(original))
+        assert.ok((await note.innerText()).includes(correction))
+        await note.locator('summary').click()
+        assert.ok((await note.innerText()).replace(/\s+/g, ' ').includes(original.replace(/\s+/g, ' ')), 'the original agent observation remains in visible history')
         assert.equal(await note.locator('bearing').count(), 0, 'authored markup remains plain text')
       }
       await page.locator('#comments').screenshot({ path: join(directory, `native-thread-${width}.png`) })
@@ -189,5 +220,6 @@ export async function agentCommentsJourney() {
   } finally {
     await browser?.close()
     await h.close()
+    await installation.remove()
   }
 }
