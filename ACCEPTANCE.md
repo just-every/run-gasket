@@ -527,7 +527,7 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 1. Create a motor BOM with two approved bearings and a serial restriction, plan a repair with one out of stock and select a substitute.
 2. Inspect compatibility and quantities on the resulting work/parts reservation.
 
-**Evidence.** `tests/gasket/flows.mjs` — "ASSET-006 bill of materials and interchangeable spares"; `tests/gasket/recovery.mjs` — "recoveryJourney"
+**Evidence.** `tests/gasket/flows.mjs` — "ASSET-006 bill of materials and interchangeable spares": public asset and BOM forms, serial and model compatibility, BOM-only substitute selection through the browser, unchanged stock and reservations on JSON and form refusals, and revision attribution; `tests/gasket/recovery.mjs` — "recoveryJourney": inactive restoration of model history, restrictions and substitute reservations
 **Gap.** Stock per eligible storeroom and complete bin allocation, valuation and count reconciliation under PART-001 and PART-002 remain unproved. Operational additional-site scope retains ADMIN-002 and its conservative custody default awaiting CT approval; in-transit custody retains PART-006. The Base 0.2.84 hold and native, offline and device qualification remain unchanged. The primary-site journeys prove lead-managed model identity, combined serial and model restrictions, unchanged stock and reservations on incompatible requests, approved substitution, historical revisions and inactive restoration.
 
 #### ASSET-007 — Asset lifecycle and replacement decision

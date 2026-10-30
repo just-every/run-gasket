@@ -1663,6 +1663,9 @@ try {
     assert.ok(!(await (await h.raw(`/app/assets/${motor}`, { cookie: cookie.max })).text()).includes('Save new revision'))
     const work = (await (await h.raw(`/app/work/${twinJob}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
     for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; models DRV-100 to DRV-199; this asset is M-2500, model DRV-150']) assert.ok(work.includes(text), text)
+    // Exercise a BOM-only approval in the real work form, without site-wide approval.
+    await h.api('part.substitute', cookie.lead, { part: open, substitute: shielded, withdraw: true, reason: 'Use asset-specific BOM approval' })
+    await h.api('reservation.release', cookie.lead, { reservation: (await wo('lead', laterRepair)).reservations[0].id, reason: 'Reserve through the work page' })
     const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
     try {
       for (const width of process.env.GASKET_BOM_SCREENSHOTS ? [1440, 390] : [1440]) {
@@ -1679,8 +1682,26 @@ try {
               assert.equal(await screen.locator('input[name="model"]').inputValue(), 'DRV-150')
               assert.equal(await screen.locator('input[name="modelFrom"]').first().inputValue(), 'DRV-100')
               assert.equal(await screen.locator('input[name="alternateModelTo"]').first().inputValue(), 'DRV-199')
-            } else if (name === 'work') assert.match(await screen.locator('main').innerText(), /Shielded bearing/)
-            else assert.match(await screen.getByRole('alert').innerText(), /model/i)
+            } else {
+              const workOrder = new URL(path, h.origin).pathname.split('/').pop()
+              const before = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+              const form = screen.locator('form[action="/app/do/workorder.reserve"]').filter({ has: screen.getByRole('button', { name: 'Reserve part', exact: true }) })
+              await form.getByLabel('Part', { exact: true }).selectOption(name === 'work' ? shielded : c3)
+              await form.getByLabel('Instead of', { exact: true }).selectOption(name === 'work' ? open : belt)
+              await form.getByLabel('Quantity', { exact: true }).fill(name === 'work' ? '2' : '1')
+              await Promise.all([screen.waitForURL(url => url.searchParams.has(name === 'work' ? 'notice' : 'error')), form.getByRole('button', { name: 'Reserve part', exact: true }).click()])
+              const after = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+              if (name === 'work') {
+                assert.deepEqual(after.work.reservations.filter(row => row.state === 'open').map(row => [row.part.id, row.insteadOf.id, row.quantity]), [[shielded, open, '2']], 'the browser can reserve a compatible BOM-only substitute')
+                assert.deepEqual(after.parts.map(row => [row.id, row.onHand]), before.parts.map(row => [row.id, row.onHand]), 'reservation moves no stock')
+                assert.match(await screen.locator('main').innerText(), /Shielded bearing/)
+              } else {
+                const alerts = await screen.getByRole('alert').allTextContents()
+                assert.ok(alerts.length, 'the refused form has a visible alert')
+                for (const alert of alerts) assert.match(alert, /model/i, 'every refusal alert explains model applicability')
+                assert.deepEqual(after, before, 'the browser refuses a model-incompatible BOM substitute without effects')
+              }
+            }
             assert.equal(await screen.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${name} fits the desktop`)
           }
           if (process.env.GASKET_BOM_SCREENSHOTS) {
@@ -1691,7 +1712,7 @@ try {
         await context.close()
       }
     } finally { await browser.close() }
-    console.log('PROBE ASSET-006 screens: built asset and work pages -> current model, restrictions, stock, substitute and model refusal displayed')
+    console.log('PROBE ASSET-006 screens: built asset and work pages -> current model, restrictions, stock, BOM-only substitute selection and model refusal displayed')
 
   })
 
