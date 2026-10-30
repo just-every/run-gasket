@@ -1,9 +1,8 @@
 import { applyInterval, intervalBasis } from './intervals'
 import { approveMerge, mergeProposalBasis } from './part-merge'
-// Agent preparation, human approval. An agent (or a lead) prepares a schedule,
-// a corrective work order or a parts count; a lead or the owner approves it.
-// Approval re-checks the record versions the proposal relied on, runs the
-// normal command as the approver and records the exact payload hash.
+// Native independent decisions retain the exact proposed payload and source facts.
+// The reassignment adapter also admits company-policy execution as the current
+// sponsor, without inventing a human approval for autonomous or review dispositions.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
 import { AUDIT_INSERT, all, commit, guard, insist, newId, now, one, sha256Hex, stmt, type Row } from './core'

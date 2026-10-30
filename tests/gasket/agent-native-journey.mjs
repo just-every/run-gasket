@@ -62,7 +62,10 @@ export default async function journey({ request, origin, cookie, tool }) {
   assert.equal(stale.result?._meta?.['com.runeditrun/error']?.code, 'revision_conflict')
   assert.deepEqual(await api(`assets/${asset.id}`), after)
   console.log('Native Core journey: changed-key and stale-revision refusals preserved native records')
-  const work = first.result.structuredContent.work[0]
+  // Phase preparation also creates human work; exercise attribution on a genuine MCP creation.
+  const attributed = await tool('gasket.work.create', { asset: asset.id, title: 'Synthetic attribution inspection', due: '2030-01-10', idempotency_key: crypto.randomUUID() })
+  assert.ok(attributed.result?.structuredContent && !attributed.result.isError)
+  const work = attributed.result.structuredContent
   assert.ok((await api(`work/${work.id}`)).created_by_name.includes(' for '))
   const procedures = await api('checklists')
   assert.ok((await api(`checklists/${procedures[0].id}`)).revisions[0].publishedBy.includes(' for '))
