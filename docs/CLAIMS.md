@@ -9,7 +9,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 1 | Gasket turns operator requests, PM schedules and sensor readings into work with parts and people. | `REQ-001` partial; `REQ-003` done; `PM-001` partial; `PM-002` done; `PLAN-004` partial; `INT-010` missing | partial |
 | 2 | Keeps technicians working offline. | `FIELD-001` missing; `FIELD-002` missing; `FIELD-003` missing | missing |
 | 3 | Spots failing machines before breakdown. | `AGENT-001` missing | missing |
-| 4 | 100% free, open source alternative to MaintainX, UpKeep and Fiix; MIT licensed. | `HTTP-001` partial; `ADMIN-009` partial | partial |
+| 4 | 100% free, open source alternative to MaintainX, UpKeep and Fiix; MIT licensed. | `HTTP-001` done; `ADMIN-009` partial | partial |
 | 5 | QR faults become assigned work; offline checklists save and sync. | `ASSET-002` done; `REQ-002` partial; `REQ-003` done; `FIELD-002` missing; `FIELD-003` missing | partial |
 | 6 | OPC UA temperature and Samsara engine hours feed maintenance. | `INT-010` missing; `INT-013` missing; `PM-002` done | partial |
 | 7 | Low oil stock drafts a purchase order. | `PART-005` done; `BUY-002` done | done |
