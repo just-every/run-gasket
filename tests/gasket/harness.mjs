@@ -61,7 +61,7 @@ export async function harness({ vars, installation, clockOffset = offset, clockI
     return cookie
   }
 
-  return { origin, scratch: worker.scratch, vars, installation, raw, api, submit, signIn, owner, stop, close, scheduled: worker.scheduled, mails: worker.mails, setMailOutcome: worker.setMailOutcome, setGenerationHook: worker.setGenerationHook, setPMHook: worker.setPMHook, setClockInstant: worker.setClockInstant, setSaveFault: worker.setSaveFault, getSaveCommits: worker.getSaveCommits }
+  return { origin, scratch: worker.scratch, vars, installation, clockOffset, clockInstant, raw, api, submit, signIn, owner, stop, close, scheduled: worker.scheduled, mails: worker.mails, setMailOutcome: worker.setMailOutcome, setGenerationHook: worker.setGenerationHook, setPMHook: worker.setPMHook, setClockInstant: worker.setClockInstant, setSaveFault: worker.setSaveFault, getSaveCommits: worker.getSaveCommits }
 }
 
 export const file = (filename, content, type = 'application/octet-stream') => ({ filename, base64: Buffer.from(content).toString('base64'), type })
