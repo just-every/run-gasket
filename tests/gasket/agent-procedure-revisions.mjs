@@ -32,18 +32,23 @@ async function before(ctx) {
   const work = await api('workorder.create', { location: 'Workshop', title: 'Issued before procedure amendment', due: '2030-01-10', template: template.id, unassigned: true })
   const pinned = await api(`work/${work.id}`)
   assert.equal(pinned.checklist_revision_id, source.revisions[0].id)
-  prepared.set(ctx.args.idempotency_key, { source, work: pinned })
+  prepared.set(ctx.args.idempotency_key, { source, work: pinned, template: template.id })
 }
 
 /** Both company policies execute this same native revision and replay journey. */
 async function after(ctx) {
   if (ctx.step.id !== 'amend-procedure' || !['autonomous', 'held'].includes(ctx.phase)) return
-  const { api, json } = doors(ctx), { source, work } = prepared.get(ctx.args.idempotency_key)
+  const { api, json } = doors(ctx), { source, work, template } = prepared.get(ctx.args.idempotency_key)
   const current = await api(`checklists/${source.id}`), revised = current.revisions[0]
   assert.deepEqual(ctx.result, { id: source.id, revision: revised.id, number: 2 })
   assert.equal(revised.items[0].text, ctx.args.amendments[0].text)
   assert.equal(revised.items[0].key, source.revisions[0].items[0].key)
   assert.deepEqual(current.revisions.slice(1), source.revisions)
+  assert.deepEqual(revised.items, source.revisions[0].items.map(item => ({ ...item, text: ctx.args.amendments.find(change => change.step === item.key)?.text ?? item.text })))
+  const later = await api('workorder.create', { location: 'Workshop', title: 'Issued after procedure amendment', due: '2030-01-11', template, unassigned: true })
+  const laterWork = await api(`work/${later.id}`)
+  assert.equal(laterWork.checklist_revision_id, revised.id)
+  assert.deepEqual(laterWork.items.map((item, index) => Object.fromEntries(Object.keys(revised.items[index]).map(key => [key, item[key]]))), revised.items)
   assert.deepEqual(await api(`work/${work.id}`), work)
   assert.equal(work.status, 'open')
   assert.deepEqual(work.signatures, [])
@@ -220,7 +225,7 @@ export async function isolatedRevisions() {
     }
     for (const phase of ['autonomous', 'held']) {
       await adopt(phase === 'held' ? heldPolicy() : autonomousPolicy())
-      const source = await h.api('checklist.create', cookie, { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Inspect original procedure'] })
+      const source = await h.api('checklist.create', cookie, { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Inspect original procedure | check', 'Record clearance | number mm 1..5 | when step 1 is pass', 'Choose condition | options sound, damaged | fail on damaged', 'Describe damage | text | when step 3 is damaged', 'Photograph the guard | photo'] })
       const native = await h.api(`checklists/${source.id}`, cookie), first = native.revisions[0]
       ctx.phase = phase
       ctx.args = { checklist: source.id, sourceRevision: first.id, expected_revision: first.id, amendments: [{ step: first.items[0].key, text: 'Inspect amended procedure' }], note: 'Clarify the inspection', idempotency_key: crypto.randomUUID() }

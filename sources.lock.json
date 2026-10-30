@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "0e2446b4bac6c26d741b1056502a46dc9c611f36bb66f9202dbdd28ed5c93957",
+      "sha256": "e0e9786cbcedebfd08567e3f7fa203bd84f9dd13cac89efef32a5dd5e35a8d8f",
       "executable": false
     },
     "DEMO.md": {
@@ -4692,7 +4692,7 @@
       "executable": false
     },
     "tests/gasket/agent-procedure-revisions.mjs": {
-      "sha256": "cb7b858b8ee5a88b5be3bca2946f9951929938939ff496708265a30b09cbf108",
+      "sha256": "ed3a8af26de0c846e3ff809e1f547e6297a1fc3a709f9452186e345908d49a07",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
