@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { ToolContext } from '../../modules/agent-door/index.ts'
 
-export interface NativePolicyFence { envelope: string | null; local_document: string | null; local_revision: number }
+export interface NativePolicyFence { envelope: string | null; local_document: string | null; local_revision: number; disposition?: string; admission?: string; revision?: number | null }
 const context = new AsyncLocalStorage<{ ctx: ToolContext; policy: NativePolicyFence }>()
 export const agentContext = () => context.getStore()?.ctx
 export const agentPolicyFence = () => context.getStore()?.policy
