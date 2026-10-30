@@ -34,13 +34,13 @@ export async function pmInterruptionJourney() {
       const schedule = (await h.api('schedule.create', owner, { asset, checklist, title: 'Recover interrupted PM', everyDays: 30, firstDue: day })).id
       const health = () => h.api('automation', owner)
       const grant = async () => (await health()).rules.find(row => row.id === 'pm')
-      const jobs = () => h.api('automation/jobs', owner)
+      const jobs = () => h.api('/automation/jobs', owner)
       const work = () => h.api('work', owner)
       const details = async () => Promise.all((await work()).map(row => h.api(`work/${row.id}`, owner)))
       const snapshot = async () => ({ work: await details(), jobs: await jobs(), audit: await h.api('audit', owner), purchases: await h.api('purchasing', owner), notices: await h.api('notices', owner) })
       await h.api('automation.control', owner, { rule: 'pm', revision: (await grant()).revision, paused: true, reason: 'Preview before activation' })
       const beforePreview = await snapshot(), mailCount = h.mails.length
-      assert.equal((await h.api(`automation/preview?schedule=${schedule}`, owner)).created.length, 1)
+      assert.equal((await h.api(`/automation/preview?schedule=${schedule}`, owner)).created.length, 1)
       assert.deepEqual(await snapshot(), beforePreview, 'preview has no accepted or execution effects')
       assert.equal(h.mails.length, mailCount, 'preview sends no notification')
       await h.api('automation.control', owner, { rule: 'pm', revision: (await grant()).revision, paused: false, reason: 'Enable tested PM' })
@@ -60,7 +60,7 @@ export async function pmInterruptionJourney() {
       await h.stop(); held.release(); held = null
       assert.equal(await trigger, 'terminated')
       h = await harness({ vars, installation, clockInstant: initial + hour, pmGate: true })
-      let record = await h.api(`automation/jobs?job=${interrupted.id}`, owner)
+      let record = await h.api(`/automation/jobs?job=${interrupted.id}`, owner)
       assert.equal(record.state, 'running', 'termination did not execute the callback failure handler')
       assert.equal(record.interrupted, true)
       assert.deepEqual(record.input, originalInput)
@@ -80,16 +80,16 @@ export async function pmInterruptionJourney() {
       await h.api('automation.schedule', owner, { schedule, revision: 2, active: true, reason: 'Resume schedule' })
       await h.api('checklist.revise', owner, { checklist, items: ['Inspect revised seal'], note: 'Later procedure' })
       assert.equal((await h.api('automation.catchup', owner, { rule: 'pm', revision: originalGrant }, 409)).error, 'automation_changed')
-      assert.equal((await h.api(`automation/jobs?job=${interrupted.id}`, owner)).recovered_by, null, 'stale authority cannot claim recovery')
+      assert.equal((await h.api(`/automation/jobs?job=${interrupted.id}`, owner)).recovered_by, null, 'stale authority cannot claim recovery')
       const revision = (await grant()).revision
       const recovery = await h.api('automation.catchup', owner, { rule: 'pm', revision })
       assert.equal(recovery.state, 'completed')
       assert.equal(recovery.output.created.length, accepted.length ? 0 : 1)
-      const recoveryRecord = await h.api(`automation/jobs?job=${recovery.job}`, owner)
+      const recoveryRecord = await h.api(`/automation/jobs?job=${recovery.job}`, owner)
       assert.equal(recoveryRecord.rule_revision, revision)
       assert.deepEqual(recoveryRecord.recovers, [interrupted.id])
       if (!accepted.length) assert.equal(recoveryRecord.input.schedules.find(row => row.id === schedule).revision, 3)
-      record = await h.api(`automation/jobs?job=${interrupted.id}`, owner)
+      record = await h.api(`/automation/jobs?job=${interrupted.id}`, owner)
       assert.equal(record.state, 'failed'); assert.equal(record.error, 'pm_interrupted')
       assert.equal(record.recovered_by, recovery.job)
       assert.equal(record.output.recovery.recoveredBy, recovery.job)
@@ -122,7 +122,7 @@ export async function pmInterruptionJourney() {
       const recoveredWork = await details(), recoveredRecord = record
       assert.equal((await h.api('automation.catchup', owner, { rule: 'pm', revision })).output.created.length, 0)
       assert.deepEqual(await details(), recoveredWork)
-      assert.deepEqual(await h.api(`automation/jobs?job=${interrupted.id}`, owner), recoveredRecord)
+      assert.deepEqual(await h.api(`/automation/jobs?job=${interrupted.id}`, owner), recoveredRecord)
       console.log(`PROBE PM-008 recovery-${phase}: current-revision catch-up twice -> one occurrence, original input retained, recovery=${recovery.job}, reconciled effects=${record.output.created.length}`)
       if (phase === 'occurrence') await browserProof(h, owner, 'recovered')
       // A live but superseded callback is also fenced at its actual write.
@@ -136,12 +136,12 @@ export async function pmInterruptionJourney() {
         assert.equal((await h.setClockInstant(initial + 2 * hour)).status, 204)
         const replacement = await h.api('automation.catchup', owner, { rule: 'pm', revision })
         assert.equal(replacement.output.created.filter(row => row.schedule === next).length, 1)
-        const fencedRecord = await h.api(`automation/jobs?job=${old.id}`, owner), fencedWork = await details()
+        const fencedRecord = await h.api(`/automation/jobs?job=${old.id}`, owner), fencedWork = await details()
         held.release(); held = null
         const refused = await oldRequest
         assert.equal(refused.status, 409); assert.equal((await refused.json()).error, 'automation_changed')
         assert.deepEqual(await details(), fencedWork, 'superseded callback cannot add or change accepted work')
-        assert.deepEqual(await h.api(`automation/jobs?job=${old.id}`, owner), fencedRecord, 'superseded completion cannot overwrite recovery lineage')
+        assert.deepEqual(await h.api(`/automation/jobs?job=${old.id}`, owner), fencedRecord, 'superseded completion cannot overwrite recovery lineage')
         assert.equal((await details()).filter(row => row.schedule_id === next).length, 1)
         console.log('PROBE PM-008 fencing: expired callback released after recovery -> HTTP 409 automation_changed, unchanged work and recovery ledger')
       }
@@ -150,7 +150,7 @@ export async function pmInterruptionJourney() {
       h = await harness({ vars, installation, clockInstant: initial + 3 * hour, pmGate: true })
       await h.scheduled(cron)
       assert.deepEqual(await details(), beforeRestart, 'another Worker restart and Cron event keep accepted work')
-      assert.deepEqual(await h.api(`automation/jobs?job=${interrupted.id}`, owner), recoveredRecord)
+      assert.deepEqual(await h.api(`/automation/jobs?job=${interrupted.id}`, owner), recoveredRecord)
     } finally {
       held?.release()
       await h.stop()
