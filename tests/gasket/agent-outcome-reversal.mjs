@@ -97,6 +97,8 @@ export async function agentOutcomeReversalJourney() {
       assert.deepEqual(approval.summary.nativeTarget, { kind: 'schedule', id: schedule })
       assert.ok(approval.summary.items.some(item => item.includes(candidate.report.source.sourceHash)))
       assert.ok(approval.summary.items.some(item => item.includes(candidate.report.id)))
+      assert.ok(approval.summary.items.some(item => item.includes(candidate.report.status)))
+      for (const uncertainty of candidate.report.uncertainty) assert.ok(approval.summary.items.some(item => item.includes(uncertainty)), 'the decision retains the measured outcome uncertainty')
       assert.ok(approval.summary.items.some(item => item.includes(candidate.report.source.windows.baseline.from) && item.includes(candidate.report.source.windows.baseline.to)))
       assert.ok(approval.summary.items.some(item => item.includes(candidate.report.source.windows.post.from) && item.includes(candidate.report.source.windows.post.to)))
       assert.ok(approval.summary.items.some(item => item.includes(String(candidate.proposal.basis.schedule.revision))))

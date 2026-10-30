@@ -36,7 +36,8 @@ export function intervalProposalTools(env: Bindings): ToolDefinition[] {
         `Rollback plan: ${basis.rollbackPlan}`,
         ...basis.limits.map(limit => `Declared ${limit.source} limit, revision ${limit.revision}: ${limit.min_days === null ? '' : `${limit.min_days} to ${limit.max_days} days. `}${limit.min_units === null ? '' : `${limit.min_units} to ${limit.max_units} meter units. `}${limit.reference}`),
         ...(basis.outcome ? [`Assessment: ${basis.outcome.id}`, `Source fingerprint: ${basis.outcome.sourceHash}`, `Agreed window: ${basis.outcome.window}`] : []),
-        ...(report ? [`Agreed baseline: ${report.source.windows.baseline.from} to ${report.source.windows.baseline.to}`, `Agreed follow-up: ${report.source.windows.post.from} to ${report.source.windows.post.to}`] : []),
+        ...(report ? [`Measured outcome: ${report.status}`, `Agreed baseline: ${report.source.windows.baseline.from} to ${report.source.windows.baseline.to}`, `Agreed follow-up: ${report.source.windows.post.from} to ${report.source.windows.post.to}`,
+          ...report.uncertainty.map((item: string) => `Outcome uncertainty: ${item}`)] : []),
         basis.expectedEffect, ...basis.uncertainty,
       ] }
     },
