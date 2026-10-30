@@ -27,6 +27,8 @@ const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued
 // Worker with real local D1. No provider is involved; all people are invented.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { mkdir } from 'node:fs/promises'
+import { chromium } from '@playwright/test'
 import { join } from 'node:path'
 import { crc32 } from 'node:zlib'
 import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
@@ -405,6 +407,105 @@ try {
     assert.ok(!board.lowParts.some(part => part.id === ids.oilPart))
     await h.api('board', cookie.max, undefined, 403)
     assert.match(await (await h.raw('/app/board', { cookie: cookie.lead })).text(), /Twin fryer/)
+
+    // A separate persisted installation keeps historic outages out of the other
+    // core journeys. Freeze the emitted Worker's clock for exact elapsed totals.
+    const instant = now(), wallNow = localAt(instant), day = wallNow.slice(0, 10)
+    const windowStart = `${addDays(day, -30)}T00:00`
+    const at = (days, time) => `${addDays(day, days)}T${time}`
+    // Parse the submitted wall-clock timestamps independently of board helpers.
+    const minutes = (from, to) => (Date.parse(`${to}:00Z`) - Date.parse(`${from}:00Z`)) / 60_000
+    const isolated = await harness({ clockInstant: instant })
+    try {
+      const owner = await isolated.owner(), people = {}, sessions = {}
+      await isolated.api('site.configure', owner, { name: 'Downtime window workshop', timezone: zone })
+      for (const role of ['lead', 'supervisor', 'maintainer']) {
+        const email = [`board-${role}`, 'example.test'].join('@')
+        people[role] = (await isolated.api('access.give', owner, { name: `Board ${role}`, email, role })).id
+        sessions[role] = await isolated.signIn(email)
+      }
+      const assets = {}, jobs = {}, sources = {}
+      for (const [key, name] of [['expired', 'Expired outage pump'], ['closed', 'Window crossing compressor'], ['open', 'Open outage fan'], ['longOpen', 'Historic open mixer']]) {
+        assets[key] = (await isolated.api('asset.create', sessions.lead, { tag: `BOARD-${key}`, name, location: 'Window workshop' })).id
+        jobs[key] = (await isolated.api('workorder.create', sessions.lead, { asset: assets[key], title: name, due: addDays(day, -1), assignee: people.maintainer })).id
+        sources[key] = []
+      }
+      const outage = async (key, startedOn, endedOn) => {
+        const { downtime } = await isolated.api('downtime.start', sessions.maintainer, { workOrder: jobs[key], startedOn, reason: `Recorded ${key} outage` })
+        if (endedOn) await isolated.api('downtime.end', sessions.maintainer, { workOrder: jobs[key], endedOn })
+        sources[key].push({ id: downtime, startedOn, endedOn: endedOn ?? null })
+      }
+      await outage('expired', at(-40, '09:10'), at(-38, '10:40'))
+      await outage('closed', at(-40, '08:05'), at(-39, '09:35'))
+      await outage('closed', at(-31, '23:15'), at(-29, '01:25'))
+      await outage('closed', at(-5, '09:10'), at(-5, '11:40'))
+      await outage('open', at(-2, '10:15'))
+      await outage('longOpen', at(-32, '18:35'))
+      // The public work detail proves these are original persisted timestamps,
+      // including excluded history and NULL ends, rather than report fixtures.
+      for (const key of Object.keys(assets)) {
+        const work = await isolated.api(`work/${jobs[key]}`, sessions.maintainer)
+        assert.deepEqual(work.downtime.map(row => [row.id, row.started_on, row.ended_on]).sort(), sources[key].map(row => [row.id, row.startedOn, row.endedOn]).sort())
+      }
+      const expected = [
+        { asset_id: assets.closed, minutes: minutes(windowStart, sources.closed[1].endedOn) + minutes(sources.closed[2].startedOn, sources.closed[2].endedOn), events: 2 },
+        { asset_id: assets.open, minutes: minutes(sources.open[0].startedOn, wallNow), events: 1 },
+        { asset_id: assets.longOpen, minutes: minutes(windowStart, wallNow), events: 1 },
+      ].sort((a, b) => b.minutes - a.minutes)
+      const expectedDown = ['open', 'longOpen'].map(key => ({ asset_id: assets[key], minutesSoFar: minutes(sources[key][0].startedOn, wallNow) })).sort((a, b) => a.asset_id.localeCompare(b.asset_id))
+
+      // Populate the existing board's other categories, including a real
+      // submitted order, without disturbing the historic outage source rows.
+      const submitted = (await isolated.api('workorder.create', sessions.lead, { asset: assets.closed, title: 'Ready for independent review', due: day, assignee: people.maintainer })).id
+      await isolated.api('workorder.submit', sessions.maintainer, { workOrder: submitted, version: (await isolated.api(`work/${submitted}`, sessions.maintainer)).version })
+      const finding = await isolated.api('finding.record', sessions.maintainer, { workOrder: jobs.open, severity: 'high', text: 'Fan bearing needs corrective work', followUp: true })
+      const part = (await isolated.api('part.create', sessions.lead, { number: 'BOARD-BEARING', name: 'Replacement fan bearing', unit: 'each', minimum: '2' })).id
+      for (const role of ['lead', 'supervisor']) {
+        const view = await isolated.api('board', sessions[role])
+        assert.equal(view.since, windowStart.slice(0, 10))
+        assert.deepEqual(view.downtime.map(({ asset_id, minutes, events }) => ({ asset_id, minutes, events })), expected, `${role}: expired history excluded, closed and open outages clipped, totals and event counts reconciled`)
+        assert.deepEqual(view.down.map(({ asset_id, minutesSoFar }) => ({ asset_id, minutesSoFar })).sort((a, b) => a.asset_id.localeCompare(b.asset_id)), expectedDown, `${role}: down-now elapsed time retains the full open outage`)
+        assert.deepEqual(view.overdue.map(row => row.id).sort(), Object.values(jobs).sort())
+        assert.deepEqual(view.awaitingReview.map(row => row.id), [submitted])
+        assert.deepEqual(view.followUps.map(row => row.id), [finding.followUp])
+        assert.deepEqual(view.lowParts.map(row => row.id), [part])
+      }
+      await isolated.api('board', sessions.maintainer, undefined, 403)
+      assert.equal((await isolated.raw('/app/board', { cookie: sessions.maintainer })).status, 403)
+
+      const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+      try {
+        for (const role of ['lead', 'supervisor']) {
+          const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 1100 } })
+          await context.addCookies(sessions[role].split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: isolated.origin } }))
+          const page = await context.newPage()
+          assert.equal((await page.goto(`${isolated.origin}/app/board`)).status(), 200)
+          const displayed = await page.locator('#downtime tbody tr').evaluateAll(rows => rows.map(row => ({
+            asset_id: row.querySelector('a').getAttribute('href').split('/').pop(),
+            minutes: Number(row.cells[1].textContent.replace(/,/g, '')),
+            events: Number(row.cells[2].textContent.replace(/,/g, '')),
+          })))
+          assert.deepEqual(displayed, expected, `${role}: the board page shows the calculated minutes and event counts`)
+          const down = await page.locator('#down tbody tr').evaluateAll(rows => rows.map(row => ({
+            asset_id: row.querySelector('a').getAttribute('href').split('/').pop(),
+            minutesSoFar: Number(row.cells[1].querySelector('.gk-sub').textContent.replace(/[^\d]/g, '')),
+          })))
+          assert.deepEqual(down.sort((a, b) => a.asset_id.localeCompare(b.asset_id)), expectedDown, `${role}: the board page shows elapsed open minutes`)
+          assert.deepEqual(await page.locator('.gk-tile-n').allTextContents(), ['4', '1', '1', '2', '1'])
+          assert.ok((await page.locator('#review').innerText()).includes('Ready for independent review'))
+          assert.ok((await page.locator('#follow-ups').innerText()).includes('Fan bearing needs corrective work'))
+          if (role === 'lead') {
+            const directory = process.env.BOARD_SCREENSHOTS || `/tmp/gasket-board-${process.pid}`
+            await mkdir(directory, { recursive: true })
+            for (const width of [1440, 390]) {
+              await page.setViewportSize({ width, height: 1100 })
+              await page.screenshot({ path: `${directory}/downtime-board-${width}.png`, fullPage: true })
+            }
+          }
+          await context.close()
+        }
+      } finally { await browser.close() }
+    } finally { await isolated.close() }
   })
 
   await check('GAS-11 asset history and CSV', async () => {
