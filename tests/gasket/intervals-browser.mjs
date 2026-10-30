@@ -170,6 +170,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     assert.equal(failedReceipt.id,before.find(([key])=>key==='__gk_save')[1],`${action} refusal identifies this submission`)
     assert.equal(failedReceipt.action,action.slice('/app/do/'.length),`${action} refusal identifies this action`)
     assert.equal(failedReceipt.state,'failed');assert.equal(failedReceipt.batches,0)
+    await proof('refused-'+action.slice('/app/do/'.length))
     const retryDraft = await form.evaluate(el=>[...new FormData(el)].map(([key,value])=>[key,typeof value==='string'?value:value.name]))
     await form.evaluate(el=>el.querySelector('[data-save-error]')?.remove())
     const retryId = retryDraft.find(([key])=>key==='__gk_save')[1]
@@ -199,6 +200,7 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     assert.equal(receipt.action,action.slice('/app/do/'.length),`${action} confirmation identifies this action`)
     assert.equal(receipt.state,'saved',`${action} durable receipt`)
     assert.ok(receipt.batches>0,`${action} records a real committed write`)
+    await proof('confirmed-'+action.slice('/app/do/'.length))
     await snapshot?.interrupt({action,fields:submitted,cookie:who,view,steps:receipt.batches})
     await snapshot?.close()
     assert.equal(confirmation.saved,true)
