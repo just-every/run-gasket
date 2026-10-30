@@ -4,7 +4,7 @@ import type { Bindings } from '../auth.server'
 import { can, requireCapability, type Actor } from './actor'
 import { all, commit, guard, insist, now, one, stmt } from './core'
 import type { Input } from './input'
-import { AUTOMATION_RULES, automationLedger, automationRules, type AutomationRule } from './automation-jobs'
+import { AUTOMATION_RULES, automationLedger, automationRules, interruptedPM, type AutomationRule } from './automation-jobs'
 import { issueDue } from './schedules'
 import { addDays } from './dates'
 import { meterState } from './meters'
@@ -46,7 +46,7 @@ export async function previewAutomation(env: Bindings, actor: Actor, id: string)
 
 export async function automationHealth(env: Bindings, actor: Actor) {
   requireCapability(actor, 'board.read')
-  const [rules, jobs, schedules] = await Promise.all([automationRules(env), all(env, 'SELECT id,rule_id,rule_revision,source,started_at,finished_at,state,error,output FROM gk_automation_jobs ORDER BY started_at DESC,id DESC LIMIT 50'), all(env, `SELECT s.*,
+  const [rules, jobs, schedules] = await Promise.all([automationRules(env), all(env, 'SELECT id,rule_id,rule_revision,source,started_at,finished_at,state,error,output,lease_expires_at,recovered_by FROM gk_automation_jobs ORDER BY started_at DESC,id DESC LIMIT 50'), all(env, `SELECT s.*,
     (SELECT w.id FROM gk_work_orders w WHERE w.schedule_id=s.id AND w.status NOT IN ('closed','cancelled') LIMIT 1) AS open_work,
     (SELECT w.occurrence FROM gk_work_orders w WHERE w.schedule_id=s.id ORDER BY w.created_at DESC LIMIT 1) AS last_occurrence,
     (SELECT w.status FROM gk_work_orders w WHERE w.schedule_id=s.id ORDER BY w.created_at DESC LIMIT 1) AS last_status
@@ -64,7 +64,7 @@ export async function automationHealth(env: Bindings, actor: Actor) {
       const latest = await one(env, "SELECT started_at FROM gk_automation_jobs WHERE rule_id=? AND state='completed' ORDER BY started_at DESC LIMIT 1", rule.id)
       const since = latest?.started_at ?? (rule.changed_at || null), minutes = since === null ? null : Math.max(0, Math.floor((instant - since) / 60_000))
       return { ...rule, name: AUTOMATION_RULES[rule.id as AutomationRule], lastRun: latest?.started_at ?? null, uncoveredMinutes: minutes, missed: minutes !== null && minutes > SCHEDULER.missedAfterMinutes }
-    })), jobs: jobs.map(row => ({ ...row, output: row.output === null ? null : visibleOutput(actor,JSON.parse(row.output)) })), coverage,
+    })), jobs: jobs.map(row => ({ ...row, interrupted: interruptedPM(row), output: row.output === null ? null : visibleOutput(actor,JSON.parse(row.output)) })), coverage,
     delivery: { replenishment: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='replenishment' AND state='failed'")).n }, vendor: { reminders: await all(env, 'SELECT state,COUNT(*) AS n FROM gk_vendor_reminders GROUP BY state ORDER BY state'), pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='vendor' AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id='vendor' AND state='failed'")).n }, inApp: { pendingJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='running'")).n, failedJobs: (await one(env, "SELECT COUNT(*) AS n FROM gk_automation_jobs WHERE rule_id IN ('chase','expiry') AND state='failed'")).n, stored: (await one(env,can(actor,'work.assign')?"SELECT (SELECT COUNT(*) FROM gk_notices)+(SELECT COUNT(*) FROM gk_request_escalations)"+(can(actor,'site.manage')?'+(SELECT COUNT(*) FROM gk_qualification_reminders)':'')+' AS n':'SELECT COUNT(*) AS n FROM gk_notices')).n }, external: { state: 'unavailable', detail: 'Email and push delivery workers are not configured. In-app notices are saved synchronously.' } },
   }
 }

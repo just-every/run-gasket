@@ -36,6 +36,7 @@ import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, 
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney, connectorJourney } from './automation.mjs'
+import { pmInterruptionJourney } from './pm-interruption.mjs'
 import { replenishmentJourney } from './replenishment.mjs'
 import { receivingJourney } from './receiving.mjs'
 import { workReturnsJourney } from './work-returns.mjs'
@@ -57,7 +58,7 @@ const independent = new Map([
   [genericMigrationJourney,'inventory'],
   [safetyJourney,'inventory'],
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
-  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
+  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
   [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
@@ -2403,6 +2404,7 @@ try {
   await check('BUY-002 quotes and numbered purchase orders', async () => { await purchaseOrdersJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm }) })
   await check('PM-009 nested programs', nestedJourney)
   await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
+  await check('PM-008 interrupted PM recovery', pmInterruptionJourney)
   await check('INT-002 signed events and durable connector delivery', connectorJourney)
 
   await check('BUY-001 vendor records and maintenance requisitions', async () => {
