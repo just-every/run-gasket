@@ -158,8 +158,13 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   const decision = input.text('decision', { max: 10 })
   insist(['approve', 'reject'].includes(decision), 'invalid_decision')
   const note = input.text('note', { optional: decision === 'approve', max: 1000 }) || null
+  const decisionFence = () => [
+    guard(env, 'decision_authority_ended', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=?
+      AND m.status='active' AND o.status='active' AND (o.role='owner' OR (m.role='lead' AND EXISTS(SELECT 1 FROM gk_site_memberships sm WHERE sm.member_id=m.id AND sm.site_id='primary' AND sm.status='active'))))`, actor.id),
+    guard(env, 'already_decided', `EXISTS(SELECT 1 FROM ${table} WHERE id = ? AND status = 'pending')`, proposal.id),
+  ]
   if (decision === 'reject') {
-    await commit(env, [stmt(env, `UPDATE ${table} SET status = 'rejected', decided_by = ?, decided_at = ?, decision_note = ? WHERE id = ? AND status = 'pending'`, actor.id, now(), note, proposal.id)],
+    await commit(env, [...decisionFence(), stmt(env, `UPDATE ${table} SET status = 'rejected', decided_by = ?, decided_at = ?, decision_note = ? WHERE id = ?`, actor.id, now(), note, proposal.id)],
       { actor: actor.id, action: 'proposal.reject', subject: proposal.id, detail: { note } })
     return { id: proposal.id, status: 'rejected' }
   }
@@ -176,9 +181,7 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   const also = (resultId: string) => [
     ...(proposal.kind === 'corrective' ? correctiveFence(env, proposal) : []),
     ...(['reassign', 'interval', 'merge'].includes(proposal.kind) ? [auditFence(env, revision)] : []),
-    guard(env, 'decision_authority_ended', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=?
-      AND m.status='active' AND o.status='active' AND (o.role='owner' OR (m.role='lead' AND EXISTS(SELECT 1 FROM gk_site_memberships sm WHERE sm.member_id=m.id AND sm.site_id='primary' AND sm.status='active'))))`, actor.id),
-    guard(env, 'already_decided', `EXISTS(SELECT 1 FROM ${table} WHERE id = ? AND status = 'pending')`, proposal.id),
+    ...decisionFence(),
     stmt(env, `UPDATE ${table} SET status = 'approved', decided_by = ?, decided_at = ?, decision_note = ?, result_id = ? WHERE id = ?`, actor.id, now(), note, resultId, proposal.id),
     stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.approve', proposal.id, JSON.stringify({ hash: proposal.payload_hash, result: resultId })),
   ]

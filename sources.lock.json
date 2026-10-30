@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "9c3228c171b628f9d9b4476436cb1cc6c38dc2ed47238c865fb89ac01ecb33b0",
+      "sha256": "b0538ce85101b3131f3e6fd35360eede1cadf0b4acf658411112f54c5c626e4b",
       "executable": false
     },
     "DEMO.md": {
@@ -1864,7 +1864,7 @@
       "executable": false
     },
     "src/gasket/proposals.ts": {
-      "sha256": "d128b5bec78650406d279d516cce0de5d19dca20af293d80d67b983c70434ab5",
+      "sha256": "873b50ae2daaa3ea02547922783b63584a2e6ed1e28f987353e23a74df538190",
       "executable": false
     },
     "src/gasket/purchase-authority.ts": {
@@ -4696,7 +4696,7 @@
       "executable": false
     },
     "tests/gasket/agent-proposal-policy.mjs": {
-      "sha256": "eb2ed71b59a0abd6d07fdc8b9ed1a326fa8ea0244cac3622cd909d5bd21ed3ee",
+      "sha256": "facc578abe21157695b1febc2d6d40c7a387b9a0e8166fc4728e6a0433208dfd",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {

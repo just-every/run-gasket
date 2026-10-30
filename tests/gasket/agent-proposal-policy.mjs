@@ -79,6 +79,7 @@ export default async function proposalPolicyJourney() {
     const allowed = await prepare('Synthetic allowed correction'), before = await native()
     const applied = await call(allowed)
     assert.equal(applied.result?.isError, false, JSON.stringify(applied))
+    assert.deepEqual(applied.result._meta['com.runeditrun/decision'].classes.map(({ class: name, facts }) => ({ class: name, facts })), [{ class: 'standard', facts: { measure: 1 } }])
     const result = applied.result.structuredContent
     assert.equal(result.status, 'applied')
     const work = await api(`work/${result.result}`)
@@ -138,10 +139,26 @@ export default async function proposalPolicyJourney() {
     const decision = (await api('proposals')).find(row => row.id === held.proposal)
     assert.deepEqual([decision.decided_by, decision.payload_hash, decision.status], [lead.id, held.hash, 'approved'])
     const rejected = await prepare('Synthetic rejected correction'), rejectedBefore = (await native()).work
-    await api('proposal.decide', { proposal: rejected.proposal, decision: 'reject', note: 'Duplicate inspection' }, leadCookie)
+    const rejectionAttempts = await Promise.all(['Duplicate inspection', 'Already covered'].map(async note => {
+      const response = await request('/api/gasket/proposal.decide', { method: 'POST', headers: { Origin: origin, Cookie: leadCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ proposal: rejected.proposal, decision: 'reject', note }) })
+      return { status: response.status, body: await response.json() }
+    }))
+    assert.deepEqual(rejectionAttempts.map(answer => answer.status).sort(), [200, 409], 'one independent rejection wins; the competing decision is refused')
+    assert.equal(rejectionAttempts.find(answer => answer.status === 409).body.error, 'already_decided')
+    const rejections = (await api('audit?action=proposal.reject')).rows.filter(row => row.subject === rejected.proposal)
+    assert.equal(rejections.length, 1, 'a losing rejection adds no decision audit effect')
+    const rejectedRow = (await api('proposals')).find(row => row.id === rejected.proposal)
+    assert.deepEqual([rejectedRow.status, rejectedRow.decided_by, rejectedRow.result_id], ['rejected', lead.id, null])
+    assert.equal(JSON.parse(rejections[0].detail).note, rejectedRow.decision_note)
     await refuses(rejected, 'already_decided')
     assert.deepEqual((await native()).work, rejectedBefore)
+    console.log('PROBE GAS-13 independent rejection: concurrent native decisions -> one rejection, one attributed audit effect, no corrective work')
     console.log('PROBE GAS-13 held decision and rejection: review -> pending; different lead decides exact hash; rejection creates no work')
+
+    await policy({ ...autonomousPolicy(), rules: [{ id: 'refuse', class: '*', do: 'blocked' }] })
+    await refuses(await prepare('Synthetic blocked correction'), 'policy_blocked')
+    await refuses(allowed, 'policy_blocked')
+    console.log('PROBE GAS-13 refused policy: new application and completed replay -> refused without native effects')
 
     await policy({ ...autonomousPolicy(), rules: [{ id: 'hold', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }] })
     const pending = await prepare('Synthetic policy fencing'), pendingCall = await call(pending)
@@ -169,6 +186,25 @@ export default async function proposalPolicyJourney() {
     assert.equal((await approve(waitingHandle)).approval.code, 'approval_evidence_changed')
     assert.deepEqual(await native(), pendingBefore)
     console.log('PROBE GAS-13 policy fencing: policy changes after held admission -> approval refused without native effects')
+
+    await policy({ ...autonomousPolicy(), rules: [{ id: 'hold', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }] })
+    const staleApproval = await prepare('Synthetic stale pending correction', leadCookie)
+    const staleCall = await call(staleApproval)
+    const staleHandle = staleCall.result._meta['com.runeditrun/error'].approval
+    const beforeAssetChange = await api(`assets/${asset.id}`)
+    await api('asset.update', { asset: asset.id, revision: beforeAssetChange.revision, tag: beforeAssetChange.tag, name: 'Synthetic revised pending pump', location: beforeAssetChange.location })
+    assetRevision++
+    const staleBefore = await native()
+    const staleOutcome = (await approve(staleHandle)).approval
+    assert.deepEqual([staleOutcome.state, staleOutcome.code], ['refused', 'revision_conflict'], 'a held approval cannot execute against changed asset facts')
+    assert.deepEqual(await native(), staleBefore)
+    await policy(autonomousPolicy())
+    assert.deepEqual((await call(allowed)).result.structuredContent, result, 'completed replay retains the original result after a later asset revision')
+    assert.deepEqual(await native(), staleBefore, 'replay after a source edit creates no new order or application receipt')
+    await api('access.role', { member: lead.id, role: 'supervisor' })
+    await refuses(authority, 'forbidden', leadClaims)
+    await api('access.role', { member: lead.id, role: 'lead' })
+    console.log('PROBE GAS-13 pending source and completed replay: changed asset -> held execution refused; original completed result replays once within current authority')
 
     await policy({ ...autonomousPolicy(), rules: [{ id: 'hold', class: '*', do: 'approval', approver: ['sponsor'], wait: 'PT1H' }] })
     const lostRole = await prepare('Synthetic approval role removed')
