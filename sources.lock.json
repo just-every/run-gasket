@@ -4708,7 +4708,7 @@
       "executable": false
     },
     "tests/gasket/agent-work-parity.mjs": {
-      "sha256": "7af3a8556c939accfbda2c832e0ae65c9724c32560ebc5de6704144e84f625f7",
+      "sha256": "673238df1afe43d96c524c68bb8b544e52e4aad7320fb7fd2285bbfd4b473a68",
       "executable": false
     },
     "tests/gasket/api.mjs": {
