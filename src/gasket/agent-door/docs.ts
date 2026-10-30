@@ -1,7 +1,7 @@
 import type { Bindings } from '../../auth.server'
 import { mutationTools } from './tools'
 import { procedureTools } from './procedures'
-import { recordTools } from './records'
+import { recordResources, recordTools } from './records'
 import { capabilities, notTools } from './index'
 
 /** Public, registry-derived documentation contains declarations only, never native records. */
@@ -9,6 +9,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
   const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const resources = recordResources(env).sort((a, b) => a.uriTemplate.localeCompare(b.uriTemplate))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -18,9 +19,17 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '| --- | --- | --- | --- | --- |',
     ...tools.map(tool => `| ${tool.name} | ${tool.scope} | ${tool.readOnly} | ${tool.classes.join(', ')} | ${tool.clauses.join(', ')} |`),
     '',
+    '## Maintenance resources',
+    '',
+    '| Resource template | Scope | Classes |',
+    '| --- | --- | --- |',
+    ...resources.map(resource => `| ${resource.uriTemplate} | ${resource.scope} | ${resource.classes.join(', ')} |`),
+    '',
+    'Discover templates with resources/templates/list and follow returned resource links with resources/read. Each read retrieves current primary-site native facts and rechecks sponsor, credential, scope, consent and policy. Detailed work computes sensitive personnel and pay facts from the current record; approval policy withholds content. Native service credentials retain their existing route restrictions and cannot read procedures. No additional credential scope is issued.',
+    '',
     '## Declared door',
     '',
-    `Capabilities: ${capabilities.join(', ')}. Events, resources, prompts and subscriptions are undeclared. Their catalogues are empty and calls return capability_not_declared without native effects. Read tools inspect native records with current visibility; stored and imported text is untrusted.`,
+    `Capabilities: ${capabilities.join(', ')}. Events, prompts and subscriptions are undeclared. Their catalogues are empty and calls return capability_not_declared without native effects. Read tools inspect native records with current visibility; stored and imported text is untrusted.`,
     '',
     '## Verification',
     '',
@@ -28,7 +37,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     '## Limits',
     '',
-    'This Core adoption exposes the listed software jobs. It does not expose native purchasing, provider model runs, role administration, physical attestations, import, deployment or device operations as MCP jobs. Existing native screens and their permissions remain authoritative. Native maintenance events, resources, prompts and subscriptions are undeclared. Resource refresh, multi-sponsor completion, outside mail and queued continuations remain unproved. No cost reservation or provider call is registered. The 0.2.91 conformance journey checks Core jobs and typed refusals for omitted families.',
+    'This Core adoption exposes the listed software jobs. It does not expose native purchasing, provider model runs, role administration, physical attestations, import, deployment or device operations as MCP jobs. Existing native screens and their permissions remain authoritative. Native maintenance events, prompts and subscriptions are undeclared. Remaining resource families, event handoffs, channel revocation, multi-sponsor completion, outside mail and queued continuations remain unproved. No cost reservation or provider call is registered. The pinned conformance journey checks Core jobs, every returned resource link under autonomous and held policy, and typed refusals for omitted families.',
     '',
     'The maintenance coordinator reads source records and stages proposals through the listed tools. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
     '',
@@ -38,7 +47,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     '## Refusals and capacities',
     '',
-    'Native business codes are retained. Door codes include policy_unset, agents_paused, policy_blocked, insufficient_scope, idempotency_conflict, revision_conflict, resource_unavailable, capability_not_declared, tool_not_found and self_escalation. Discovery reports the current body and request capacities. The public resource door is undeclared and returns capability_not_declared; native read tools retain their visibility checks. MCP supports 2026-07-28 and 2025-11-25.',
+    'Native business codes are retained. Door codes include policy_unset, agents_paused, policy_blocked, insufficient_scope, idempotency_conflict, revision_conflict, resource_unavailable, capability_not_declared, tool_not_found and self_escalation. Discovery reports the current body and request capacities. Resource reads use the same policy decision as native read tools and return no record content on refusal. MCP supports 2026-07-28 and 2025-11-25.',
     '',
   ].join('\n')
   return new Response(request.method === 'HEAD' ? null : body, { headers: { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } })
