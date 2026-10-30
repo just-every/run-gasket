@@ -398,13 +398,15 @@ try {
 
   await check('GAS-10 overdue and downtime board', async () => {
     await h.api('downtime.start', cookie.mo, { workOrder: ids.corrective, startedOn: ago(100), reason: 'Thermostat failed' })
-    const board = await h.api('board', cookie.sam)
-    assert.ok(board.overdue.some(row => row.id === ids.corrective), 'the corrective work due two days ago is overdue')
-    assert.ok(board.followUps.some(row => row.id === ids.followUp))
-    assert.ok(board.down.some(row => row.asset_id === ids.fryer))
-    assert.equal(board.downtime.find(row => row.asset_id === ids.compressor).minutes, 31)
-    assert.ok(board.lowParts.some(part => part.id === ids.drier), 'three filter driers are below the minimum of four')
-    assert.ok(!board.lowParts.some(part => part.id === ids.oilPart))
+    for (const role of ['lead', 'sam']) {
+      const board = await h.api('board', cookie[role])
+      assert.ok(board.overdue.some(row => row.id === ids.corrective), 'the corrective work due two days ago is overdue')
+      assert.ok(board.followUps.some(row => row.id === ids.followUp))
+      assert.ok(board.down.some(row => row.asset_id === ids.fryer))
+      assert.equal(board.downtime.find(row => row.asset_id === ids.compressor).minutes, 31)
+      assert.ok(board.lowParts.some(part => part.id === ids.drier), 'three filter driers are below the minimum of four')
+      assert.ok(!board.lowParts.some(part => part.id === ids.oilPart))
+    }
     await h.api('board', cookie.max, undefined, 403)
     assert.match(await (await h.raw('/app/board', { cookie: cookie.lead })).text(), /Twin fryer/)
 
@@ -446,6 +448,7 @@ try {
       for (const key of Object.keys(assets)) {
         const work = await isolated.api(`work/${jobs[key]}`, sessions.maintainer)
         assert.deepEqual(work.downtime.map(row => [row.id, row.started_on, row.ended_on]).sort(), sources[key].map(row => [row.id, row.startedOn, row.endedOn]).sort())
+        assert.deepEqual(work.downtime.map(row => [row.id, row.minutes]).sort(), sources[key].map(row => [row.id, row.endedOn ? minutes(row.startedOn, row.endedOn) : null]).sort(), 'source records retain full closed durations and unended outages')
       }
       const expected = [
         { asset_id: assets.closed, minutes: minutes(windowStart, sources.closed[1].endedOn) + minutes(sources.closed[2].startedOn, sources.closed[2].endedOn), events: 2 },

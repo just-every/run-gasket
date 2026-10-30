@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "e02665928523f2f067ad3a42d845a3d8a310586449309b76688706d096569aa2",
+      "sha256": "366477eb2373b69fac3eb9c4e76a7318befeb007d46f7b01de6b1846fe63eb63",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "1a241d56667e793afc066ee14307bb21c38dd4e40317d7e73a1a46c8a8a5a1fb",
+      "sha256": "97fd1b0c59339224d69cc93b8641dddb695f9d667c09475d5fa3207b86a2fd47",
       "executable": false
     },
     "DEMO.md": {
@@ -4728,7 +4728,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "ec7a0e535558890681ab333ce7fc4a6ea803809aba8d95f37e610482e885fd3c",
+      "sha256": "bf3478de00ccc0a3cc8b57dc85137a94684c404fc728b549b4968ac6bb310fe7",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {

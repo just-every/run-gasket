@@ -171,8 +171,8 @@ Core · published · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 1. Open the board as lead and supervisor with overdue, submitted, failed and down assets plus low stock.
 2. Compare counts and clipped minutes with source records; a maintainer cannot read the board API.
 
-**Evidence.** `tests/gasket/flows.mjs` — "GAS-10 overdue and downtime board"
-**Gap.** A public-door journey reading historic-window clipping and elapsed open downtime on the board is missing. The cited journeys show overdue/follow-up/down/low-stock rows and a completed outage.
+**Evidence.** `tests/gasket/flows.mjs` — "GAS-10 overdue and downtime board": lead and supervisor reads with all board categories; persisted source timestamps and durations; expired history excluded; closed and open outages clipped; per-asset minutes and event counts; board pages and maintainer refusal.
+**Gap.** Main's partial judgment is retained pending acceptance review of the expanded historic-window clipping and elapsed open-downtime public-door journey. The candidate adds persisted-source reconciliation and lead/supervisor board assertions without changing the judgment.
 
 #### GAS-11 — Read and keep the history
 
