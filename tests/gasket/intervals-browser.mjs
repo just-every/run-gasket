@@ -5,7 +5,7 @@ import { PAGE_DOORS, match } from '../../src/gasket/doors.ts'
 import { saveSnapshot } from './form-save-interruptions.mjs'
 import { conditionalSaves } from './workspace-conditional-saves.mjs'
 import { png } from './fixtures.mjs'
-import { chromium } from '@playwright/test'
+import { chromium, expect } from '@playwright/test'
 import { harness } from './harness.mjs'
 import { now, zone } from './clock.mjs'
 
@@ -130,7 +130,8 @@ export async function workspaceBrowser(h, cookie, browser, directory, {condition
     assert.equal(await page.locator('.gk-skip').evaluate(el=>el===document.activeElement),true)
     assert.notEqual(await page.locator('.gk-skip').evaluate(el=>getComputedStyle(el).outlineStyle),'none')
     await page.keyboard.press('Enter')
-    assert.equal(await page.getByRole('main').evaluate(el=>el===document.activeElement),true)
+    // Fragment navigation can settle after key dispatch; still require actual main focus.
+    await expect(page.getByRole('main'), `${name} skip link reaches main`).toBeFocused()
     for (const href of await page.locator('a[href]').evaluateAll(elements=>elements.map(el=>el.getAttribute('href')))) {
       const destination=new URL(href,h.origin), door=match(PAGE_DOORS,destination.pathname)
       if (destination.origin===h.origin && door && !/(?:Csv|Pdf|Zip|File|Photo|Evidence|Pack|Mark|Template)$/i.test(door.name)) linked.set(destination.pathname,destination.pathname+destination.search)
