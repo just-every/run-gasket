@@ -8,12 +8,12 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 51 | 56 | 37 | 144 |
+| Core | 52 | 55 | 37 | 144 |
 | Agent surface | 0 | 7 | 0 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 51 | 63 | 37 | 151 |
+| Full target | 52 | 62 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). PM-008 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -943,7 +943,7 @@ Core · target · **partial**
 
 #### PM-008 — Scheduler health and automation controls
 
-Core · target · **partial** · Cites BASE-OPS-003, BASE-OPS-004 · Rules D-3
+Core · target · **done** · Cites BASE-OPS-003, BASE-OPS-004 · Rules D-3
 
 **Requirement.** Owners see last/next run, due-event coverage, paused rules, delivery backlog and per-job errors. They can test a rule without live work/purchases, pause/resume and safely catch up; workers have bounded authority and all automatic actions retain rule revision and input evidence. The maintenance rules and calculations are specified in [Maintenance semantics](docs/maintenance-semantics.md#pm-008).
 
@@ -951,8 +951,8 @@ Core · target · **partial** · Cites BASE-OPS-003, BASE-OPS-004 · Rules D-3
 1. Test then enable a PM rule, stop its worker across a due slot and inspect a visible missed-run condition.
 2. Resume/catch up and inspect one due work order with rule revision; test mode sends no live notification.
 
-**Evidence.** `tests/gasket/automation.mjs` — "automationJourney"; `tests/gasket/planning.mjs` — "qualificationPlanningJourney"
-**Gap.** A public-door journey interrupting a running PM job across a due slot and reconciling catch-up is missing. The cited journeys show pause/resume, stale/concurrent catch-up, no-write preview and job lineage; connector recovery does not interrupt a PM job.
+**Evidence.** `tests/gasket/automation.mjs` — "automationJourney" (preview, authority, pause and resume, due work, job inputs and delivery health); `tests/gasket/pm-interruption.mjs` — "pmInterruptionJourney" (actual Worker termination before and after occurrence commit, missed coverage, current-revision catch-up, original revisions, recovery lineage, superseded-attempt refusal and unchanged accepted work); `tests/gasket/planning.mjs` — "qualificationPlanningJourney"
+**Gap.** None.
 
 #### PM-009 — Nested and coordinated preventive programs
 

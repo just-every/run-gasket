@@ -32,6 +32,10 @@ export async function runJob<T>(env: Bindings, rule: AutomationRule, source: Sou
   await env.DB.batch([
     stmt(env, `INSERT INTO gk_automation_jobs (id,rule_id,rule_revision,source,started_at,finished_at,state,input,error,lease_expires_at) SELECT ?,?,?,?,?,?,?,${qualificationInputSql('payload','capture')},?,? FROM (SELECT ? AS payload)`, job, rule, revision ?? grant.revision, source, instant, state === 'running' ? null : now(), state, stale ? 'automation_changed' : null, rule === 'pm' && state === 'running' ? executionTime + PM_ATTEMPT_MS : null, JSON.stringify(input)),
     ...(rule === 'pm' && state === 'running' ? [recoverPM(env, job, executionTime)] : []),
+    ...(rule === 'pm' && state === 'running' ? [stmt(env, `UPDATE gk_scheduler_runs SET state='failed',error='pm_interrupted',finished_at=?,
+      created=(SELECT COUNT(*) FROM gk_audit a JOIN gk_automation_jobs j ON json_extract(a.detail,'$.automation.job')=j.id
+        WHERE json_extract(j.input,'$.schedulerRun')=gk_scheduler_runs.id AND a.action IN ('workorder.schedule','workorder.trigger'))
+      WHERE state='running' AND id IN (SELECT json_extract(input,'$.schedulerRun') FROM gk_automation_jobs WHERE recovered_by=? AND source='cron')`, executionTime, job)] : []),
   ])
   if (stale) throw new GasketError('automation_changed', 409)
   if (grant.paused) return { job, state: 'paused' as const, output: null }

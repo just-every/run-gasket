@@ -1851,13 +1851,13 @@ Core and typed refusals, not the full aggregate jobs or undeclared families.
 
 ## Status
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026).
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). PM-008 is judged from the candidate commit `HEAD` (30 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
 | Published | 13 | 3 | 0 | 16 |
-| Target and push further | 38 | 60 | 37 | 135 |
-| All | 51 | 63 | 37 | 151 |
+| Target and push further | 39 | 59 | 37 | 135 |
+| All | 52 | 62 | 37 | 151 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1929,7 +1929,7 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | `PM-005` | Assignee and approver notifications | target | missing |  | In-app maintenance notices exist; assignment/review/due-change email and APNs/FCM delivery, event/destination lifecycle, channel preferences, quiet hours and mandatory escalation remain absent. |
 | `PM-006` | Overdue escalation and blocker chasing | target | done | `tests/gasket/flows.mjs` — "PM-006 overdue escalation and blocker chasing" |  |
 | `PM-007` | PM template rollout and change control | target | partial | `tests/gasket/requests.mjs` — strategyRolloutJourney: copy air-compressor library provenance, adapt and independently approve the strategy; preview two current-site compressor schedules, preserve local interval overrides, require a reasoned conflict decision, refuse stale previews and declared interval-bound violations, refuse self-approval by an author with review rights, retain approver and exact rollout digest with both conflict sides, preserve due occurrences and meter triggers, retain explicit cancellation and catch-up plans, retain rollout decisions, leave every issued-work field unchanged and issue the next occurrence with the approved procedure. capture: conflict diff and retained rollout at 1440 and 390. `src/gasket/pm-library.ts`; `src/gasket/pm-strategies.ts`; `src/gasket/ui/pm-strategies.ts`; `migrations/core/0085_pm_strategies.sql`. | Ct ruled 25 October 2026: an owner or supervisor independent of the author explicitly approves the adapted strategy and exact rollout. The atomic rollout approval retains a digest of the source preview, conflict decisions and occurrence plan, with both local and program values. Current-site calendar and meter procedure rollouts preserve issued work, due dates and meter triggers. Explicit plans cancel no issued work and retain due occurrences for ordinary generation. Two-site rollout and complete site scope still require this seed's unbuilt multi-site model (ADMIN-002); calibration strategy rollout remains unbuilt. |
-| `PM-008` | Scheduler health and automation controls | target | partial | `tests/gasket/automation.mjs` — "automationJourney"; `tests/gasket/planning.mjs` — "qualificationPlanningJourney" | A public-door journey interrupting a running PM job across a due slot and reconciling catch-up is missing. The cited journeys show pause/resume, stale/concurrent catch-up, no-write preview and job lineage; connector recovery does not interrupt a PM job. |
+| `PM-008` | Scheduler health and automation controls | target | done | `tests/gasket/automation.mjs` — "automationJourney" (preview, authority, pause and resume, due work, job inputs and delivery health); `tests/gasket/pm-interruption.mjs` — "pmInterruptionJourney" (actual Worker termination before and after occurrence commit, missed coverage, current-revision catch-up, original revisions, recovery lineage, superseded-attempt refusal and unchanged accepted work); `tests/gasket/planning.mjs` — "qualificationPlanningJourney" |  |
 | `PM-009` | Nested and coordinated preventive programs | target | done | `tests/gasket/nested.mjs` — "nestedJourney" |  |
 | `FIELD-001` | iOS and Android technician app | target | missing |  | No native app packages, supported-device policy or native push/deep links. |
 | `FIELD-002` | Offline work packs and durable capture | target | missing |  | No offline database, job packs, durable outbox or offline evidence capture. |
