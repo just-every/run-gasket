@@ -22,7 +22,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 14 | The bill goes to QuickBooks once it matches the delivery. | `BUY-004` done; `BUY-005` missing; `INT-003` missing | partial |
 | 15 | The agent reads invoice lines and retains the recorded purchasing decision. | `AGENT-008` missing; `BUY-003` done; `BUY-005` missing | partial |
 | 16 | Signed work preserves procedure, original evidence, parts and labor cost, and independent review. | `FIELD-004` partial; `FIELD-005` partial; `FIELD-006` done; `REPORT-001` done; `FIELD-007` done | partial |
-| 17 | Backlog hours and assets down are visible before first shift. | `GAS-10` partial; `REPORT-004` done | partial |
+| 17 | Backlog hours and assets down are visible before first shift. | `GAS-10` done; `REPORT-004` done | done |
 | 18 | The monthly PDF/CSV pack arrives with source-linked PM, downtime, MTTR, MTBF and Pareto measures. | `REPORT-002` done; `REPORT-003` done; `REPORT-004` done; `REPORT-005` done; `REPORT-006` partial; `ADMIN-002` partial | partial |
 | 19 | The agent recommends a constrained interval change with rollback and checks reliability after repair. | `AGENT-003` partial; `AGENT-004` partial | partial |
 | 20 | Every asset, PM and work order since 2019 moves in from MaintainX, including people and original attachments. | `MIG-001` partial; `MIG-002` partial; `ADMIN-014` missing | partial |
@@ -30,4 +30,4 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 22 | Shadow compare reconciles PM dates and stock value before cutover. | `MIG-008` partial | partial |
 | 23 | Seven years of MaintainX, moved in a weekend. | `MIG-002` partial; `MIG-008` partial | partial |
 
-Claims: 23; 2 done, 18 partial, 3 missing.
+Claims: 23; 3 done, 17 partial, 3 missing.

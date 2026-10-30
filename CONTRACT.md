@@ -1851,13 +1851,13 @@ Core and typed refusals, not the full aggregate jobs or undeclared families.
 
 ## Status
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026).
+Judged from the code and tests at commit `b1edec85e22c9154f94cf865955d2a813e9c476d` (30 October 2026). GAS-10 is revalidated by the required core flows verification on the exact candidate SHA; other clause judgments retain commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026).
 
 | Clauses | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Published | 12 | 4 | 0 | 16 |
+| Published | 13 | 3 | 0 | 16 |
 | Target and push further | 38 | 60 | 37 | 135 |
-| All | 50 | 64 | 37 | 151 |
+| All | 51 | 63 | 37 | 151 |
 
 | Clause | Title | Kind | Status | Evidence | Gap |
 | --- | --- | --- | --- | --- | --- |
@@ -1872,7 +1872,7 @@ Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451
 | `GAS-14` | Record asset downtime | published | done | `tests/gasket/flows.mjs` — "GAS-08, GAS-14 and GAS-15 parts, downtime and findings" |  |
 | `GAS-15` | Record findings and corrective follow-up | published | done | `tests/gasket/flows.mjs` — "GAS-08, GAS-14 and GAS-15 parts, downtime and findings" |  |
 | `GAS-09` | Submit and review | published | done | `tests/gasket/flows.mjs` — "GAS-09 submit and review"; `tests/gasket/flows.mjs` — "FIELD-007 crew completion and independent review" |  |
-| `GAS-10` | Watch overdue work and downtime | published | partial | `tests/gasket/flows.mjs` — "GAS-10 overdue and downtime board" | A public-door journey reading historic-window clipping and elapsed open downtime on the board is missing. The cited journeys show overdue/follow-up/down/low-stock rows and a completed outage. |
+| `GAS-10` | Watch overdue work and downtime | published | done | `tests/gasket/flows.mjs` — "GAS-10 overdue and downtime board": lead and supervisor reads with all board categories; persisted source timestamps and durations; expired history excluded; closed and open outages clipped; per-asset minutes and event counts; board pages and maintainer refusal. |  |
 | `GAS-11` | Read and keep the history | published | done | `tests/gasket/flows.mjs` — "GAS-11 asset history and CSV"; `tests/gasket/flows.mjs` — "GAS-11 rer export and rer import keep every record" |  |
 | `GAS-12` | Move in from MaintainX | published | done | `tests/gasket/flows.mjs` — "GAS-12 MaintainX move-in" |  |
 | `GAS-13` | Version-bound maintenance proposals | published | partial | `tests/gasket/flows.mjs` — "GAS-13 agent prepares, a person approves" | A public-door journey selecting company policy and proving standard/money decisions is missing. The cited journeys show fixed-gate proposals, exact-hash decisions, stale stock refusal and attribution. |
