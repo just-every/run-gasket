@@ -51,7 +51,9 @@ export async function commit(env: Bindings, statements: D1PreparedStatement[], a
   const authority = automationAuthority(), credential = serviceAuthority(), agent = agentContext()
   try {
     const results = await env.DB.batch([
-      ...(authority ? [guard(env, 'automation_changed', 'EXISTS(SELECT 1 FROM gk_automation_rules WHERE id=? AND revision=? AND paused=0)', authority.rule, authority.revision)] : []),
+      ...(authority ? [guard(env, 'automation_changed', `EXISTS(SELECT 1 FROM gk_automation_rules r JOIN gk_automation_jobs j ON j.rule_id=r.id
+        WHERE r.id=? AND r.revision=? AND r.paused=0 AND j.id=? AND j.state='running'
+        AND (j.lease_expires_at IS NULL OR j.lease_expires_at>?))`, authority.rule, authority.revision, authority.job, Date.now())] : []),
       ...(serviceAuthority() ? [guard(env, 'service_authority_ended', `EXISTS(SELECT 1 FROM gk_api_credentials c JOIN gk_members m ON m.id=c.member_id JOIN oa_operators o ON o.id=m.operator_id WHERE c.id=? AND c.revoked_at IS NULL AND c.expires_at>? AND m.status='active' AND o.status='active' AND o.role='owner')`, serviceAuthority(), now())] : []),
       ...(siteAuthority() && !siteAuthority()!.owner ? [guard(env, 'site_access_ended', "EXISTS(SELECT 1 FROM gk_site_memberships sm JOIN gk_members m ON m.id=sm.member_id WHERE sm.site_id='primary' AND sm.member_id=? AND sm.status='active' AND m.status='active')", siteAuthority()!.member)] : []),
       ...(agent ? [guard(env, 'agent_authority_ended', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id

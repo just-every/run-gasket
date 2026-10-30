@@ -36,6 +36,7 @@ import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, 
 import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney, connectorJourney } from './automation.mjs'
+import { pmInterruptionJourney } from './pm-interruption.mjs'
 import { replenishmentJourney } from './replenishment.mjs'
 import { receivingJourney } from './receiving.mjs'
 import { workReturnsJourney } from './work-returns.mjs'
@@ -58,7 +59,7 @@ const independent = new Map([
   [requiredMigrationJourney,'inventory'],
   [safetyJourney,'inventory'],
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
-  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
+  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
   [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
@@ -2263,8 +2264,17 @@ try {
     let job = await wo('max', first)
     for (const owed of ['step 2 (Mid scale 500 kPa) is outside its limits and needs a linked finding with follow-up work', 'record which Deadweight tester was used', 'the calibration needs its certificate attached']) assert.ok(job.missing.includes(owed), owed)
     const adjust = await h.api('finding.record', cookie.max, { workOrder: first, item: 1, severity: 'medium', text: 'Reads 503.1 kPa at 500: adjust the gauge', followUp: true })
-    await h.api('workorder.evidence', cookie.max, { workOrder: first, file: file('PG-7-cert-1.pdf', '%PDF-1.4 PG-7 as found', 'application/pdf'), certificate: true })
     await h.api('workorder.tool', cookie.max, { workOrder: first, tool: 0, identifier: 'DWT-118' })
+    const withoutCertificate = await wo('max', first)
+    assert.deepEqual(withoutCertificate.missing, ['the calibration needs its certificate attached'], 'the linked corrective work and recorded tool leave only the certificate outstanding')
+    const certificatesBefore = (await calibration()).certificates
+    const refused = await h.api('workorder.submit', cookie.max, { workOrder: first, version: withoutCertificate.version }, 409)
+    assert.deepEqual([refused.error, refused.detail.missing], ['not_ready_for_review', ['the calibration needs its certificate attached']])
+    job = await wo('max', first)
+    const submissionState = work => ({ id: work.id, status: work.status, version: work.version, results: work.items.map(item => item.result), tools: work.tools, findings: work.findings, evidence: work.evidence, calibration: work.calibration, reviews: work.reviews })
+    assert.deepEqual(submissionState(job), submissionState(withoutCertificate), 'refused submission preserves the work revision and all recorded calibration evidence')
+    assert.deepEqual((await calibration()).certificates, certificatesBefore, 'refused submission creates no certificate version')
+    await h.api('workorder.evidence', cookie.max, { workOrder: first, file: file('PG-7-cert-1.pdf', '%PDF-1.4 PG-7 as found', 'application/pdf'), certificate: true })
     job = await wo('max', first)
     assert.deepEqual([job.missing, job.calibration.certificate.filename, job.calibration.overdue_after], [[], 'PG-7-cert-1.pdf', addDays(today, 1)])
     await h.api('workorder.submit', cookie.max, { workOrder: first, version: job.version })
@@ -2404,6 +2414,7 @@ try {
   await check('BUY-002 quotes and numbered purchase orders', async () => { await purchaseOrdersJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm }) })
   await check('PM-009 nested programs', nestedJourney)
   await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
+  await check('PM-008 interrupted PM recovery', pmInterruptionJourney)
   await check('INT-002 signed events and durable connector delivery', connectorJourney)
 
   await check('BUY-001 vendor records and maintenance requisitions', async () => {

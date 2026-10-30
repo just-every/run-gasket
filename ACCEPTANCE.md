@@ -1986,7 +1986,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-002, BASE
 2. Create the same corrective work through its UI action, API and MCP job; inspect equal maintenance state and source history.
 3. Run a bounded embedded maintenance proposal and find its corresponding registry job in the run lineage.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390; `tests/gasket/agent-work-parity.mjs` — workParity: native browser, JSON and MCP corrective creation parity, source audit, completed replay and refused writes, loaded by the native specialist journey in required foundation verification
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
 **Gap.** Only the documented granular Core slice is registered. The aggregate jobs, remaining native verbs and embedded model-run invocation are incomplete.
 
 #### SURFACE-002 — Internal changes and outside maintenance exposure

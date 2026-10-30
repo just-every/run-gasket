@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import workParity from './agent-work-parity.mjs'
 
 /** Additional Core proof uses native sessions and issued credentials; no fixture authority enters production. */
-export default async function journey({ request, origin, cookie, tool }) {
+export default async function journey({ request, origin, cookie, tool, mail }) {
   const api = async (path, body) => {
     const response = await request(new URL(`/api/gasket/${path}`, origin).href, { method: body === undefined ? 'GET' : 'POST', headers: { Cookie: cookie, Origin: origin, 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
     assert.equal(response.status, 200, `native ${path}`)
@@ -71,5 +71,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   const audit = await api('audit')
   assert.ok(audit.rows.some(row => JSON.parse(row.detail).preparedBy?.label?.includes(' for ') && row.actor_name.includes(' for ')))
   console.log('Native Core journey: native audit attribution passed')
-  await workParity({ request, origin, cookie, tool }).catch(error => { console.error(error.stack); throw error })
+  await workParity({ request, origin, cookie, mail }).catch(error => { console.error(error.stack); throw error })
 }

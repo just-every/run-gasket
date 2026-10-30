@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "aaf5afb78526acefe183f2c1ca600e839c909f59f304df5784264dad8ecd3957",
+      "sha256": "cfd285911c1898cbbb37cbb4e6fc6c5ba3dea7df3f9e7ca0b20dc0ccfa55d1e3",
       "executable": false
     },
     "agent-surface.json": {
@@ -264,7 +264,7 @@
       "executable": false
     },
     "docs/maintenance-semantics.md": {
-      "sha256": "72b84b7d6bb1b7bc96dafb06d981d2a18b2c196324143a407108013549b289fe",
+      "sha256": "c309c8a11db0fdbcaa21c0a59214e292689d036b2d0a972df75c4646ed4dfd3b",
       "executable": false
     },
     "docs/migration-sources.md": {
@@ -316,7 +316,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "e3f2420bf4ef5ddea248518cb1430a0c7a378de62cf6ab48938327aecd59a478",
+      "sha256": "54dfb6f36a5eff0e1e90377a39abf2686221cc4b1ddb7167e6233f0321aad638",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -785,6 +785,10 @@
     },
     "migrations/core/0108_agent_door.sql": {
       "sha256": "016d8a98b964385f5c4a13447361c3c783910a76aaf4606b0e0081482bc819cc",
+      "executable": false
+    },
+    "migrations/core/0109_pm_attempt_recovery.sql": {
+      "sha256": "ef3e9f959f969fd6d977691e44f1ff4546aeffd394275ff64125f221f398aca7",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1504,11 +1508,11 @@
       "executable": false
     },
     "src/gasket/automation-jobs.ts": {
-      "sha256": "d4e4025d8e91a605771fa86739c99090e6100a4105d32a0d48003ab8e6a092e2",
+      "sha256": "5f4668485cfac3d47a6540177adb34e8a41081fc49a44c566aa7087af762b25a",
       "executable": false
     },
     "src/gasket/automation.ts": {
-      "sha256": "64ec6c14d443fc0ba1a475f67b9dcf498c6e6be2fad70d4464a39acf57caf23f",
+      "sha256": "b2b7d3cbd81d8cbb9fcd2f43e116ebad940f141b1cd12d39592686cf531616ae",
       "executable": false
     },
     "src/gasket/availability.ts": {
@@ -1576,7 +1580,7 @@
       "executable": false
     },
     "src/gasket/core.ts": {
-      "sha256": "54eb6d5c0070cbbf897b1b79e50bebc25d663a4fedbb3a8464aa74fc8f4c2812",
+      "sha256": "08103dc1426511cf081992e0685c38bc24b23fcc60a781fa905fb23794a476c1",
       "executable": false
     },
     "src/gasket/corrections.ts": {
@@ -2028,7 +2032,7 @@
       "executable": false
     },
     "src/gasket/scheduler.ts": {
-      "sha256": "bb5365463a9df172a4409751beb844a010bb1c7f00374ba61b5cd1174c513b44",
+      "sha256": "8e4d5d22744e972d7c0e094a4515e86080a69159f0b4def88d91a83b0c220626",
       "executable": false
     },
     "src/gasket/schedules.ts": {
@@ -2124,7 +2128,7 @@
       "executable": false
     },
     "src/gasket/ui/automation.ts": {
-      "sha256": "a96b7071d5b4eef59db746f3ae7dabb15dd11e9dd9b133edcc075b0062228651",
+      "sha256": "917e99bbc70d07ec66de00e1378d33766d88229354b38d51ece485ac223efc45",
       "executable": false
     },
     "src/gasket/ui/availability.ts": {
@@ -4672,7 +4676,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "e13ef35cf3c74225da5c6b9d4373440d2e9dc4a0a02454be7b60c48729c69fa5",
+      "sha256": "a7929b367870168546ce0445520a7fee9b77837f7c800523d909b444f510c903",
       "executable": false
     },
     "tests/gasket/agent-follow-up-browser.mjs": {
@@ -4684,7 +4688,7 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "85f21ea601e970580d714e8325eae4252bf64c0837dde081081a6de207b9466a",
+      "sha256": "1da0fd978f4b5de21e6841bd84ea2aa23cc5a22197fc3f4d940c3bd455362a73",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
@@ -4708,7 +4712,7 @@
       "executable": false
     },
     "tests/gasket/agent-work-parity.mjs": {
-      "sha256": "673238df1afe43d96c524c68bb8b544e52e4aad7320fb7fd2285bbfd4b473a68",
+      "sha256": "c8e273ef5bdc4aef093e8884ce9e1c226ec09e09c61befa413b4af850aa98571",
       "executable": false
     },
     "tests/gasket/api.mjs": {
@@ -4732,7 +4736,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "e9be89bbb33ee7329fb1cb06fbbf5e6d739e274ffc89593ac8b8b12e929458ce",
+      "sha256": "c68677014461408797156e5f7084e20db7e01747a8d2e2b6bc05f7bc006ede40",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4748,7 +4752,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "e81e35b3ec7e8c85ccb13569be73c5d300f9cac23d2b5b9a7245d6bf07fdac87",
+      "sha256": "9971a8c2fa0013b8d5d788cb8e31f108a2b4e265197e0842f031399e1ac305d1",
       "executable": false
     },
     "tests/gasket/initialize-agent-owner.mjs": {
@@ -4809,6 +4813,14 @@
     },
     "tests/gasket/planning.mjs": {
       "sha256": "3388f1479c72e30cfe0f86c6839370d1ca7f7f36eb0015db6b5c23e10960a1b8",
+      "executable": false
+    },
+    "tests/gasket/pm-attempt-gate.mjs": {
+      "sha256": "72cf5c8fe0c941c0a088a9cd3aa79d924c998b78c88c42243bb5a487ab699fc2",
+      "executable": false
+    },
+    "tests/gasket/pm-interruption.mjs": {
+      "sha256": "e40fd30ba31cc7e17a0c6671a201f49f9e7fde60bb080e6ef1057414b1d687ed",
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {

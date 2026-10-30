@@ -11,7 +11,7 @@ const toolCall = ['tools', 'call'].join('/')
 const errorMeta = ['com.runeditrun', 'error'].join('/')
 
 /** One corrective-work sanity journey, using only the hosted Worker's public doors. */
-export default async function workParity({ request, origin, cookie }) {
+export default async function workParity({ request, origin, cookie, mail }) {
   const send = (path, { session = cookie, body, form, headers = {}, ...init } = {}) => request(new URL(path, origin).href, {
     redirect: 'manual', method: body === undefined && !form ? 'GET' : 'POST',
     ...init, headers: { ...(session ? { Cookie: session } : {}), Origin: origin,
@@ -34,7 +34,7 @@ export default async function workParity({ request, origin, cookie }) {
   const input = { asset: asset.id, title: `Synthetic corrective inspection ${randomUUID()}`, description: 'Inspect vibration and record the physical observation.', due: '2030-01-10', assignee: owner.id }
   const state = async () => {
     const { rows, total } = await api('work-page?limit=200')
-    return { work: { rows, total }, audit: await api('audit?action=workorder.create&limit=500') }
+    return { work: { rows, total }, audit: await api('audit?action=workorder.create&limit=500'), history: await api(`assets/${asset.id}/history`) }
   }
   const writer = await api('service.create', { name: 'Synthetic parity writer', scopes: ['workorder.create'], expiresAt: Date.now() + 3600000, consent: true })
   const initial = await state()
@@ -59,6 +59,11 @@ export default async function workParity({ request, origin, cookie }) {
       { asset: input.asset, title: input.title, due: input.due, assignee: input.assignee, priority: 'normal', door })
     assert.equal(event.actor, owner.id)
     assert.ok(event.at >= started && event.at <= ended, `${door} retains the source audit's genuine time`)
+    const history = snapshot.history.events.filter(event => event.workOrder === `WO-${String(row.number).padStart(4, '0')}`)
+    assert.equal(history.length, 1, `${door} appears once in the asset's native source history`)
+    assert.equal(history[0].kind, 'workorder')
+    assert.equal(history[0].at, event.at)
+    assert.equal(history[0].who, row.created_by_name)
     if (door === 'mcp') {
       assert.equal(detail.preparedBy.for.id, owner.id)
       assert.ok(detail.preparedBy.agent.id)
@@ -89,28 +94,25 @@ export default async function workParity({ request, origin, cookie }) {
       await route.fulfill({ status: response.status, headers, body: Buffer.from(await response.arrayBuffer()) })
     })
     const page = await context.newPage()
-    assert.equal((await page.goto(`${origin}/app/assets/${asset.id}`)).status(), 200)
-    const form = page.locator('form[action="/app/do/workorder.create"]')
-    await form.locator('[name=title]').fill(input.title)
-    await form.locator('[name=description]').fill(input.description)
-    await form.locator('[name=due]').fill(input.due)
-    await form.locator('[name=assignee]').selectOption(input.assignee)
+    // Desktop is the parity assertion width; phone repeats the actual submission as its smoke.
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
+      assert.equal((await page.goto(`${origin}/app/assets/${asset.id}`)).status(), 200)
+      const form = page.locator('form[action="/app/do/workorder.create"]')
+      await form.locator('[name=title]').fill(input.title)
+      await form.locator('[name=description]').fill(input.description)
+      await form.locator('[name=due]').fill(input.due)
+      await form.locator('[name=assignee]').selectOption(input.assignee)
       await form.screenshot({ path: join(directory, `corrective-form-${width}.png`) })
-    }
-    await page.setViewportSize({ width: 1440, height: 1100 })
-    const started = Date.now()
-    await Promise.all([page.waitForURL(/\/app\/work\/[\w-]+/), form.getByRole('button', { name: 'Raise work order', exact: true }).click()])
-    const id = new URL(page.url()).pathname.split('/').pop()
-    await inspect(id, 'web', started, Date.now())
-    assert.ok((await page.locator('main').innerText()).includes(input.description))
-    for (const width of [1440, 390]) {
-      await page.setViewportSize({ width, height: 1100 })
+      const started = Date.now()
+      await Promise.all([page.waitForURL(/\/app\/work\/[\w-]+/), form.getByRole('button', { name: 'Raise work order', exact: true }).click()])
+      const id = new URL(page.url()).pathname.split('/').pop()
+      await inspect(id, 'web', started, Date.now())
+      assert.ok((await page.locator('main').innerText()).includes(input.description))
       await page.screenshot({ path: join(directory, `corrective-result-${width}.png`), fullPage: true })
     }
   } finally { await browser.close() }
-  console.log('PROBE SURFACE-001 browser: asset corrective form at 1440 and 390 -> one work record and one web source audit')
+  console.log('PROBE SURFACE-001 browser: asset corrective form submitted at 1440 and 390 -> one work record, source audit and history entry per submission')
 
   let started = Date.now()
   const json = await api('workorder.create', input)
@@ -123,16 +125,20 @@ export default async function workParity({ request, origin, cookie }) {
   assert.equal(created.status, 200)
   assert.ok(created.result?.structuredContent && !created.result.isError, 'MCP creation succeeds')
   await inspect(created.result.structuredContent.id, 'mcp', started, Date.now())
-  assert.equal(new Set(accepted.map(row => row.id)).size, 3, 'doors retain distinct genuine work identities')
-  assert.equal(new Set(accepted.map(row => row.number)).size, 3, 'doors retain distinct genuine work numbers')
-  assert.deepEqual(accepted.map(maintenance), [expected, expected, expected])
+  assert.equal(new Set(accepted.map(row => row.id)).size, 4, 'doors retain distinct genuine work identities')
+  assert.equal(new Set(accepted.map(row => row.number)).size, 4, 'doors retain distinct genuine work numbers')
+  assert.deepEqual(accepted.map(maintenance), [expected, expected, expected, expected])
   const beforeRetry = await state()
   const retryReply = await mcp(writer.token, args)
   const retry = { status: retryReply.status, ...retryReply.body }
+  assert.equal(retry.status, 200)
   assert.ok(!retry.result?.isError)
   assert.deepEqual(retry.result.structuredContent, created.result.structuredContent)
-  assert.deepEqual(await api(`work/${created.result.structuredContent.id}`), accepted[2])
+  assert.deepEqual(await api(`work/${created.result.structuredContent.id}`), accepted.at(-1))
   assert.deepEqual(await state(), beforeRetry, 'completed MCP retry adds no work or native source audit')
+  const conflict = await mcp(writer.token, { ...args, description: 'Changed instructions on the completed key' })
+  assert.equal(failure(conflict.body), 'idempotency_conflict')
+  assert.deepEqual(await state(), beforeRetry, 'changed-payload replay cannot alter accepted work or history')
   console.log('PROBE SURFACE-001 MCP: equivalent inputs and completed retry -> equal maintenance facts, genuine agent attribution, no duplicate work or source audit')
 
   const unchanged = await state()
@@ -172,5 +178,32 @@ export default async function workParity({ request, origin, cookie }) {
   await revoked.body?.cancel()
   await api('service.revoke', { credential: narrow.id })
   assert.deepEqual(await state(), unchanged, 'revoked authority creates no work or native source audit')
-  console.log('PROBE SURFACE-001 refusal: signed-out, forbidden and revoked public creation attempts -> no new work or source audit')
+
+  // Revoke a genuine browser session too, keeping the original observer session live.
+  const requestedAt = Date.now()
+  const login = await send('/auth/magic-link', { session: '', body: { email: owner.email, returnTo: '/app' } })
+  assert.equal(login.status, 202)
+  await login.body?.cancel()
+  const message = mail.read({ after: requestedAt }).at(-1)
+  const link = message?.text.match(/https:\/\/\S+/)?.[0]
+  assert.ok(link, 'ordinary sign-in mail reaches the disposable network edge')
+  const confirmation = await send('/auth/confirm', { session: '', body: { token: new URL(link).searchParams.get('token') } })
+  assert.equal(confirmation.status, 303)
+  const session = confirmation.headers.getSetCookie().map(value => value.split(';', 1)[0]).join('; ')
+  await confirmation.body?.cancel()
+  assert.ok(session && session !== cookie, 'native sign-in issues a separate genuine session')
+  const live = await send('/api/gasket/me', { session })
+  assert.equal(live.status, 200)
+  assert.equal((await live.json()).id, owner.id)
+  assert.equal((await send('/auth/signout', { session, body: {} })).status, 204)
+  for (const [path, options] of [
+    ['/app/do/workorder.create', { form, headers: { 'Content-Type': formType } }],
+    ['/api/gasket/workorder.create', { body: refused }],
+  ]) {
+    const response = await send(path, { session, ...options })
+    assert.equal(response.status, 401, 'revoked browser capture is refused')
+    await response.body?.cancel()
+    assert.deepEqual(await state(), unchanged, 'revoked browser session adds no work, audit or history')
+  }
+  console.log('PROBE SURFACE-001 refusal: signed-out, forbidden and revoked public creation attempts, including revoked browser captures -> no new work, source audit or history')
 }
