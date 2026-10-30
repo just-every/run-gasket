@@ -13,7 +13,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 | Later | 0 | 0 | 0 | 0 |
 | Full target | 51 | 63 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 and the ASSET-006 model compatibility slice are judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -527,8 +527,8 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001
 1. Create a motor BOM with two approved bearings and a serial restriction, plan a repair with one out of stock and select a substitute.
 2. Inspect compatibility and quantities on the resulting work/parts reservation.
 
-**Evidence.** `tests/gasket/flows.mjs` — "ASSET-006 bill of materials and interchangeable spares"
-**Gap.** A public-door journey model compatibility and stock per eligible storeroom is missing. The cited journeys show serial-range refusal, revisions, named tools and compatible reservations.
+**Evidence.** `tests/gasket/flows.mjs` — "ASSET-006 bill of materials and interchangeable spares"; `tests/gasket/recovery.mjs` — "recoveryJourney"
+**Gap.** Stock per eligible storeroom and complete bin allocation, valuation and count reconciliation under PART-001 and PART-002 remain unproved. Operational additional-site scope retains ADMIN-002 and its conservative custody default awaiting CT approval; in-transit custody retains PART-006. The Base 0.2.84 hold and native, offline and device qualification remain unchanged. The primary-site journeys prove lead-managed model identity, combined serial and model restrictions, unchanged stock and reservations on incompatible requests, approved substitution, historical revisions and inactive restoration.
 
 #### ASSET-007 — Asset lifecycle and replacement decision
 

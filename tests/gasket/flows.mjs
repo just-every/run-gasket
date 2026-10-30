@@ -1552,18 +1552,25 @@ try {
   })
 
   await check('ASSET-006 bill of materials and interchangeable spares', async () => {
-    const motor = (await h.api('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', location: 'Dock' })).id
+    const registered = await h.submit('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', model: 'DRV-150', location: 'Dock' }, '/app/assets/{id}')
+    const motor = registered.pathname.split('/').pop()
+    assert.equal(registered.searchParams.get('error'), null)
+    assert.equal((await h.api(`assets/${motor}`, cookie.lead)).model, 'DRV-150')
+    assert.equal((await h.api('assets', cookie.max)).find(row => row.id === motor).model, 'DRV-150')
     const part = async (number, name, quantity) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each' })).id; if (quantity) await h.api('part.receive', cookie.lead, { part: id, quantity }); return id }
     const open = await part('BRG-6306', 'Open bearing'), shielded = await part('BRG-6306-ZZ', 'Shielded bearing', '2'), c3 = await part('BRG-6306-C3', 'C3 clearance bearing', '2'), belt = await part('BELT-A42', 'Drive belt A42', '1'), other = await part('BRG-9999', 'Unrelated bearing', '1')
-    const revision = { asset: motor, part: [open, belt], quantity: ['2', '1'], serialFrom: ['', 'M-1000'], serialTo: ['', 'M-1999'], alternateFor: [open, open], alternate: [shielded, c3], alternateFrom: ['', 'M-2000'], alternateTo: ['', 'M-2999'], tool: ['Bearing puller', 'Torque wrench'], note: 'From the OEM manual' }
+    const revision = { asset: motor, part: [open, belt], quantity: ['2', '1'], serialFrom: ['', 'M-1000'], serialTo: ['', 'M-1999'], modelFrom: ['DRV-100', 'DRV-100'], modelTo: ['DRV-199', 'DRV-199'], alternateFor: [open, open], alternate: [shielded, c3], alternateFrom: ['', 'M-2000'], alternateTo: ['', 'M-2999'], alternateModelFrom: ['DRV-100', 'DRV-100'], alternateModelTo: ['DRV-199', 'DRV-199'], tool: ['Bearing puller', 'Torque wrench'], note: 'From the OEM manual' }
     await h.api('bom.revise', cookie.max, revision, 403)
     await h.api('bom.revise', cookie.lead, { ...revision, alternateFor: [belt, other] }, 400)
     await h.api('bom.revise', cookie.lead, { ...revision, serialFrom: ['', 'M-2000'], serialTo: ['', 'M-1000'] }, 400)
+    assert.equal((await h.api('bom.revise', cookie.lead, { ...revision, modelFrom: ['DRV-300', ''], modelTo: ['DRV-100', ''] }, 400)).error, 'invalid_model_range')
+    assert.equal((await h.api('bom.revise', cookie.lead, { ...revision, alternateModelFrom: ['DRV-300', ''], alternateModelTo: ['DRV-100', ''] }, 400)).error, 'invalid_model_range')
     assert.equal((await h.api('bom.revise', cookie.lead, revision)).number, 1)
     await h.api('bom.revise', cookie.lead, { ...revision, revision: 0 }, 409)
     // A second revision through the asset page's form; the first stays on record.
     assert.equal((await h.submit('bom.revise', cookie.lead, { ...revision, quantity: ['2', '2'], note: 'Two belts per drive', revision: '1' }, `/app/assets/${motor}`)).searchParams.get('error'), null)
     const bom = (await h.api(`assets/${motor}`, cookie.max)).bom
+    assert.deepEqual(bom.revisions.map(row => [row.createdBy, row.lines[0].model_from, row.lines[0].model_to, row.alternates[0].model_from]), [['Lena Park', 'DRV-100', 'DRV-199', 'DRV-100'], ['Lena Park', 'DRV-100', 'DRV-199', 'DRV-100']])
     assert.deepEqual([bom.revision, bom.revisions.map(row => [row.number, row.note]), bom.tools], [2, [[2, 'Two belts per drive'], [1, 'From the OEM manual']], ['Bearing puller', 'Torque wrench']])
     assert.deepEqual(bom.lines.map(line => [line.part.number, line.quantity, line.available, line.fits, line.short, line.alternates.map(alt => [alt.part.number, alt.available, alt.fits])]),
       [['BRG-6306', '2', '0', true, true, [['BRG-6306-ZZ', '2', true], ['BRG-6306-C3', '2', false]]], ['BELT-A42', '2', '1', true, true, []]], 'the C3 bearing only fits serials M-2000 to M-2999')
@@ -1578,17 +1585,95 @@ try {
     assert.deepEqual(planned.reservations.map(row => [row.part.number, row.insteadOf.number, row.quantity, row.state]), [['BRG-6306-ZZ', 'BRG-6306', '2', 'open']])
     assert.deepEqual(planned.bom.lines[0].alternates.map(alt => [alt.part.number, alt.available]), [['BRG-6306-ZZ', '0'], ['BRG-6306-C3', '2']])
     // A line restricted to other serials does not fit this motor's twin with a later serial.
-    const twin = (await h.api('asset.create', cookie.lead, { tag: 'HK-061', name: 'Conveyor drive motor 2', serial: 'M-2500', location: 'Dock' })).id
-    await h.api('bom.revise', cookie.lead, { asset: twin, part: [belt], quantity: ['1'], serialFrom: ['M-1000'], serialTo: ['M-1999'] })
+    const twin = (await h.api('asset.create', cookie.lead, { tag: 'HK-061', name: 'Conveyor drive motor 2', serial: 'M-2500', model: 'DRV-150', location: 'Dock' })).id
+    await h.api('bom.revise', cookie.lead, { asset: twin, part: [belt], quantity: ['1'], serialFrom: ['M-1000'], serialTo: ['M-1999'], modelFrom: ['DRV-100'], modelTo: ['DRV-199'] })
     const twinJob = (await h.api('workorder.create', cookie.lead, { asset: twin, title: 'Change the belt', due: addDays(today, 2), assignee: ids.max })).id
     assert.equal((await wo('lead', twinJob)).bom.lines[0].fits, false)
     await h.api('workorder.reserve', cookie.lead, { workOrder: twinJob, part: belt, quantity: '1' }, 409)
+    const unchangedRefusal = async (workOrder, fields, error, status = 409, who = 'lead') => {
+      const before = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+      assert.equal((await h.api('workorder.reserve', cookie[who], { workOrder, ...fields }, status)).error, error)
+      assert.deepEqual({ parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }, before, 'refusal changes neither stock nor work reservations')
+    }
+    await unchangedRefusal(twinJob, { part: belt, quantity: '1' }, 'part_not_compatible')
+    for (const [tag, model] of [['HK-062', 'DRV-250'], ['HK-063', '']]) {
+      const asset = (await h.api('asset.create', cookie.lead, { tag, name: `Conveyor ${tag}`, serial: 'M-1500', model, location: 'Dock' })).id
+      assert.equal((await h.api(`assets/${asset}`, cookie.max)).model, model || null)
+      const restrictions = { asset, part: [belt], quantity: ['1'], serialFrom: ['M-1000'], serialTo: ['M-1999'], modelFrom: ['DRV-100'], modelTo: ['DRV-199'], alternateFor: [belt], alternate: [c3], alternateModelFrom: ['DRV-100'], alternateModelTo: ['DRV-199'] }
+      await h.api('bom.revise', cookie.lead, restrictions)
+      const workOrder = (await h.api('workorder.create', cookie.lead, { asset, title: 'Check model before reserving', due: today, assignee: ids.max })).id
+      assert.equal((await wo('lead', workOrder)).bom.lines[0].fits, false)
+      assert.equal((await wo('lead', workOrder)).bom.lines[0].alternates[0].fits, false)
+      await unchangedRefusal(workOrder, { part: belt, quantity: '1' }, 'part_not_compatible')
+      await unchangedRefusal(workOrder, { part: c3, insteadOf: belt, quantity: '1' }, 'substitute_not_compatible')
+      if (!model) {
+        await h.api('bom.revise', cookie.lead, { asset, revision: 1, part: [c3], quantity: ['1'] })
+        await h.api('workorder.reserve', cookie.lead, { workOrder, part: c3, quantity: '1' })
+        assert.equal((await wo('lead', workOrder)).reservations[0].quantity, '1', 'an unrestricted line accepts an unknown model')
+      }
+    }
+    const laterRepair = (await h.api('workorder.create', cookie.lead, { asset: motor, title: 'Recheck current compatibility', due: today, assignee: ids.max })).id
+    const identity = { asset: motor, tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', model: 'DRV-250', location: 'Dock' }
+    const beforeIdentity = await h.api(`assets/${motor}`, cookie.lead)
+    await h.api('asset.update', cookie.max, { ...identity, revision: beforeIdentity.revision }, 403)
+    assert.deepEqual(await h.api(`assets/${motor}`, cookie.lead), beforeIdentity)
+    assert.equal((await h.submit('asset.update', cookie.lead, { ...identity, revision: beforeIdentity.revision }, `/app/assets/${motor}`)).searchParams.get('error'), null)
+    const changed = await h.api(`assets/${motor}`, cookie.lead)
+    assert.deepEqual([changed.model, changed.versions[0].value.model, changed.versions[0].changed_by], ['DRV-250', 'DRV-150', ids.lead])
+    await unchangedRefusal(laterRepair, { part: shielded, insteadOf: open, quantity: '1' }, 'substitute_not_compatible')
+    await unchangedRefusal(laterRepair, { part: belt, quantity: '1' }, 'part_not_compatible')
+    assert.deepEqual((await wo('lead', repair)).reservations, planned.reservations, 'existing commitments survive identity corrections')
+    await h.api('asset.update', cookie.lead, { ...identity, model: 'DRV-150', revision: changed.revision })
+    // A new BOM revision can make a previously compatible substitute incompatible, even with site approval.
+    await h.api('part.substitute', cookie.lead, { part: open, substitute: shielded, reason: 'General bearing approval' })
+    await h.api('bom.revise', cookie.lead, { ...revision, revision: 2, alternateModelFrom: ['DRV-200', 'DRV-100'], alternateModelTo: ['DRV-299', 'DRV-199'], note: 'Shielded model restriction corrected' })
+    await unchangedRefusal(laterRepair, { part: shielded, insteadOf: open, quantity: '1' }, 'substitute_not_compatible')
+    const revised = (await h.api(`assets/${motor}`, cookie.lead)).bom
+    assert.deepEqual(revised.revisions.slice(1), bom.revisions, 'earlier revisions retain their quantities, restrictions, author and time')
+    assert.deepEqual((await wo('lead', repair)).reservations, planned.reservations)
+    await h.api('bom.revise', cookie.lead, { ...revision, revision: 3, quantity: ['2', '2'], note: 'OEM model applicability confirmed' })
+    await unchangedRefusal(laterRepair, { part: shielded, insteadOf: open, quantity: '1' }, 'forbidden', 403, 'max')
+    await h.api('reservation.release', cookie.lead, { reservation: planned.reservations[0].id, reason: 'Replanned with current model confirmation' })
+    await h.api('workorder.reserve', cookie.lead, { workOrder: laterRepair, part: shielded, insteadOf: open, quantity: '2' })
+    assert.deepEqual((await wo('lead', laterRepair)).reservations.map(row => [row.part.id, row.insteadOf.id, row.quantity, row.state]), [[shielded, open, '2', 'open']])
+    console.log('PROBE ASSET-006 models and ranges: public asset forms and JSON -> matching, mismatching and unknown identities retained; both restrictions enforced')
+    console.log('PROBE ASSET-006 reservations: public reservation JSON -> incompatible and newly incompatible requests refused with unchanged stock and work; compatible approved substitute reserved')
+    console.log('PROBE ASSET-006 history: public asset JSON -> previous model identity and immutable BOM revision quantities, restrictions, author and time retained')
     assert.ok((await h.api(`assets/${motor}/history`, cookie.sam)).events.some(event => event.what === 'Bill of materials revision 2 saved: Two belts per drive'))
     const page = await (await h.raw(`/app/assets/${motor}`, { cookie: cookie.lead })).text()
-    for (const text of ['Bill of materials', 'Revision 2', 'Out of stock', 'does not fit this serial', 'Bearing puller', 'Save new revision', 'From the OEM manual']) assert.ok(page.includes(text), text)
+    for (const text of ['Bill of materials', 'Revision 4', 'Out of stock', 'does not fit this serial', 'Bearing puller', 'Save new revision', 'From the OEM manual']) assert.ok(page.includes(text), text)
     assert.ok(!(await (await h.raw(`/app/assets/${motor}`, { cookie: cookie.max })).text()).includes('Save new revision'))
     const work = (await (await h.raw(`/app/work/${twinJob}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
-    for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; this asset is M-2500']) assert.ok(work.includes(text), text)
+    for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; models DRV-100 to DRV-199; this asset is M-2500, model DRV-150']) assert.ok(work.includes(text), text)
+    const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+    try {
+      for (const width of process.env.GASKET_BOM_SCREENSHOTS ? [1440, 390] : [1440]) {
+        const context = await browser.newContext({ viewport: { width, height: 1000 } })
+        await context.addCookies(cookie.lead.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
+        const screen = await context.newPage()
+        for (const [name, path] of [['asset', `/app/assets/${motor}`], ['work', `/app/work/${laterRepair}`]]) {
+          await screen.goto(h.origin + path)
+          await screen.locator('#bom').waitFor()
+          await screen.evaluate(async () => { await document.fonts.ready })
+          if (width === 1440) {
+            assert.match(await screen.locator('#bom').innerText(), /models DRV-100 to DRV-199/)
+            if (name === 'asset') {
+              assert.equal(await screen.locator('input[name="model"]').inputValue(), 'DRV-150')
+              assert.equal(await screen.locator('input[name="modelFrom"]').first().inputValue(), 'DRV-100')
+              assert.equal(await screen.locator('input[name="alternateModelTo"]').first().inputValue(), 'DRV-199')
+            } else assert.match(await screen.locator('main').innerText(), /Shielded bearing/)
+            assert.equal(await screen.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${name} fits the desktop`)
+          }
+          if (process.env.GASKET_BOM_SCREENSHOTS) {
+            await mkdir(process.env.GASKET_BOM_SCREENSHOTS, { recursive: true })
+            await screen.screenshot({ path: join(process.env.GASKET_BOM_SCREENSHOTS, `${name}-${width}.png`), fullPage: true })
+          }
+        }
+        await context.close()
+      }
+    } finally { await browser.close() }
+    console.log('PROBE ASSET-006 screens: built asset and work pages -> current model, restrictions, stock and substitute displayed')
+
   })
 
   await check('PLAN-006 comments, mentions and shift handoff', async () => {

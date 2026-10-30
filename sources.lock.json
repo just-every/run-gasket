@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "366477eb2373b69fac3eb9c4e76a7318befeb007d46f7b01de6b1846fe63eb63",
+      "sha256": "674af709a688ec5ced5a0a372909a16b06381a74a5e380c48cf1d132d98cc9ae",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "97fd1b0c59339224d69cc93b8641dddb695f9d667c09475d5fa3207b86a2fd47",
+      "sha256": "67378c252299d3cba62f829d79d90bc97fb0cab2b7b47b9a24012fdb1a1bc7c2",
       "executable": false
     },
     "DEMO.md": {
@@ -264,7 +264,7 @@
       "executable": false
     },
     "docs/maintenance-semantics.md": {
-      "sha256": "72b84b7d6bb1b7bc96dafb06d981d2a18b2c196324143a407108013549b289fe",
+      "sha256": "87cac8fb5999099ea4a91f23bbfa8f7e42e82399aba3bd6841a154e2b574a65e",
       "executable": false
     },
     "docs/migration-sources.md": {
@@ -785,6 +785,10 @@
     },
     "migrations/core/0108_agent_door.sql": {
       "sha256": "016d8a98b964385f5c4a13447361c3c783910a76aaf4606b0e0081482bc819cc",
+      "executable": false
+    },
+    "migrations/core/0109_bom_models.sql": {
+      "sha256": "3116d7e25ab2f4ba1cd1b2aab063c9f196ad0c520916f627b9626f539b5ede9f",
       "executable": false
     },
     "ONBOARDING.md": {
@@ -1484,7 +1488,7 @@
       "executable": false
     },
     "src/gasket/assets.ts": {
-      "sha256": "3fd56040fef0b14885627769238b04b6f834195e8d024842ad12215931e4b625",
+      "sha256": "6dbfd419faa563c6e5fdc457fc8ccb82ccd20785897eda37db920a84a29dbfbc",
       "executable": false
     },
     "src/gasket/attachment-erasure.ts": {
@@ -1524,7 +1528,7 @@
       "executable": false
     },
     "src/gasket/bom.ts": {
-      "sha256": "b20f36e61951caa711403406a211d2b2d89352bbd1ffe3822ee5fc1502feaee3",
+      "sha256": "bbb636cb9d3d7d1d96990054aefb223f2576dca117e74599c1a744bb508e8c53",
       "executable": false
     },
     "src/gasket/calendar.ts": {
@@ -1980,7 +1984,7 @@
       "executable": false
     },
     "src/gasket/reservations.ts": {
-      "sha256": "d722e6e00d38905d037d1dddd9998c0af5eb8d45c879d40b349ca0baadd04f4e",
+      "sha256": "3561e37fa9955a931afa70b709bf97332e6b5085226c01cd814a2c219d36ed7a",
       "executable": false
     },
     "src/gasket/resource-authority.ts": {
@@ -2120,7 +2124,7 @@
       "executable": false
     },
     "src/gasket/ui/assets.ts": {
-      "sha256": "0323abbba16ad337ea1bb93f4c5baa9d311f1eb1ae2a7ac8565eb1e87db220e6",
+      "sha256": "b3ebfffa91b6a922a697ffc90fc8383baabc618c64ff244c95c85d3f9da5acc0",
       "executable": false
     },
     "src/gasket/ui/automation.ts": {
@@ -2140,7 +2144,7 @@
       "executable": false
     },
     "src/gasket/ui/bom.ts": {
-      "sha256": "aaad221284ad63611546efa45ed786d249c07479b7c07596d30f35158b00119c",
+      "sha256": "52941acc39be3f500ab5bec102ae1843a130463cc04d43f6d69d9ec0ce9a9307",
       "executable": false
     },
     "src/gasket/ui/calendar.ts": {
@@ -2400,7 +2404,7 @@
       "executable": false
     },
     "src/gasket/work.ts": {
-      "sha256": "a63fbc65f2451185ab05d4083b2f21355272097e7b43ca05d36884753c6d5dbb",
+      "sha256": "32b0795f71443fe385e042f0b5054dc9a399c38ce6e7087da355ef39149e73a6",
       "executable": false
     },
     "src/gasket/zip.ts": {
@@ -4728,7 +4732,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "bf3478de00ccc0a3cc8b57dc85137a94684c404fc728b549b4968ac6bb310fe7",
+      "sha256": "5b3cbc869693468e1c4713643a201b076aa5f2c48fdd690fcaf971a3e2516009",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4840,7 +4844,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "e6e20f465435c68f09f04140a4b8083d89cf0d4d98aff2d0efa0e25f6fc72e7f",
+      "sha256": "9b1c2a7ac4cae7df7a6b1c2831cd9cd0ab83f408115292c9cee9e6cbdc2c57da",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {
