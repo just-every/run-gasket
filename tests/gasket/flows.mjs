@@ -1600,6 +1600,9 @@ try {
       assert.deepEqual({ parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }, before, 'refusal changes neither stock nor work reservations')
     }
     await unchangedRefusal(twinJob, { part: belt, quantity: '1' }, 'part_not_compatible')
+    const kit = (await h.api('kit.create', cookie.lead, { name: 'Model-restricted repair kit', part: [other, belt], quantity: ['1', '1'] })).id
+    await unchangedRefusal(twinJob, { kit }, 'part_not_compatible')
+    let modelRefusalPage
     for (const [tag, model] of [['HK-062', 'DRV-250'], ['HK-063', '']]) {
       const asset = (await h.api('asset.create', cookie.lead, { tag, name: `Conveyor ${tag}`, serial: 'M-1500', model, location: 'Dock' })).id
       assert.equal((await h.api(`assets/${asset}`, cookie.max)).model, model || null)
@@ -1610,6 +1613,19 @@ try {
       assert.equal((await wo('lead', workOrder)).bom.lines[0].alternates[0].fits, false)
       await unchangedRefusal(workOrder, { part: belt, quantity: '1' }, 'part_not_compatible')
       await unchangedRefusal(workOrder, { part: c3, insteadOf: belt, quantity: '1' }, 'substitute_not_compatible')
+      await unchangedRefusal(workOrder, { kit }, 'part_not_compatible')
+      await unchangedRefusal(workOrder, { kit, swap: [`${belt}:${c3}`] }, 'substitute_not_compatible')
+      // A planner using the work form must see model applicability in the refusal too.
+      for (const [fields, error] of [[{ part: belt, quantity: '1' }, 'part_not_compatible'], [{ part: c3, insteadOf: belt, quantity: '1' }, 'substitute_not_compatible']]) {
+        const before = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+        const refused = await h.submit('workorder.reserve', cookie.lead, { workOrder, ...fields }, `/app/work/${workOrder}`)
+        assert.equal(refused.searchParams.get('error'), error)
+        const page = await (await h.raw(refused.pathname + refused.search, { cookie: cookie.lead })).text()
+        const alert = page.match(/<p[^>]*role="alert"[^>]*>([^<]*)<\/p>/)?.[1]
+        assert.match(alert ?? '', /model/i, 'a model-incompatible reservation explains model applicability')
+        assert.deepEqual({ parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }, before, 'form refusal changes neither stock nor reservations')
+        if (model) modelRefusalPage = refused.pathname + refused.search
+      }
       if (!model) {
         await h.api('bom.revise', cookie.lead, { asset, revision: 1, part: [c3], quantity: ['1'] })
         await h.api('workorder.reserve', cookie.lead, { workOrder, part: c3, quantity: '1' })
@@ -1643,6 +1659,11 @@ try {
     await h.api('reservation.release', cookie.lead, { reservation: planned.reservations[0].id, reason: 'Replanned with current model confirmation' })
     await h.api('workorder.reserve', cookie.lead, { workOrder: laterRepair, part: shielded, insteadOf: open, quantity: '2' })
     assert.deepEqual((await wo('lead', laterRepair)).reservations.map(row => [row.part.id, row.insteadOf.id, row.quantity, row.state]), [[shielded, open, '2', 'open']])
+    await h.api('workorder.reserve', cookie.lead, { workOrder: laterRepair, kit })
+    const kitReservations = (await wo('lead', laterRepair)).reservations.filter(row => row.kit === 'Model-restricted repair kit')
+    assert.deepEqual(kitReservations.map(row => [row.part.id, row.quantity, row.state]).sort(), [[other, '1', 'open'], [belt, '1', 'open']].sort(), 'a compatible kit reserves every line')
+    for (const row of kitReservations) await h.api('reservation.release', cookie.lead, { reservation: row.id, reason: 'Kit compatibility confirmed' })
+    console.log('PROBE ASSET-006 kits: public reservation JSON -> compatible kit reserves every line; serial, model and substitute refusals retain all stock and reservations')
     console.log('PROBE ASSET-006 models and ranges: public asset forms and JSON -> matching, mismatching and unknown identities retained; both restrictions enforced')
     console.log('PROBE ASSET-006 reservations: public reservation JSON -> incompatible and newly incompatible requests refused with unchanged stock and work; compatible approved substitute reserved')
     console.log('PROBE ASSET-006 history: public asset JSON -> previous model identity and immutable BOM revision quantities, restrictions, author and time retained')
@@ -1654,14 +1675,14 @@ try {
     for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; models DRV-100 to DRV-199; this asset is M-2500, model DRV-150']) assert.ok(work.includes(text), text)
     // Exercise a BOM-only approval in the real work form, without site-wide approval.
     await h.api('part.substitute', cookie.lead, { part: open, substitute: shielded, withdraw: true, reason: 'Use asset-specific BOM approval' })
-    await h.api('reservation.release', cookie.lead, { reservation: (await wo('lead', laterRepair)).reservations[0].id, reason: 'Reserve through the work page' })
+    await h.api('reservation.release', cookie.lead, { reservation: (await wo('lead', laterRepair)).reservations.find(row => row.part.id === shielded && row.state === 'open').id, reason: 'Reserve through the work page' })
     const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
     try {
       for (const width of process.env.GASKET_BOM_SCREENSHOTS ? [1440, 390] : [1440]) {
         const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
         await context.addCookies(cookie.lead.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
         const screen = await context.newPage()
-        for (const [name, path] of [['asset', `/app/assets/${motor}`], ['work', `/app/work/${laterRepair}`]]) {
+        for (const [name, path] of [['asset', `/app/assets/${motor}`], ['work', `/app/work/${laterRepair}`], ['model-refusal', modelRefusalPage]]) {
           await screen.goto(h.origin + path)
           await screen.locator('#bom').waitFor()
           await screen.evaluate(async () => { await document.fonts.ready })
