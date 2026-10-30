@@ -32,17 +32,22 @@ export async function agentReassignmentPolicyJourney() {
     cookie.owner = await h.owner()
     await api('site.configure', cookie.owner, { name: 'Synthetic gasket workshop', timezone: 'Australia/Sydney' })
     ids.owner = (await api('me', cookie.owner)).id
-    for (const [key, role] of [['lead','lead'],['max','maintainer'],['mo','maintainer'],['sam','supervisor'],['agent','agent']]) {
-      ids[key] = (await api('access.give', cookie.owner, { name: `Synthetic gasket ${key}`, email: email(`synthetic-gasket-${key}`), role })).id
-      cookie[key] = await h.signIn(email(`synthetic-gasket-${key}`))
-    }
     const settings = await signJws(pair.privateKey, kid, 'rer-business-settings+jwt', {
       v: 1, iss: issuer, aud: 'self-host', sub: installationId, business: 'synthetic-gasket-business', email: vars.OWNER_EMAIL,
       owner_id: 'synthetic-gasket-owner', jti: randomUUID(), iat: instant / 1000, exp: instant / 1000 + 300, rev: 1, values: {}, logo: null,
-      team: ['lead','max','mo'].map(key => ({ id: `synthetic-gasket-${key}`, email: email(`synthetic-gasket-${key}`), name: `Synthetic gasket ${key}`, role: 'member', invite: 1 })),
+      team: ['lead','max','mo'].map(key => ({ id: `synthetic-gasket-${key}`, email: email(`synthetic-gasket-${key}`), name: `Synthetic gasket ${key}`, role: key === 'lead' ? 'admin' : 'member', invite: 1 })),
     })
     const paired = await h.raw('/api/rer/business-settings', { body: { settings } })
     assert.equal(paired.status, 200, await paired.text())
+    const members = await api('members', cookie.owner)
+    for (const key of ['lead','max','mo']) {
+      ids[key] = members.find(member => member.email === email(`synthetic-gasket-${key}`)).id
+      cookie[key] = await h.signIn(email(`synthetic-gasket-${key}`))
+    }
+    for (const [key, role] of [['sam','supervisor'],['agent','agent']]) {
+      ids[key] = (await api('access.give', cookie.owner, { name: `Synthetic gasket ${key}`, email: email(`synthetic-gasket-${key}`), role })).id
+      cookie[key] = await h.signIn(email(`synthetic-gasket-${key}`))
+    }
     const asset = (await api('asset.create', cookie.lead, { tag: 'synthetic-gasket-1', name: 'Synthetic compressor', location: 'Workshop' })).id
     const checklist = (await api('checklist.create', cookie.lead, { name: 'Synthetic inspection', items: ['Listen for bearing noise'] })).id
     const schedule = (await api('schedule.create', cookie.lead, { asset, checklist, title: 'Synthetic overdue inspection', everyDays: 30, firstDue: day(-4), assignee: ids.max })).id
@@ -79,7 +84,7 @@ export async function agentReassignmentPolicyJourney() {
     }
     const protocol = createProtocol({ ...context, points })
     protocol.fetch = (url, init = {}) => h.raw(new URL(url).pathname + new URL(url).search, {
-      method: init.method, headers: init.headers, ...(init.body === undefined ? {} : { body: JSON.parse(init.body) }),
+      method: init.method, headers: Object.fromEntries(new Headers(init.headers)), ...(init.body === undefined ? {} : { body: JSON.parse(init.body) }),
     })
     const call = (args, options) => protocol.tool('gasket.proposals.reassign', args, options)
     const draft = async (id = pm, assignee = ids.mo) => {
@@ -91,7 +96,8 @@ export async function agentReassignmentPolicyJourney() {
     const refuse = async (args, codes, label, options) => {
       const before = await retained(pm), proposal = await savedProposal(args)
       const answer = await call(args, options)
-      assert.ok(codes.includes(errorCode(answer)), `${label}: ${errorCode(answer)}`)
+      if (codes.includes('unauthenticated')) assert.equal(answer.status, 401, `${label} HTTP refusal`)
+      assert.ok(codes.includes(errorCode(answer)) || codes.includes('unauthenticated') && errorCode(answer) === -32001, `${label}: ${errorCode(answer)} ${JSON.stringify(answer.body)}`)
       assert.deepEqual(await retained(pm), before, `${label} preserves work and both queues`)
       assert.deepEqual(await savedProposal(args), proposal, `${label} preserves proposal`)
       return answer
@@ -153,6 +159,16 @@ export async function agentReassignmentPolicyJourney() {
     assert.deepEqual((await call(args)).result.structuredContent, allowed.result.structuredContent)
     assert.deepEqual(await retained(pm), replayBefore)
     assert.equal((await api('audit?action=proposal.apply', cookie.owner)).rows.filter(row => row.subject === args.proposal).length, 1)
+    const parallelWork = (await api('workorder.create', cookie.owner, { location: 'Synthetic workshop', title: 'Synthetic concurrent handoff', due: day(-10), assignee: ids.max })).id
+    const parallelQuery = await api('agent.query', cookie.agent, { workOrder: parallelWork, version: (await work(parallelWork)).version, question: 'Who can inspect next?' })
+    await api('chase.rule', cookie.owner, { remindBeforeDays: 1, responseWithinDays: 0, leadAfterDays: 0, supervisorAfterDays: 1 })
+    const concurrent = await draft(parallelWork), parallelBefore = await work(parallelWork)
+    const racing = await Promise.all([call(concurrent), call({ ...concurrent, idempotency_key: randomUUID() })])
+    assert.equal(racing.filter(answer => !errorCode(answer)).length, 1, 'only one concurrent proposal application succeeds')
+    assert.equal((await work(parallelWork)).crew.handoffs.length, parallelBefore.crew.handoffs.length + 1)
+    assert.equal((await savedProposal(concurrent)).status, 'approved')
+    assert.equal((await api('audit?action=proposal.apply', cookie.owner)).rows.filter(row => row.subject === concurrent.proposal).length, 1)
+    assert.ok(parallelQuery.id)
     console.log('PROBE AGENT-005 allowing: MCP existing missed-promise proposal -> standard, one attributed handoff, reset acknowledgment, both queues and retained source receipt; replay unchanged')
     // A held standard policy executes with a genuine review record, separately from human sign-off.
     await adopt(heldPolicy())

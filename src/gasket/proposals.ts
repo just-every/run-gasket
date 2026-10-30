@@ -196,6 +196,9 @@ export async function applyReassignment(env: Bindings, actor: Actor, input: Inpu
       AND (? IS NULL OR EXISTS(SELECT 1 FROM gk_team_members tm WHERE tm.team_id=? AND tm.member_id=m.id AND tm.added_at IS ?)))`,
       basis.eligible.id, basis.eligible.role, basis.eligible.operator_role, team,
       team, basis.eligible.team_joined_at),
+    ...(decider ? [guard(env, 'agent_authority_ended', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+      JOIN gk_site_memberships sm ON sm.member_id=m.id AND sm.site_id='primary'
+      WHERE m.id=? AND m.status='active' AND o.status='active' AND sm.status='active' AND (o.role='owner' OR m.role='lead'))`, decider.id)] : []),
     guard(env, 'agent_policy_changed', "EXISTS(SELECT 1 FROM agent_door_audit WHERE id=? AND row=? AND evidence=?)", admission.id, admission.row, admission.evidence),
     guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id=? AND status='pending' AND payload_hash=? AND basis_json=?)", proposal.id, proposal.payload_hash, proposal.basis_json),
     stmt(env, `UPDATE gk_proposals SET status='approved',decided_by=?,decided_at=?,decision_note=?,result_id=? WHERE id=?`,

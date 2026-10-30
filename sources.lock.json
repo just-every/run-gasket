@@ -1876,7 +1876,7 @@
       "executable": false
     },
     "src/gasket/proposals.ts": {
-      "sha256": "f6b9a23780e55bfef36792f439a811b0e374992e931116491f1de40a272553a5",
+      "sha256": "a6911b12240f9116d83c4d304295b883a8df55034f2c2b37d8441b148973e8fa",
       "executable": false
     },
     "src/gasket/purchase-authority.ts": {
@@ -4712,7 +4712,7 @@
       "executable": false
     },
     "tests/gasket/agent-reassignment-policy.mjs": {
-      "sha256": "8b0bde8f58c01658ea2567cd26918c7bb9174da005bd615ab2806cee38f6f774",
+      "sha256": "5afea1b8edb323f3a895419309ac6a4a405525a869e41ebb54d20e85f64fb558",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
