@@ -10,7 +10,9 @@ function workbook(rows,format='xlsx',name='work') {
   const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet(rows),name)
   return XLSX.write(book,{type:'buffer',bookType:format==='xls'?'biff8':'xlsx'})
 }
-export async function genericMigrationJourney(){
+export async function genericMigrationJourney({requiredRows=2_000}={}){
+  const count=Number(process.env.GASKET_MIGRATION_ROWS??requiredRows)
+  assert.ok(Number.isSafeInteger(count)&&count>=requiredRows&&count%2===0,`MIG-007 requires at least ${requiredRows} rows split evenly between open work and history; received ${count}`)
   const h=await harness({clockInstant:Date.parse('2027-03-07T13:59:00Z')})
   try{
     const owner=await h.owner()
@@ -24,10 +26,27 @@ export async function genericMigrationJourney(){
     const refrigerant=(await h.api('customfield.save',owner,{name:'Refrigerant type',entityType:'asset',type:'single',scope:'category',category:'HVAC',required:true,options:'R134a,R32'})).id
     const voltage=(await h.api('customfield.save',owner,{name:'Voltage',entityType:'part',type:'number',scope:'organization',unit:'V'})).id
     const preview=(entity,rows,format='csv',extra={})=>h.api('spreadsheet.preview',importer,{entity,dateFormat:'MDY',spreadsheet:file(`synthetic-gasket-1.${format}`,format==='csv'?csv(rows):workbook(rows,format,entity)),...extra})
-    async function apply(p){
+    async function apply(p,{bounded=false}={}){
       let job=await h.api('spreadsheet.apply',importer,{...p.carry,fingerprint:p.fingerprint})
-      for(let n=0;n<100&&job.state!=='completed';n++)job=await h.api('spreadsheet.job',importer,{job:job.job,action:'resume'})
+      const journal=async()=>{
+        const row=(await h.api('spreadsheet-imports',importer)).jobs.find(row=>row.id===job.job)
+        assert.ok(row,'the public import journal retains the job')
+        assert.equal(row.total,p.accepted.length)
+        assert.equal(row.error,null)
+        return row
+      }
+      let progress=bounded?await journal():null
+      if(bounded)assert.ok(progress.checkpoint>0&&progress.checkpoint<=60&&progress.checkpoint<progress.total,'apply returns after bounded progress with rows left to resume')
+      for(let n=0;n<100&&job.state!=='completed';n++){
+        job=await h.api('spreadsheet.job',importer,{job:job.job,action:'resume'})
+        if(bounded){
+          const next=await journal()
+          assert.ok(next.checkpoint>progress.checkpoint&&next.checkpoint-progress.checkpoint<=60,'resume advances the durable checkpoint by a bounded batch')
+          progress=next
+        }
+      }
       assert.equal(job.state,'completed')
+      if(bounded)assert.equal(progress.checkpoint,progress.total,'resume reconciles the complete accepted input')
       return job.job
     }
     const assets=[['Source ID','Tag','Name','Location','Category','Cooling type'],['00017','00017','Chiller 17','Cold room','HVAC','R134a']]
@@ -70,7 +89,6 @@ export async function genericMigrationJourney(){
     assert.notEqual(await apply(pmPreview),pmJob,'reapply after undo creates a new durable job')
     const beforeStock=await h.api(`parts/${part}`,owner),beforeNotices=await h.api('notices',owner)
     const header=['Source ID','Status','Asset ID','Title','Work type','Created on','Due date','Completed on','Completed by','Assignee','Team','Priority','Estimate hours','Parts cost USD','Labor cost USD','Other cost USD','Historical consumption','Custom: Inspection type']
-    const count=Number(process.env.GASKET_MIGRATION_ROWS??8)
     const rows=Array.from({length:count},(_,n)=>[String(n+1).padStart(6,'0'),n%2?'completed':'open','00317',`Inspect chiller ${n+1}`,'corrective',n%3?'03/01/2027':'2027-03-01','03/15/2027',n%2?'2027-03-02T11:45':'',n%2?'Former technician':'',n%2?'Retired person':'legacy-user',n%2?'Legacy team':'legacy-crew','normal','1.5',n%2?'12.34':'',n%2?'56.78':'',n%2?'9.00':'',n%2?'00021: 2 each':'','Mechanical'])
     const broken=rows.map(r=>[...r]);broken[0][6]='not a date';broken[1][17]='Invalid choice'
     const bad=await preview('work',[header,...broken],'xlsx',{assetMapping:{'00317':asset}})
@@ -85,13 +103,16 @@ export async function genericMigrationJourney(){
     assert.deepEqual(csvEquivalent.accepted,fixed.accepted,'CSV and Excel normalize identical source values')
     const legacyEquivalent=await preview('work',[header,...rows],'xls',mappings)
     assert.deepEqual(legacyEquivalent.accepted,fixed.accepted,'legacy Excel preserves the same source values')
-    const job=await apply(fixed)
+    const job=await apply(fixed,{bounded:true})
     const reconciled=[];let after=0
     do{const page=await h.api(`spreadsheet-imports/${job}/rows?after=${after}`,owner);reconciled.push(...page.rows);after=page.next}while(after!==null)
     assert.equal(reconciled.length,count)
     const actual=new Map(reconciled.map(r=>[r.value.sourceId,r]))
+    assert.equal(actual.size,count,'every accepted source row reconciles exactly once')
     for(const [n,row]of rows.entries()){
       const value=actual.get(row[0]).value
+      assert.equal(actual.get(row[0]).targetId,fixed.accepted[n].targetId)
+      assert.equal(actual.get(row[0]).kind,n%2?'history':'open')
       assert.deepEqual(value.source,Object.fromEntries(header.map((key,i)=>[key,row[i]])))
       assert.equal(value.native.title,`Inspect chiller ${n+1}`)
       if(n%2){assert.equal(value.native.asset,asset);assert.equal(value.native.completedOn,'2027-03-02T11:45');assert.equal(value.native.completedBy,'Former technician');assert.equal(value.native.sourceSystem,'Spreadsheet');assert.deepEqual([value.native.partsCents,value.native.laborCents,value.native.otherCents],[1234,5678,900]);assert.deepEqual(value.native.details,{customValues:{[field]:'Mechanical'},team:'Legacy team',consumption:'00021: 2 each'})}
@@ -118,7 +139,7 @@ export async function genericMigrationJourney(){
     assert.equal((await h.raw(`/api/gasket/spreadsheet-imports/${job}/rows`)).status,401)
     if(process.env.MIGRATION_SCREENSHOTS){
       await mkdir(process.env.MIGRATION_SCREENSHOTS,{recursive:true})
-      const browser=await chromium.launch({headless:true,args:['--use-mock-keychain','--password-store=basic']})
+      const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--no-sandbox','--use-mock-keychain','--password-store=basic']})
       try{
         const context=await browser.newContext({ignoreHTTPSErrors:true});await context.addCookies(importer.split('; ').map(pair=>{const i=pair.indexOf('=');return {name:pair.slice(0,i),value:pair.slice(i+1),url:h.origin}}))
         const page=await context.newPage()

@@ -50,11 +50,12 @@ import { now, zone } from './clock.mjs'
 
 // Standalone journeys own their installations; core retains its shared fixture
 // and complete archive reconciliation in their original order.
+const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
   [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
   [privateFileLinksJourney, 'automation'],
-  [genericMigrationJourney,'inventory'],
+  [requiredMigrationJourney,'inventory'],
   [safetyJourney,'inventory'],
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
@@ -2522,7 +2523,7 @@ try {
   await check('REPORT-009 definitions and data quality', async () => { await metricsJourney(h, cookie, ids) })
 
   await check('Weekly report delivery and recipient authorization', reportSchedulesJourney)
-  await check('Spreadsheet migration and source reconciliation', genericMigrationJourney)
+  await check('2,000-row spreadsheet migration and source reconciliation', requiredMigrationJourney)
   await check('REPORT-010 work PDF and bulk ZIP', workPdfJourney)
   let laborContext
   await check('Reviewed person time and protected labor costs', async () => { laborContext = await laborJourney(h,cookie,ids) })
