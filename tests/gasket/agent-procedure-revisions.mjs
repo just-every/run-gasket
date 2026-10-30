@@ -238,6 +238,51 @@ export async function isolatedRevisions() {
       ctx.result = data(answer)
       await after(ctx)
     }
+    // A prepared approval grants no lasting authority to publish its instructions.
+    for (const boundary of ['role', 'pause', 'consent']) {
+      await adopt(heldPolicy())
+      const source = await h.api('checklist.create', cookie, { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Retained source instructions'] })
+      const original = await h.api(`checklists/${source.id}`, cookie), first = original.revisions[0]
+      const identity = boundary === 'role' ? { sub: leadSub, email: leadEmail, act: { sub: `synthetic-gasket-${crypto.randomUUID()}`, name: 'Synthetic held lead coordinator', specialist: 'maintenance coordinator' } } : {}
+      const args = { checklist: source.id, sourceRevision: first.id, expected_revision: first.id, amendments: [{ step: first.items[0].key, text: 'Instructions requiring current authority' }], note: 'Held publication boundary', idempotency_key: crypto.randomUUID() }
+      const pending = await ctx.tool('gasket.procedures.amend', args, identity)
+      assert.equal(pending.result?.resultType, 'input_required', `${boundary}: ${JSON.stringify(pending.body)}`)
+      assert.equal(pending.decision.disposition, 'approval')
+      const reviewer = doors({ ...ctx, cookie: boundary === 'role' ? leadCookie : cookie })
+      const path = `/agents/api/approvals/${pending.result._meta['com.runeditrun/approval'].id}`
+      const { approval } = await reviewer.json(path)
+      assert.deepEqual(approval.summary.nativeTarget, { kind: 'procedure', id: source.id })
+      assert.ok(approval.summary.items.some(item => item.includes(first.id)))
+      const audit = (await h.api('audit', cookie)).rows.filter(row => row.subject === source.id)
+      if (boundary === 'role') await h.api('access.role', cookie, { member: lead.id, role: 'maintainer' })
+      if (boundary === 'pause') await doors(ctx).json('/agents/api/pause', { paused: true })
+      if (boundary === 'consent') await adopt(heldPolicy(), { revision: c.revision, revoked: { agents: [], consents: [c.consent] } })
+      try {
+        const approvalStatus = boundary === 'consent' ? 409 : 200
+        const refused = await reviewer.json(`${path}/approve`, { revision: approval.revision, summary_sha256: approval.summary_sha256 }, approvalStatus)
+        if (boundary === 'consent') {
+          assert.equal(refused.code, 'approval_expired')
+          assert.equal((await reviewer.json(path)).approval.state, 'expired')
+        } else {
+          assert.equal(refused.approval.state, 'refused', `${boundary} must stop an already prepared publication`)
+          assert.ok(refused.approval.code)
+        }
+        const retry = await ctx.tool('gasket.procedures.amend', args, identity)
+        assert.equal(retry.result?.structuredContent, undefined)
+        assert.ok(error(retry), `${boundary} must also refuse the MCP retry`)
+        assert.deepEqual(await h.api(`checklists/${source.id}`, cookie), original)
+        assert.deepEqual((await h.api('audit', cookie)).rows.filter(row => row.subject === source.id), audit)
+        const again = await reviewer.json(`${path}/approve`, { revision: approval.revision, summary_sha256: approval.summary_sha256 }, approvalStatus)
+        assert.deepEqual(again, refused)
+      } finally {
+        if (boundary === 'role') await h.api('access.role', cookie, { member: lead.id, role: 'lead' })
+        if (boundary === 'pause') await doors(ctx).json('/agents/api/pause', { paused: false })
+        if (boundary === 'consent') c.consent = crypto.randomUUID()
+      }
+      assert.deepEqual(await h.api(`checklists/${source.id}`, cookie), original)
+      assert.deepEqual((await h.api('audit', cookie)).rows.filter(row => row.subject === source.id), audit)
+      console.log(`PROBE SURFACE-003 held ${boundary}: prepare amendment, change current authority, approve and retry -> refused, original revision and source audit unchanged`)
+    }
     await adopt(autonomousPolicy())
     const source = await h.api('checklist.create', leadCookie, { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Lead-managed instruction'] })
     const first = (await h.api(`checklists/${source.id}`, cookie)).revisions[0]
