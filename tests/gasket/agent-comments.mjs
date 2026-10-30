@@ -114,7 +114,11 @@ export async function agentCommentsJourney() {
     assert.deepEqual((await mcp(heldArgs)).result.structuredContent, held.result.structuredContent)
     assert.deepEqual(await snapshot(), heldSaved)
     assert.equal((await person('/agents/api/reviews')).reviews.length, 1)
-    console.log('PROBE PLAN-006 held policy: public MCP -> review disposition, native comment and one genuine human-marked review; replay creates no duplicate')
+    const newlyHeld = await mcp(args)
+    assert.equal(newlyHeld.code, 'review_required', 'current held policy cannot reuse an autonomous receipt as a review')
+    assert.equal(newlyHeld.result?.structuredContent, undefined)
+    assert.deepEqual(await snapshot(), heldSaved, 'a newly required review is not fabricated by replay')
+    console.log('PROBE PLAN-006 held policy: public MCP -> review disposition, native comment and one genuine human-marked review; replay creates no duplicate and an old autonomous receipt cannot satisfy a newly required review')
 
     await adopt(autonomousPolicy())
     // A retry must not overwrite a later human correction or lose its attribution.
@@ -146,9 +150,31 @@ export async function agentCommentsJourney() {
     }
     await refused('other sponsor edit', () => h.api('comment.edit', memberCookie, { comment: first.id, body: 'Synthetic Gasket unauthorized correction' }, 403), answer => assert.equal(answer.error, 'not_your_comment'))
     const fresh = () => ({ ...args, idempotency_key: randomUUID() })
+    const blocked = autonomousPolicy()
+    blocked.rules = [{ id: 'all', class: '*', do: 'blocked' }]
+    await adopt(blocked)
+    for (const [label, input] of [['company policy', fresh()], ['company policy replay', args]]) {
+      await refused(label, () => mcp(input), answer => {
+        assert.equal(answer.code, 'policy_blocked')
+        assert.equal(answer.result?.structuredContent, undefined, 'blocked policy exposes no cached native result')
+      })
+    }
     await adopt(autonomousPolicy())
+    await person('/agents/api/pause', { paused: true })
+    try {
+      for (const [label, input] of [['local Pause', fresh()], ['local Pause replay', args]]) {
+        await refused(label, () => mcp(input), answer => {
+          assert.equal(answer.code, 'agents_paused')
+          assert.equal(answer.result?.structuredContent, undefined, 'local Pause exposes no cached native result')
+        })
+      }
+    } finally { await person('/agents/api/pause', { paused: false }) }
     await refused('signed-out', () => mcp(fresh(), {}, null), answer => assert.equal(answer.status, 401))
     await refused('insufficient scope', () => mcp(fresh(), { scope: 'work:read' }), answer => assert.equal(answer.code, 'insufficient_scope'))
+    await refused('insufficient scope replay', () => mcp(args, { scope: 'work:read' }), answer => {
+      assert.equal(answer.code, 'insufficient_scope')
+      assert.equal(answer.result?.structuredContent, undefined)
+    })
     const service = await h.api('service.create', owner, { name: 'Synthetic Gasket reader', scopes: ['work:read'], expiresAt: Date.now() + 3600000, consent: true })
     await refused('service scope boundary', () => mcp(fresh(), {}, service.token), answer => assert.equal(answer.code, 'insufficient_scope'))
     assert.equal((await h.api('service.create', owner, { name: 'Synthetic Gasket refused scope', scopes: ['comment.post'], expiresAt: Date.now() + 3600000, consent: true }, 400)).error, 'invalid_service_scope')
@@ -205,16 +231,16 @@ export async function agentCommentsJourney() {
     for (const width of [1440, 390]) {
       await page.setViewportSize({ width, height: 1100 })
       const response = await page.goto(`${h.origin}/app/work/${work.id}`)
+      const note = page.locator(`#comment-${first.id}`)
+      await note.locator('summary').click()
       if (width === 1440) {
         assert.equal(response.status(), 200)
-        const note = page.locator(`#comment-${first.id}`)
         assert.ok((await note.innerText()).includes(first.author))
         assert.ok((await note.innerText()).includes(correction))
-        await note.locator('summary').click()
         assert.ok((await note.innerText()).replace(/\s+/g, ' ').includes(original.replace(/\s+/g, ' ')), 'the original agent observation remains in visible history')
         assert.equal(await note.locator('bearing').count(), 0, 'authored markup remains plain text')
       }
-      await page.locator('#comments').screenshot({ path: join(directory, `native-thread-${width}.png`) })
+      await page.screenshot({ fullPage: true, path: join(directory, `native-thread-${width}.png`) })
     }
     console.log('PROBE PLAN-006 native thread: built work page -> attributed plain text at 1440 and 390; photos, mentions and handoff adapter operations remain omitted')
   } finally {
