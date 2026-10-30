@@ -19,6 +19,7 @@ import { laborJourney } from './labor-costs.mjs'
 import { outcomeJourney } from './outcomes.mjs'
 import { agentRunJourney } from './agent-runs.mjs'
 import { intervalJourney } from './intervals.mjs'
+import { conditionalWorkspaceJourney } from './intervals-browser.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
 import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
 const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued !== null) process.exit(queued)
@@ -57,6 +58,7 @@ const independent = new Map([
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
+  [conditionalWorkspaceJourney, 'inventory'],
   [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
@@ -2293,6 +2295,7 @@ try {
   await check('AGENT-009 granted, budgeted and revocable model runs', agentRunJourney)
 
   await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
+  await check('ADMIN-011 conditional workspace save recovery', conditionalWorkspaceJourney)
 
   await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
 
