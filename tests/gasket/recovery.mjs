@@ -123,8 +123,6 @@ export async function recoveryJourney() {
       const beforeRefusal = { parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }
       assert.equal((await restored.api('workorder.reserve', signed, { workOrder: refusedWork, part: alternate, insteadOf: bearing, quantity: '1' }, 409)).error, 'substitute_not_compatible')
       assert.deepEqual({ parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }, beforeRefusal)
-      console.log('PROBE ASSET-006 inactive restore: rer export and import then authenticated JSON -> model history, BOM restrictions and substitute reservations reconcile; mismatched reservation remains refused without effects')
-
       assert.equal((await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:owner})).status,303,'source sessions cannot open restored packs')
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:signed})).arrayBuffer()),paperPdf,'immutable pack bytes reconcile after inactive restore')
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-previews/${paperPreview}/original`,{cookie:signed})).arrayBuffer()),png,'the original paper bytes and digest reconcile')
@@ -162,6 +160,13 @@ export async function recoveryJourney() {
       assert.ok(drill.drill_at)
       await restored.api('recovery.drill', signed, { receipt: recovery.restore.id, confirm: true })
       assert.equal((await restored.api('audit?action=recovery.drill', signed)).rows.length, 1, 'drill confirmation is idempotent')
+      const compatibleWork = (await restored.api('workorder.create', signed, { asset, title: 'Plan a compatible repair after restore', due: today, assignee: member })).id
+      await restored.api('workorder.reserve', signed, { workOrder: compatibleWork, part: alternate, insteadOf: bearing, quantity: '1' })
+      assert.deepEqual((await restored.api(`work/${compatibleWork}`, signed)).reservations.map(row => [row.part.id, row.insteadOf.id, row.quantity, row.state]), [[alternate, bearing, '1', 'open']], 'restored approval serves a new compatible repair')
+      assert.deepEqual((await restored.api('parts', signed)).map(row => [row.id, row.onHand]), beforeRefusal.parts.map(row => [row.id, row.onHand]), 'a restored compatible reservation moves no stock')
+      assert.equal((await restored.api('parts', signed)).find(row => row.id === alternate).available, '0', 'original and new restored reservations share the remaining stock')
+      assert.deepEqual((await restored.api(`work/${accepted.id}`, signed)).reservations, retainedReservations, 'new planning preserves the original restored reservation')
+      console.log('PROBE ASSET-006 inactive restore: rer export and import then authenticated JSON -> model history, restrictions and original reservations reconcile; incompatible substitution is refused without effects and a new compatible substitution reserves the remaining unit without moving stock')
       const schedules = await restored.api('schedules', signed)
       assert.ok(schedules.length); assert.ok(schedules.every(row => !row.active))
       assert.ok((await restored.api('automation' + '/jobs', signed)).rules.every(row => row.paused))
