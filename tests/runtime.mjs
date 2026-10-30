@@ -42,7 +42,13 @@ try {
   for (const path of ['/missing', '/health/extra', '/api', '/api/missing']) {
     assert.equal((await fetch(`${origin}${path}`)).status, 404, path)
   }
-  console.log('HTTP-001 passed against emitted local Worker: health, the installed homepage, HTTP and document 404s')
+  const signedOut = await fetch(`${origin}/app`, { redirect: 'manual', credentials: 'omit' })
+  assert.equal(signedOut.status, 303)
+  assert.equal(signedOut.headers.get('location'), '/signin?returnTo=%2Fapp')
+  assert.equal(new URL(signedOut.headers.get('location'), origin).origin, origin)
+  assert.equal(signedOut.headers.get('cache-control'), 'no-store')
+  assert.equal(await signedOut.text(), '', 'A signed-out redirect must expose no private workspace content')
+  console.log('HTTP-001 passed against emitted local Worker: health, the installed homepage, HTTP and document 404s, signed-out private-page redirect')
 } finally {
   worker.kill('SIGTERM')
   await new Promise(resolve => worker.exitCode !== null ? resolve() : worker.once('exit', resolve))

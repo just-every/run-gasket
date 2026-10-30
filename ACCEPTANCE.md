@@ -8,12 +8,12 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 53 | 54 | 37 | 144 |
+| Core | 54 | 53 | 37 | 144 |
 | Agent surface | 0 | 7 | 0 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 53 | 61 | 37 | 151 |
+| Full target | 54 | 60 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). SURFACE-003 amendment evidence is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). HTTP-001 is judged from the candidate commit `HEAD` (31 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). SURFACE-003 amendment evidence is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -214,15 +214,15 @@ Core · published · **partial** · Cites BASE-AGENT-002, BASE-AGENT-005, BASE-A
 
 #### HTTP-001 — Health, Lobby and real 404s
 
-Core · published · **partial** · Cites BASE-OPS-001, BASE-ACCESS-002, BASE-INSTALL-001, BASE-DATA-005
+Core · published · **done** · Cites BASE-OPS-001, BASE-ACCESS-002, BASE-INSTALL-001, BASE-DATA-005
 
 **Requirement.** The installed origin presents Gasket’s branded Lobby and deployment identity; unknown maintenance document and API routes are real not-found responses. Gasket is a free, MIT-licensed edition.
 
 **Acceptance.**
 1. Request the installed Lobby, deployment health, unknown maintenance document, unknown API and an unknown health subpath; inspect branding, deployment identity and status, then try a private maintenance page signed out.
 
-**Evidence.** `tests/runtime.mjs` — "HTTP-001 passed against emitted local Worker: health, the installed homepage, HTTP and document 404s"
-**Gap.** A public-door journey opening a private maintenance page signed out within the old cited evidence is missing. The cited journeys show branded Lobby, deployment identity and unknown-route 404s.
+**Evidence.** `tests/runtime.mjs` — "HTTP-001 passed against emitted local Worker: health, the installed homepage, HTTP and document 404s, signed-out private-page redirect" covers the Lobby, deployment identity, document and API 404s, and cookie-free private-page refusal with its same-origin sign-in return, no-store cache policy and empty response.
+**Gap.** None.
 
 ### Administration, trust and ownership
 
