@@ -1,3 +1,4 @@
+import { agentOutcomeReversalJourney } from './agent-outcome-reversal.mjs'
 import { agentOutcomePolicyJourney } from './agent-outcome-policy.mjs'
 import assert from 'node:assert/strict'
 
@@ -72,4 +73,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   assert.ok(audit.rows.some(row => JSON.parse(row.detail).preparedBy?.label?.includes(' for ') && row.actor_name.includes(' for ')))
   console.log('Native Core journey: native audit attribution passed')
   await agentOutcomePolicyJourney()
+  await agentOutcomeReversalJourney()
 }

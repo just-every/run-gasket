@@ -15,7 +15,7 @@ function proposalDatabase(db) {
     return wrapped
   }
   return { prepare: query => wrap(db.prepare(query), query), async batch(statements) {
-    if (statements.some(s => queries.get(s)?.startsWith('INSERT INTO gk_work_orders'))
+    if (statements.some(s => queries.get(s)?.startsWith('INSERT INTO gk_work_orders') || queries.get(s)?.startsWith('INSERT INTO gk_interval_changes'))
         && statements.some(s => queries.get(s)?.startsWith('UPDATE gk_proposals SET'))) {
       await fetch('https://synthetic-gasket.invalid/proposal-application')
     }

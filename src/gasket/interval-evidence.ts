@@ -150,7 +150,7 @@ export async function intervalEvidence(env: Bindings, actor: Actor, payload: Rec
   const calendarFrequencyChangePercent = dayDelta ? round1((schedule.every_days / toDays! - 1) * 100) : null
   const meterFrequencyChangePercent = unitDelta ? round1((Number(schedule.every_units) / Number(toUnits) - 1) * 100) : null
   const expectedEffect = options.rollback
-    ? 'Restores an earlier human-approved maintenance interval. This restoration is not an evidence-supported reliability forecast; observed failures, exposure gaps and costs remain disclosed.'
+    ? 'Restores the prior recorded maintenance interval. This restoration is not an evidence-supported reliability forecast; observed failures, exposure gaps and costs remain disclosed.'
     : extension
       ? 'A longer interval reduces nominal PM frequency and increases time or counter exposure between PMs. The observed cohort has no recorded failures and has PM and operating-hour evidence; future failure risk, downtime and savings remain unproven.'
       : 'A shorter interval increases nominal PM frequency and reduces time or counter exposure between PMs, with more planned maintenance effort. The recorded histories do not establish how much failure risk or downtime will change.'

@@ -252,6 +252,20 @@
         "SURFACE-002",
         "SURFACE-006"
       ]
+    },
+    {
+      "name": "gasket.intervals.apply",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "commitment"
+      ],
+      "clauses": [
+        "AGENT-003",
+        "AGENT-004",
+        "SURFACE-003",
+        "SURFACE-006"
+      ]
     }
   ],
   "notTools": [
@@ -311,7 +325,10 @@
         "asset"
       ]
     },
-    "journey": "tests/gasket/agent-native-journey.mjs"
+    "journey": "tests/gasket/agent-native-journey.mjs",
+    "fixtures": {
+      "module": "tests/gasket/agent-interval-fixtures.mjs"
+    }
   },
   "journey": [
     {
@@ -614,6 +631,54 @@
           "class": "standard"
         }
       ]
+    },
+    {
+      "id": "interval-proposal",
+      "tool": "gasket.proposals.prepare",
+      "args": {
+        "kind": "interval",
+        "reasoning": "Shorten the maintenance cadence while retaining uncertainty and declared limits.",
+        "payload": {
+          "$fixture": "interval",
+          "pointer": ""
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "apply-interval",
+      "tool": "gasket.intervals.apply",
+      "args": {
+        "proposal": {
+          "$from": "interval-proposal",
+          "pointer": "/id"
+        },
+        "hash": {
+          "$from": "interval-proposal",
+          "pointer": "/hash"
+        }
+      },
+      "expect": [
+        {
+          "class": "commitment",
+          "facts": {
+            "measure": 0,
+            "currency": "USD",
+            "counterparty": "internal"
+          }
+        }
+      ],
+      "target": {
+        "kind": "schedule",
+        "id": {
+          "$fixture": "interval",
+          "pointer": "/schedule"
+        }
+      }
     }
   ],
   "capabilities": [

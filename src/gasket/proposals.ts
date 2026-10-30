@@ -192,6 +192,54 @@ export async function applyCorrectiveProposal(env: Bindings, actor: Actor, input
   return { id: proposal.id, status: 'approved', result: result.id }
 }
 
+/** Interval decisions retain the complete native comparison and any worsening assessment. */
+export async function intervalApplication(env: Bindings, actor: Actor, input: Input, completed = false) {
+  requireCapability(actor, 'proposal.decide')
+  const proposal = await one<Row>(env, 'SELECT * FROM gk_proposals WHERE id=?', input.text('proposal', { max: 100 }))
+  insist(proposal, 'proposal_not_found', 404)
+  insist(proposal.kind === 'interval', 'unsupported_proposal_kind', 409)
+  insist(input.text('hash', { max: 64 }) === proposal.payload_hash, 'proposal_changed', 409)
+  const payload = JSON.parse(proposal.payload_json) as Record<string, string>
+  if (completed && proposal.status === 'approved' && proposal.result_id) return { proposal, payload, basis: JSON.parse(proposal.basis_json) as Awaited<ReturnType<typeof intervalBasis>> }
+  insist(proposal.status === 'pending', 'already_decided', 409)
+  const basis = await intervalBasis(env, actor, payload)
+  insist(JSON.stringify(basis) === proposal.basis_json, 'proposal_stale', 409)
+  return { proposal, payload, basis }
+}
+
+/** The schedule, immutable interval lineage and application receipt share one guarded batch. */
+export async function applyIntervalProposal(env: Bindings, actor: Actor, input: Input, disposition: string) {
+  const ctx = agentContext()
+  insist(ctx && ['autonomous', 'approval'].includes(disposition), 'agent_policy_required', 403)
+  const revision = await auditRevision(env)
+  const { proposal, payload, basis } = await intervalApplication(env, actor, input)
+  const eligible = `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+    WHERE m.id=? AND m.status='active' AND o.status='active' AND (o.role='owner' OR (m.role='lead'
+      AND EXISTS(SELECT 1 FROM gk_site_memberships WHERE site_id='primary' AND member_id=m.id AND status='active'))))`
+  let approver: string | null = null
+  if (disposition === 'approval') {
+    // A signed-in person may decide an agent's preparation for them. A person's
+    // own native preparation still requires a different eligible decision maker.
+    const agentPrepared = await one(env, "SELECT 1 FROM gk_audit WHERE subject=? AND action='proposal.prepare' AND json_extract(detail,'$.preparedBy.agent.id') IS NOT NULL", proposal.id)
+    for (const person of ctx.approvers) {
+      if ((person.id !== proposal.prepared_by || agentPrepared) && await one(env, `SELECT 1 WHERE ${eligible}`, person.id)) { approver = person.id; break }
+    }
+    insist(approver, 'independent_decision_required', 403)
+  }
+  const also = [
+    auditFence(env, revision),
+    guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id=? AND status='pending' AND payload_hash=? AND basis_json=?)", proposal.id, proposal.payload_hash, proposal.basis_json),
+    ...(approver ? [guard(env, 'independent_decision_required', eligible, approver)] : []),
+    stmt(env, "UPDATE gk_proposals SET status='approved',decided_by=?,decided_at=?,decision_note=?,result_id=? WHERE id=?", approver, now(),
+      approver ? 'Independent company-policy approval' : 'Company policy authorized agent execution; no human approval asserted.', payload.schedule, proposal.id),
+    stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.apply', proposal.id, JSON.stringify({
+      hash: proposal.payload_hash, result: payload.schedule, basis, disposition, preparedBy: ctx.actor, approvers: ctx.approvers, operationId: ctx.operationId,
+    })),
+  ]
+  const result = await applyInterval(env, actor, payload, basis, proposal.id, also, { approver })
+  return { id: proposal.id, status: 'approved', result: result.id }
+}
+
 export async function proposalList(env: Bindings, _actor: Actor) {
   const rows = await all(env, `SELECT p.*, COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.subject=p.id AND a.action='proposal.prepare' ORDER BY a.seq LIMIT 1),m.name) AS prepared_by_name, d.name AS decided_by_name FROM gk_all_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by LEFT JOIN gk_members d ON d.id = p.decided_by
     ORDER BY p.status = 'pending' DESC, p.prepared_at DESC LIMIT 200`)

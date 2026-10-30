@@ -1,4 +1,4 @@
-// Sources that already have a retained independent human approval.
+// Sources with a retained maintenance decision; physical work keeps independent review.
 import type {Bindings} from '../auth.server'
 import {all,insist,one,type Row} from './core'
 export async function outcomeIntervention(env:Bindings, proposal:string|null, workOrder:string|null) {

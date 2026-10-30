@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url'
 import { harness } from './harness.mjs'
 import { offset, zone } from './clock.mjs'
 
-export async function outcomeJourney({ bindings, investigate, proposalGate = false } = {}) {
+export async function outcomeJourney({ bindings, investigate, reverse, proposalGate = false } = {}) {
   const initial=await harness({bindings,proposalGate,clockOffset:offset-8*86_400_000});let h=initial
   try {
     const cookie={owner:await h.owner()},ids={},assets=[],meters=[],plans={},baselineJobs=[]
@@ -102,7 +102,8 @@ export async function outcomeJourney({ bindings, investigate, proposalGate = fal
     const reversal=await h.api('outcome.reversal',cookie.agent,{outcome:worse.id,rollbackPlan:'Restore 30-day interval only after this independent decision; investigate the oil-feed fault and continue measurement.'})
     assert.equal((await h.api('schedules',cookie.lead)).find(s=>s.id===schedule).every_days,14,'AGENT-004 proposal makes no autonomous standard change')
     await h.api('proposal.decide',cookie.agent,{proposal:reversal.id,hash:reversal.hash,decision:'approve'},403)
-    if(process.env.OUTCOME_SCREENSHOTS) {
+    if (reverse) await reverse({ h, cookie, ids, assets, meters, plans, day, worse, reading, assess, schedule, baselineJobs, reversal })
+    else if(process.env.OUTCOME_SCREENSHOTS) {
       const {outcomeBrowser}=await import('./outcomes-browser.mjs');await outcomeBrowser(h,cookie,reversal)
     } else await h.api('proposal.decide',cookie.lead,{proposal:reversal.id,hash:reversal.hash,decision:'approve'})
     assert.equal((await h.api('schedules',cookie.lead)).find(s=>s.id===schedule).every_days,30)

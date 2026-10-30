@@ -714,6 +714,12 @@
       "name": "0109_pm_attempt_recovery.sql",
       "sha256": "ef3e9f959f969fd6d977691e44f1ff4546aeffd394275ff64125f221f398aca7",
       "sql": "-- Interrupted PM jobs retain their input and reconcile effects before catch-up.\nALTER TABLE gk_automation_jobs ADD COLUMN lease_expires_at INTEGER;\nALTER TABLE gk_automation_jobs ADD COLUMN recovered_by TEXT REFERENCES gk_automation_jobs(id);\nUPDATE gk_automation_jobs SET lease_expires_at=0 WHERE rule_id='pm' AND state='running';\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0110_interval_policy_execution.sql",
+      "sha256": "a9a5523915a62750d3807821287874bacd124e2488878819b8e2a870978ce305",
+      "sql": "-- Preserve every earlier interval decision and distinguish execution from a person's approval.\nCREATE TABLE gk_interval_changes_next (\n proposal_id TEXT PRIMARY KEY, schedule_id TEXT NOT NULL REFERENCES gk_schedules(id),\n revision INTEGER NOT NULL, before_days INTEGER, after_days INTEGER, before_units TEXT, after_units TEXT,\n rollback_plan TEXT NOT NULL, rollback_of TEXT, approved_by TEXT REFERENCES gk_members(id), approved_at INTEGER NOT NULL,\n executed_by TEXT NOT NULL REFERENCES gk_members(id),\n execution_kind TEXT NOT NULL CHECK(execution_kind IN ('human','company_policy'))\n);\nINSERT INTO gk_interval_changes_next SELECT proposal_id,schedule_id,revision,before_days,after_days,before_units,after_units,\n rollback_plan,rollback_of,approved_by,approved_at,approved_by,'human' FROM gk_interval_changes;\nDROP TABLE gk_interval_changes;\nALTER TABLE gk_interval_changes_next RENAME TO gk_interval_changes;\nCREATE TRIGGER gk_interval_changes_no_update BEFORE UPDATE ON gk_interval_changes BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_interval_changes_no_delete BEFORE DELETE ON gk_interval_changes BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
