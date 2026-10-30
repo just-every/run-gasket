@@ -2125,14 +2125,106 @@ try {
     }
     assert.deepEqual((await wo('sam', first.id)).tools.map(tool => [tool.name, tool.identifier, tool.recorded_by]), [['Probe thermometer', 'PT-0042', 'Max Ortiz']])
     // The run stays incomplete: the missed stop is open on its own, and signing the run cannot close it.
-    const now = (await h.api('routes', cookie.sam)).find(row => row.id === route.id).runs.find(row => row.id === run.id)
-    assert.deepEqual([now.complete, now.stops.map(stop => [stop.state, stop.follow_ups]), now.stops[2].missed_reason], [false, [['done', 0], ['done', 1], ['missed', 0]], 'Room 3 locked for stocktake'])
+    const incompleteRun = (await h.api('routes', cookie.sam)).find(row => row.id === route.id).runs.find(row => row.id === run.id)
+    assert.deepEqual([incompleteRun.complete, incompleteRun.stops.map(stop => [stop.state, stop.follow_ups]), incompleteRun.stops[2].missed_reason], [false, [['done', 0], ['done', 1], ['missed', 0]], 'Room 3 locked for stocktake'])
     const refused = await h.api('route.sign', cookie.sam, { run: run.id }, 409)
     assert.deepEqual([refused.error, refused.detail.open], ['route_incomplete', [third.number]])
     const still = await wo('lead', third.id)
     assert.deepEqual([still.status, still.missed_reason, (await wo('lead', follow.followUp)).follow_up_of], ['open', 'Room 3 locked for stocktake', second.id])
     const page = (await (await h.raw('/app/schedules', { cookie: cookie.lead })).text())
     for (const text of ['Inspection routes', 'Cold store round', 'Every 7 days', 'Tools: Probe thermometer', 'incomplete', 'Missed: Room 3 locked for stocktake', '1 follow-up']) assert.ok(page.includes(text), text)
+
+    // A separate run goes from refused to signed, leaving the open calibration fixture above intact.
+    const completion = await h.api('route.issue', cookie.lead, { route: route.id, due: today, assignee: ids.max })
+    const completedRun = async () => (await h.api('routes', cookie.sam)).find(row => row.id === route.id).runs.find(row => row.id === completion.run)
+    const jobs = await Promise.all(completion.workOrders.map(id => wo('max', id)))
+    assert.deepEqual(jobs.map(job => [job.asset_id, job.checklist_revision, job.items.length]), rooms.map(asset => [asset, 2, 3]))
+    // A master revision published later must not change any issued stop or its completion requirements.
+    await h.api('checklist.revise', cookie.lead, { checklist: round, note: 'For future runs', items: ['Replacement inspection'] })
+    const missReason = 'Room 3 awaiting stocktake release'
+    await h.api('workorder.results', cookie.max, { workOrder: jobs[0].id, outcome: ['pass', '', 'pass'], value: ['', '-21', ''] })
+    await h.api('workorder.results', cookie.max, { workOrder: jobs[1].id, outcome: ['pass', '', 'pass'], value: ['', '-9', ''] })
+    const correction = await h.api('finding.record', cookie.max, { workOrder: jobs[1].id, item: 1, severity: 'high', text: 'Room 2 still warm: defrost evaporator', followUp: true })
+    await h.api('route.miss', cookie.max, { workOrder: jobs[2].id, reason: missReason })
+    const failed = await wo('max', jobs[1].id), missed = await wo('max', jobs[2].id)
+    const correctiveWork = await wo('lead', correction.followUp)
+    assert.deepEqual([failed.items[1].result.outcome, failed.items[1].result.value, failed.items[1].result.recorded_by], ['fail', '-9', 'Max Ortiz'])
+    assert.deepEqual(failed.findings.map(finding => [finding.item, finding.text, finding.follow_up_id, finding.follow_up_status, finding.recorded_by]), [[1, 'Room 2 still warm: defrost evaporator', correction.followUp, 'open', 'Max Ortiz']])
+    assert.deepEqual([correctiveWork.status, correctiveWork.follow_up_of, correctiveWork.created_by, correctiveWork.asset_id], ['open', jobs[1].id, ids.max, rooms[1]])
+    assert.ok(failed.findings[0].recorded_at && failed.items[1].result.recorded_at)
+    assert.deepEqual([missed.status, missed.missed_reason, missed.missed_by, Boolean(missed.missed_at)], ['open', missReason, ids.max, true])
+    const beforeRefusal = await completedRun()
+    assert.deepEqual([beforeRefusal.complete, beforeRefusal.signed_by, beforeRefusal.signed_at, beforeRefusal.stops.map(stop => stop.state)], [false, null, null, ['open', 'open', 'missed']])
+    assert.deepEqual(await h.api('route.sign', cookie.sam, { run: completion.run }, 409), { error: 'route_incomplete', detail: { open: jobs.map(job => job.number) } })
+    assert.deepEqual(await completedRun(), beforeRefusal, 'refused signing changes no run or stop state')
+    assert.deepEqual(await wo('lead', correction.followUp), correctiveWork, 'refused signing leaves the corrective work untouched')
+
+    // Finish the same missed stop with its pinned procedure and tool, then independently review every stop.
+    await h.api('workorder.results', cookie.max, { workOrder: jobs[2].id, outcome: ['pass', '', 'pass'], value: ['', '-20', ''] })
+    for (const job of jobs) {
+      const pending = await wo('max', job.id)
+      assert.deepEqual(pending.missing, ['record which Probe thermometer was used'])
+      await h.api('workorder.tool', cookie.max, { workOrder: job.id, tool: 0, identifier: 'PT-0043' })
+      const ready = await wo('max', job.id)
+      assert.deepEqual(ready.missing, [])
+      await h.api('workorder.submit', cookie.max, { workOrder: job.id, version: ready.version })
+      const submitted = await wo('sam', job.id)
+      assert.equal(submitted.status, 'submitted')
+      await h.api('workorder.review', cookie.sam, { workOrder: job.id, version: submitted.version, decision: 'approve' })
+      const closed = await wo('sam', job.id)
+      assert.deepEqual([closed.status, closed.closed_by, closed.checklist_revision_id, closed.checklist_revision], ['closed', ids.sam, job.checklist_revision_id, 2])
+      assert.deepEqual(closed.reviews.map(review => [review.decision, review.reviewer, review.version]), [['approved', 'Sam Ito', submitted.version]])
+      assert.deepEqual(closed.tools.map(tool => [tool.name, tool.identifier, tool.recorded_by]), [['Probe thermometer', 'PT-0043', 'Max Ortiz']])
+    }
+    const readyRun = await completedRun()
+    assert.deepEqual([readyRun.complete, readyRun.signed_at, readyRun.stops.map(stop => [stop.state, stop.follow_ups])], [true, null, [['done', 0], ['done', 1], ['done', 0]]])
+    assert.equal((await h.api('route.sign', cookie.max, { run: completion.run }, 403)).error, 'forbidden')
+    assert.deepEqual(await completedRun(), readyRun, 'the maintainer cannot sign a completed run')
+    const beforeSign = now()
+    assert.equal((await h.api('route.sign', cookie.sam, { run: completion.run })).id, completion.run)
+    const signed = await completedRun()
+    assert.deepEqual([signed.id, signed.complete, signed.signed_by, signed.stops[2].missed_reason], [completion.run, true, 'Sam Ito', missReason])
+    assert.ok(signed.signed_at >= beforeSign && signed.signed_at <= now(), 'the retained signing time belongs to this sign-off')
+    const retainedFailure = await wo('sam', jobs[1].id), retainedMiss = await wo('sam', jobs[2].id)
+    assert.deepEqual(retainedFailure.items.map(item => item.result), failed.items.map(item => item.result), 'review and signing retain the original failed reading')
+    assert.deepEqual(retainedFailure.findings, failed.findings, 'the attributed finding and open follow-up survive sign-off')
+    assert.deepEqual([retainedMiss.missed_reason, retainedMiss.missed_by, retainedMiss.missed_at], [missReason, missed.missed_by, missed.missed_at])
+    assert.deepEqual(await wo('lead', correction.followUp), correctiveWork, 'signing the run never closes its independent corrective work')
+    const signedPage = await (await h.raw('/app/schedules', { cookie: cookie.sam })).text()
+    const signedSection = signedPage.split(`href="/app/work/${jobs[0].id}"`)[0].split('<p class="gk-sub">').at(-1)
+    assert.ok(signedSection.includes('signed off by Sam Ito'), 'the schedules page identifies this run and signer')
+    for (const job of jobs) {
+      assert.ok(signedPage.includes(`href="/app/work/${job.id}"`), 'the retained run links each pinned stop')
+      const stopPage = await (await h.raw(`/app/work/${job.id}`, { cookie: cookie.sam })).text()
+      assert.ok(stopPage.includes('Cold room round') && stopPage.includes('revision 2'), 'linked stop pages retain the issued procedure revision')
+      assert.ok(!stopPage.includes('Replacement inspection'), 'later master instructions do not replace the pinned procedure')
+    }
+    assert.ok(signedPage.includes(`Missed: ${missReason}`), 'the schedules page retains the original miss after completion')
+    assert.equal((await h.api('route.sign', cookie.sam, { run: completion.run }, 409)).error, 'already_signed')
+    assert.deepEqual(await completedRun(), signed, 'repeat signing preserves the original signer and time')
+    assert.deepEqual(await wo('lead', correction.followUp), correctiveWork)
+    assert.deepEqual([ids.roundStop, (await wo('lead', ids.roundStop)).status], [third.id, 'open'], 'ASSET-010 keeps its original open non-calibration fixture')
+
+    if (process.env.ROUTE_SCREENSHOTS) {
+      const { chromium } = await import('@playwright/test')
+      const { mkdir } = await import('node:fs/promises')
+      await mkdir(process.env.ROUTE_SCREENSHOTS, { recursive: true })
+      const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+      try {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true })
+        await context.addCookies(cookie.sam.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
+        const page = await context.newPage()
+        for (const width of [1440, 390]) {
+          await page.setViewportSize({ width, height: 1100 })
+          await page.goto(h.origin + '/app/schedules')
+          await page.locator('#routes').screenshot({ path: `${process.env.ROUTE_SCREENSHOTS}/inspection-run-${width}.png` })
+          await page.goto(`${h.origin}/app/work/${jobs[1].id}`)
+          await page.screenshot({ path: `${process.env.ROUTE_SCREENSHOTS}/inspection-failed-stop-${width}.png`, fullPage: true })
+          await page.goto(`${h.origin}/app/work/${jobs[2].id}`)
+          await page.screenshot({ path: `${process.env.ROUTE_SCREENSHOTS}/inspection-completed-miss-${width}.png`, fullPage: true })
+        }
+      } finally { await browser.close() }
+    }
   })
 
   await check('ASSET-010 gauge calibration with tolerances, tools and certificate versions', async () => {
