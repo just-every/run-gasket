@@ -13,7 +13,7 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 | Later | 0 | 0 | 0 | 0 |
 | Full target | 52 | 62 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). SURFACE-003 amendment evidence is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -2016,8 +2016,8 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-006, BASE
 3. Run a purchase offer carrying both money and commitment under two company policies; the result follows the policy in force.
 4. Inspect usage-priced model cost separately from provider invoices, and an unknown charge as a reservation.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
-**Gap.** First immutable procedure publication is commitment; purchasing/money and the complete bound-revision/value decision journeys remain unimplemented.
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390; `tests/gasket/agent-procedure-revisions.mjs` — "Revision-bound procedure amendments": public MCP allowing and held policies, native target and source attribution, bound instructions, immutable earlier revisions, issued-work pins, stale-source and changed-content refusal, current authority, Pause, consent and completed replay; loaded by `tests/gasket/agent-native-journey.mjs` in required foundation verification
+**Gap.** First immutable procedure publication is commitment; purchasing/money and the complete bound-revision/value decision journeys remain unimplemented.  The added procedure-amendment proof is limited to existing primary-site step instructions and does not close that full-clause gap. Purchasing and valued-stock money adapters, cost-policy changes, purchase offers carrying both money and commitment under both company policies, maintenance sign-off, interval-standard and qualification-exception decisions, model-cost and provider-invoice reconciliation, and unknown-charge reservations remain unproved. Operational additional-site scope, broader delegation, provider and account qualification, native, offline and device qualification and shared Base changes remain omitted. ADMIN-002 custody approval and the existing Base hold remain unchanged.
 
 #### SURFACE-004 — Authority, custody and operating-service classes
 
