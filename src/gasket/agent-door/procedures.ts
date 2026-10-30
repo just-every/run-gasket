@@ -1,5 +1,6 @@
 import type { ToolDefinition, ToolContext } from '../../modules/agent-door/index.ts'
 import type { Bindings } from '../../auth.server'
+import { ToolRefusal } from '../../modules/agent-door/index.ts'
 import { actions } from '../actions'
 import { requireCapability } from '../actor'
 import { insist, one } from '../core'
@@ -34,15 +35,15 @@ function amendmentTool(env: Bindings): ToolDefinition {
   })
   const proposed = async (args: Record<string, unknown>, ctx: ToolContext) => {
     const row = await source(args, ctx)
-    insist(row.revision === args.sourceRevision, 'revision_conflict', 409)
+    if (row.revision !== args.sourceRevision) throw new ToolRefusal('revision_conflict')
     const original = JSON.parse(row.items_json) as ChecklistItem[]
     const changes = args.amendments as { step: string; text: string }[]
-    insist(new Set(changes.map(change => change.step)).size === changes.length, 'duplicate_step')
-    insist(changes.every(change => original.some(item => item.key === change.step)), 'step_not_found', 404)
+    if (new Set(changes.map(change => change.step)).size !== changes.length) throw new ToolRefusal('duplicate_step')
+    if (!changes.every(change => original.some(item => item.key === change.step))) throw new ToolRefusal('step_not_found')
     // Labels change; the stored type, limits, conditions and step identities remain authoritative.
     const amended = original.map(item => ({ ...item, text: changes.find(change => change.step === item.key)?.text.trim() ?? item.text }))
-    insist(amended.every(item => item.text.length && !/[|\r\n]/.test(item.text)), 'invalid_items')
-    const lines = amended.map(item => `${lineOf(item, amended)} | key ${item.key}`)
+    if (!amended.every(item => item.text.length && !/[|\r\n]/.test(item.text))) throw new ToolRefusal('invalid_items')
+    const lines = amended.map(item => `${lineOf(item, amended)}${item.kind === 'check' ? ' | check' : ''} | key ${item.key}`)
     return { row, original, amended, lines }
   }
   return {

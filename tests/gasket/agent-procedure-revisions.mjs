@@ -5,6 +5,7 @@ import { chromium } from '@playwright/test'
 const prepared = new Map()
 const error = answer => answer.result?._meta?.['com.runeditrun/error']?.code ?? answer.body?.error?.data?.code
 const data = answer => {
+  assert.equal(answer.status, 200, `procedure transport: ${JSON.stringify(answer.body)}`)
   assert.equal(answer.result?.isError, false, `procedure call: ${error(answer)}`)
   assert.ok(answer.result?.structuredContent)
   return answer.result.structuredContent
@@ -24,7 +25,7 @@ function doors({ request, origin, cookie }) {
 }
 
 /** Work issued before an amendment must continue to use its original instructions. */
-export async function beforeStep(ctx) {
+async function before(ctx) {
   if (ctx.step.id !== 'amend-procedure' || !['autonomous', 'held'].includes(ctx.phase)) return
   const { api } = doors(ctx), source = await api(`checklists/${ctx.args.checklist}`)
   const template = await api('template.save', { name: `synthetic-gasket-${crypto.randomUUID()}`, title: 'Inspect the workshop pump', checklist: source.id })
@@ -35,7 +36,7 @@ export async function beforeStep(ctx) {
 }
 
 /** Both company policies execute this same native revision and replay journey. */
-export async function afterStep(ctx) {
+async function after(ctx) {
   if (ctx.step.id !== 'amend-procedure' || !['autonomous', 'held'].includes(ctx.phase)) return
   const { api, json } = doors(ctx), { source, work } = prepared.get(ctx.args.idempotency_key)
   const current = await api(`checklists/${source.id}`), revised = current.revisions[0]
@@ -52,6 +53,9 @@ export async function afterStep(ctx) {
   const detail = JSON.parse(audit[0].detail)
   assert.equal(detail.sourceRevision, source.revisions[0].id)
   assert.equal(detail.number, 2)
+  const sponsor = await api('me')
+  assert.equal(audit[0].actor, sponsor.id)
+  assert.deepEqual(detail.preparedBy.for, { id: sponsor.id, name: sponsor.name })
   assert.ok(detail.preparedBy.label.includes(' for '))
   assert.equal(detail.approvers.length, ctx.phase === 'held' ? 1 : 0)
 
@@ -71,7 +75,7 @@ export async function afterStep(ctx) {
   assert.deepEqual(await effects(), audit)
   console.log(`PROBE SURFACE-003 ${ctx.phase}: public MCP amendment and native reads -> commitment, exact source audit, immutable history, pinned issued instructions and replay without another native effect`)
 
-  if (ctx.phase === 'held') {
+  if (ctx.phase === 'held' && ctx.isolated) {
     const args = { ...ctx.args, sourceRevision: revised.id, expected_revision: revised.id, idempotency_key: crypto.randomUUID(), amendments: [{ step: revised.items[0].key, text: 'Inspect the guard before reporting the observation.' }], note: 'Exact held instruction amendment' }
     const pending = await ctx.tool(ctx.step.tool, args)
     assert.equal(pending.result?.resultType, 'input_required')
@@ -104,7 +108,7 @@ export async function afterStep(ctx) {
 }
 
 /** Additional public-door refusals and the amendment's existing native screens. */
-export default async function procedureRevisions(ctx) {
+async function procedureRevisions(ctx) {
   const { api, json, raw } = doors(ctx)
   const source = await api('checklist.create', { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Inspect the guard | check', 'Record the gap | number mm 1..5 | when step 1 is pass'] })
   const original = await api(`checklists/${source.id}`), first = original.revisions[0]
@@ -137,6 +141,8 @@ export default async function procedureRevisions(ctx) {
   assert.deepEqual(await api(`checklists/${source.id}`), amended)
   console.log('PROBE SURFACE-003 guards: public MCP and native doors -> missing source, foreign step, changed type, Pause, insufficient scope and signed-out refusal; typed native instructions preserved')
 
+  await isolatedRevisions()
+
   const directory = process.env.PROCEDURE_SCREENSHOTS || `/tmp/gasket-procedures-${process.pid}`
   mkdirSync(directory, { recursive: true })
   const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
@@ -162,4 +168,109 @@ export default async function procedureRevisions(ctx) {
     }
     await context.close()
   } finally { await browser.close() }
+}
+
+async function diagnose(fn, ctx) {
+  try { await fn(ctx) } catch (error) { console.error(`Procedure proof failed in ${fn.name}: ${error.message}`); throw error }
+}
+export const beforeStep = ctx => diagnose(before, ctx)
+export const afterStep = ctx => diagnose(after, ctx)
+export default ctx => diagnose(procedureRevisions, ctx)
+
+/** A separate real installation keeps deliberate stale approvals out of the Core harness's own call ledger. */
+export async function isolatedRevisions() {
+  const { webcrypto, randomBytes } = await import('node:crypto')
+  const { harness } = await import('./harness.mjs')
+  const { signJws, accessToken, policyEnvelope, autonomousPolicy, heldPolicy } = await import('../../src/modules/agent-door/conformance/crypto.mjs')
+  const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
+  const kid = crypto.randomUUID(), keys = { [kid]: { ...await webcrypto.subtle.exportKey('jwk', pair.publicKey), kid, alg: 'ES256', use: 'sig' } }
+  const email = ['synthetic-gasket-owner', 'example.test'].join('@'), issuer = 'https://synthetic-gasket.invalid', installationId = crypto.randomUUID(), business = 'synthetic-gasket-company', sub = crypto.randomUUID()
+  const h = await harness({ clockOffset: 0, vars: { OWNER_EMAIL: email, SESSION_SECRET: randomBytes(32).toString('hex'), SETUP_TOKEN: randomBytes(32).toString('hex'), RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId, RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys), RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: 'self-host', subject: installationId, email, keys }) } })
+  try {
+    const cookie = await h.owner(), owner = await h.api('me', cookie)
+    await h.api('site.configure', cookie, { name: 'Synthetic revision workshop', timezone: 'UTC' })
+    const leadEmail = ['synthetic-gasket-lead', 'example.test'].join('@'), leadSub = crypto.randomUUID()
+    const iat = Math.floor(Date.now() / 1000)
+    const settings = await signJws(pair.privateKey, kid, 'rer-business-settings+jwt', { v: 1, iss: issuer, aud: 'self-host', sub: installationId, business, email, owner_id: sub, jti: crypto.randomUUID(), iat, exp: iat + 3600, rev: 1, values: {}, logo: null, team: [{ id: leadSub, email: leadEmail, name: 'Synthetic revision lead', role: 'admin', invite: 1 }] })
+    const paired = await h.raw('/api/rer/business-settings', { body: { settings } })
+    assert.equal(paired.status, 200)
+    await paired.body?.cancel()
+    const lead = (await h.api('members', cookie)).find(member => member.email === leadEmail)
+    assert.equal(lead.role, 'lead')
+    const leadCookie = await h.signIn(leadEmail)
+    const c = { signer: { issuer, installationId, kid, privateKey: pair.privateKey }, person: { email, sub }, origin: h.origin, business, agentId: `synthetic-gasket-${crypto.randomUUID()}`, consent: crypto.randomUUID(), seq: 0, revision: 0, surface: { specialist: 'maintenance coordinator', tools: [{ scope: 'checklist.revise' }] } }
+    const adopt = async (document, options) => {
+      const signed = await policyEnvelope(c, document, options)
+      const response = await h.raw('/api/rer/agent-policy', { body: { policy: signed.policy } })
+      assert.equal(response.status, 200)
+      await response.body?.cancel()
+      c.seq = signed.payload.seq; c.revision = signed.payload.revision
+    }
+    const ctx = { request: (url, init = {}) => {
+      const headers = new Headers(init.headers), cookie = headers.get('cookie')
+      headers.delete('cookie'); headers.delete('origin'); headers.delete('content-type')
+      return h.raw(new URL(url).pathname + new URL(url).search, { cookie, method: init.method, headers: Object.fromEntries(headers), ...(init.body ? { body: JSON.parse(init.body) } : {}) })
+    }, origin: h.origin, cookie, isolated: true, step: { id: 'amend-procedure', tool: 'gasket.procedures.amend' } }
+    // Use the current protocol to exercise a held input request and its native approval evidence.
+    ctx.tool = async (name, args, identity = {}) => {
+      const token = await accessToken(c, identity)
+      const response = await h.raw('/mcp', { headers: { Authorization: `Bearer ${token}`, 'MCP-Protocol-Version': '2026-07-28', 'Mcp-Method': 'tools/call', 'Mcp-Name': name }, body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args, _meta: { 'io.modelcontextprotocol/protocolVersion': '2026-07-28', 'io.modelcontextprotocol/clientCapabilities': { elicitation: { url: {} } }, 'io.modelcontextprotocol/clientInfo': { name: 'synthetic-gasket', version: '1' } } } } })
+      const body = await response.json()
+      return { body, result: body.result, status: response.status, decision: body.result?._meta?.['com.runeditrun/decision'] }
+    }
+    for (const phase of ['autonomous', 'held']) {
+      await adopt(phase === 'held' ? heldPolicy() : autonomousPolicy())
+      const source = await h.api('checklist.create', cookie, { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Inspect original procedure'] })
+      const native = await h.api(`checklists/${source.id}`, cookie), first = native.revisions[0]
+      ctx.phase = phase
+      ctx.args = { checklist: source.id, sourceRevision: first.id, expected_revision: first.id, amendments: [{ step: first.items[0].key, text: 'Inspect amended procedure' }], note: 'Clarify the inspection', idempotency_key: crypto.randomUUID() }
+      await before(ctx)
+      let answer = await ctx.tool(ctx.step.tool, ctx.args)
+      if (phase === 'held') {
+        assert.equal(answer.result.resultType, 'input_required')
+        assert.deepEqual(await h.api(`checklists/${source.id}`, cookie), native)
+        const path = `/agents/api/approvals/${answer.result._meta['com.runeditrun/approval'].id}`
+        const { approval } = await doors(ctx).json(path)
+        const approved = await doors(ctx).json(`${path}/approve`, { revision: approval.revision, summary_sha256: approval.summary_sha256 })
+        assert.equal(approved.approval.state, 'executed')
+        answer = await ctx.tool(ctx.step.tool, ctx.args)
+      }
+      ctx.result = data(answer)
+      await after(ctx)
+    }
+    await adopt(autonomousPolicy())
+    const source = await h.api('checklist.create', leadCookie, { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Lead-managed instruction'] })
+    const first = (await h.api(`checklists/${source.id}`, cookie)).revisions[0]
+    const identity = { sub: leadSub, email: leadEmail, act: { sub: `synthetic-gasket-${crypto.randomUUID()}`, name: 'Synthetic lead coordinator', specialist: 'maintenance coordinator' } }
+    const args = { checklist: source.id, sourceRevision: first.id, expected_revision: first.id, amendments: [{ step: first.items[0].key, text: 'Lead-authorized amendment' }], note: 'Current lead authority', idempotency_key: crypto.randomUUID() }
+    data(await ctx.tool('gasket.procedures.amend', args, identity))
+    const allowed = await h.api(`checklists/${source.id}`, cookie), audit = (await h.api('audit', cookie)).rows
+    await h.api('access.role', cookie, { member: lead.id, role: 'maintainer' })
+    const denied = await ctx.tool('gasket.procedures.amend', args, identity)
+    assert.equal(error(denied), 'forbidden')
+    assert.equal(denied.result.structuredContent, undefined)
+    const nativeDenied = await h.api('checklist.revise', leadCookie, { checklist: source.id, items: ['Must not publish'], note: 'Removed authority' }, 403)
+    assert.equal(nativeDenied.error, 'forbidden')
+    assert.deepEqual(await h.api(`checklists/${source.id}`, cookie), allowed)
+    assert.deepEqual((await h.api('audit', cookie)).rows.filter(row => row.action === 'checklist.revise'), audit.filter(row => row.action === 'checklist.revise'))
+    await h.api('access.end', cookie, { member: lead.id })
+    assert.equal((await ctx.tool('gasket.procedures.amend', args, identity)).status, 401)
+    assert.equal((await h.raw('/api/gasket/checklist.revise', { cookie: leadCookie, body: { checklist: source.id, items: ['Revoked'], note: 'Ended' } })).status, 401)
+    const race = await h.api('checklist.create', cookie, { name: `synthetic-gasket-${crypto.randomUUID()}`, items: ['Concurrent source instruction'] })
+    const raceSource = (await h.api(`checklists/${race.id}`, cookie)).revisions[0]
+    const publications = await Promise.all(['First competing instruction', 'Second competing instruction'].map(text => h.raw('/api/gasket/checklist.revise', { cookie, body: { checklist: race.id, sourceRevision: raceSource.id, items: [text], note: 'Concurrent exact-source publication' } })))
+    assert.deepEqual(publications.map(response => response.status).sort(), [200, 409])
+    for (const response of publications) await response.body?.cancel()
+    const raced = await h.api(`checklists/${race.id}`, cookie)
+    assert.equal(raced.revisions.length, 2)
+    assert.deepEqual(raced.revisions[1], raceSource)
+    assert.equal((await h.api('audit', cookie)).rows.filter(row => row.subject === race.id && row.action === 'checklist.revise').length, 1)
+    console.log('PROBE SURFACE-003 concurrent source: two public native publications from one revision -> one success, one 409, one new revision and one audit effect')
+    await adopt(autonomousPolicy(), { revoked: { agents: [], consents: [c.consent] } })
+    const revoked = await ctx.tool('gasket.procedures.amend', ctx.args)
+    assert.equal(revoked.status, 401)
+    assert.equal(revoked.result?.structuredContent, undefined)
+    assert.deepEqual(await h.api(`checklists/${source.id}`, cookie), allowed)
+    console.log('PROBE SURFACE-003 authority: lead MCP amendment succeeds; role removal, ended membership and revoked consent refuse current and completed calls without instructions or new revision effects')
+  } finally { await h.close() }
 }
