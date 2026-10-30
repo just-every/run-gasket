@@ -1,3 +1,4 @@
+import { fieldTools } from './fields'
 import type { Bindings } from '../../auth.server'
 import { mutationTools } from './tools'
 import { procedureTools } from './procedures'
@@ -8,7 +9,7 @@ import { capabilities, notTools } from './index'
 export function agentDocumentation(request: Request, env: Bindings): Response | null {
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
-  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...fieldTools(env)].sort((a, b) => a.name.localeCompare(b.name))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -24,7 +25,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     '## Verification',
     '',
-    'agent-surface.json supplies every declared tool/class fixture. Its native owner initializer and additional journey exercise real production setup, scoped credentials, revocation, changed-key conflicts, stale revisions and native attribution. Standard is internal record work. Detailed work records include native personnel identities and authorized private pay/rate fields, so their class is sensitive; publishing the first immutable procedure revision is commitment, with no monetary consideration.',
+    'agent-surface.json supplies every declared tool/class fixture. Its native owner initializer and additional journey exercise real production setup, scoped credentials, revocation, changed-key conflicts, stale revisions and native attribution. Standard is internal record work. Detailed work records include native personnel identities and authorized private pay/rate fields, so their class is sensitive; publishing the first immutable procedure revision is commitment, with no monetary consideration. Retiring an existing custom-field identity is destructive, counts that one stored identity, binds its exact revision and retains all native values and history. Schema and membership authority remain unchanged.',
     '',
     '## Limits',
     '',
