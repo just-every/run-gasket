@@ -180,7 +180,7 @@
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "77bfa6278412af5eb3a06339bc2c28665094a91b5cf653043dbb3f0e2361cbbc",
+      "sha256": "9b6af0a8e1034fc3da650a3b22b504e8dc8daf504914c65856cf64b549f8bbeb",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "944ed6b4af950a2214748f401988dc0645bf284f4d52eaf9a953fa0a347f43cb",
+      "sha256": "aa0772e67f8040b5d1ed7b661b266656f40a8da7284f0d5769e20efff70b5796",
       "executable": false
     },
     "DEMO.md": {
@@ -1428,11 +1428,11 @@
       "executable": false
     },
     "src/gasket/agent-door/docs.ts": {
-      "sha256": "72a839bde8980c25f7e79e7c54477b392e9571daf12d05b228f065c301eabc76",
+      "sha256": "14cabdc08802894447f36327b92568424e656c8ea45b2c42d820dcd4d1910303",
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
-      "sha256": "2aecf42793ec5aebfcac0b304214b87445fbb9145823a4c455e428d5a18c36e1",
+      "sha256": "0742193c81e1a0ac41fc931775b17239316d08c84f734ca88694f01ee997bb09",
       "executable": false
     },
     "src/gasket/agent-door/native.ts": {
@@ -1445,6 +1445,10 @@
     },
     "src/gasket/agent-door/procedures.ts": {
       "sha256": "71bcfab20b71955034f4584defad6304646cfe1cecf469b24f3d4ae03ee596db",
+      "executable": false
+    },
+    "src/gasket/agent-door/reassignment.ts": {
+      "sha256": "fbb020edff55b4dd19c121d0454012df30eea942e9d080b167a03dce1f20d56c",
       "executable": false
     },
     "src/gasket/agent-door/records.ts": {
@@ -1860,7 +1864,7 @@
       "executable": false
     },
     "src/gasket/proposals.ts": {
-      "sha256": "1bc93a29237c47b9f496e416b52e91c4e3cd6b4f7a7aade2b7022f3c495b78fb",
+      "sha256": "f6b9a23780e55bfef36792f439a811b0e374992e931116491f1de40a272553a5",
       "executable": false
     },
     "src/gasket/purchase-authority.ts": {
@@ -2404,7 +2408,7 @@
       "executable": false
     },
     "src/gasket/work.ts": {
-      "sha256": "a63fbc65f2451185ab05d4083b2f21355272097e7b43ca05d36884753c6d5dbb",
+      "sha256": "c8111ec716e3caab8d8228047f44f8ff1ea7d15dd444c19947a3c4d2981abe1a",
       "executable": false
     },
     "src/gasket/zip.ts": {
@@ -4684,11 +4688,19 @@
       "executable": false
     },
     "tests/gasket/agent-follow-up.mjs": {
-      "sha256": "c99136681a9c3b88d9cce6c5c0d1f1b072298fd53814f23e7991c1e552f35ccb",
+      "sha256": "bb2c81baf53b6be1342ffb4f0b59759348c6aa24d1aea8cdd95f36ec1ad57414",
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "68657027e0efe902b79cfe0b75b3299908398b4942b6ce029fda9e2174269c97",
+      "sha256": "1578e967da15617cd9856a8bfcd663a10312699ee7d6d2d59756be83ba9ed877",
+      "executable": false
+    },
+    "tests/gasket/agent-reassignment-fixtures.mjs": {
+      "sha256": "e271246ffad244bb0215362b12833bd5b8607e5466c9af4c1c17c46897bf9502",
+      "executable": false
+    },
+    "tests/gasket/agent-reassignment-policy.mjs": {
+      "sha256": "8b0bde8f58c01658ea2567cd26918c7bb9174da005bd615ab2806cee38f6f774",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
