@@ -164,7 +164,7 @@
       "executable": false
     },
     ".github/workflows/verify.yml": {
-      "sha256": "fee469a7e7c6e1e13722e0f440396cc7440d998f4a64b3eb47f34da1c6e5e071",
+      "sha256": "9a3c3804d632e46d50a310041f539ee8acce148a375eb6ea206dfc66fddc274e",
       "executable": false
     },
     ".gitignore": {
@@ -176,7 +176,7 @@
       "executable": false
     },
     "ACCEPTANCE.md": {
-      "sha256": "366477eb2373b69fac3eb9c4e76a7318befeb007d46f7b01de6b1846fe63eb63",
+      "sha256": "cfd285911c1898cbbb37cbb4e6fc6c5ba3dea7df3f9e7ca0b20dc0ccfa55d1e3",
       "executable": false
     },
     "agent-surface.json": {
@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "97fd1b0c59339224d69cc93b8641dddb695f9d667c09475d5fa3207b86a2fd47",
+      "sha256": "944ed6b4af950a2214748f401988dc0645bf284f4d52eaf9a953fa0a347f43cb",
       "executable": false
     },
     "DEMO.md": {
@@ -232,7 +232,7 @@
       "executable": false
     },
     "docs/CLAIMS.md": {
-      "sha256": "f1f8bee0e28c35e77cd0e0e3c69cee0c315f6217770b6e0177f5e0d117a16030",
+      "sha256": "1309d61e0b47254f67f42fab00873cd4085ce4e744488183526fc8f74b34055c",
       "executable": false
     },
     "docs/contract/COVERAGE.json": {
@@ -4728,7 +4728,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "bf3478de00ccc0a3cc8b57dc85137a94684c404fc728b549b4968ac6bb310fe7",
+      "sha256": "e9be89bbb33ee7329fb1cb06fbbf5e6d739e274ffc89593ac8b8b12e929458ce",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4740,7 +4740,7 @@
       "executable": false
     },
     "tests/gasket/generic-migration.mjs": {
-      "sha256": "ffa155b5331aee9bdbcb0e0afb9b5b5e9f4a4e8a688625b02004d8ff9cb96595",
+      "sha256": "30893b7d5167b9f7e2c03bd3df8319b56e332b43c8bbf9adbda7628fa252033b",
       "executable": false
     },
     "tests/gasket/harness.mjs": {

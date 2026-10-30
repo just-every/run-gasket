@@ -8,12 +8,12 @@ The primary journey: Bring the equipment estate across, triage a fault, plan qua
 
 | Tier | Done | Partial | Missing | Total |
 | --- | ---: | ---: | ---: | ---: |
-| Core | 51 | 56 | 37 | 144 |
+| Core | 52 | 55 | 37 | 144 |
 | Agent surface | 0 | 7 | 0 | 7 |
 | Later | 0 | 0 | 0 | 0 |
-| Full target | 51 | 63 | 37 | 151 |
+| Full target | 52 | 62 | 37 | 151 |
 
-Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
+Judged from the code and tests at commit `71ab859aee4bfeca7bdf810a0797ca708c5451d3` (27 October 2026). GAS-06 is judged from the candidate commit `HEAD` (30 October 2026). MIG-007 is judged from the candidate commit `HEAD` (30 October 2026). Field proof register: 21 rows; 0 passed, 0 failed, 21 not run.
 
 ## Core
 
@@ -1785,7 +1785,7 @@ Core · target · **missing** · Register R-16
 
 #### MIG-007 — Open-work CSV and Excel migration
 
-Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001 · Rules D-3
+Core · target · **done** · Cites BASE-ROLE-001, BASE-INPUT-001 · Rules D-3
 
 **Requirement.** Leads import generic CSV/XLS/XLSX open work, assets, locations, parts, PMs and historical work using published templates and source-ID mapping. Dates, US/SI units, leading-zero codes, custom fields, team assignments and unknown users are previewed; imported historic consumption does not issue stock or notify people.
 
@@ -1793,8 +1793,8 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001 · Rules D-
 1. Upload a 2,000-row open/history spreadsheet with leading-zero assets, mixed dates, custom fields and orphan assignees.
 2. Fix preview errors, apply and compare every accepted row, no stock side effects and no historical notices.
 
-**Evidence.** `tests/gasket/generic-migration.mjs` — "genericMigrationJourney"
-**Gap.** A public-door journey the stated 2,000-row scale in exact-candidate Verify is missing. The cited journeys show default-sized templates, errors, source mappings, native values, replay and no historic stock/notices; scale mode is separate from Verify.
+**Evidence.** `tests/gasket/generic-migration.mjs` — "genericMigrationJourney": 2,000 open and historical rows through CSV, XLS and XLSX preview; leading-zero identifiers, mixed dates, custom values, explicit asset, user and team mappings, corrected preview errors, bounded apply and durable resume, every accepted native row, replay, unchanged stock and no historical notices; template and import authority refusals; migration screens at 1440 and 390. `tests/gasket/flows.mjs` — "2,000-row spreadsheet migration and source reconciliation", required in the inventory shard with small-fixture refusal.
+**Gap.** None.
 
 #### MIG-008 — Reconciled cutover and a complete exit
 

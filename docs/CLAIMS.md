@@ -26,7 +26,7 @@ A claim is done when every clause behind it is done, missing when every one is m
 | 18 | The monthly PDF/CSV pack arrives with source-linked PM, downtime, MTTR, MTBF and Pareto measures. | `REPORT-002` done; `REPORT-003` done; `REPORT-004` done; `REPORT-005` done; `REPORT-006` partial; `ADMIN-002` partial | partial |
 | 19 | The agent recommends a constrained interval change with rollback and checks reliability after repair. | `AGENT-003` partial; `AGENT-004` partial | partial |
 | 20 | Every asset, PM and work order since 2019 moves in from MaintainX, including people and original attachments. | `MIG-001` partial; `MIG-002` partial; `ADMIN-014` missing | partial |
-| 21 | Move in from UpKeep, Fiix, Limble or a spreadsheet. | `MIG-003` missing; `MIG-004` missing; `MIG-005` missing; `MIG-007` partial | partial |
+| 21 | Move in from UpKeep, Fiix, Limble or a spreadsheet. | `MIG-003` missing; `MIG-004` missing; `MIG-005` missing; `MIG-007` done | partial |
 | 22 | Shadow compare reconciles PM dates and stock value before cutover. | `MIG-008` partial | partial |
 | 23 | Seven years of MaintainX, moved in a weekend. | `MIG-002` partial; `MIG-008` partial | partial |
 
