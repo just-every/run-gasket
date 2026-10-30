@@ -803,8 +803,8 @@ Core · target · **partial** · Cites BASE-ROLE-001, BASE-INPUT-001, BASE-INPUT
 1. Mention the incoming technician on a returning job with a photo and internal cost note, sign in on their phone and follow the notice.
 2. Inspect unread state, retained edit history and contractor/requester privacy.
 
-**Evidence.** `tests/gasket/flows.mjs` — "PLAN-006 comments, mentions and shift handoff"
-**Gap.** A public-door journey requester/contractor privacy with those identities and company-policy execution of agent comments is missing. The cited journeys show internal handoff, mentions, originals, unread state and retained edits; external identities cannot be created.
+**Evidence.** `tests/gasket/flows.mjs` — "PLAN-006 comments, mentions and shift handoff"; `tests/gasket/agent-comments.mjs` — "agentCommentsJourney", loaded by `tests/gasket/agent-native-journey.mjs`; `agent-surface.json` — "comment" in required allowing and held policy conformance
+**Gap.** A public-door journey of requester/contractor privacy with those identities remains missing; external identities cannot be created. The cited native journeys show internal handoff, mentions, originals, unread state and retained edits. Company-policy plain-text comments on existing primary-site work use the current human sponsor's native comment and record rights, with standard classification, exact stored target, retained agent-for-sponsor attribution, genuine review, replay and current-authority refusals. Other agent comment operations (photos, mentions, edits and handoff summaries), broader roles and additional-site scope remain unproved; native agent-role rights and service-credential scopes are unchanged. No completion is claimed.
 
 #### PLAN-007 — Bulk actions and controlled cancellation
 

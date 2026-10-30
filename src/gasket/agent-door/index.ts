@@ -1,4 +1,5 @@
 import { procedureTools } from './procedures'
+import { commentTools } from './comments'
 import { createAgentDoor, type Trust } from '../../modules/agent-door/index.ts'
 import { runtimeBindings, type Bindings } from '../../auth.server'
 import { serviceActor } from '../service-auth'
@@ -23,7 +24,7 @@ export const capabilities = ['tools', 'policy', 'pause', 'audit', 'idempotency']
 export function gasketAgentDoor(original: Bindings) {
   const env = runtimeBindings(original)
   return createAgentDoor({ seed: 'gasket', name: 'Gasket', specialist: 'maintenance coordinator', db: env.DB, origin: env.AUTH_ORIGIN,
-    trust: trust(env), people: gasketPeople(env), tools: [...recordTools(env), ...mutationTools(env), ...procedureTools(env)], resources: recordResources(env), notTools, capabilities,
+    trust: trust(env), people: gasketPeople(env), tools: [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...commentTools(env)], resources: recordResources(env), notTools, capabilities,
     async localCredentials(request) {
       try {
         const actor = await serviceActor(env, request)
