@@ -99,6 +99,7 @@ export default async function proposalPolicyJourney() {
 
     const changed = await prepare('Synthetic hash fence')
     await refuses({ ...changed, hash: '0'.repeat(64) }, 'proposal_changed')
+    await refuses({ ...changed, hash: allowed.hash }, 'proposal_changed')
     await refuses({ ...changed, assetRevision: 2 }, 'proposal_changed')
     const detail = await api(`assets/${asset.id}`)
     await api('asset.update', { asset: asset.id, revision: detail.revision, tag: detail.tag, name: 'Synthetic changed pump', location: detail.location })
@@ -125,6 +126,47 @@ export default async function proposalPolicyJourney() {
     assert.equal(raceAfter.work.length, raceBefore.work.length + 1)
     assert.equal(raceAfter.effects.filter(row => row.subject === racing.proposal).length, 1)
     console.log('PROBE GAS-13 concurrency: two MCP applications of one proposal -> one work order and one application receipt')
+
+    // Native decisions and policy execution share the same pending proposal,
+    // even when both doors have already resolved its exact stored payload.
+    for (const decision of ['approve', 'reject']) {
+      const competing = await prepare(`Synthetic competing ${decision}`), beforeCompetition = await native()
+      const [agentAnswer, humanAnswer] = await Promise.all([
+        call(competing),
+        request('/api/gasket/proposal.decide', { method: 'POST', headers: { Origin: origin, Cookie: leadCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ proposal: competing.proposal, hash: competing.hash, decision, note: 'Independent native decision' }) })
+          .then(async response => ({ httpStatus: response.status, ...await response.json() })),
+      ])
+      const agentWon = agentAnswer.result?.structuredContent?.status === 'applied', humanWon = humanAnswer.httpStatus === 200
+      assert.equal(Number(agentWon) + Number(humanWon), 1, `exactly one door decides the proposal: ${JSON.stringify({ decision, agentAnswer, humanAnswer })}`)
+      if (!agentWon) assert.ok(['already_decided', 'proposal_changed'].includes(code(agentAnswer)), JSON.stringify(agentAnswer))
+      if (!humanWon) {
+        assert.equal(humanAnswer.httpStatus, 409)
+        assert.ok(['already_decided', 'proposal_changed'].includes(humanAnswer.error), JSON.stringify(humanAnswer))
+      }
+      const row = (await api('proposals')).find(row => row.id === competing.proposal)
+      const created = (await api('audit?action=workorder.create')).rows.filter(event => JSON.parse(event.detail).proposal === competing.proposal)
+      const decisions = (await Promise.all(['proposal.apply', 'proposal.approve', 'proposal.reject'].map(action => api(`audit?action=${action}`))))
+        .flatMap(page => page.rows).filter(event => event.subject === competing.proposal)
+      assert.equal(decisions.length, 1, 'the losing transaction leaves no decision receipt')
+      const acceptedWork = agentWon || decision === 'approve'
+      assert.equal((await native()).work.length, beforeCompetition.work.length + Number(acceptedWork))
+      assert.equal(created.length, Number(acceptedWork), 'the losing application leaves no work or work audit')
+      assert.deepEqual([row.status, row.decided_by], [agentWon ? 'applied' : decision === 'approve' ? 'approved' : 'rejected', agentWon ? null : lead.id])
+      assert.equal(decisions[0].action, agentWon ? 'proposal.apply' : `proposal.${decision}`)
+      if (acceptedWork) {
+        const resultId = agentWon ? agentAnswer.result.structuredContent.result : humanAnswer.result
+        assert.equal(row.result_id, resultId)
+        assert.equal(created[0].subject, resultId)
+        assert.equal(JSON.parse(decisions[0].detail).result, resultId)
+        assert.equal((await api(`work/${resultId}`)).title, `Synthetic competing ${decision}`)
+        if (agentWon) {
+          const committed = await native()
+          assert.deepEqual((await call(competing)).result.structuredContent, agentAnswer.result.structuredContent)
+          assert.deepEqual(await native(), committed)
+        }
+      } else assert.equal(row.result_id, null)
+    }
+    console.log('PROBE GAS-13 competing doors: MCP application racing native approval or rejection -> one decision, matching work and atomic receipt, no losing effects')
 
     await policy(heldPolicy())
     const held = await prepare('Synthetic held correction'), heldBefore = await native(), review = await call(held)
@@ -178,6 +220,15 @@ export default async function proposalPolicyJourney() {
     const independentRow = (await api('proposals')).find(row => row.id === independent.proposal)
     assert.deepEqual([independentRow.status, independentRow.decided_by], ['approved', owner.id])
     assert.equal((await api(`work/${independentRow.result_id}`)).title, 'Synthetic genuine policy approval')
+    const approvedState = await native(), approvedReplay = await call(independent)
+    assert.deepEqual(approvedReplay.result.structuredContent, { id: independent.proposal, status: 'approved', result: independentRow.result_id })
+    assert.deepEqual(approvedReplay.result._meta['com.runeditrun/receipt'].approved_by, [owner.id])
+    assert.equal((await approve(independentHandle)).approval.state, 'executed')
+    assert.deepEqual((await call(independent)).result.structuredContent, approvedReplay.result.structuredContent)
+    assert.deepEqual(await native(), approvedState, 'completed approval and application replays change no native records')
+    assert.equal((await api('audit?action=proposal.approve')).rows.filter(row => row.subject === independent.proposal).length, 1)
+    assert.equal((await api('audit?action=workorder.create')).rows.filter(row => JSON.parse(row.detail).proposal === independent.proposal).length, 1)
+    console.log('PROBE GAS-13 approved replay: genuine independent policy approval and repeated MCP calls -> original corrective result and one attributed application effect')
     const waiting = await prepare('Synthetic changed policy')
     const waitingCall = await call(waiting)
     const waitingHandle = waitingCall.result._meta['com.runeditrun/error'].approval

@@ -4696,7 +4696,7 @@
       "executable": false
     },
     "tests/gasket/agent-proposal-policy.mjs": {
-      "sha256": "facc578abe21157695b1febc2d6d40c7a387b9a0e8166fc4728e6a0433208dfd",
+      "sha256": "4eddb5b13d99b171e4eb022240fb3fb7eeed8dfb78f13d8c825d74b2b64711ff",
       "executable": false
     },
     "tests/gasket/agent-run-live.mjs": {
