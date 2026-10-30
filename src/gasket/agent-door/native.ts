@@ -7,6 +7,7 @@ import { today } from '../dates'
 import { authorizeOperationalSite } from '../site-access'
 import { withSiteAuthority } from '../site-context'
 import { withServiceAuthority } from '../service-context'
+import { authorizeService } from '../service-auth'
 import { withAgentContext, type NativePolicyFence } from './context'
 import { gasketPeople } from './people'
 
@@ -16,15 +17,31 @@ export async function nativeActor(env: Bindings, person: Person): Promise<Actor>
   const zone = await siteZone(env)
   return { id: current.id, email: current.email, name: current.name, role: current.role as Role, sessionId: '', zone, today: today(zone) }
 }
+type NativeIdentity = Pick<ToolContext, 'person' | 'clientId'>
+async function nativeAuthority(env: Bindings, ctx: NativeIdentity): Promise<Actor> {
+  const actor = await nativeActor(env, ctx.person)
+  const credential = ctx.clientId?.startsWith('gasket-service:') ? ctx.clientId.slice('gasket-service:'.length) : undefined
+  if (credential) {
+    const row = await one(env, 'SELECT member_id,scopes_json FROM gk_api_credentials WHERE id=? AND revoked_at IS NULL AND expires_at>?', credential, Date.now())
+    if (!row || row.member_id !== actor.id || actor.role !== 'owner') throw new ToolRefusal('unauthenticated')
+    actor.service = { id: credential, scopes: JSON.parse(row.scopes_json) }
+  }
+  return actor
+}
+
+/** Resource reads keep the native service route restrictions and fresh sponsor authority. */
+export async function nativeRead<T>(env: Bindings, ctx: NativeIdentity, path: string, run: (actor: Actor) => Promise<T>): Promise<T> {
+  const actor = await nativeAuthority(env, ctx)
+  const request = new Request(env.AUTH_ORIGIN)
+  authorizeService(actor, request, path)
+  await authorizeOperationalSite(env, actor, request)
+  return withSiteAuthority(actor, () => withServiceAuthority(actor.service?.id, () => run(actor)))
+}
+
 export async function nativeCall<T>(env: Bindings, ctx: ToolContext, run: (actor: Actor) => Promise<T>, effect = false): Promise<T> {
   try {
-    const actor = await nativeActor(env, ctx.person)
-    const credential = ctx.clientId?.startsWith('gasket-service:') ? ctx.clientId.slice('gasket-service:'.length) : undefined
-    if (credential) {
-      const row = await one(env, 'SELECT scopes_json FROM gk_api_credentials WHERE id=? AND revoked_at IS NULL AND expires_at>?', credential, Date.now())
-      if (!row) throw new ToolRefusal('unauthenticated')
-      actor.service = { id: credential, scopes: JSON.parse(row.scopes_json) }
-    }
+    const actor = await nativeAuthority(env, ctx)
+    const credential = actor.service?.id
     await authorizeOperationalSite(env, actor, new Request(env.AUTH_ORIGIN))
     const policy = await one<NativePolicyFence>(env, 'SELECT envelope,local_document,local_revision FROM agent_door_state WHERE id=1')
     if (effect && !policy) throw new ToolRefusal('policy_unset')

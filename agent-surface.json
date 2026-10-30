@@ -277,7 +277,12 @@
       "reason": "screen"
     }
   ],
-  "resources": [],
+  "resources": [
+    "gasket://assets/{id}",
+    "gasket://work/{id}",
+    "gasket://parts/{id}",
+    "gasket://procedures/{id}"
+  ],
   "witness": {
     "tool": "gasket.workspace.snapshot",
     "args": {}
@@ -580,6 +585,7 @@
     "policy",
     "pause",
     "audit",
-    "idempotency"
+    "idempotency",
+    "resources"
   ]
 }
