@@ -162,6 +162,7 @@ export async function agentIntervalPolicyJourney() {
     const view = (await person(`/agents/api/approvals/${handle.id}`)).approval
     assert.deepEqual(view.summary.nativeTarget, { kind: 'schedule', id: schedules[1] })
     assert.ok(view.summary.items.some(item => item.includes('30 days to 21 days')))
+    assert.ok(view.summary.items.some(item => item.includes('100 h to 75 h')), 'approval retains the schedule meter units')
     assert.ok(view.summary.items.includes((await saved(args)).basis.expectedEffect))
     await approve(pending, 'max', 403)
     // The held policy names the sponsor; even that human cannot invent independent approval.

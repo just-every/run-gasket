@@ -73,7 +73,8 @@
     "migrations/core/0080_dependency_keys_sealed.sql",
     "migrations/core/0081_operator_last_signin.sql",
     "migrations/core/0082_scheduled_policy.sql",
-    "migrations/core/0112_bom_models.sql"
+    "migrations/core/0112_bom_models.sql",
+    "migrations/core/0113_interval_policy.sql"
   ],
   "breaking": false,
   "agentUpdateInstructions": "Use the committed setup manifest to configure the application and mail provider. Preserve existing migration names and bytes, back up the installation, and follow OPERATIONS.md before changing traffic."
