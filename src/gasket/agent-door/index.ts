@@ -21,7 +21,7 @@ export const notTools = [
   { clauses: ['FIELD-001','FIELD-002','FIELD-003','FIELD-010'], reason: 'device' as const },
   { clauses: ['ADMIN-011'], reason: 'screen' as const },
 ]
-export const capabilities = ['tools', 'policy', 'pause', 'audit', 'idempotency'] as const
+export const capabilities = ['tools', 'policy', 'pause', 'audit', 'idempotency', 'resources'] as const
 export function gasketAgentDoor(original: Bindings) {
   const env = runtimeBindings(original)
   return createAgentDoor({ seed: 'gasket', name: 'Gasket', specialist: 'maintenance coordinator', db: env.DB, origin: env.AUTH_ORIGIN,
