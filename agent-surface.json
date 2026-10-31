@@ -598,6 +598,37 @@
       }
     },
     {
+      "id": "apply-corrective",
+      "tool": "gasket.proposals.apply_corrective",
+      "args": {
+        "proposal": {
+          "$from": "proposal",
+          "pointer": "/id"
+        },
+        "hash": {
+          "$from": "proposal",
+          "pointer": "/hash"
+        },
+        "assetRevision": 2,
+        "expected_revision": 2
+      },
+      "target": {
+        "kind": "proposal",
+        "id": {
+          "$from": "proposal",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
       "id": "proposals",
       "tool": "gasket.proposals.list",
       "args": {},
