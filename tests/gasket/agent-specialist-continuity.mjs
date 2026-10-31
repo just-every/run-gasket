@@ -190,6 +190,15 @@ export default async function specialistContinuity() {
           assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
           const icons = await page.locator('button,a[href]').evaluateAll(elements => elements.filter(el => el.getClientRects().length && el.querySelector('svg') && !el.textContent.trim()).map(el => ({ title: el.getAttribute('title'), tooltip: el.getAttribute('aria-describedby') })))
           assert.ok(icons.every(icon => icon.title || icon.tooltip), 'icon-only controls expose their tooltip')
+          const afterSave = await maintenance()
+          for (const specialist of specialists) {
+            assert.equal(code(await tool(specialist, 'gasket.work.create', workArgs)), 'agents_paused')
+            const pausedRead = await tool(specialist, 'gasket.work.read', { id: techWork })
+            assert.equal(code(pausedRead), 'agents_paused')
+            assert.equal(pausedRead.result?.structuredContent, undefined, 'Pause withholds technician evidence from specialists')
+            assert.deepEqual(await h.api(`work/${techWork}`, owner), saved, 'later paused calls preserve the accepted browser result')
+            assert.deepEqual(await maintenance(), afterSave, 'specialist calls remain without effects after the human save')
+          }
           await person('/agents/api/pause', owner, { paused: false })
           results.push(saved)
           console.log('PROBE SURFACE-007 pause: both specialists refused while the assigned maintainer saves a pre-entered browser result -> attributed result retained at 1440 and 390')
