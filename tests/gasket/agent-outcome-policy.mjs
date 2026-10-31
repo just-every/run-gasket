@@ -25,14 +25,22 @@ export async function agentOutcomePolicyJourney() {
     const members = await h.api('members', cookie.owner)
     const member = key => members.find(row => row.id === ids[key])
     const iat = Math.floor(clock / 1000), business = 'synthetic-gasket'
+    const decisionSub = 'synthetic-gasket-decision-lead'
+    const decisionEmail = ['synthetic-gasket-decision', h.vars.OWNER_EMAIL.split('@')[1]].join('@')
     const settings = await signJws(pair.privateKey, kid, 'rer-business-settings+jwt', {
       v: 1, iss: issuer, aud: audience, sub: installationId, business, email: h.vars.OWNER_EMAIL, owner_id: ownerSub,
       jti: randomUUID(), iat, exp: iat + 300, rev: 1, values: {}, logo: null,
-      team: [['lead', leadSub], ['max', maintainerSub]].map(([key, id]) => ({ id, email: member(key).email, name: member(key).name, role: key === 'lead' ? 'admin' : 'member', invite: 1 })),
+      team: [
+        ...[['lead', leadSub], ['max', maintainerSub]].map(([key, id]) => ({ id, email: member(key).email, name: member(key).name, role: key === 'lead' ? 'admin' : 'member', invite: 1 })),
+        { id: decisionSub, email: decisionEmail, name: 'Synthetic independent company lead', role: 'admin', invite: 1 },
+      ],
     })
     const paired = await h.raw('/api/rer/business-settings', { body: { settings } })
     assert.equal(paired.status, 200)
     await paired.body?.cancel()
+    const decisionCookie = await h.signIn(decisionEmail)
+    const decisionLead = await h.api('me', decisionCookie)
+    assert.equal(decisionLead.role, 'lead')
     const context = {
       origin: h.origin, signer, business, consent: randomUUID(), agentId: `synthetic-gasket-${randomUUID()}`,
       person: { sub: ownerSub, email: h.vars.OWNER_EMAIL }, surface: { specialist: 'maintenance coordinator', tools: [{ scope: 'proposal.decide' }] },
@@ -100,9 +108,12 @@ export async function agentOutcomePolicyJourney() {
     assert.deepEqual(execution.resource, { kind: 'proposal', id: allowed.proposal.id })
     assert.equal(execution.sponsor.id, retained.decided_by ?? work.created_by)
     assert.equal(execution.consent, context.consent)
+    const commitment = (await h.api('proposals', cookie.owner)).find(row => row.id === allowed.report.proposal)
+    assert.equal(code(await call({ proposal: commitment.id, hash: commitment.payload_hash, idempotency_key: randomUUID() })), 'unsupported_proposal_kind', 'corrective application cannot execute an interval commitment')
     const completedState = await works()
     const replay = await call(allowed.args)
     assert.deepEqual(result(replay), receipt)
+    assert.equal(code(await call({ ...allowed.args, hash: '0'.repeat(64) })), 'idempotency_conflict')
     await assertNoWork(completedState, 'completed replay creates no second corrective order')
     assert.equal((await audit()).rows.filter(row => row.action === 'proposal.apply' && row.subject === allowed.proposal.id).length, 1)
     console.log('PROBE AGENT-004 allowing policy: MCP exact proposal and hash -> standard autonomous execution, retained assessment, one work and one application effect on replay')
@@ -143,6 +154,10 @@ export async function agentOutcomePolicyJourney() {
           for (const [name, path] of [['investigation-proposals', '/app/proposals'], ['investigation-work', `/app/work/${human.result}`]]) {
             assert.equal((await page.goto(h.origin + path)).status(), 200)
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+            if (name === 'investigation-proposals') {
+              const card = page.locator('section.gk-card').filter({ has: page.locator(`[href="/app/work/${human.result}"]`) })
+              await card.scrollIntoViewIfNeeded()
+            }
             await page.screenshot({ path: `${process.env.OUTCOME_POLICY_SCREENSHOTS}/${name}-${width}.png`, fullPage: name !== 'investigation-proposals' })
           }
         }
@@ -151,6 +166,35 @@ export async function agentOutcomePolicyJourney() {
     }
     console.log('PROBE AGENT-004 held policy: MCP application -> genuine review and pending proposal; independent native lead decision -> one attributed corrective investigation')
 
+    await adopt({ ...autonomousPolicy(), rules: [{ id: 'independent', class: '*', do: 'approval', approver: [`person:${decisionSub}`], wait: 'PT1H' }] })
+    const approvalCase = await freshProposal()
+    const approvalBefore = await works()
+    const pending = await call(approvalCase.args)
+    assert.equal(decision(pending).disposition, 'approval')
+    const handle = pending.body.result?._meta?.['com.runeditrun/error']?.approval
+    assert.ok(handle?.id)
+    const approvalPath = `/agents/api/approvals/${handle.id}`
+    const { approval } = await person(approvalPath)
+    assert.deepEqual(approval.summary.nativeTarget, { kind: 'proposal', id: approvalCase.proposal.id })
+    assert.ok(approval.summary.items.some(item => item.includes(approvalCase.report.source.sourceHash)))
+    const exactDecision = { revision: approval.revision, summary_sha256: approval.summary_sha256 }
+    const selfApproval = await h.raw(`${approvalPath}/approve`, { cookie: cookie.owner, body: exactDecision })
+    assert.equal(selfApproval.status, 403, 'the sponsor cannot supply the independent company decision')
+    await selfApproval.body?.cancel()
+    await assertNoWork(approvalBefore, 'pending company approval and self-approval refusal preserve work')
+    const approved = await person(`${approvalPath}/approve`, exactDecision, decisionCookie)
+    assert.equal(approved.approval.state, 'executed')
+    const accepted = await call(approvalCase.args)
+    assert.equal(code(accepted), undefined)
+    assert.equal(result(accepted).status, 'approved')
+    assert.equal((await h.api('proposals', cookie.owner)).find(row => row.id === approvalCase.proposal.id).decided_by, decisionLead.id)
+    const acceptedState = await works()
+    assert.equal(acceptedState.length, approvalBefore.length + 1)
+    assert.deepEqual(result(await call(approvalCase.args)), result(accepted))
+    await assertNoWork(acceptedState, 'approved company execution replays one corrective result')
+    console.log('PROBE AGENT-004 independent company approval: exact source summary, sponsor refusal and genuine lead decision -> one authorized corrective result and no duplicate on replay')
+
+    await adopt(heldPolicy())
     const rejected = await freshProposal()
     await h.api('proposal.decide', cookie.lead, { proposal: rejected.proposal.id, decision: 'reject', note: 'Retain the assessment; investigate with the next agreed observation window.' })
     const rejectionBefore = await works()
@@ -212,13 +256,17 @@ export async function agentOutcomePolicyJourney() {
     assert.ok([401, 403].includes(unauthorized.status), `unauthorized sponsor refused: HTTP ${unauthorized.status}, code ${code(unauthorized)}`)
     assert.equal(result(unauthorized), undefined)
     await h.api('proposal.decide', cookie.max, { proposal: guarded.proposal.id, hash: guarded.args.hash, decision: 'approve' }, 403)
-    const leadToken = { sub: leadSub, email: member('lead').email, act: { sub: randomUUID(), name: 'Synthetic lead coordinator', specialist: 'maintenance coordinator' } }
-    await h.api('access.role', cookie.owner, { member: ids.lead, role: 'maintainer' })
+    const leadToken = { sub: decisionSub, email: decisionEmail, act: { sub: randomUUID(), name: 'Synthetic lead coordinator', specialist: 'maintenance coordinator' } }
+    await adopt(heldPolicy())
+    assert.equal(result(await call(guarded.args, leadToken)).status, 'pending', 'a genuinely bound current lead reaches held review')
+    await h.api('access.role', cookie.owner, { member: decisionLead.id, role: 'maintainer' })
     const demoted = await call(guarded.args, leadToken)
-    assert.ok([401, 403].includes(demoted.status), 'demoted or unbound sponsor cannot apply old preparation')
+    assert.equal(code(demoted), 'forbidden', 'completed review replay rechecks the current native role')
     assert.equal(result(demoted), undefined)
-    await h.api('proposal.decide', cookie.lead, { proposal: guarded.proposal.id, hash: guarded.args.hash, decision: 'approve' }, 403)
-    await h.api('access.role', cookie.owner, { member: ids.lead, role: 'lead' })
+    await h.api('proposal.decide', decisionCookie, { proposal: guarded.proposal.id, hash: guarded.args.hash, decision: 'approve' }, 403)
+    await h.api('access.end', cookie.owner, { member: decisionLead.id })
+    assert.equal((await call(guarded.args, leadToken)).status, 401, 'ended sponsor cannot reuse the original credential or receipt')
+    await adopt(autonomousPolicy())
     await h.api('service.create', cookie.owner, { name: 'Refused authority expansion', scopes: ['proposal.decide'], expiresAt: clock + 3600000, consent: true }, 400)
     await h.api('workorder.create', cookie.agent, { asset: assets[0], title: 'Refused direct mutation', due: currentDay }, 403)
     await person('/agents/api/pause', { paused: true })
