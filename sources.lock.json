@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "efb7638b7cc2c6a71fa3627017b98c460737f5201da388ffa9af70431e40541d",
+      "sha256": "4a01f9009d980ade3c844f5bad3a7854d95eea56a95b197c7aa5aa2e16b2a43a",
       "executable": false
     },
     "DEMO.md": {
@@ -4764,7 +4764,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "6386ea0a7d55f956946d5b844a69515d2d893292b5558e78f163e375fb980831",
+      "sha256": "51f9d128b9cfa1b525442dc0cdd09bb7eacb9f6fd123e59ef98aa6851b14deaa",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4849,6 +4849,10 @@
     },
     "tests/gasket/pm-interruption.mjs": {
       "sha256": "e40fd30ba31cc7e17a0c6671a201f49f9e7fde60bb080e6ef1057414b1d687ed",
+      "executable": false
+    },
+    "tests/gasket/pm-restarts.mjs": {
+      "sha256": "e4a4e99e8dc8ad4cb8d054b4b61e7e2a531bd6bf69dfc00ba745a435dd9d4251",
       "executable": false
     },
     "tests/gasket/print-packs.mjs": {

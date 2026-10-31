@@ -1,3 +1,4 @@
+import { pmRestartsJourney } from './pm-restarts.mjs'
 import { printPacksJourney } from './print-packs.mjs'
 import { messagesJourney } from './messages.mjs'
 import { workPaginationJourney } from './work-pagination.mjs'
@@ -54,6 +55,7 @@ import { now, zone } from './clock.mjs'
 // and complete archive reconciliation in their original order.
 const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
+  [pmRestartsJourney, 'automation'],
   [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
   [privateFileLinksJourney, 'automation'],
@@ -100,6 +102,7 @@ const unzip = buffer => {
 }
 
 try {
+  await check('PM-001 unattended generation across Worker restarts', pmRestartsJourney)
   await check('Controlled print packs and authenticated paper entry', printPacksJourney)
   await check('Retained direct messages and participant authority', messagesJourney)
   await check('Complete authorized work pages and bounded CSV', workPaginationJourney)
@@ -953,7 +956,7 @@ try {
     assert.deepEqual([early.filter(row => row.title === 'Monthly fryer gas check').length, early.filter(row => row.title === 'Fryer thermostat calibration').length], [0, 1], 'five days out is beyond a three-day lead time')
     await h.api('site.configure', cookie.owner, { ...place, leadDays: 5 })
     assert.match(await (await h.raw('/app/schedules', { cookie: cookie.lead })).text(), /created 5 days ahead of their due date/)
-    // Restarted twice, the second run three hours later: still one order per occurrence.
+    // Repeated scheduled delivery after the earlier gap: still one order per occurrence.
     await h.scheduled(cron, minutes(15))
     await h.scheduled(cron, minutes(15))
     const work = await h.api('work', cookie.lead)
