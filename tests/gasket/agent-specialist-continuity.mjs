@@ -120,7 +120,7 @@ export default async function specialistContinuity() {
     const checklist = (await h.api('checklist.create', lead, { name: 'Synthetic technician inspection', items: ['Inspect the casing condition'] })).id
     await h.api('schedule.create', lead, { asset: techAsset, checklist, title: 'Synthetic technician inspection', everyDays: 7, firstDue: '2026-10-30', assignee: techPerson.id })
     const techWork = (await h.api('workorders.generate', lead, {})).created[0].id
-    browser = await chromium.launch({ headless: true, executablePath: process.env.GASKET_CHROMIUM || '/usr/bin/chromium', args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+    browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
     const browserContext = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 1100 } })
     await browserContext.addCookies(technician.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
     const page = await browserContext.newPage()
