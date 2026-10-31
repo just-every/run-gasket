@@ -1,3 +1,4 @@
+import { assetUndoJourney } from './agent-asset-undo.mjs'
 import assert from 'node:assert/strict'
 import procedureRevisions from './agent-procedure-revisions.mjs'
 export { beforeStep, afterStep } from './agent-procedure-revisions.mjs'
@@ -74,4 +75,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   assert.ok(audit.rows.some(row => JSON.parse(row.detail).preparedBy?.label?.includes(' for ') && row.actor_name.includes(' for ')))
   console.log('Native Core journey: native audit attribution passed')
   await procedureRevisions({ request, origin, cookie, tool })
+  await assetUndoJourney()
 }

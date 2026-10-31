@@ -162,7 +162,8 @@
         "SURFACE-001",
         "SURFACE-002",
         "SURFACE-006"
-      ]
+      ],
+      "description": "Native identity update; reviewed changes confined to display name and notes support human compensation at the exact applied revision."
     },
     {
       "name": "gasket.work.create",
