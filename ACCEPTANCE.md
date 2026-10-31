@@ -1916,7 +1916,7 @@ Core · push-further · **partial** · Cites BASE-AGENT-002, BASE-AGENT-005, BAS
 1. Leave a PM blocked on parts and a repair awaiting review, answer one agent query with a promised date and miss it.
 2. Inspect contextual escalation, proposed reassignment and refusal to mark either work or finding closed without the technician’s evidence; under the held company policy, closure waits for the supervisor’s decision.
 
-**Evidence.** `tests/gasket/agent-follow-up.mjs` — "agentFollowUpJourney"
+**Evidence.** `tests/gasket/agent-follow-up.mjs` — "agentFollowUpJourney"; `tests/gasket/agent-reassignment-policy.mjs` — "agentReassignmentPolicyJourney", loaded by `tests/gasket/agent-native-journey.mjs`: missed promises, source-bound policy reassignment, queues, attribution, replay and unsafe refusals
 **Gap.** A public-door journey computing standard/commitment and executing reassignment/sign-off under company policy is missing. The cited journeys show questions, blockers/promises, fixed-gate reassignment and unsupported-closure refusal.
 
 #### AGENT-006 — Reconcile spare-parts reality
