@@ -202,7 +202,7 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
 export async function proposalList(env: Bindings, _actor: Actor) {
   const rows = await all(env, `SELECT p.*, COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.subject=p.id AND a.action='proposal.prepare' ORDER BY a.seq LIMIT 1),m.name) AS prepared_by_name, d.name AS decided_by_name FROM gk_all_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by LEFT JOIN gk_members d ON d.id = p.decided_by
     ORDER BY p.status = 'pending' DESC, p.prepared_at DESC LIMIT 200`)
-  return Promise.all(rows.map(async row => ({ ...row, ...(row.kind === 'reassign' ? { source: await sha256Hex(row.basis_json) } : {}), payload: JSON.parse(row.payload_json), basis: JSON.parse(row.basis_json), payload_json: undefined, basis_json: undefined })))
+  return Promise.all(rows.map(async row => ({ ...row, ...(row.kind === 'corrective' && row.status === 'approved' && !row.decided_by ? { status: 'applied' } : {}), ...(row.kind === 'reassign' ? { source: await sha256Hex(row.basis_json) } : {}), payload: JSON.parse(row.payload_json), basis: JSON.parse(row.basis_json), payload_json: undefined, basis_json: undefined })))
 }
 
 /** An existing reassignment, remeasured through native facts, never model-supplied evidence. */

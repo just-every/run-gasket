@@ -180,7 +180,7 @@
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "83a51f48e66a2f2b8d50b8377cbbed40d4d846ae20ffe9cd6b2a5044f6ff1be2",
+      "sha256": "8b91f8a555b4ebb7b97f66473e7235b1c4a4fe76d0732a2caf0f20faa87ab113",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -1884,7 +1884,7 @@
       "executable": false
     },
     "src/gasket/proposals.ts": {
-      "sha256": "1ec7ed0c0e4f5da467eac858ad949d7869687f3a0ca29a152d0f9bc770f80412",
+      "sha256": "1477ee5de2e137e8af44466d000f190259b6c54f206d2ebb13d09d4661f12348",
       "executable": false
     },
     "src/gasket/purchase-authority.ts": {
