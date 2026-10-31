@@ -1,3 +1,4 @@
+import { fieldTools } from './fields'
 import { reassignmentTools } from './reassignment'
 import type { Bindings } from '../../auth.server'
 import { mutationTools } from './tools'
@@ -9,7 +10,7 @@ import { capabilities, notTools } from './index'
 export function agentDocumentation(request: Request, env: Bindings): Response | null {
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
-  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...fieldTools(env)].sort((a, b) => a.name.localeCompare(b.name))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -25,7 +26,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     '## Verification',
     '',
-    'agent-surface.json supplies every declared tool and class fixture. Its native owner initializer and additional journey exercise real production setup, scoped credentials, revocation, changed-key conflicts, stale revisions and native attribution. Standard is internal record work. Detailed work records include native personnel identities and authorized private pay and rate fields, so their class is sensitive; publishing the first immutable procedure revision and amending an existing exact revision are commitment, with no monetary consideration. Amendment resolves the primary-site target and step identities from native records, binds the source and proposed instructions to policy approval, and rechecks the source atomically. Earlier revisions and issued work keep their instructions. Native owner and lead authority is required; service credential scopes are unchanged.',
+    'agent-surface.json supplies every declared tool and class fixture. Its native owner initializer and additional journey exercise real production setup, scoped credentials, revocation, changed-key conflicts, stale revisions and native attribution. Standard is internal record work. Detailed work records include native personnel identities and authorized private pay and rate fields, so their class is sensitive; publishing the first immutable procedure revision and amending an existing exact revision are commitment, with no monetary consideration. Amendment resolves the primary-site target and step identities from native records, binds the source and proposed instructions to policy approval, and rechecks the source atomically. Earlier revisions and issued work keep their instructions. Native owner and lead authority is required; service credential scopes are unchanged. Retiring an existing custom-field identity is destructive, counts that one stored identity, binds its exact revision and retains all native values and history. Schema and membership authority remain unchanged.',
     '',
     '## Limits',
     '',

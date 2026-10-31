@@ -1,7 +1,14 @@
+import { fieldRetirementJourney, afterStep as fieldAfterStep } from './agent-field-retirement.mjs'
+import { afterStep as procedureAfterStep } from './agent-procedure-revisions.mjs'
 import assert from 'node:assert/strict'
 import procedureRevisions from './agent-procedure-revisions.mjs'
-export { beforeStep, afterStep } from './agent-procedure-revisions.mjs'
+export { beforeStep } from './agent-procedure-revisions.mjs'
 import { agentReassignmentPolicyJourney } from './agent-reassignment-policy.mjs'
+
+export async function afterStep(context) {
+  await procedureAfterStep(context)
+  await fieldAfterStep(context)
+}
 
 /** Additional Core proof uses native sessions and issued credentials; no fixture authority enters production. */
 export default async function journey({ request, origin, cookie, tool }) {
@@ -81,4 +88,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   console.log('Native Core journey: native audit attribution passed')
   await procedureRevisions({ request, origin, cookie, tool })
   await agentReassignmentPolicyJourney()
+  await fieldRetirementJourney()
 }
