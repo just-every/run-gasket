@@ -27,7 +27,7 @@ export async function workDependenciesJourney() {
     const owner=await h.owner()
     await h.api('site.configure',owner,{name:'Synthetic dependency plant',timezone:'UTC'})
     const ids={}, cookies={owner}
-    for(const [name,role] of [['lead','lead'],['tech','maintainer'],['reviewer','supervisor'],['agent','agent'],['revoked','lead']]) {
+    for(const [name,role] of [['lead','lead'],['tech','maintainer'],['reviewer','supervisor'],['agent','agent'],['revoked','lead'],['changing','lead']]) {
       ids[name]=(await h.api('access.give',owner,{name:`Synthetic ${name}`,email:address(`synthetic-gasket-dependency-${name}`),role})).id
       cookies[name]=await h.signIn(address(`synthetic-gasket-dependency-${name}`))
     }
@@ -79,6 +79,10 @@ export async function workDependenciesJourney() {
       await page.setViewportSize({width:1440,height:1000})
     }
     await capture('blocked')
+    const sourceBeforePreview=await read(predecessor)
+    const consequences=await h.api('workorders.bulk',cookies.lead,{workOrder:[predecessor],version:[String(sourceBeforePreview.version)],action:'cancel',reason:'Inspect dependency consequences',preview:true})
+    assert.ok(consequences.rows[0].notes.includes(`Dependent WO-${String((await read(dependent)).number).padStart(4,'0')} requires this work to remain independently approved`))
+    assert.deepEqual(await read(predecessor),sourceBeforePreview,'dependency consequence preview is read-only')
     let row=await read(dependent),before=await read(dependent)
     const blocked=await h.api('workorder.submit',cookies.tech,{workOrder:dependent,version:row.version},409)
     assert.equal(blocked.error,'not_ready_for_review');assert.ok(blocked.detail.missing.some(s=>s.includes('predecessor WO-')))
@@ -105,7 +109,14 @@ export async function workDependenciesJourney() {
     assert.equal((await h.raw('/api/gasket/workorder.dependency',{headers:{authorization:`Bearer ${credential.token}`},body:{...firstLink,active:false}})).status,403)
     assert.deepEqual(await snapshot(dependent),before)
     // Removing and re-adding retains one link identity and all three attributed revisions.
-    await action(await linkPayload(dependent,predecessor,false));await action(await linkPayload(dependent,predecessor))
+    await page.locator('form[action="/app/do/workorder.dependency"]').getByLabel('Reason for link change').fill('Remove a predecessor through the human form')
+    const removalResponse=page.waitForResponse(response=>response.url().endsWith('/app/do/workorder.dependency')&&response.request().method()==='POST')
+    await page.getByRole('button',{name:'Remove predecessor',exact:true}).click()
+    const removed=await removalResponse
+    assert.equal(removed.status(),200)
+    await page.getByRole('button',{name:'Remove predecessor',exact:true}).waitFor({state:'detached'})
+    assert.equal((await read(dependent)).dependencies.links[0].active,0)
+    await action(await linkPayload(dependent,predecessor))
     row=await read(dependent)
     assert.deepEqual(row.dependencies.history.map(d=>[d.revision,d.active,d.by]),[[1,1,'Synthetic lead'],[2,0,'Synthetic lead'],[3,1,'Synthetic lead']])
     const replay=await linkPayload(dependent,predecessor,false)
@@ -131,6 +142,39 @@ export async function workDependenciesJourney() {
     h.setDependencyHook(()=>h.api('workorder.evidence',cookies.tech,{workOrder:predecessor,version:1,file:file('synthetic-gasket-source.png',png,'image/png')}))
     assert.equal((await h.api('workorder.dependency',cookies.lead,racePayload,409)).error,'stale')
     assert.deepEqual(await read(race),unchanged);assert.deepEqual((await h.api('audit?action=workorder.dependency',owner)).rows,auditBefore)
+    // Revocation after the handler reads must still prevent its write batch.
+    const authorityRace=await make('Synthetic authority race'),authorityPayload=await linkPayload(authorityRace,predecessor)
+    const authorityBefore=await read(authorityRace),authorityAudit=(await h.api('audit?action=workorder.dependency',owner)).rows
+    h.setDependencyHook(()=>h.api('access.end',owner,{member:ids.changing}))
+    await h.api('workorder.dependency',cookies.changing,authorityPayload,409)
+    const authorityAfter=await read(authorityRace)
+    assert.deepEqual([authorityAfter.version,authorityAfter.status,authorityAfter.dependencies,authorityAfter.evidence],[authorityBefore.version,authorityBefore.status,authorityBefore.dependencies,authorityBefore.evidence])
+    assert.deepEqual((await h.api('audit?action=workorder.dependency',owner)).rows,authorityAudit)
+    // A submitted predecessor has no approval yet, and self-review cannot supply it.
+    const ownerId=(await h.api('me',owner)).id
+    const independent=(await h.api('workorder.create',owner,{asset,title:'Synthetic independent predecessor',due:today,assignee:ownerId})).id
+    const protectedWork=await make('Synthetic independently gated dependent')
+    await action(await linkPayload(protectedWork,independent))
+    await h.api('workorder.submit',owner,{workOrder:independent,version:1})
+    let pending=await read(independent)
+    assert.equal((await h.api('workorder.review',owner,{workOrder:independent,version:pending.version,decision:'approve'},403)).error,'own_work')
+    assert.deepEqual(await read(independent),pending)
+    assert.equal((await read(protectedWork)).dependencies.ready,false)
+    await h.api('workorder.review',cookies.reviewer,{workOrder:independent,version:pending.version,decision:'approve'})
+    assert.equal((await read(protectedWork)).dependencies.ready,true)
+    // A satisfied predecessor never supplies the required physical safety attestation.
+    const checklist=(await h.api('checklist.create',owner,{name:'Synthetic isolation checklist',items:['Confirm maintenance task']})).id
+    await h.api('safety.publish',owner,{checklist,hazard:'Stored energy',isolation:'Follow the approved site isolation procedure',qualification:'Synthetic isolation training',siteApproved:true})
+    const template=(await h.api('template.save',owner,{name:'Synthetic isolation work',title:'Synthetic isolated repair',checklist})).id
+    const isolated=(await h.api('workorder.create',owner,{asset,template,due:today,assignee:ids.tech})).id
+    await action(await linkPayload(isolated,independent))
+    await h.api('workorder.results',cookies.tech,{workOrder:isolated,outcome:['pass'],note:['Maintenance task recorded']})
+    const isolationBefore=await read(isolated)
+    assert.equal(isolationBefore.dependencies.ready,true)
+    assert.equal((await h.api('workorder.submit',cookies.tech,{workOrder:isolated,version:isolationBefore.version},409)).error,'safety_evidence_required')
+    assert.deepEqual(await read(isolated),isolationBefore)
+    assert.deepEqual((await h.api(`work/${isolated}/safety`,cookies.tech)).attestations,[])
+    console.log('PROBE PLAN-005 safety and authority: source approval grants no isolation attestation; self-review and authority revoked before persistence -> refused with unchanged work and link history')
     await complete(predecessor)
     row=await read(dependent);assert.equal(row.dependencies.ready,true)
     await capture('ready')

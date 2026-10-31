@@ -34,6 +34,8 @@ export async function changeWorkDependency(env: Bindings, actor: Actor, input: I
   insist(!actor.service && ['owner','lead'].includes(actor.role), 'forbidden', 403)
   const human = humanSessionSql(actor), capability = capabilitySql(actor.sessionId, 'work.assign')
   insist(await one(env, `SELECT 1 WHERE ${human.sql}`, ...human.params), 'access_ended', 403)
+  input.only(['workOrder','version','predecessor','predecessorVersion','revision','active','reason','returnTo'])
+  insist(input.present('active'), 'missing_active')
   const work = input.text('workOrder', { max: 100 }), predecessor = input.text('predecessor', { max: 100 })
   insist(work !== predecessor, 'dependency_self', 409)
   const version = input.integer('version', { min: 1, max: 1_000_000 })!

@@ -84,7 +84,6 @@ export async function recoveryJourney() {
     await h.api('bom.revise', owner, { ...applicability, asset: mismatched })
     const refusedWork = (await h.api('workorder.create', owner, { asset: mismatched, title: 'Restored model refusal', due: today, assignee: member })).id
     const dependencyRecords=await dependencyFixture(h,owner,member,asset)
-    const retainedDependencies=await h.api(`work/${dependencyRecords.work}`,owner)
     for(const id of [dependencyRecords.work,dependencyRecords.predecessor]) {
       const retained=await h.api(`work/${id}`,owner)
       const preview=await h.api(`record-erasure-preview?kind=work&id=${id}`,owner)
@@ -103,6 +102,7 @@ export async function recoveryJourney() {
     const paperAccept={preview:paperPreview,digest:paperDraft.digest,confirm:true}
     const paperReceipt=(await h.api('printpack.accept',owner,paperAccept)).receipt
     const erasedRecords=await erasureFixture(h,owner,asset)
+    const retainedDependencies=await h.api(`work/${dependencyRecords.work}`,owner)
     const paperSnapshot=await h.api(`work/${paperWork.work}`,owner)
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'recovery.rer')
