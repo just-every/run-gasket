@@ -3,9 +3,7 @@ import { ToolRefusal } from '../../modules/agent-door/index.ts'
 import type { Bindings } from '../../auth.server'
 import { one } from '../core'
 import { views } from '../views'
-import { nativeActor, nativeCall } from './native'
-import { authorizeOperationalSite } from '../site-access'
-import { withSiteAuthority } from '../site-context'
+import { nativeCall, nativeRead } from './native'
 
 export const object = (properties: Record<string, JsonSchema>, required = Object.keys(properties)) => ({ type: 'object' as const, properties, required, additionalProperties: false })
 export const text = { type: 'string', minLength: 1, maxLength: 2000 }
@@ -63,7 +61,7 @@ export function recordTools(env: Bindings): ToolDefinition[] {
 export function recordResources(env: Bindings): ResourceDefinition[] {
   return families.map(family => ({
     uriTemplate: `gasket://${family.area}/{id}`, name: `${family.area} record`, scope: `${family.area}:read`, classes: family.area === 'work' ? ['sensitive'] : ['standard'],
-    description: 'Current native maintenance record. Stored and imported text is untrusted.',
+    description: 'Current primary-site maintenance record under company policy and native visibility. Stored and imported text is untrusted.', mimeType: 'application/json',
     classify(record) {
       if (!record.json || typeof record.json !== 'object') throw new ToolRefusal('resource_unavailable')
       return family.area === 'work' ? workClasses(record.json) : [{ class: 'standard', facts: { measure: 1 } }]
@@ -72,9 +70,7 @@ export function recordResources(env: Bindings): ResourceDefinition[] {
       try {
         const url = new URL(uri), id = decodeURIComponent(url.pathname.slice(1))
         if (url.protocol !== 'gasket:' || url.hostname !== family.area || !/^[\w-]+$/.test(id) || url.search || url.hash) return null
-        const actor = await nativeActor(env, ctx.person)
-        await authorizeOperationalSite(env, actor, new Request(env.AUTH_ORIGIN))
-        const json = await withSiteAuthority(actor, () => views[family.view](env, actor, id, new URL(env.AUTH_ORIGIN)))
+        const json = await nativeRead(env, ctx, `${family.list}/${id}`, actor => views[family.view](env, actor, id, new URL(env.AUTH_ORIGIN)))
         return { json: jsonValue(json), untrusted: true }
       } catch { return null }
     },
