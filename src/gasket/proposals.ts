@@ -202,7 +202,7 @@ export async function applyCorrectiveProposal(env: Bindings, actor: Actor, input
 export async function proposalList(env: Bindings, _actor: Actor) {
   const rows = await all(env, `SELECT p.*, COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.subject=p.id AND a.action='proposal.prepare' ORDER BY a.seq LIMIT 1),m.name) AS prepared_by_name, d.name AS decided_by_name FROM gk_all_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by LEFT JOIN gk_members d ON d.id = p.decided_by
     ORDER BY p.status = 'pending' DESC, p.prepared_at DESC LIMIT 200`)
-  return Promise.all(rows.map(async row => ({ ...row, ...(row.kind === 'reassign' ? { source: await sha256Hex(row.basis_json) } : {}), payload: JSON.parse(row.payload_json), basis: JSON.parse(row.basis_json), payload_json: undefined, basis_json: undefined })))
+  return Promise.all(rows.map(async row => ({ ...row, ...(['reassign','interval'].includes(row.kind) ? { source: await sha256Hex(row.basis_json) } : {}), ...(row.kind === 'interval' ? { application: await one(env, 'SELECT * FROM gk_interval_policy_changes WHERE proposal_id=?', row.id) } : {}), payload: JSON.parse(row.payload_json), basis: JSON.parse(row.basis_json), payload_json: undefined, basis_json: undefined })))
 }
 
 /** An existing reassignment, remeasured through native facts, never model-supplied evidence. */
@@ -269,4 +269,81 @@ export async function applyReassignment(env: Bindings, actor: Actor, input: Inpu
   ]
   await assign(env, actor, Input.of({ ...payload, version: basis.version }), { proposal: proposal.id, also })
   return { id: proposal.id, status: 'approved', result: payload.workOrder }
+}
+
+/** Only existing, non-rollback shortenings are exposed by this policy adapter. */
+export async function intervalProposal(env: Bindings, actor: Actor, id: string, hash: string, source: string, completed = false) {
+  requireCapability(actor, 'proposal.decide')
+  const proposal = await one(env, "SELECT * FROM gk_proposals WHERE id=? AND kind='interval'", id)
+  insist(proposal, 'proposal_not_found', 404)
+  insist(hash === proposal.payload_hash && hash === await sha256Hex(proposal.payload_json)
+    && source === await sha256Hex(proposal.basis_json), 'proposal_changed', 409)
+  const payload = JSON.parse(proposal.payload_json) as Record<string, string>
+  const basis = JSON.parse(proposal.basis_json) as Awaited<ReturnType<typeof intervalBasis>>
+  insist(!payload.rollbackOf && !basis.rollback && basis.change.direction === 'shortening', 'interval_policy_shortening_only', 409)
+  insist(basis.schedule.id === payload.schedule && basis.limits.length === 3, 'proposal_changed', 409)
+  if (!completed) {
+    insist(proposal.status === 'pending', 'already_decided', 409)
+    const current = await intervalBasis(env, actor, payload)
+    insist(JSON.stringify(current) === proposal.basis_json, 'proposal_stale', 409)
+  }
+  return { proposal, payload, basis, source }
+}
+
+/** The policy decision, exact proposal and cadence effect share one native commit. */
+export async function applyIntervalProposal(env: Bindings, actor: Actor, input: Input) {
+  const ctx = agentContext(), policy = agentPolicyFence()
+  insist(ctx && policy && !actor.service, 'forbidden', 403)
+  const revision = await auditRevision(env)
+  const { proposal, payload, basis, source } = await intervalProposal(env, actor,
+    input.text('proposal', { max: 100 }), input.text('hash', { max: 64 }), input.text('source', { max: 64 }))
+  const admission = await one(env, `SELECT id,row,evidence FROM agent_door_audit
+    WHERE json_extract(row,'$.operation_id')=? AND json_extract(row,'$.tool')='gasket.proposals.interval'
+      AND json_extract(row,'$.outcome')='running' ORDER BY sequence DESC LIMIT 1`, ctx.operationId)
+  insist(admission, 'agent_policy_changed', 409)
+  const decision = JSON.parse(admission.row), evidence = JSON.parse(admission.evidence)
+  const envelope = policy.envelope ? JSON.parse(policy.envelope) : null
+  const document = envelope?.document ?? (policy.local_document ? JSON.parse(policy.local_document) : null)
+  insist(decision.sponsor.id === actor.id && decision.agent.id === ctx.agent.id && decision.idempotency_key === ctx.idempotencyKey
+    && decision.resource?.kind === 'schedule' && decision.resource.id === basis.schedule.id
+    && decision.classes.length === 1 && decision.classes[0].class === 'commitment'
+    && decision.revision === (envelope?.revision ?? policy.local_revision) && canonical(document) === canonical(evidence.document)
+    && ['autonomous','review','approval'].includes(decision.decision), 'agent_policy_changed', 409)
+  const decider = decision.decision === 'approval'
+    ? ctx.approvers.find(person => person.id !== proposal.prepared_by && person.id !== actor.id) : null
+  if (decision.decision === 'approval') {
+    insist(decider, 'own_proposal', 403)
+    insist(await one(env, `SELECT m.id FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+      JOIN gk_site_memberships sm ON sm.member_id=m.id AND sm.site_id='primary'
+      WHERE m.id=? AND m.status='active' AND o.status='active' AND sm.status='active' AND (o.role='owner' OR m.role='lead')`, decider!.id), 'forbidden', 403)
+  }
+  const decisionId = decision.decision_id ?? decision.id
+  const digest = await sha256Hex(canonical({ name: 'gasket.proposals.interval', arguments: {
+    proposal: proposal.id, hash: proposal.payload_hash, source, idempotency_key: ctx.idempotencyKey,
+  }, ...(ctx.clientId === undefined ? {} : { client_id: ctx.clientId }) }))
+  const claim = await one(env, 'SELECT agent,key,digest,decision_id FROM agent_door_calls WHERE agent=? AND decision_id=?', ctx.agent.id, decisionId)
+  insist(claim?.digest === digest, 'proposal_changed', 409)
+  const also = [
+    auditFence(env, revision),
+    guard(env, 'proposal_changed', 'EXISTS(SELECT 1 FROM agent_door_calls WHERE agent=? AND key=? AND digest=? AND decision_id=?)', claim.agent, claim.key, digest, decisionId),
+    ...(decider ? [guard(env, 'agent_authority_ended', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+      JOIN gk_site_memberships sm ON sm.member_id=m.id AND sm.site_id='primary'
+      WHERE m.id=? AND m.status='active' AND o.status='active' AND sm.status='active' AND (o.role='owner' OR m.role='lead'))`, decider.id)] : []),
+    guard(env, 'agent_policy_changed', 'EXISTS(SELECT 1 FROM agent_door_audit WHERE id=? AND row=? AND evidence=?)', admission.id, admission.row, admission.evidence),
+    guard(env, 'already_decided', `EXISTS(SELECT 1 FROM gk_proposals WHERE id=? AND status='pending'
+      AND payload_hash=? AND payload_json=? AND basis_json=? AND prepared_by=?)`, proposal.id, proposal.payload_hash, proposal.payload_json, proposal.basis_json, proposal.prepared_by),
+    ...basis.limits.map(limit => guard(env, 'proposal_stale', `EXISTS(SELECT 1 FROM gk_interval_limits l WHERE l.id=? AND l.revision=?
+      AND NOT EXISTS(SELECT 1 FROM gk_interval_limits n WHERE n.schedule_id=l.schedule_id AND n.source=l.source AND n.revision>l.revision))`, limit.id, limit.revision)),
+    stmt(env, `UPDATE gk_proposals SET status='approved',decided_by=?,decided_at=?,decision_note=?,result_id=? WHERE id=?`,
+      decider?.id ?? null, now(), `Company policy ${decision.revision}: ${decision.decision}; decision ${decisionId}`, payload.schedule, proposal.id),
+    stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.apply', proposal.id, JSON.stringify({
+      hash: proposal.payload_hash, source, basis, result: payload.schedule, decision: decisionId, disposition: decision.decision,
+      preparedBy: ctx.actor, approvers: ctx.approvers, operationId: ctx.operationId,
+    })),
+  ]
+  await applyInterval(env, actor, payload, basis, proposal.id, also, {
+    sponsor: actor.id, agent: ctx.agent.id, operation: ctx.operationId, decision: decisionId,
+    disposition: decision.decision, approver: decider?.id ?? null, hash: proposal.payload_hash, source, basis: proposal.basis_json,
+  })
+  return { id: proposal.id, status: 'approved', result: payload.schedule }
 }

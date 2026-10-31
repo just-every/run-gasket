@@ -4,21 +4,14 @@ import { pathToFileURL } from 'node:url'
 import { harness } from './harness.mjs'
 import { offset, zone } from './clock.mjs'
 
-export async function intervalJourney() {
-  const initial = await harness(); let h = initial
-  try {
-    const cookie = { owner: await h.owner() }, ids = {}, assets = [], schedules = [], meters = [], jobs = []
-    await h.api('site.configure', cookie.owner, { name: 'Great Lakes Packaging and Compressor Works', timezone: zone })
-    for (const [key, role, name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['sam','supervisor','Rosa Alvarez'],['agent','agent','Reliability agent']]) {
-      ids[key] = (await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})).id
-      cookie[key] = await h.signIn(`${key}@example.test`)
-    }
+export async function intervalCohort(h, cookie, ids, prefix = 'CMP') {
+  const assets = [], schedules = [], meters = [], jobs = []
     const day = (await h.api('me',cookie.owner)).today
     const shift = n => { const d = new Date(`${day}T12:00Z`); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10) }
     const from = shift(-2), to = day
-    const checklist = (await h.api('checklist.create',cookie.lead,{name:'Compressor bearing condition and guard check',items:['Inspect bearing and guard']})).id
+    const checklist = (await h.api('checklist.create',cookie.lead,{name:`${prefix} compressor bearing condition and guard check`,items:['Inspect bearing and guard']})).id
     for (let i=0;i<3;i++) {
-      const asset = (await h.api('asset.create',cookie.lead,{tag:`CMP-${i+1}`,name:`Production air compressor ${i+1} with remote intake and access platform`,location:'West production hall',category:'Air compressor'})).id
+      const asset = (await h.api('asset.create',cookie.lead,{tag:`${prefix}-${i+1}`,name:`Production air compressor ${i+1} with remote intake and access platform`,location:'West production hall',category:'Air compressor'})).id
       assets.push(asset)
       const meter = (await h.api('meter.create',cookie.lead,{asset,name:'Run hours',kind:'counter',unit:'h'})).id; meters.push(meter)
       schedules.push((await h.api('schedule.create',cookie.lead,{asset,checklist,title:`Inspect compressor ${i+1} bearing condition before production`,everyDays:30,meter,everyUnits:'100',firstDue:shift(-29),firstDueMeter:'200',assignee:ids.max})).id)
@@ -44,6 +37,19 @@ export async function intervalJourney() {
     const issued = await h.api('workorders.generate',cookie.lead,{})
     assert.equal(issued.created.length,3,'AGENT-003 pending issued orders exercise preservation')
     const issuedBefore = await Promise.all(issued.created.map(w=>h.api(`work/${w.id}`,cookie.lead)))
+  return { assets, schedules, meters, jobs, from, to, shift, limit, issued, issuedBefore }
+}
+
+export async function intervalJourney() {
+  const initial = await harness(); let h = initial
+  try {
+    const cookie = { owner: await h.owner() }, ids = {}
+    await h.api('site.configure', cookie.owner, { name: 'Great Lakes Packaging and Compressor Works', timezone: zone })
+    for (const [key, role, name] of [['lead','lead','Mara Chen'],['max','maintainer','Luis Ortega'],['sam','supervisor','Rosa Alvarez'],['agent','agent','Reliability agent']]) {
+      ids[key] = (await h.api('access.give',cookie.owner,{name,email:`${key}@example.test`,role})).id
+      cookie[key] = await h.signIn(`${key}@example.test`)
+    }
+    const { assets, schedules, meters, jobs, from, to, shift, limit, issued, issuedBefore } = await intervalCohort(h, cookie, ids)
     await h.stop()
     h = await harness({installation:initial.installation,vars:initial.vars,clockOffset:offset+86_400_000,formSaveFault:true})
     cookie.owner=await h.signIn(initial.vars.OWNER_EMAIL)

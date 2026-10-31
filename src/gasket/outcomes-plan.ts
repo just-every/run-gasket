@@ -36,7 +36,7 @@ export async function outcomeFollowUp(env: Bindings, actor: Actor, input: Input,
   insist(current.id === report.id,'outcome_stale',409,{current:current.id})
   if(reversal) {
     insist(report.status === 'worsening','outcome_not_worsening',409)
-    const change = await one<Row>(env,'SELECT * FROM gk_interval_changes WHERE proposal_id=?',report.proposal)
+    const change = await one<Row>(env,'SELECT * FROM gk_all_interval_changes WHERE proposal_id=?',report.proposal)
     insist(change,'approved_intervention_not_found',404)
     return prepare(env,actor,Input.of({kind:'interval',reasoning:`Observed maintenance outcome: exposure-normalized performance worsened. Review the retained comparison and confounders before restoring the prior cadence.`,payload:{
       schedule:change.schedule_id,...(change.before_days?{everyDays:String(change.before_days)}:{}),...(change.before_units?{everyUnits:change.before_units}:{}),
