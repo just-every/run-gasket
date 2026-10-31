@@ -26,13 +26,7 @@ function pmDatabase(db) {
   }, exec: query => db.exec(query) }
 }
 export default { ...worker,
-  fetch(request, env, ctx) {
-    if (new URL(request.url).pathname === '/cdn-cgi/gasket-test-clock') {
-      globalThis.__gasketInstant = Number(new URL(request.url).searchParams.get('instant'))
-      return new Response(null, { status: 204 })
-    }
-    return worker.fetch(request, { ...env, DB: pmDatabase(env.DB) }, ctx)
-  },
+  fetch(request, env, ctx) { return testClock(request) ?? worker.fetch(request, { ...env, DB: pmDatabase(env.DB) }, ctx) },
   scheduled(controller, env, ctx) { return worker.scheduled(controller, { ...env, DB: pmDatabase(env.DB) }, ctx) },
 }
 `

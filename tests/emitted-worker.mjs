@@ -21,7 +21,8 @@ const { unstable_splitSqlQuery: splitSql } = require('wrangler')
 /**
  * With `installation`, the Worker runs on that local installation's D1 (already migrated) and leaves it in place.
  * With `offset` (ms), the Worker's clock runs that far from the machine's: an entry module replaces Date before the
- * built Worker loads, so the test, not the hour it happens to run at, decides what day it is.
+ * built Worker loads, so the test, not the hour it happens to run at, decides what day it is. `setClockInstant(ms)`
+ * holds that clock at one instant and `setClockInstant()` lets it run again.
  */
 export async function emittedWorker(vars, { installation, offset, instant, outbound, generationGate = false, formSaveFault = false, pmGate = false, proposalGate = false } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
@@ -39,8 +40,8 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter(file => file.endsWith('.js')).map(file => `assets/${file}`)]
     .map(file => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
   if (offset !== undefined || instant !== undefined) modules.unshift(
-    { type: 'ESModule', path: join(root, 'dist/server/pinned-entry.mjs'), contents: `import './pinned-clock.mjs'\nexport * from './${config.main}'\n${proposalGate?`import worker from './${config.main}'\n${proposalApplicationGate}`:pmGate?`import worker from './${config.main}'\n${pmAttemptGate}`:formSaveFault?`import worker from './${config.main}'\n${formSaveGate}`:generationGate?`import worker from './${config.main}'\n${reportGenerationGate}`:`export { default } from './${config.main}'`}\n` },
-    { type: 'ESModule', path: join(root, 'dist/server/pinned-clock.mjs'), contents: `const Real = Date, offset = ${offset ?? 0}\nglobalThis.__gasketInstant = ${instant ?? "undefined"}\nclass PinnedDate extends Real { constructor(...args) { super(...(args.length ? args : [globalThis.__gasketInstant ?? Real.now() + offset])) } static now() { return globalThis.__gasketInstant ?? Real.now() + offset } }\nglobalThis.Date = PinnedDate\n` })
+    { type: 'ESModule', path: join(root, 'dist/server/pinned-entry.mjs'), contents: `import { testClock } from './pinned-clock.mjs'\nexport * from './${config.main}'\n${proposalGate?`import worker from './${config.main}'\n${proposalApplicationGate}`:pmGate?`import worker from './${config.main}'\n${pmAttemptGate}`:formSaveFault?`import worker from './${config.main}'\n${formSaveGate}`:generationGate?`import worker from './${config.main}'\n${reportGenerationGate}`:`import worker from './${config.main}'\nexport default { ...worker, fetch: (request, env, ctx) => testClock(request) ?? worker.fetch(request, env, ctx) }`}\n` },
+    { type: 'ESModule', path: join(root, 'dist/server/pinned-clock.mjs'), contents: `const Real = Date, offset = ${offset ?? 0}\nglobalThis.__gasketInstant = ${instant ?? "undefined"}\nclass PinnedDate extends Real { constructor(...args) { super(...(args.length ? args : [globalThis.__gasketInstant ?? Real.now() + offset])) } static now() { return globalThis.__gasketInstant ?? Real.now() + offset } }\nglobalThis.Date = PinnedDate\nexport const testClock = request => { const url = new URL(request.url); if (url.pathname !== '/cdn-cgi/gasket-test-clock') return; globalThis.__gasketInstant = url.searchParams.has('instant') ? Number(url.searchParams.get('instant')) : undefined; return new Response(null, { status: 204 }) }\n` })
   const options = () => ({
     ...convertV4MiniflareOptions({
       host: '127.0.0.1', port: 0, https: true, unsafeTriggerHandlers: true, modulesRoot: join(root, 'dist/server'),
@@ -89,7 +90,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   } catch (error) { await close(); throw error }
   return worker()
 
-  function worker() { return { origin, scratch: directory, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setPMHook: value => { pmHook=value }, setProposalHook: value => { proposalHook=value }, setClockInstant: value => mf.dispatchFetch(`${origin}/cdn-cgi/gasket-test-clock?instant=${value}`), setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step; saveCommits=0 }, getSaveCommits: () => saveCommits, request, scheduled, signInToken, close } }
+  function worker() { return { origin, scratch: directory, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setPMHook: value => { pmHook=value }, setProposalHook: value => { proposalHook=value }, setClockInstant: value => mf.dispatchFetch(`${origin}/cdn-cgi/gasket-test-clock${value === undefined ? '' : `?instant=${value}`}`), setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step; saveCommits=0 }, getSaveCommits: () => saveCommits, request, scheduled, signInToken, close } }
 
   /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
   async function scheduled(cron, at = instant ?? Date.now() + (offset ?? 0)) {

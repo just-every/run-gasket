@@ -9,16 +9,23 @@ const local = instant => {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(instant).map(p => [p.type,p.value]))
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`
 }
+/** The journey runs on one held instant: unknown coverage counts wall time up to now, so doors compared on a running
+ * clock could read either side of a minute (12:02:59 and 12:03:00 round to 706 and 706.1 hours). */
 export async function metricsJourney(h, cookie, people) {
-  const today = local(now()).slice(0,10)
+  const at = now()
+  assert.equal((await h.setClockInstant(at)).status, 204)
+  try { await journey(h, cookie, people, at) } finally { await h.setClockInstant(h.clockInstant) }
+}
+async function journey(h, cookie, people, at) {
+  const today = local(at).slice(0,10)
   const asset = (await h.api('asset.create', cookie.lead, { tag: 'DQ-901', name: 'Process chilled-water recirculation pump', location: 'North plant · Chiller skid 4' })).id
   const meter = (await h.api('meter.create', cookie.lead, { asset, name: 'Drive operating hours', unit: 'h', kind: 'counter' })).id
-  for (const [value,minutes] of [['100',180],['102',60]]) await h.api('meter.feed', cookie.lead, { meter, source: 'Plant historian export', value, takenOn: local(now()-minutes*60000) })
-  const late = await h.api('meter.feed', cookie.lead, { meter, source: 'Delayed gateway file', value: '99', takenOn: local(now()-30*3600000) })
+  for (const [value,minutes] of [['100',180],['102',60]]) await h.api('meter.feed', cookie.lead, { meter, source: 'Plant historian export', value, takenOn: local(at-minutes*60000) })
+  const late = await h.api('meter.feed', cookie.lead, { meter, source: 'Delayed gateway file', value: '99', takenOn: local(at-30*3600000) })
   assert.equal(late.quality,'stale')
   const job = (await h.api('workorder.create', cookie.lead, { asset, title: 'Inspect noisy drive bearing and restore circulation', due: today, assignee: people.max })).id
-  await h.api('downtime.start', cookie.max, { workOrder: job, startedOn: local(now()-120*60000), reason: 'Bearing vibration exceeded shutdown trigger' })
-  await h.api('downtime.end', cookie.max, { workOrder: job, endedOn: local(now()-90*60000) })
+  await h.api('downtime.start', cookie.max, { workOrder: job, startedOn: local(at-120*60000), reason: 'Bearing vibration exceeded shutdown trigger' })
+  await h.api('downtime.end', cookie.max, { workOrder: job, endedOn: local(at-90*60000) })
   // This journey imports its own records: prior flows deliberately edit and retain their moved-in records.
   const ownSource=text=>text.replaceAll('82001','92001').replaceAll('82002','92002').replaceAll('HK-201','DQ-201').replaceAll('HK-202','DQ-202').replace(/700([1-8])/g,'9700$1')
   const files = { assets: file('maintainx-assets-quality.csv', ownSource(historyAssetsCsv)), work: file('maintainx-incomplete-history.csv', ownSource(workCsv)) }

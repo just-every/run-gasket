@@ -4708,7 +4708,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "e2ee5e321c80f20a15444b021785493363d75fb51bf12ed58d18e732bdec3847",
+      "sha256": "24492a71b4c332d862a7e8a7fabdf63f804566368c25bdc5a60cefa476c05e68",
       "executable": false
     },
     "tests/gasket/agent-comments.mjs": {
@@ -4844,7 +4844,7 @@
       "executable": false
     },
     "tests/gasket/metrics.mjs": {
-      "sha256": "a989170c8a32fae9c7b7ab3f34659a95bb137b17f07972f9716d8e40e0e532de",
+      "sha256": "be240c68880f0cb217d29ce51d8a938f7c9342bb9508a99af8911a90a06a368a",
       "executable": false
     },
     "tests/gasket/nested.mjs": {
@@ -4872,7 +4872,7 @@
       "executable": false
     },
     "tests/gasket/pm-attempt-gate.mjs": {
-      "sha256": "72cf5c8fe0c941c0a088a9cd3aa79d924c998b78c88c42243bb5a487ab699fc2",
+      "sha256": "95af1ab6784c27213e694c9b8b5c0d20c0e79c95100a17ead98cb290a6118a74",
       "executable": false
     },
     "tests/gasket/pm-interruption.mjs": {
