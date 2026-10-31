@@ -106,7 +106,7 @@ export async function thread(env: Bindings, actor: Actor, kind: Kind, id: string
     all(env, `SELECT x.comment_id, m.id, m.name FROM gk_comment_mentions x JOIN gk_members m ON m.id = x.member_id WHERE x.${where} ORDER BY m.name, m.id`, id),
     all(env, `SELECT id, comment_id, filename, media_type, size, sha256 FROM gk_comment_photos WHERE ${where} ORDER BY position`, id),
     all(env, `SELECT r.comment_id, r.number, r.body,
-      COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.action=CASE WHEN r.number=1 THEN 'comment.post' ELSE 'comment.edit' END AND json_extract(a.detail,'$.comment')=r.comment_id AND a.at=r.edited_at ORDER BY a.seq LIMIT 1),m.name) AS by,
+      COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.action=CASE WHEN r.number=1 THEN 'comment.post' ELSE 'comment.edit' END AND json_extract(a.detail,'$.comment')=r.comment_id AND (r.number=1 OR a.at=r.edited_at) ORDER BY a.seq LIMIT 1),m.name) AS by,
       r.edited_at FROM gk_comment_revisions r LEFT JOIN gk_members m ON m.id = r.edited_by WHERE r.${where} ORDER BY r.number`, id),
   ])
   const of = (list: Row[], comment: string) => list.filter(row => row.comment_id === comment).map(({ comment_id: _comment, ...row }) => row)
