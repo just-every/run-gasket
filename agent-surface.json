@@ -278,6 +278,18 @@
         "SURFACE-001",
         "SURFACE-002"
       ]
+    },
+    {
+      "name": "gasket.fields.retire",
+      "scope": "customfield.retire",
+      "readOnly": false,
+      "classes": [
+        "destructive"
+      ],
+      "clauses": [
+        "ASSET-009",
+        "SURFACE-004"
+      ]
     }
   ],
   "notTools": [
@@ -730,6 +742,33 @@
         "kind": "work",
         "id": {
           "$from": "work",
+          "pointer": "/id"
+        }
+      }
+    },
+    {
+      "id": "retire-field",
+      "tool": "gasket.fields.retire",
+      "args": {
+        "id": {
+          "$fixture": "retirement",
+          "pointer": "/id"
+        },
+        "revision": 1,
+        "expected_revision": 1
+      },
+      "expect": [
+        {
+          "class": "destructive",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ],
+      "target": {
+        "kind": "custom-field",
+        "id": {
+          "$fixture": "retirement",
           "pointer": "/id"
         }
       }
