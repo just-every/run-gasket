@@ -4,6 +4,7 @@ import { createAgentDoor, type Trust } from '../../modules/agent-door/index.ts'
 import { runtimeBindings, type Bindings } from '../../auth.server'
 import { serviceActor } from '../service-auth'
 import { one } from '../core'
+import { withNativeRequest } from './native'
 import { gasketPeople } from './people'
 import { mutationTools } from './tools'
 import { recordResources, recordTools } from './records'
@@ -23,7 +24,7 @@ export const notTools = [
 export const capabilities = ['tools', 'policy', 'pause', 'audit', 'idempotency'] as const
 export function gasketAgentDoor(original: Bindings) {
   const env = runtimeBindings(original)
-  return createAgentDoor({ seed: 'gasket', name: 'Gasket', specialist: 'maintenance coordinator', db: env.DB, origin: env.AUTH_ORIGIN,
+  const door = createAgentDoor({ seed: 'gasket', name: 'Gasket', specialist: 'maintenance coordinator', db: env.DB, origin: env.AUTH_ORIGIN,
     trust: trust(env), people: gasketPeople(env), tools: [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env)], resources: recordResources(env), notTools, capabilities,
     async localCredentials(request) {
       try {
@@ -37,4 +38,5 @@ export function gasketAgentDoor(original: Bindings) {
       return credential ? JSON.parse(credential.scopes_json) : []
     },
   })
+  return { ...door, handle: (request: Request) => withNativeRequest(request, () => door.handle(request)) }
 }
