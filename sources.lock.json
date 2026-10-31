@@ -1444,7 +1444,7 @@
       "executable": false
     },
     "src/gasket/agent-door/docs.ts": {
-      "sha256": "d80d945e9693e01e5c43ded21320d357ef1aca8bd9a6e6a8be5831c95b0e0ee6",
+      "sha256": "4a6b0ffdcd5d46899d773bae5882618eba38179077cc9e6be12bfa6fb9e88ba0",
       "executable": false
     },
     "src/gasket/agent-door/index.ts": {
@@ -1592,7 +1592,7 @@
       "executable": false
     },
     "src/gasket/comments.ts": {
-      "sha256": "5cad47d1bf79b74abc9b2008ba25dfbb727b2dfe568f824d15a3ec1bfb91d325",
+      "sha256": "03c44c75dbc46af8d487d4470a1c818cbeb9245af5f30c6c45b4d45bc64508e5",
       "executable": false
     },
     "src/gasket/compliance-pack.ts": {
