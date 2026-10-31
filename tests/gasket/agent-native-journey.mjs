@@ -1,3 +1,4 @@
+import proposalPolicyJourney from './agent-proposal-policy.mjs'
 import assert from 'node:assert/strict'
 import procedureRevisions from './agent-procedure-revisions.mjs'
 export { beforeStep, afterStep } from './agent-procedure-revisions.mjs'
@@ -81,4 +82,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   console.log('Native Core journey: native audit attribution passed')
   await procedureRevisions({ request, origin, cookie, tool })
   await agentReassignmentPolicyJourney()
+  await proposalPolicyJourney()
 }
