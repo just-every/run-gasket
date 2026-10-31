@@ -22,6 +22,10 @@ function render(value: unknown): string {
 export const initials = (name: string) => name.split(/\s+/).filter(Boolean).map(part => part[0]).slice(0, 2).join('').toUpperCase()
 
 const ERRORS: Record<string, string> = {
+  dependency_self: 'a work order cannot depend on itself.',
+  dependency_cycle: 'that predecessor would create a dependency cycle.',
+  dependencies_blocked: 'a predecessor no longer has current independent approval. Your work evidence is unchanged.',
+  dependency_unchanged: 'this link already has that state. Reload to inspect it.',
   stale: 'someone changed this record first. Reload and try again.',
   insufficient_stock: 'there is not that much of this part on hand.',
   source_reconciliation_required: 'this part has an unattributed stock change. Bin reconciliation is required before further issues.',

@@ -1,5 +1,6 @@
 // PM-006: my notices and the chase rule, and the chasing card on a work order.
 import type { Bindings } from '../../auth.server'
+import { one } from '../core'
 import { can, type Actor } from '../actor'
 import { chaseRule, notices } from '../chasing'
 import { showDate, showInstant } from '../dates'
@@ -33,4 +34,19 @@ export function chaseCard(w: any, actor: Actor, back: string, people: { id: stri
     ${chase.blockers.filter((row: any) => !row.resolved_at && (row.owner_id === actor.id || mine || lead)).map((row: any) => form('blocker.resolve', back, h`${hidden('blocker', row.id)}${field(`What cleared the ${BLOCKERS.find(item => item.value === row.kind)!.label.toLowerCase()} blocker`, 'resolution')}`, 'Clear blocker', { secondary: true }))}
     ${chase.notices.length ? h`<ul class="gk-plain-list">${chase.notices.map((row: any) => h`<li>${tag(KIND[row.kind])} ${row.recipient ?? '—'}<span class="gk-sub">${row.text}</span></li>`)}</ul>` : ''}
     ${mine ? h`${post('workorder.respond', hidden('response', 'on_it'), 'I am on it')}${post('workorder.respond', h`${hidden('response', 'blocked')}${blockerFields(people)}`, 'Report a blocker')}` : lead ? post('blocker.raise', blockerFields(people), 'Raise a blocker') : ''}`, { id: 'chasing' })
+}
+
+/** Existing work pages carry the link search, confirmation and retained history. */
+export async function dependencyCard(env: Bindings, w: any, actor: Actor, back: string, url: URL) {
+  const d = w.dependencies, editable = !actor.service && ['owner','lead'].includes(actor.role) && ['open','in_progress','returned'].includes(w.status)
+  const number = url.searchParams.get('predecessor') ?? ''
+  const candidate = editable && /^\d{1,9}$/.test(number) ? await one(env, 'SELECT id,number,title,status,version FROM gk_work_orders WHERE number=?', Number(number)) : null
+  const fields = (source: any, revision: number, active: boolean) => h`${hidden('workOrder', w.id)}${hidden('version', w.version)}${hidden('predecessor', source.predecessor_id ?? source.id)}${hidden('predecessorVersion', source.version)}${hidden('revision', revision)}${hidden('active', active ? 'yes' : 'no')}${field('Reason for link change', 'reason')}`
+  return card('Predecessor work', h`<p role="status">${tag(d.ready ? 'Ready' : 'Blocked')} ${d.ready ? 'All linked predecessors have current independent approval.' : 'A linked predecessor still needs current independent approval.'}</p>
+    <p>Completion of a predecessor grants no permit, isolation attestation or physical authorization. Ordinary safety checks and independent review still apply.</p>
+    ${d.links.filter((row: any) => row.active).map((row: any) => h`<p><a href="/app/work/${row.predecessor_id}">WO-${String(row.number).padStart(4, '0')} · ${row.title}</a><span class="gk-sub">${row.satisfied ? 'Independently approved' : `Blocked: ${row.status.replace(/_/g, ' ')}`} · Work version ${row.version} · Link revision ${row.revision}</span></p>${editable ? form('workorder.dependency', back, fields(row, row.revision, false), 'Remove predecessor', { secondary: true }) : ''}`)}
+    ${editable ? h`<form method="get" action="${back}#dependencies" class="gk-form">${field('Find predecessor by work number', 'predecessor', { type: 'number', value: number })}<button class="gk-secondary" type="submit">Find predecessor</button></form>
+      ${candidate ? h`<p>WO-${String(candidate.number).padStart(4, '0')} · ${candidate.title} · ${candidate.status.replace(/_/g, ' ')} · Version ${candidate.version}</p>${candidate.id === w.id ? h`<p>This work cannot depend on itself.</p>` : d.links.some((row: any) => row.predecessor_id === candidate.id && row.active) ? h`<p>This predecessor is already linked.</p>` : form('workorder.dependency', back, fields(candidate, d.links.find((row: any) => row.predecessor_id === candidate.id)?.revision ?? 0, true), 'Add predecessor', { secondary: true })}` : number ? h`<p>No work found for that number.</p>` : ''}` : ''}
+    ${d.history.length ? h`<details><summary>Link history</summary><ul class="gk-plain-list">${d.history.map((row: any) => h`<li>WO-${String(row.number).padStart(4, '0')} · ${row.active ? 'Linked' : 'Removed'} · Revision ${row.revision}: ${row.reason}<span class="gk-sub">${row.by} · ${showInstant(row.changed_at, actor.zone)}</span></li>`)}</ul></details>` : ''}
+    ${d.dependents.length ? h`<p>Required by ${d.dependents.map((row: any) => h`<a href="/app/work/${row.id}">WO-${String(row.number).padStart(4, '0')} ${row.title}</a> `)}</p>` : ''}`, { id: 'dependencies' })
 }
