@@ -57,20 +57,20 @@ import { now, zone } from './clock.mjs'
 // so reports keeps its required report-pack, PDF and retention journeys in budget.
 const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
-  [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
+  [printPacksJourney, 'inventory-1'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory-2'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
   [privateFileLinksJourney, 'automation'],
-  [requiredMigrationJourney,'inventory'],
-  [safetyJourney,'inventory'],
-  [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
+  [requiredMigrationJourney,'inventory-1'],
+  [safetyJourney,'inventory-3'],
+  [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory-3'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
-  [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
+  [workReturnsJourney, 'inventory-3'], [replenishmentJourney, 'inventory-2'], [vendorFollowUpJourney, 'inventory-2'],
   [conditionalWorkspaceJourney, 'workspace'],
   [outcomeJourney, 'reports'], [agentOutcomePolicyJourney, 'workspace'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
-assert.ok(['all', 'core', 'automation', 'inventory', 'reports', 'workspace'].includes(shard), `Unknown flows shard: ${shard}`)
+assert.ok(['all', 'core', 'automation', 'inventory-1', 'inventory-2', 'inventory-3', 'reports', 'workspace'].includes(shard), `Unknown flows shard: ${shard}`)
 const h = shard === 'all' || shard === 'core' ? await harness() : null
 let passed = 0
 const check = async (id, run) => {

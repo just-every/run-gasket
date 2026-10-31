@@ -189,7 +189,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, automation, inventory, reports, workspace]
+        shard: [core, automation, inventory-1, inventory-2, inventory-3, reports, workspace]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
