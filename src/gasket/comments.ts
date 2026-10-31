@@ -1,6 +1,8 @@
 // PLAN-006: comments, mentions and shift handoff on a work order or an asset.
 // Every member reads a record's thread; the people roles (owner, lead,
-// maintainer, supervisor) post to it, an agent does not. A comment is plain
+// maintainer, supervisor) post to it; the native agent role does not. The MCP
+// adapter acts for an authorized human sponsor under current company policy.
+// A comment is plain
 // text with up to four photos, may be marked a shift handoff summary, and
 // mentions active people chosen when it is posted: each gets one in-app notice
 // on the Notices page linking to the comment. Only its author edits it, and
@@ -98,10 +100,14 @@ export async function thread(env: Bindings, actor: Actor, kind: Kind, id: string
   const marker = (await one(env, 'SELECT read_seq FROM gk_comment_reads WHERE member_id = ? AND subject_kind = ? AND subject_id = ?', actor.id, kind, id))?.read_seq ?? 0
   const where = `comment_id IN (SELECT id FROM gk_comments WHERE ${COLUMN[kind]} = ?)`
   const [rows, mentions, photos, revisions] = await Promise.all([
-    all(env, `SELECT c.id, c.seq, c.kind, c.body, c.author_id, m.name AS author, c.created_at, c.edited_at FROM gk_comments c LEFT JOIN gk_members m ON m.id = c.author_id WHERE c.${COLUMN[kind]} = ? ORDER BY c.seq`, id),
+    all(env, `SELECT c.id, c.seq, c.kind, c.body, c.author_id,
+      COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.action='comment.post' AND a.subject=COALESCE(c.work_order_id,c.asset_id) AND json_extract(a.detail,'$.comment')=c.id ORDER BY a.seq LIMIT 1),m.name) AS author,
+      c.created_at, c.edited_at FROM gk_comments c LEFT JOIN gk_members m ON m.id = c.author_id WHERE c.${COLUMN[kind]} = ? ORDER BY c.seq`, id),
     all(env, `SELECT x.comment_id, m.id, m.name FROM gk_comment_mentions x JOIN gk_members m ON m.id = x.member_id WHERE x.${where} ORDER BY m.name, m.id`, id),
     all(env, `SELECT id, comment_id, filename, media_type, size, sha256 FROM gk_comment_photos WHERE ${where} ORDER BY position`, id),
-    all(env, `SELECT r.comment_id, r.number, r.body, m.name AS by, r.edited_at FROM gk_comment_revisions r LEFT JOIN gk_members m ON m.id = r.edited_by WHERE r.${where} ORDER BY r.number`, id),
+    all(env, `SELECT r.comment_id, r.number, r.body,
+      COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.action=CASE WHEN r.number=1 THEN 'comment.post' ELSE 'comment.edit' END AND json_extract(a.detail,'$.comment')=r.comment_id AND a.at=r.edited_at ORDER BY a.seq LIMIT 1),m.name) AS by,
+      r.edited_at FROM gk_comment_revisions r LEFT JOIN gk_members m ON m.id = r.edited_by WHERE r.${where} ORDER BY r.number`, id),
   ])
   const of = (list: Row[], comment: string) => list.filter(row => row.comment_id === comment).map(({ comment_id: _comment, ...row }) => row)
   const comments = rows.map(row => ({ ...row, unread: row.author_id !== actor.id && row.seq > marker, mentions: of(mentions, row.id), photos: of(photos, row.id), revisions: of(revisions, row.id) }))

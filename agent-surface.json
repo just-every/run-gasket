@@ -251,6 +251,19 @@
         "SURFACE-003",
         "SURFACE-006"
       ]
+    },
+    {
+      "name": "gasket.comments.post",
+      "scope": "comment.post",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "PLAN-006",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
     }
   ],
   "notTools": [
@@ -647,6 +660,32 @@
           "class": "standard"
         }
       ]
+    },
+    {
+      "id": "comment",
+      "tool": "gasket.comments.post",
+      "args": {
+        "workOrder": {
+          "$from": "work",
+          "pointer": "/id"
+        },
+        "body": "Synthetic gasket observation: inspect <bearing> & retain original text.\nNo physical maintenance is asserted."
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ],
+      "target": {
+        "kind": "work",
+        "id": {
+          "$from": "work",
+          "pointer": "/id"
+        }
+      }
     }
   ],
   "capabilities": [
