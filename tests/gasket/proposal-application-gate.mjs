@@ -4,13 +4,13 @@ export const proposalApplicationGate = `
 function proposalDatabase(db) {
   const originals = new WeakMap(), queries = new WeakMap()
   const wrap = (statement, query) => {
-    const wrapped = {
-      bind(...args) { return wrap(statement.bind(...args), query) },
-      first: (...args) => statement.first(...args),
-      all: (...args) => statement.all(...args),
-      run: (...args) => statement.run(...args),
-      raw: (...args) => statement.raw(...args),
-    }
+    // Preserve the native handle's fields when the account-attribution adapter
+    // places its own proxy in a mixed Business/native maintenance batch.
+    const wrapped = new Proxy(statement, { get(target, key) {
+      if (key === 'bind') return (...args) => wrap(target.bind(...args), query)
+      const value = Reflect.get(target, key, target)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
     originals.set(wrapped, statement); queries.set(wrapped, query)
     return wrapped
   }
