@@ -52,7 +52,9 @@ import { vendorFollowUpJourney } from './vendor-follow-up.mjs'
 import { now, zone } from './clock.mjs'
 
 // Standalone journeys own their installations; core retains its shared fixture
-// and complete archive reconciliation in their original order.
+// and complete archive reconciliation in their original order. The policy outcome
+// journey repeats the complete outcome fixture; use the lighter workspace shard
+// so reports keeps its required report-pack, PDF and retention journeys in budget.
 const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
   [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
@@ -64,7 +66,7 @@ const independent = new Map([
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
   [conditionalWorkspaceJourney, 'workspace'],
-  [outcomeJourney, 'reports'], [agentOutcomePolicyJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
+  [outcomeJourney, 'reports'], [agentOutcomePolicyJourney, 'workspace'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
