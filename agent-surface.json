@@ -629,6 +629,32 @@
       }
     },
     {
+      "id": "apply-corrective",
+      "tool": "gasket.proposals.apply",
+      "args": {
+        "proposal": {
+          "$from": "proposal",
+          "pointer": "/id"
+        },
+        "hash": {
+          "$from": "proposal",
+          "pointer": "/hash"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "target": {
+        "kind": "proposal",
+        "id": {
+          "$from": "proposal",
+          "pointer": "/id"
+        }
+      }
+    },
+    {
       "id": "proposals",
       "tool": "gasket.proposals.list",
       "args": {},
