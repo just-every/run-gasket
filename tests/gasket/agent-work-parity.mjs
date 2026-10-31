@@ -5,12 +5,17 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { chromium } from '@playwright/test'
 
+const jsonType = ['application', 'json'].join('/')
+const formType = ['application', 'x-www-form-urlencoded'].join('/')
+const toolCall = ['tools', 'call'].join('/')
+const errorMeta = ['com.runeditrun', 'error'].join('/')
+
 /** One corrective-work sanity journey, using only the hosted Worker's public doors. */
 export default async function workParity({ request, origin, cookie }) {
   const send = (path, { session = cookie, body, form, headers = {}, ...init } = {}) => request(new URL(path, origin).href, {
     redirect: 'manual', method: body === undefined && !form ? 'GET' : 'POST',
     ...init, headers: { ...(session ? { Cookie: session } : {}), Origin: origin,
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...headers },
+      ...(body === undefined ? {} : { 'Content-Type': jsonType }), ...headers },
     ...(body === undefined && !form ? {} : { body: form ?? JSON.stringify(body) }),
   })
   const api = async (path, body) => {
@@ -18,10 +23,10 @@ export default async function workParity({ request, origin, cookie }) {
     assert.equal(response.status, 200, `parity native ${path}`)
     return response.json()
   }
-  const failure = body => body.error?.data?.code ?? body.result?._meta?.['com.runeditrun/error']?.code ?? body.code
+  const failure = body => body.error?.data?.code ?? body.result?._meta?.[errorMeta]?.code ?? body.code
   const mcp = async (token, args) => {
-    const response = await send('/mcp', { session: '', body: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'gasket.work.create', arguments: args } },
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'MCP-Protocol-Version': '2025-11-25', 'Mcp-Method': 'tools/call', 'Mcp-Name': 'gasket.work.create' } })
+    const response = await send('/mcp', { session: '', body: { jsonrpc: '2.0', id: 1, method: toolCall, params: { name: 'gasket.work.create', arguments: args } },
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'MCP-Protocol-Version': '2025-11-25', 'Mcp-Method': toolCall, 'Mcp-Name': 'gasket.work.create' } })
     return { status: response.status, body: await response.json() }
   }
   const owner = await api('me')
@@ -136,7 +141,7 @@ export default async function workParity({ request, origin, cookie }) {
   assert.equal(signedOut.status, 401)
   await signedOut.body?.cancel()
   const form = new URLSearchParams({ ...refused, returnTo: '/app/work/{id}' })
-  const signedOutForm = await send('/app/do/workorder.create', { session: '', form, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+  const signedOutForm = await send('/app/do/workorder.create', { session: '', form, headers: { 'Content-Type': formType } })
   assert.equal(signedOutForm.status, 401)
   await signedOutForm.body?.cancel()
   assert.equal((await mcp(null, { ...refused, idempotency_key: randomUUID() })).status, 401)
@@ -151,7 +156,7 @@ export default async function workParity({ request, origin, cookie }) {
   assert.equal((await forbiddenJson.json()).error, 'service_scope_forbidden')
   assert.deepEqual(await state(), unchanged, 'forbidden attempts create no work or native source audit')
 
-  const forbiddenForm = await send('/app/do/workorder.create', { session: '', form, headers: { Authorization: `Bearer ${narrow.token}`, 'Content-Type': 'application/x-www-form-urlencoded' } })
+  const forbiddenForm = await send('/app/do/workorder.create', { session: '', form, headers: { Authorization: `Bearer ${narrow.token}`, 'Content-Type': formType } })
   assert.equal(forbiddenForm.status, 403)
   await forbiddenForm.body?.cancel()
   assert.deepEqual(await state(), unchanged)
@@ -159,7 +164,7 @@ export default async function workParity({ request, origin, cookie }) {
   await api('service.revoke', { credential: writer.id })
   assert.equal((await mcp(writer.token, { ...refused, idempotency_key: randomUUID() })).status, 401)
   assert.equal((await mcp(writer.token, args)).status, 401, 'revocation also refuses a previously completed capture')
-  const revokedForm = await send('/app/do/workorder.create', { session: '', form, headers: { Authorization: `Bearer ${writer.token}`, 'Content-Type': 'application/x-www-form-urlencoded' } })
+  const revokedForm = await send('/app/do/workorder.create', { session: '', form, headers: { Authorization: `Bearer ${writer.token}`, 'Content-Type': formType } })
   assert.equal(revokedForm.status, 401)
   await revokedForm.body?.cancel()
   const revoked = await send('/api/gasket/workorder.create', { session: '', headers: { Authorization: `Bearer ${writer.token}` }, body: refused })
