@@ -210,7 +210,7 @@ Core · published · **partial** · Cites BASE-AGENT-002, BASE-AGENT-005, BASE-A
 2. Change underlying stock and try the stale proposal; inspect refusal and unchanged stock. Under that policy, try direct mutation and self-approval and inspect refusal.
 
 **Evidence.** `tests/gasket/flows.mjs` — "GAS-13 agent prepares, a person approves"
-**Gap.** A public-door journey selecting company policy and proving standard/money decisions is missing. The cited journeys show fixed-gate proposals, exact-hash decisions, stale stock refusal and attribution.
+**Gap.** A public-door journey selecting company policy and proving standard/money decisions is missing. The cited journeys show fixed-gate proposals, exact-hash decisions, stale stock refusal and attribution. Candidate corrective-policy application and refusal evidence is added in `tests/gasket/agent-proposal-policy.mjs`; this does not change the partial judgment or establish the remaining full standard/money acceptance.
 
 #### HTTP-001 — Health, Lobby and real 404s
 
