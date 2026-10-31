@@ -5012,7 +5012,7 @@
       "executable": false
     },
     "tests/gasket/work-dependencies.mjs": {
-      "sha256": "41e5512eb405141df0f439c99c85448a4f6be56b3797fd367ba285a445888e33",
+      "sha256": "be4c80ccf4f0be3759d6ba7a08ad936a9738e94e459ecf5e641f6fb84b4374cd",
       "executable": false
     },
     "tests/gasket/work-pagination.mjs": {

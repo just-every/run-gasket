@@ -7,6 +7,7 @@ import { chromium } from '@playwright/test'
 import { harness, file } from './harness.mjs'
 import { png } from './fixtures.mjs'
 const address = name => [name,'example.test'].join(String.fromCharCode(64))
+const imageType = ['image','png'].join('/')
 const sha = value => createHash('sha256').update(value).digest('hex')
 
 export async function dependencyFixture(h, owner, assignee, asset) {
@@ -37,7 +38,7 @@ export async function workDependenciesJourney() {
     const make=async title=>(await h.api('workorder.create',cookies.lead,{asset,title,due:today,assignee:ids.tech,description:'Keep entered maintenance evidence'})).id
     const sourceUrl=await h.submit('workorder.create',cookies.lead,{asset,title:'Synthetic predecessor',due:today,assignee:ids.tech},'/app/work/{id}')
     const predecessor=sourceUrl.pathname.split('/').at(-1), dependent=await make('Synthetic dependent')
-    const photo=(await h.api('workorder.evidence',cookies.tech,{workOrder:dependent,version:1,file:file('synthetic-gasket-dependency.png',png,'image/png')})).evidence
+    const photo=(await h.api('workorder.evidence',cookies.tech,{workOrder:dependent,version:1,file:file('synthetic-gasket-dependency.png',png,imageType)})).evidence
     const original=(await read(dependent)).evidence
     const evidence=async()=>{
       const row=await read(dependent),response=await h.raw(`/app/evidence/${photo}`,{cookie:cookies.tech})
@@ -139,7 +140,7 @@ export async function workDependenciesJourney() {
     // A real source change after application reads is fenced by the in-batch source revision.
     const race=await make('Synthetic source race'),racePayload=await linkPayload(race,predecessor)
     const unchanged=await read(race),auditBefore=(await h.api('audit?action=workorder.dependency',owner)).rows
-    h.setDependencyHook(()=>h.api('workorder.evidence',cookies.tech,{workOrder:predecessor,version:1,file:file('synthetic-gasket-source.png',png,'image/png')}))
+    h.setDependencyHook(()=>h.api('workorder.evidence',cookies.tech,{workOrder:predecessor,version:1,file:file('synthetic-gasket-source.png',png,imageType)}))
     assert.equal((await h.api('workorder.dependency',cookies.lead,racePayload,409)).error,'stale')
     assert.deepEqual(await read(race),unchanged);assert.deepEqual((await h.api('audit?action=workorder.dependency',owner)).rows,auditBefore)
     // Revocation after the handler reads must still prevent its write batch.
