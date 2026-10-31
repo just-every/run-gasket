@@ -1,4 +1,5 @@
 import { agentCommentsJourney } from './agent-comments.mjs'
+import { agentOutcomePolicyJourney } from './agent-outcome-policy.mjs'
 import assert from 'node:assert/strict'
 import procedureRevisions from './agent-procedure-revisions.mjs'
 export { beforeStep, afterStep } from './agent-procedure-revisions.mjs'
@@ -85,4 +86,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   await agentReassignmentPolicyJourney()
   await agentCommentsJourney()
   await workParity({ request, origin, cookie, tool }).catch(error => { console.error(error.stack); throw error })
+  await agentOutcomePolicyJourney()
 }
