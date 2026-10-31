@@ -2082,7 +2082,7 @@ Agent surface · target · **partial** · From new · Cites BASE-AGENT-001, BASE
 4. Before policy setup, inspect no effect; complete the company’s answers and resume the same maintenance week.
 5. Pause the specialist mid-week, try its next call and inspect refusal without affecting the technician’s browser work.
 
-**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390
+**Evidence.** `agent-surface.json`; `src/gasket/agent-door`; `tests/gasket/agent-native-journey.mjs`; 30 October 2026 normal GASKET_VERIFY_SHARD=foundation pnpm exec rer verify --non-interactive on rer 0.2.91 with Base 2135c394939f4a737adabdc8003b0e667b31ac5a: 1,376/1,376 BASE-AGENT points and native specialist journey, exit 0; native product probe at 1440 and 390; `tests/gasket/agent-specialist-continuity.mjs` — supplemental native sponsor, policy, Pause and replay assertions
 **Gap.** The declared maintenance slice has a native owner/scoped-credential journey. Full stranger-specialist fault-to-repair/purchasing/reliability work, multi-sponsor completion, outside mail and timed/dual-host journeys remain unproved.
 
 ## Later
