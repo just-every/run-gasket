@@ -23,7 +23,7 @@ const { unstable_splitSqlQuery: splitSql } = require('wrangler')
  * With `offset` (ms), the Worker's clock runs that far from the machine's: an entry module replaces Date before the
  * built Worker loads, so the test, not the hour it happens to run at, decides what day it is.
  */
-export async function emittedWorker(vars, { installation, offset, instant, outbound, generationGate = false, formSaveFault = false, pmGate = false, proposalGate = false } = {}) {
+export async function emittedWorker(vars, { installation, offset, instant, outbound, generationGate = false, formSaveFault = false, pmGate = false, proposalGate = false, bindingsForOrigin } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'gasket-worker-'))
   const config = JSON.parse(await readFile(join(root, 'dist/server/wrangler.json'), 'utf8'))
   let origin = 'https://127.0.0.1'
@@ -79,6 +79,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
     // auth from that address before making requests or exposing the harness.
     origin = (await mf.ready).origin
     bindings.AUTH_ORIGIN = vars.AUTH_ORIGIN ?? origin
+    if (bindingsForOrigin) Object.assign(bindings, bindingsForOrigin(origin))
     await mf.setOptions(options())
     assert.equal((await mf.ready).origin, origin, 'auth configuration retains the live Worker listener')
     if (installation) return worker()

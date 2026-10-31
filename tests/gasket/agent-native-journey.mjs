@@ -1,10 +1,17 @@
 import { agentCommentsJourney } from './agent-comments.mjs'
 import { agentOutcomePolicyJourney } from './agent-outcome-policy.mjs'
+import { fieldRetirementJourney, afterStep as fieldAfterStep } from './agent-field-retirement.mjs'
+import { afterStep as procedureAfterStep } from './agent-procedure-revisions.mjs'
 import assert from 'node:assert/strict'
 import procedureRevisions from './agent-procedure-revisions.mjs'
-export { beforeStep, afterStep } from './agent-procedure-revisions.mjs'
+export { beforeStep } from './agent-procedure-revisions.mjs'
 import { agentReassignmentPolicyJourney } from './agent-reassignment-policy.mjs'
 import workParity from './agent-work-parity.mjs'
+
+export async function afterStep(context) {
+  await procedureAfterStep(context)
+  await fieldAfterStep(context)
+}
 
 /** Additional Core proof uses native sessions and issued credentials; no fixture authority enters production. */
 export default async function journey({ request, origin, cookie, tool }) {
@@ -87,4 +94,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   await agentCommentsJourney()
   await workParity({ request, origin, cookie, tool }).catch(error => { console.error(error.stack); throw error })
   await agentOutcomePolicyJourney()
+  await fieldRetirementJourney()
 }
