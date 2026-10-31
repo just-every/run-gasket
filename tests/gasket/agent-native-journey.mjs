@@ -83,8 +83,10 @@ export default async function journey({ request, origin, cookie, tool }) {
   assert.ok(audit.rows.some(row => JSON.parse(row.detail).preparedBy?.label?.includes(' for ') && row.actor_name.includes(' for ')))
   console.log('Native Core journey: native audit attribution passed')
   await procedureRevisions({ request, origin, cookie, tool })
-  await agentIntervalPolicyJourney()
   await agentReassignmentPolicyJourney()
-  await agentCommentsJourney()
+  await agentCommentsJourney().catch(error => { console.error(error.stack); throw error })
   await workParity({ request, origin, cookie, tool }).catch(error => { console.error(error.stack); throw error })
+  // This independent installation has its own clock and policy. Keep its archive
+  // recovery after the parent installation's calls, whose policy expires normally.
+  await agentIntervalPolicyJourney()
 }

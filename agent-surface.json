@@ -354,7 +354,14 @@
     "journey": "tests/gasket/agent-native-journey.mjs",
     "fixtures": {
       "module": "tests/gasket/agent-reassignment-fixtures.mjs"
-    }
+    },
+    "reviewers": [
+      {
+        "label": "interval-preparer",
+        "email": "synthetic-gasket-preparer\u0040example.invalid",
+        "initializer": "tests/gasket/initialize-interval-preparer.mjs"
+      }
+    ]
   },
   "journey": [
     {
@@ -745,6 +752,41 @@
         "id": {
           "$from": "work",
           "pointer": "/id"
+        }
+      }
+    },
+    {
+      "id": "interval",
+      "tool": "gasket.proposals.interval",
+      "args": {
+        "proposal": {
+          "$fixture": "interval",
+          "pointer": "/proposal"
+        },
+        "hash": {
+          "$fixture": "interval",
+          "pointer": "/hash"
+        },
+        "source": {
+          "$fixture": "interval",
+          "pointer": "/source"
+        }
+      },
+      "expect": [
+        {
+          "class": "commitment",
+          "facts": {
+            "measure": 0,
+            "currency": "USD",
+            "counterparty": "internal"
+          }
+        }
+      ],
+      "target": {
+        "kind": "schedule",
+        "id": {
+          "$fixture": "interval",
+          "pointer": "/schedule"
         }
       }
     }

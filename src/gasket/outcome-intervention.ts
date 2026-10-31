@@ -1,4 +1,4 @@
-// Sources that already have a retained independent human approval.
+// Accepted interval applications and independently reviewed physical work retain their distinct authority.
 import type {Bindings} from '../auth.server'
 import {all,insist,one,type Row} from './core'
 export async function outcomeIntervention(env:Bindings, proposal:string|null, workOrder:string|null) {

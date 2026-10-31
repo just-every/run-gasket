@@ -17,7 +17,7 @@ export async function agentIntervalPolicyJourney() {
   const vars = { OWNER_EMAIL: email('synthetic-gasket-owner'), SESSION_SECRET: randomBytes(32).toString('base64url'), SETUP_TOKEN: randomUUID(),
     RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId, RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(keys),
     RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: 'self-host', subject: installationId, email: email('synthetic-gasket-owner'), keys }) }
-  const h = await harness({ vars, clockInstant: tick })
+  const initial = await harness({ vars, clockInstant: tick }); let h = initial
   const ids = {}, cookie = {}, points = []
   const api = (...args) => h.api(...args)
   const person = async (path, who = 'owner', body, status = 200) => {
@@ -47,8 +47,12 @@ export async function agentIntervalPolicyJourney() {
     }
     const cohort = await intervalCohort(h, cookie, ids, 'synthetic-gasket-policy')
     tick += 86400000
-    await h.setClockInstant(tick)
+    await h.stop()
+    h = await harness({ vars, installation: initial.installation, clockInstant: tick })
+    cookie.owner = await h.signIn(vars.OWNER_EMAIL)
+    for (const key of ['lead','max','sam','agent']) cookie[key] = await h.signIn(email(`synthetic-gasket-${key}`))
     const { assets, schedules, jobs, from, to, issued, issuedBefore, limit } = cohort
+    const issuedPolicyBefore = await Promise.all(issued.created.map(w => api(`work/${w.id}`, cookie.max)))
     const payload = { schedule: schedules[0], everyDays: '14', everyUnits: '50', from, to, peers: assets.slice(1).join(','),
       rollbackPlan: 'Pause rollout if failures worsen; a human may restore the original cadence after reviewing all retained uncertainty.' }
     const context = { origin: h.origin, signer: { issuer, installationId, kid, privateKey: pair.privateKey }, now: () => tick,
@@ -150,14 +154,15 @@ export async function agentIntervalPolicyJourney() {
     console.log('PROBE AGENT-003 preservation: native schedules, proposals and issued work -> original due promises, revisions, cohort uncertainty and agent-for-sponsor attribution retained')
     // Held commitment policy requires a real different current maintenance lead.
     await adopt(heldPolicy())
-    args = await draft({ schedule: schedules[1], everyDays: '21', everyUnits: '75', peers: assets[2] })
+    args = await draft({ schedule: schedules[1], everyDays: '21', everyUnits: '75', peers: assets[2] }, 'owner')
     const heldBefore = await retained(args), pending = await call(args)
     assert.equal(pending.decision.disposition, 'approval')
     assert.deepEqual(await retained(args), heldBefore)
     const handle = pending.result._meta['com.runeditrun/approval']
     const view = (await person(`/agents/api/approvals/${handle.id}`)).approval
     assert.deepEqual(view.summary.nativeTarget, { kind: 'schedule', id: schedules[1] })
-    assert.ok(view.summary.items.includes(args.proposal) && view.summary.items.includes(args.hash) && view.summary.items.includes(args.source))
+    assert.ok(view.summary.items.some(item => item.includes('30 days to 21 days')))
+    assert.ok(view.summary.items.includes((await saved(args)).basis.expectedEffect))
     await approve(pending, 'max', 403)
     // The held policy names the sponsor; even that human cannot invent independent approval.
     const self = await approve(pending, 'owner')
@@ -168,7 +173,7 @@ export async function agentIntervalPolicyJourney() {
     await adopt(independentPolicy)
     args = await draft({ schedule: schedules[1], everyDays: '21', everyUnits: '75', peers: assets[2] })
     const genuine = await call(args)
-    if (process.env.AGENT_SCREENSHOTS) await screens(h, cookie.owner, genuine, 'pending')
+    await screens(h, cookie.lead, genuine, 'pending')
     const decided = await approve(genuine)
     assert.equal(decided.approval.state, 'executed', JSON.stringify(decided))
     assert.equal((await saved(args)).decided_by, ids.lead)
@@ -177,7 +182,7 @@ export async function agentIntervalPolicyJourney() {
     const heldAfter = await retained(args)
     assert.ok((await call(args)).result.structuredContent)
     assert.deepEqual(await retained(args), heldAfter)
-    if (process.env.AGENT_SCREENSHOTS) await screens(h, cookie.owner, genuine, 'applied')
+    await screens(h, cookie.lead, genuine, 'applied')
     console.log('PROBE AGENT-003 held: MCP constrained proposal -> no cadence change before genuine different current lead decision on exact proposal, hash, evidence and schedule; one application')
     // A prepared decision must not survive stale sources or revoked admission.
     for (const change of ['source','schedule','limit','policy','pause','consent','authority','agent']) {
@@ -215,7 +220,9 @@ export async function agentIntervalPolicyJourney() {
     const own = await draft({ schedule: schedules[2], everyDays: '21', everyUnits: '75', peers: assets[1] }, 'lead')
     await api('proposal.decide', cookie.lead, { proposal: own.proposal, hash: own.hash, decision: 'approve' }, 403)
     const leadToken = await accessToken(context, { sub: 'synthetic-gasket-lead', email: email('synthetic-gasket-lead'), act: { sub: randomUUID(), name: 'Synthetic lead agent', specialist: 'maintenance coordinator' } })
-    await adopt(heldPolicy())
+    const ownerApprovalPolicy = heldPolicy()
+    ownerApprovalPolicy.rules[0].approver = ['role:owner']
+    await adopt(ownerApprovalPolicy)
     const leadPending = await call(args, { token: leadToken })
     assert.equal(leadPending.decision.disposition, 'approval')
     await api('access.role', cookie.owner, { member: ids.lead, role: 'maintainer' })
@@ -233,30 +240,43 @@ export async function agentIntervalPolicyJourney() {
     assert.equal(racing.filter(answer => !errorCode(answer)).length, 1)
     assert.equal((await schedule(schedules[1])).revision, racingBefore.revision + 1)
     assert.equal((await api('audit?action=proposal.apply', cookie.owner)).rows.filter(row => row.subject === racingArgs.proposal).length, 1)
+    const restored = await draft({ everyDays: String(before.every_days), everyUnits: before.every_units, rollbackOf: completed.proposal })
+    const rollbackRecord = await saved(restored)
+    assert.ok(rollbackRecord.basis.expectedEffect.includes('earlier authorized maintenance interval'))
+    await api('proposal.decide', cookie.owner, { proposal: restored.proposal, hash: restored.hash, decision: 'approve' })
+    assert.deepEqual(((row) => [row.every_days,row.every_units])(await schedule(schedules[0])), [before.every_days,before.every_units])
+    assert.equal((await saved(restored)).decided_by, ids.owner, 'ordinary rollback retains its actual human approval')
+    assert.equal((await saved(completed)).application.approver_id, null, 'later human rollback does not invent an earlier human approval')
     await api('access.end', cookie.owner, { member: ids.lead })
+    const erasure = await api(`record-erasure-preview?kind=user&id=${ids.lead}`, cookie.owner)
+    assert.equal(erasure.eligible, false)
+    assert.ok(erasure.dependencies.gk_interval_policy_changes > 0, 'retained interval provenance blocks contributor erasure')
+    const receiptBefore = (await saved(args)).application
+    await api('record.erase', cookie.owner, { kind: 'user', id: ids.lead, token: erasure.token, confirm: true }, 409)
+    assert.deepEqual((await saved(args)).application, receiptBefore)
     await refuse(args, ['unauthenticated'], 'completed replay after sponsor revocation', { token: leadToken })
-    for (let i = 0; i < issued.created.length; i++) assert.deepEqual(await api(`work/${issued.created[i].id}`, cookie.owner), issuedBefore[i])
+    for (let i = 0; i < issued.created.length; i++) assert.deepEqual(await api(`work/${issued.created[i].id}`, cookie.max), issuedPolicyBefore[i])
     console.log('PROBE AGENT-003 freshness: changed source, payload hash, evidence hash, schedule and limit revisions or unsupported extension -> refusal with no cadence or receipt effect')
     console.log('PROBE AGENT-003 authority: forbidden, native agent, self approval, insufficient scope, revoked sponsor, Pause, consent and agent revocation -> no unauthorized application; concurrent callers produce one revision')
     const { intervalPolicyRecovery } = await import('./recovery.mjs')
     await intervalPolicyRecovery(h, cookie.owner, [completed, args, racingArgs], issued.created.map(row => row.id))
-  } finally { await h.close() }
+  } finally { if (h !== initial) await h.close(); await initial.close() }
 }
 
 async function screens(h, cookie, answer, state) {
   const { chromium } = await import('@playwright/test')
-  await mkdir(process.env.AGENT_SCREENSHOTS, { recursive: true })
+  if (process.env.AGENT_SCREENSHOTS) await mkdir(process.env.AGENT_SCREENSHOTS, { recursive: true })
   const browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined, args: ['--no-sandbox','--use-mock-keychain','--password-store=basic'] })
   try {
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
     await context.addCookies(cookie.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0,at), value: pair.slice(at+1), url: h.origin } }))
     const page = await context.newPage(), id = answer.result._meta['com.runeditrun/approval'].id
-    for (const width of [1440,390]) {
+    for (const width of process.env.AGENT_SCREENSHOTS ? [1440,390] : [1440]) {
       await page.setViewportSize({ width, height: 1100 })
       for (const [name,path] of [['approval',`/agents/approvals/${id}`],['native','/app/proposals']]) {
         assert.equal((await page.goto(h.origin + path)).status(), 200)
-        if (width === 1440) assert.ok((await page.locator('body').innerText()).includes(name === 'native' ? 'PM interval change' : 'Synthetic'))
-        await page.screenshot({ path: `${process.env.AGENT_SCREENSHOTS}/interval-${state}-${name}-${width}.png`, fullPage: true })
+        if (width === 1440) assert.ok((await page.locator('body').innerText()).includes(name === 'native' ? 'PM interval change' : 'Inspect compressor 2'))
+        if (process.env.AGENT_SCREENSHOTS) await page.screenshot({ path: `${process.env.AGENT_SCREENSHOTS}/interval-${state}-${name}-${width}.png`, fullPage: true })
       }
     }
     await context.close()

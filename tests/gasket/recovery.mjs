@@ -346,8 +346,8 @@ export async function backupBrowser(h, cookie) {
 
 /** Reconcile policy receipts as inert maintenance data, independently of agent admission caches. */
 export async function intervalPolicyRecovery(h, owner, applied, issued) {
-  const proposals = (await h.api('proposals', owner)).filter(row => applied.some(args => args.proposal === row.id))
-  assert.equal(proposals.length, applied.length)
+  const proposals = (await h.api('proposals', owner)).filter(row => row.application)
+  assert.ok(applied.every(args => proposals.some(row => row.id === args.proposal)))
   const work = await Promise.all(issued.map(id => h.api(`work/${id}`, owner)))
   const schedules = await h.api('schedules', owner)
   await h.stop()
@@ -355,7 +355,9 @@ export async function intervalPolicyRecovery(h, owner, applied, issued) {
   await h.installation.rer('export', '--output', archive)
   const records = (await readFile(archive, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
   const receipts = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_interval_policy_changes').map(item => item.row)
-  assert.ok(receipts.length >= applied.length)
+  assert.equal(receipts.length, proposals.length)
+  const humanApprovals = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_interval_changes')
+  assert.ok(humanApprovals.every(item => !applied.some(args => args.proposal === item.row.proposal_id)), 'policy execution never populates human-only approval history')
   for (const proposal of proposals) assert.deepEqual(receipts.find(row => row.proposal_id === proposal.id), proposal.application)
   const target = await installation()
   try {
