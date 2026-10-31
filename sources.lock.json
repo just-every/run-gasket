@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "dc2bb8cdbdf451dcdfeff71ba314f4a8e2a0226a0ff63765eb95a110716e5450",
+      "sha256": "c9ba2f608e0a53abcd30157f8713865a5a09f28e65a047371ba46959f887634e",
       "executable": false
     },
     "DEMO.md": {
@@ -4716,7 +4716,7 @@
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "f7c4a81bfbb86d3701e77bb72560429bf6878166ab4b17071417175459e8b659",
+      "sha256": "34d5df96ebc282c5f9d6471e950d4312fe961ba108d13f88d76b344090237312",
       "executable": false
     },
     "tests/gasket/agent-procedure-revisions.mjs": {
@@ -4741,6 +4741,10 @@
     },
     "tests/gasket/agent-runs.mjs": {
       "sha256": "26213342d47f57c1b4b7f1f5722770d9680c6ea7810b46572fc194b0182d238f",
+      "executable": false
+    },
+    "tests/gasket/agent-specialist-continuity.mjs": {
+      "sha256": "193ef315bea140de73cd6d0a05a76de9149e3260901a34b83ddaacec9ae103d7",
       "executable": false
     },
     "tests/gasket/agent-stock-browser.mjs": {

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import procedureRevisions from './agent-procedure-revisions.mjs'
 export { beforeStep, afterStep } from './agent-procedure-revisions.mjs'
 import { agentReassignmentPolicyJourney } from './agent-reassignment-policy.mjs'
+import specialistContinuity from './agent-specialist-continuity.mjs'
 
 /** Additional Core proof uses native sessions and issued credentials; no fixture authority enters production. */
 export default async function journey({ request, origin, cookie, tool }) {
@@ -83,4 +84,5 @@ export default async function journey({ request, origin, cookie, tool }) {
   await procedureRevisions({ request, origin, cookie, tool })
   await agentReassignmentPolicyJourney()
   await agentCommentsJourney()
+  await specialistContinuity()
 }
