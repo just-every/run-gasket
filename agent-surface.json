@@ -278,6 +278,20 @@
         "SURFACE-001",
         "SURFACE-002"
       ]
+    },
+    {
+      "name": "gasket.proposals.apply_corrective",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
     }
   ],
   "notTools": [
