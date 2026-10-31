@@ -180,7 +180,7 @@
       "executable": false
     },
     "agent-surface.json": {
-      "sha256": "fe8ab6a26bdad7a87159685013f85528d949294372b355b49579fdacf565d540",
+      "sha256": "3ab414140abff746478ed43ef4338249d11c352afa7cb5137cb0b1b03c567f0b",
       "executable": false
     },
     "AGENTS.consumer.md": {
@@ -264,7 +264,7 @@
       "executable": false
     },
     "docs/maintenance-semantics.md": {
-      "sha256": "3566aabb637a1b636090cbe47d3149539dd5fa46e37beaa720160b5c687a5c8f",
+      "sha256": "422406e67333b2ed2f727fa38f8055d782afaf9bda2ee266a785b68b6da7bdc9",
       "executable": false
     },
     "docs/migration-sources.md": {
@@ -1456,7 +1456,7 @@
       "executable": false
     },
     "src/gasket/agent-door/intervals.ts": {
-      "sha256": "115e1087f5be788340973fe0fd9e9661147a4956cfc228b25abad0c9909a415c",
+      "sha256": "00da234d3e37be31804825dd560c86d0f073745826763ae0bb4de2f22980db73",
       "executable": false
     },
     "src/gasket/agent-door/native.ts": {
@@ -1708,7 +1708,7 @@
       "executable": false
     },
     "src/gasket/interval-evidence.ts": {
-      "sha256": "4bd25ab5d9d0e6b8881d9aae92a766333006f1a338a91ec5b48878ab78c4b57f",
+      "sha256": "32f1e35e43695887f4f127387440ea6b500ce92bf85d58aa6f237dea3e3c6089",
       "executable": false
     },
     "src/gasket/intervals.ts": {
@@ -1828,7 +1828,7 @@
       "executable": false
     },
     "src/gasket/outcome-intervention.ts": {
-      "sha256": "3a86b5dae90b1e7d57c0fbe41a306a5694b25220872ed7cab8c690ca627d9aed",
+      "sha256": "f25f398f0f5e73c72b6191a2615ad4d02fb7a875ef0f95f661c7e0717310f577",
       "executable": false
     },
     "src/gasket/outcomes-plan.ts": {
@@ -1896,7 +1896,7 @@
       "executable": false
     },
     "src/gasket/proposals.ts": {
-      "sha256": "2d64cb3d4c58f7a4adada6ee9f762b3d9ad7407e8f34089473d534d9408ae7fd",
+      "sha256": "07fa7a86696fde38f73445855eb30d9907f1686a7bd76beafc3906892742fc80",
       "executable": false
     },
     "src/gasket/purchase-authority.ts": {
@@ -4728,15 +4728,15 @@
       "executable": false
     },
     "tests/gasket/agent-interval-fixtures.mjs": {
-      "sha256": "fc94234b396b3a970f44a2104b641575869e787fc8d26f09a076fb4d0c94eb43",
+      "sha256": "1c72fa2c0ab1785e7bbc127c078c87ffe809551540cb10dc768a9a3d8c78d405",
       "executable": false
     },
     "tests/gasket/agent-interval-policy.mjs": {
-      "sha256": "13201650e35ad21ceb1449f8c7df170755969ae7e328ba49ffaa64f478a821a0",
+      "sha256": "0fe09f028e02993821677b577b997e438fb439276b4a1ecc29b7eb597ec0748b",
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {
-      "sha256": "67ad6d736e8ee0b8ca345208e3b907daa8a441991803903774c395e3424b1a97",
+      "sha256": "84ed67839a515f35ff4e177d0d0357c683faf4407f41384bf104f7ec4c341b16",
       "executable": false
     },
     "tests/gasket/agent-outcome-policy.mjs": {
@@ -4748,7 +4748,7 @@
       "executable": false
     },
     "tests/gasket/agent-reassignment-fixtures.mjs": {
-      "sha256": "e271246ffad244bb0215362b12833bd5b8607e5466c9af4c1c17c46897bf9502",
+      "sha256": "bfe86e3eba5263fbad867b1a181198a4faafd0be87761ff067e585b2ac61399a",
       "executable": false
     },
     "tests/gasket/agent-reassignment-policy.mjs": {
@@ -4820,7 +4820,11 @@
       "executable": false
     },
     "tests/gasket/initialize-agent-owner.mjs": {
-      "sha256": "fa21ebc6e46ee034ea41081a61517ba16692baaaab41e9954a1779171240dd03",
+      "sha256": "7a725415368b767e1d5750bbef56f707a81c25a9206d8f9c6d96cbd958632b2f",
+      "executable": false
+    },
+    "tests/gasket/initialize-interval-preparer.mjs": {
+      "sha256": "813b773cddbbba52c490b675031667413a2661cc42d0061ff7a016cc10dfd526",
       "executable": false
     },
     "tests/gasket/installation.mjs": {
@@ -4832,7 +4836,7 @@
       "executable": false
     },
     "tests/gasket/intervals.mjs": {
-      "sha256": "f4b4ea6428e78b6fb7848422c92567cbc806a874454ca9498fa0bed7aad7965b",
+      "sha256": "b35d317912de1bd95d4b9dce2ba0c25c1b4b60c2bb94b4238810d968991cead8",
       "executable": false
     },
     "tests/gasket/labor-costs-browser.mjs": {
@@ -4924,7 +4928,7 @@
       "executable": false
     },
     "tests/gasket/recovery.mjs": {
-      "sha256": "744111b66b74363352781c9ce68e90b7e7d6deb7ad56e98ecc6c2e6ac6a17f48",
+      "sha256": "cd3015a468ae78e94ee56cbc3e4fbd7c24a661752d065193e31175d753cd1e29",
       "executable": false
     },
     "tests/gasket/replenishment-archive.mjs": {

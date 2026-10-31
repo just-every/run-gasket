@@ -6,37 +6,37 @@ import { offset, zone } from './clock.mjs'
 
 export async function intervalCohort(h, cookie, ids, prefix = 'CMP') {
   const assets = [], schedules = [], meters = [], jobs = []
-    const day = (await h.api('me',cookie.owner)).today
-    const shift = n => { const d = new Date(`${day}T12:00Z`); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10) }
-    const from = shift(-2), to = day
-    const checklist = (await h.api('checklist.create',cookie.lead,{name:`${prefix} compressor bearing condition and guard check`,items:['Inspect bearing and guard']})).id
-    for (let i=0;i<3;i++) {
-      const asset = (await h.api('asset.create',cookie.lead,{tag:`${prefix}-${i+1}`,name:`Production air compressor ${i+1} with remote intake and access platform`,location:'West production hall',category:'Air compressor'})).id
-      assets.push(asset)
-      const meter = (await h.api('meter.create',cookie.lead,{asset,name:'Run hours',kind:'counter',unit:'h'})).id; meters.push(meter)
-      schedules.push((await h.api('schedule.create',cookie.lead,{asset,checklist,title:`Inspect compressor ${i+1} bearing condition before production`,everyDays:30,meter,everyUnits:'100',firstDue:shift(-29),firstDueMeter:'200',assignee:ids.max})).id)
+  const day = (await h.api('me',cookie.owner)).today
+  const shift = n => { const d = new Date(`${day}T12:00Z`); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10) }
+  const from = shift(-2), to = day
+  const checklist = (await h.api('checklist.create',cookie.lead,{name:`${prefix} compressor bearing condition and guard check`,items:['Inspect bearing and guard']})).id
+  for (let i=0;i<3;i++) {
+    const asset = (await h.api('asset.create',cookie.lead,{tag:`${prefix}-${i+1}`,name:`Production air compressor ${i+1} with remote intake and access platform`,location:'West production hall',category:'Air compressor'})).id
+    assets.push(asset)
+    const meter = (await h.api('meter.create',cookie.lead,{asset,name:'Run hours',kind:'counter',unit:'h'})).id; meters.push(meter)
+    schedules.push((await h.api('schedule.create',cookie.lead,{asset,checklist,title:`Inspect compressor ${i+1} bearing condition before production`,everyDays:30,meter,everyUnits:'100',firstDue:shift(-29),firstDueMeter:'200',assignee:ids.max})).id)
+  }
+  const generated=await h.api('workorders.generate',cookie.lead,{})
+  for (let i=0;i<3;i++) {
+    const work = generated.created.find(w=>w.schedule===schedules[i]); jobs.push(work.id)
+    await h.api('workorder.results',cookie.max,{workOrder:work.id,item:['0'],outcome:['pass'],note:['Bearing quiet; guard fasteners secure']})
+    await h.api('workorder.readings',cookie.max,{workOrder:work.id,takenOn:`${from}T08:00`,meter:[meters[i]],value:['100']})
+    await h.api('workorder.readings',cookie.max,{workOrder:work.id,takenOn:`${day}T09:00`,meter:[meters[i]],value:[String(120+i*5)]})
+    if(i===0) {
+      await h.api('downtime.start',cookie.max,{workOrder:work.id,startedOn:`${day}T08:00`,reason:'Bearing oil feed blockage'})
+      await h.api('downtime.end',cookie.max,{workOrder:work.id,endedOn:`${day}T08:30`})
     }
-    const generated=await h.api('workorders.generate',cookie.lead,{})
-    for (let i=0;i<3;i++) {
-      const work = generated.created.find(w=>w.schedule===schedules[i]); jobs.push(work.id)
-      await h.api('workorder.results',cookie.max,{workOrder:work.id,item:['0'],outcome:['pass'],note:['Bearing quiet; guard fasteners secure']})
-      await h.api('workorder.readings',cookie.max,{workOrder:work.id,takenOn:`${from}T08:00`,meter:[meters[i]],value:['100']})
-      await h.api('workorder.readings',cookie.max,{workOrder:work.id,takenOn:`${day}T09:00`,meter:[meters[i]],value:[String(120+i*5)]})
-      if(i===0) {
-        await h.api('downtime.start',cookie.max,{workOrder:work.id,startedOn:`${day}T08:00`,reason:'Bearing oil feed blockage'})
-        await h.api('downtime.end',cookie.max,{workOrder:work.id,endedOn:`${day}T08:30`})
-      }
-      await h.api('work.cost',cookie.lead,{workOrder:work.id,category:'labor',amount:String(100+i*10),note:'Recorded repair labor, not a pay rate'})
-      await h.api('workorder.submit',cookie.max,{workOrder:work.id,version:(await h.api(`work/${work.id}`,cookie.max)).version})
-      await h.api('workorder.review',cookie.sam,{workOrder:work.id,version:(await h.api(`work/${work.id}`,cookie.sam)).version,decision:'approve'})
-    }
-    const limit = (schedule, source, extra={}) => ({schedule,source,revision:0,minDays:7,maxDays:60,minUnits:'25',maxUnits:'200',reference:`Lead-entered ${source} maintenance reference; not verified by Gasket`,...extra})
-    for(const schedule of schedules) for(const source of ['oem','legal','site']) await h.api('interval.limit',cookie.lead,limit(schedule,source,source==='oem'&&schedule===schedules[0]?{minDays:14}:{}))
-    await h.api('interval.limit',cookie.agent,limit(schedules[0],'site',{revision:1}),403)
-    await h.api('interval.limit',cookie.lead,limit(schedules[0],'site'),409)
-    const issued = await h.api('workorders.generate',cookie.lead,{})
-    assert.equal(issued.created.length,3,'AGENT-003 pending issued orders exercise preservation')
-    const issuedBefore = await Promise.all(issued.created.map(w=>h.api(`work/${w.id}`,cookie.lead)))
+    await h.api('work.cost',cookie.lead,{workOrder:work.id,category:'labor',amount:String(100+i*10),note:'Recorded repair labor, not a pay rate'})
+    await h.api('workorder.submit',cookie.max,{workOrder:work.id,version:(await h.api(`work/${work.id}`,cookie.max)).version})
+    await h.api('workorder.review',cookie.sam,{workOrder:work.id,version:(await h.api(`work/${work.id}`,cookie.sam)).version,decision:'approve'})
+  }
+  const limit = (schedule, source, extra={}) => ({schedule,source,revision:0,minDays:7,maxDays:60,minUnits:'25',maxUnits:'200',reference:`Lead-entered ${source} maintenance reference; not verified by Gasket`,...extra})
+  for(const schedule of schedules) for(const source of ['oem','legal','site']) await h.api('interval.limit',cookie.lead,limit(schedule,source,source==='oem'&&schedule===schedules[0]?{minDays:14}:{}))
+  await h.api('interval.limit',cookie.agent,limit(schedules[0],'site',{revision:1}),403)
+  await h.api('interval.limit',cookie.lead,limit(schedules[0],'site'),409)
+  const issued = await h.api('workorders.generate',cookie.lead,{})
+  assert.equal(issued.created.length,3,'AGENT-003 pending issued orders exercise preservation')
+  const issuedBefore = await Promise.all(issued.created.map(w=>h.api(`work/${w.id}`,cookie.lead)))
   return { assets, schedules, meters, jobs, from, to, shift, limit, issued, issuedBefore }
 }
 

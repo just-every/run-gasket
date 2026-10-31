@@ -1,7 +1,7 @@
 import { applyInterval, intervalBasis } from './intervals'
 import { approveMerge, mergeProposalBasis } from './part-merge'
 // Native independent decisions retain the exact proposed payload and source facts.
-// The reassignment adapter also admits company-policy execution as the current
+// The bounded policy adapters also admit company-policy execution as the current
 // sponsor, without inventing a human approval for autonomous or review dispositions.
 import type { Bindings } from '../auth.server'
 import { requireCapability, type Actor } from './actor'
@@ -310,7 +310,7 @@ export async function applyIntervalProposal(env: Bindings, actor: Actor, input: 
     && decision.revision === (envelope?.revision ?? policy.local_revision) && canonical(document) === canonical(evidence.document)
     && ['autonomous','review','approval'].includes(decision.decision), 'agent_policy_changed', 409)
   const decider = decision.decision === 'approval'
-    ? ctx.approvers.find(person => person.id !== proposal.prepared_by && person.id !== actor.id) : null
+    ? ctx.approvers.find(person => person.id !== proposal.prepared_by) : null
   if (decision.decision === 'approval') {
     insist(decider, 'own_proposal', 403)
     insist(await one(env, `SELECT m.id FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id

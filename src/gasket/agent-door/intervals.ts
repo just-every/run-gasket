@@ -20,10 +20,15 @@ export function intervalTools(env: Bindings): ToolDefinition[] {
     },
     async target(args, ctx) { return { kind: 'schedule', id: (await resolve(args, ctx)).basis.schedule.id } },
     async summary(args, ctx) {
-      const { proposal, basis, source } = await resolve(args, ctx)
+      const { basis } = await resolve(args, ctx)
       return { target: { id: basis.schedule.id, name: basis.schedule.title }, items: [
-        proposal.id, proposal.payload_hash, source, JSON.stringify(basis.change),
-        `Schedule revision ${basis.schedule.revision}`, ...basis.limits.map(limit => `${limit.source} revision ${limit.revision}: ${limit.reference}`),
+        ...(basis.change.fromDays === null ? [] : [`Calendar interval: ${basis.change.fromDays} days to ${basis.change.toDays} days.`]),
+        ...(basis.change.fromUnits === null ? [] : [`Counter interval: ${basis.change.fromUnits} to ${basis.change.toUnits} recorded units.`]),
+        `Evidence from ${basis.from} through ${basis.to}; schedule revision ${basis.schedule.revision}.`,
+        ...basis.limits.map(limit => `${String(limit.source).toUpperCase()} bounds: ${[
+          limit.min_days === null ? '' : `${limit.min_days} to ${limit.max_days} days`,
+          limit.min_units === null ? '' : `${limit.min_units} to ${limit.max_units} counter units`,
+        ].filter(Boolean).join('; ')}. Reference revision ${limit.revision}: ${limit.reference}`),
         basis.expectedEffect, ...basis.uncertainty, basis.rollbackPlan,
       ] }
     },
