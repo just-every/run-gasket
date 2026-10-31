@@ -293,6 +293,20 @@
         "SURFACE-002",
         "SURFACE-006"
       ]
+    },
+    {
+      "name": "gasket.proposals.apply_corrective",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
     }
   ],
   "notTools": [
@@ -653,6 +667,65 @@
           "pointer": "/id"
         }
       }
+    },
+    {
+      "id": "exact-proposal",
+      "tool": "gasket.proposals.prepare",
+      "args": {
+        "kind": "corrective",
+        "reasoning": "Synthetic physical observation requires independent lead review.",
+        "payload": {
+          "asset": {
+            "$from": "asset",
+            "pointer": "/id"
+          },
+          "title": "Synthetic inspect bearing",
+          "due": "2030-01-11"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "inject": {
+        "classes": [
+          "external"
+        ],
+        "confirmExternal": true,
+        "internal": false
+      }
+    },
+    {
+      "id": "apply-exact-corrective",
+      "tool": "gasket.proposals.apply_corrective",
+      "args": {
+        "proposal": {
+          "$from": "exact-proposal",
+          "pointer": "/id"
+        },
+        "hash": {
+          "$from": "exact-proposal",
+          "pointer": "/hash"
+        },
+        "assetRevision": 2,
+        "expected_revision": 2
+      },
+      "target": {
+        "kind": "proposal",
+        "id": {
+          "$from": "exact-proposal",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
     },
     {
       "id": "proposals",

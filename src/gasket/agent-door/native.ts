@@ -33,6 +33,19 @@ export async function nativeCall<T>(env: Bindings, ctx: ToolContext, run: (actor
     if (effect && envelope?.paused) throw new ToolRefusal('agents_paused')
     if (effect && envelope?.revoked?.consents?.includes(ctx.consent)) throw new ToolRefusal('consent_revoked')
     if (effect && envelope?.revoked?.agents?.includes(ctx.agent.id)) throw new ToolRefusal('unauthenticated')
+    if (effect) {
+      // Bind the native write to the decision already made at the policy chokepoint.
+      const admission = await one(env, `SELECT id,row,evidence FROM agent_door_audit WHERE agent=?
+        AND json_extract(row,'$.operation_id')=? AND json_extract(row,'$.sponsor.id')=?
+        AND json_extract(row,'$.outcome')='running' ORDER BY sequence DESC LIMIT 1`, ctx.agent.id, ctx.operationId, ctx.person.id)
+      const admitted = admission && JSON.parse(admission.row)
+      const evidence = admission?.evidence && JSON.parse(admission.evidence)
+      const document = env.RER_OWNER_CLAIM_ISSUER ? envelope?.document : policy?.local_document ? JSON.parse(policy.local_document) : null
+      const revision = env.RER_OWNER_CLAIM_ISSUER ? envelope?.revision : policy?.local_revision
+      if (!admitted || !['autonomous', 'review', 'approval'].includes(admitted.decision)
+        || admitted.revision !== revision || canonical(evidence?.document) !== canonical(document)) throw new ToolRefusal('agent_policy_changed')
+      Object.assign(policy!, { disposition: admitted.decision, admission: admission.id, revision: admitted.revision })
+    }
     return await withAgentContext(ctx, policy ?? { envelope: null, local_document: null, local_revision: 0 }, () => withSiteAuthority(actor, () => withServiceAuthority(credential, () => run(actor))))
   } catch (error) {
     if (error instanceof GasketError) throw new ToolRefusal(error.code)

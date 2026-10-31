@@ -65,11 +65,11 @@ export const touch = (env: Bindings, order: { id: string; version: number }) => 
   stmt(env, "UPDATE gk_work_orders SET version = version + 1, status = 'in_progress' WHERE id = ?", order.id),
 ]
 
-export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also, door }: FromProposal & { door?: Door } = {}) {
+export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also, door, policyExecution }: FromProposal & { door?: Door; policyExecution?: boolean } = {}) {
   // Agent attribution comes from the authenticated native context, never caller input.
   const sourceDoor = agentContext()?.door ?? door
-  requireCapability(actor, proposal ? 'proposal.decide' : 'work.create')
-  if (!proposal) insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
+  requireCapability(actor, proposal && !policyExecution ? 'proposal.decide' : 'work.create')
+  if (!proposal || policyExecution) insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
   // PLAN-001: work names an asset or, with no asset, a location (the text given, trimmed); never both.
   const assetId = input.text('asset', { optional: true, max: 100 }) || null, location = input.text('location', { optional: true, max: 160 }) || null
   insist(Boolean(assetId) !== Boolean(location), 'asset_or_location')

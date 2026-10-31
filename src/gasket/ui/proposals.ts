@@ -25,7 +25,7 @@ export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
   const decider = can(actor, 'proposal.decide')
   // One violet primary per screen: "Approve and run" on the first proposal this person may decide, secondary below it.
   const first = rows.find(row => decider && row.status === 'pending' && row.prepared_by !== actor.id)
-  const result = (row: any) => row.kind === 'merge' && row.status === 'approved' ? h`<p><a href="/app/parts/${row.result_id}">Open the canonical part</a></p>` : row.kind === 'reassign' && row.status === 'approved' ? h`<p><a href="/app/work/${row.result_id}">Open the reassigned work order</a></p>` : row.status !== 'approved' || !row.result_id ? '' : row.kind === 'corrective' ? h`<p><a href="/app/work/${row.result_id}">Open the work order it raised</a></p>`
+  const result = (row: any) => row.kind === 'merge' && row.status === 'approved' ? h`<p><a href="/app/parts/${row.result_id}">Open the canonical part</a></p>` : row.kind === 'reassign' && row.status === 'approved' ? h`<p><a href="/app/work/${row.result_id}">Open the reassigned work order</a></p>` : !['approved', 'applied'].includes(row.status) || !row.result_id ? '' : row.kind === 'corrective' ? h`<p><a href="/app/work/${row.result_id}">Open the work order it raised</a></p>`
     : ['schedule', 'interval'].includes(row.kind) ? h`<p><a href="/app/schedules">${row.kind === 'interval' ? 'See the revised schedule' : 'See the schedule it created'}</a></p>` : h`<p><a href="/app/parts/${row.payload.part}">See the part's count</a></p>`
   const items = rows.map(row => card(KIND[row.kind], h`<p>${row.reasoning}</p>
     <p class="gk-eyebrow">What it will change</p><dl class="gk-pairs">${Object.entries(row.payload as Record<string, string>).map(([key, value]) => h`<div><dt>${LABELS[key] ?? key}</dt><dd>${show(key, value)}</dd></div>`)}</dl>
@@ -40,12 +40,12 @@ export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
       <p>Combined: ${row.basis.combined.quantity} ${row.basis.combined.unit}, USD ${(row.basis.combined.valueCents / 100).toFixed(2)}. Quantity adjustment: ${row.basis.quantityDelta}; value adjustment: USD ${(row.basis.valueDeltaCents / 100).toFixed(2)}.</p>
       <p>${row.basis.consequence}</p><p>${row.basis.boundary}</p>
       <details><summary>Source stock movements (${row.basis.movements.length})</summary>${row.basis.movements.map((move: any) => h`<p>${move.kind}: ${move.quantity}, USD ${(move.valueCents / 100).toFixed(2)} · ${showInstant(move.at, actor.zone)} · <a href="/app/parts/${move.part}">Open retained source history</a></p>`)}</details>` : ''}
-    <p class="gk-sub">Prepared by ${row.prepared_by_name} · ${showInstant(row.prepared_at, actor.zone)}${row.decided_by_name ? ` · ${row.status === 'approved' ? 'approved' : 'rejected'} by ${row.decided_by_name} ${showInstant(row.decided_at, actor.zone)}` : ''}${row.decision_note ? ` · ${row.decision_note}` : ''}</p>
+    <p class="gk-sub">Prepared by ${row.prepared_by_name} · ${showInstant(row.prepared_at, actor.zone)}${row.decided_by_name ? ` · ${row.status === 'approved' ? 'approved' : 'rejected'} by ${row.decided_by_name} ${showInstant(row.decided_at, actor.zone)}` : ''}${row.status === 'applied' ? ' · Applied by company policy; no human approval recorded' : ''}${row.decision_note ? ` · ${row.decision_note}` : ''}</p>
     ${decider && row.status === 'pending' && row.prepared_by !== actor.id ? h`<div class="gk-split">
       ${form('proposal.decide', '/app/proposals', h`${hidden('proposal', row.id)}${hidden('decision', 'approve')}${hidden('hash', row.payload_hash)}`, 'Approve and run', { secondary: row !== first })}
       ${form('proposal.decide', '/app/proposals', h`${hidden('proposal', row.id)}${hidden('decision', 'reject')}${field('Reason to reject', 'note')}`, 'Reject', { secondary: true })}</div>` : ''}
     ${result(row)}`,
-  { extra: tag(row.status === 'pending' ? 'Pending' : row.status === 'approved' ? 'Approved' : 'Rejected') }))
-  return page(env, 'Proposals', actor, h`<h1>Proposals</h1><p class="gk-lede">An agent prepares; a maintenance lead approves or rejects. Approving runs the normal command as you, and refuses if the records it relied on have changed.</p>
+  { extra: tag(row.status === 'pending' ? 'Pending' : row.status === 'approved' ? 'Approved' : row.status === 'applied' ? 'Applied' : 'Rejected') }))
+  return page(env, 'Proposals', actor, h`<h1>Proposals</h1><p class="gk-lede">Company policy may allow an authorized corrective proposal to run. Held proposals need a different maintenance lead or owner to approve or reject the exact proposal. Changed source records refuse application.</p>
     ${rows.length ? items : h`<div class="gk-empty"><h2>No proposals yet</h2><p>An agent with its own access prepares proposals through Gasket's API.</p></div>`}`, { url })
 }

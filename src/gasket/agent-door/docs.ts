@@ -1,6 +1,7 @@
 import { commentTools } from './comments'
 import { correctiveProposalTools } from './outcomes'
 import { reassignmentTools } from './reassignment'
+import { proposalTools } from './proposals'
 import type { Bindings } from '../../auth.server'
 import { mutationTools } from './tools'
 import { procedureTools } from './procedures'
@@ -11,7 +12,7 @@ import { capabilities, notTools } from './index'
 export function agentDocumentation(request: Request, env: Bindings): Response | null {
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
-  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...commentTools(env), ...correctiveProposalTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...commentTools(env), ...correctiveProposalTools(env), ...proposalTools(env)].sort((a, b) => a.name.localeCompare(b.name))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -33,7 +34,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     'This Core adoption exposes the listed software jobs. It does not expose native purchasing, provider model runs, role administration, physical attestations, import, deployment or device operations as MCP jobs. Existing native screens and their permissions remain authoritative. Native maintenance events, resources, prompts and subscriptions are undeclared. Resource refresh, multi-sponsor completion, outside mail and queued continuations remain unproved. No cost reservation or provider call is registered. The 0.2.91 conformance journey checks Core jobs and typed refusals for omitted families.',
     '',
-    'The maintenance coordinator reads source records and stages proposals through the listed tools. Existing overdue reassignment proposals can execute under company policy, with exact source evidence and current assignee eligibility rechecked atomically. Standard review retains a real review record; a company-required independent approval retains its genuine lead or owner. Autonomous execution invents no human approval. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
+    'The maintenance coordinator reads source records and stages proposals through the listed tools. Existing overdue reassignment proposals can execute under company policy, with exact source evidence and current assignee eligibility rechecked atomically. Standard review retains a real review record; a company-required independent approval retains its genuine lead or owner. Autonomous execution invents no human approval. Existing exact-hash corrective proposals also execute under company policy within current native lead or owner authority; autonomous execution invents no human approval and held review retains the independent native gate. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
     '',
     'Internal plain-text work comments use native comment.post under the current human sponsor’s existing record and comment rights. Their stored work target determines the standard classification. Native threads retain agent-for-sponsor attribution. The native agent role gains no comment right, and native service credentials gain no comment scope. Photos, mentions, edits and handoff summaries are outside this adapter.',
     '',
