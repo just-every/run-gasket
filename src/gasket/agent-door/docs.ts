@@ -1,3 +1,4 @@
+import { proposalTools } from './proposals'
 import type { Bindings } from '../../auth.server'
 import { mutationTools } from './tools'
 import { procedureTools } from './procedures'
@@ -8,7 +9,7 @@ import { capabilities, notTools } from './index'
 export function agentDocumentation(request: Request, env: Bindings): Response | null {
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
-  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...proposalTools(env)].sort((a, b) => a.name.localeCompare(b.name))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -30,7 +31,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     'This Core adoption exposes the listed software jobs. It does not expose native purchasing, provider model runs, role administration, physical attestations, import, deployment or device operations as MCP jobs. Existing native screens and their permissions remain authoritative. Native maintenance events, resources, prompts and subscriptions are undeclared. Resource refresh, multi-sponsor completion, outside mail and queued continuations remain unproved. No cost reservation or provider call is registered. The 0.2.91 conformance journey checks Core jobs and typed refusals for omitted families.',
     '',
-    'The maintenance coordinator reads source records and stages proposals through the listed tools. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
+    'The maintenance coordinator reads source records, stages proposals and applies existing exact-hash corrective proposals within current native lead or owner authority. An allowing policy executes without a human approval record; review retains the proposal for a different native lead or owner. Other proposal kinds remain on the existing human doors. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
     '',
     '## Other doors',
     '',
