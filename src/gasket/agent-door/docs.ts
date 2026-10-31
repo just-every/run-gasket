@@ -1,3 +1,4 @@
+import { intervalTools } from './intervals'
 import { commentTools } from './comments'
 import { reassignmentTools } from './reassignment'
 import type { Bindings } from '../../auth.server'
@@ -10,7 +11,7 @@ import { capabilities, notTools } from './index'
 export function agentDocumentation(request: Request, env: Bindings): Response | null {
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
-  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...commentTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...commentTools(env), ...intervalTools(env)].sort((a, b) => a.name.localeCompare(b.name))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -35,6 +36,8 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     'The maintenance coordinator reads source records and stages proposals through the listed tools. Existing overdue reassignment proposals can execute under company policy, with exact source evidence and current assignee eligibility rechecked atomically. Standard review retains a real review record; a company-required independent approval retains its genuine lead or owner. Autonomous execution invents no human approval. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
     '',
     'Internal plain-text work comments use native comment.post under the current human sponsor’s existing record and comment rights. Their stored work target determines the standard classification. Native threads retain agent-for-sponsor attribution. The native agent role gains no comment right, and native service credentials gain no comment scope. Photos, mentions, edits and handoff summaries are outside this adapter.',
+    '',
+    'Existing non-rollback PM interval shortenings carry commitment. Stored cohort evidence, exact payload and source fingerprints, schedule revision and all mandatory limit revisions bind policy admission and the atomic cadence change. Allowing policy records an application without a human approval; held commitment needs a genuine different current lead or owner. Issued work and due occurrences retain their pins. Company-policy reversal, sign-off and operational additional-site authority remain outside this adapter.',
     '',
     '## Other doors',
     '',

@@ -278,6 +278,20 @@
         "SURFACE-001",
         "SURFACE-002"
       ]
+    },
+    {
+      "name": "gasket.proposals.interval",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "commitment"
+      ],
+      "clauses": [
+        "AGENT-003",
+        "SURFACE-001",
+        "SURFACE-003",
+        "SURFACE-006"
+      ]
     }
   ],
   "notTools": [

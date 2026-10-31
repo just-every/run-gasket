@@ -342,3 +342,42 @@ export async function backupBrowser(h, cookie) {
     }
   } finally { await browser.close() }
 }
+
+
+/** Reconcile policy receipts as inert maintenance data, independently of agent admission caches. */
+export async function intervalPolicyRecovery(h, owner, applied, issued) {
+  const proposals = (await h.api('proposals', owner)).filter(row => applied.some(args => args.proposal === row.id))
+  assert.equal(proposals.length, applied.length)
+  const work = await Promise.all(issued.map(id => h.api(`work/${id}`, owner)))
+  const schedules = await h.api('schedules', owner)
+  await h.stop()
+  const archive = join(h.installation.root, 'exports', 'interval-policy.rer')
+  await h.installation.rer('export', '--output', archive)
+  const records = (await readFile(archive, 'utf8')).trim().split('\n').map(line => JSON.parse(line))
+  const receipts = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_interval_policy_changes').map(item => item.row)
+  assert.ok(receipts.length >= applied.length)
+  for (const proposal of proposals) assert.deepEqual(receipts.find(row => row.proposal_id === proposal.id), proposal.application)
+  const target = await installation()
+  try {
+    await target.rer('import', '--input', archive, '--yes')
+    const restored = await harness({ vars: h.vars, installation: target, clockInstant: h.clockInstant + 86400000 })
+    try {
+      const signed = await restored.signIn(h.vars.OWNER_EMAIL)
+      assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
+      const restoredProposals = await restored.api('proposals', signed)
+      for (const proposal of proposals) {
+        assert.deepEqual(restoredProposals.find(row => row.id === proposal.id), proposal, 'receipt, uncertainty and source attribution survive inactive restore')
+        const cadence = (await restored.api('schedules', signed)).find(row => row.id === proposal.application.schedule_id)
+        const source = schedules.find(row => row.id === cadence.id)
+        for (const key of ['revision','every_days','every_units','next_due_date','next_due_meter']) assert.equal(cadence[key], source[key])
+        assert.equal(cadence.active, 0)
+      }
+      for (let index = 0; index < issued.length; index++) assert.deepEqual(await restored.api(`work/${issued[index]}`, signed), work[index])
+      assert.equal((await restored.raw('/api/gasket/proposals', { cookie: owner })).status, 401, 'source session conveys no restored access')
+      const before = await restored.api('schedules', signed)
+      await restored.scheduled('*/15 * * * *')
+      assert.deepEqual(await restored.api('schedules', signed), before, 'inactive restoration does not replay interval effects')
+    } finally { await restored.close() }
+  } finally { await target.remove() }
+  console.log('PROBE AGENT-003 recovery: export and inactive import -> durable policy receipts, attribution, original work and due promises reconcile; no replayed cadence effects or source-session access')
+}

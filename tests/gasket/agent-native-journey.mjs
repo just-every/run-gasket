@@ -1,3 +1,4 @@
+import { agentIntervalPolicyJourney } from './agent-interval-policy.mjs'
 import { agentCommentsJourney } from './agent-comments.mjs'
 import assert from 'node:assert/strict'
 import procedureRevisions from './agent-procedure-revisions.mjs'
@@ -82,6 +83,7 @@ export default async function journey({ request, origin, cookie, tool }) {
   assert.ok(audit.rows.some(row => JSON.parse(row.detail).preparedBy?.label?.includes(' for ') && row.actor_name.includes(' for ')))
   console.log('Native Core journey: native audit attribution passed')
   await procedureRevisions({ request, origin, cookie, tool })
+  await agentIntervalPolicyJourney()
   await agentReassignmentPolicyJourney()
   await agentCommentsJourney()
   await workParity({ request, origin, cookie, tool }).catch(error => { console.error(error.stack); throw error })

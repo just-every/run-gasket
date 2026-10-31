@@ -45,7 +45,7 @@ export async function proposalsPage(env: Bindings, actor: Actor, url: URL) {
       ${form('proposal.decide', '/app/proposals', h`${hidden('proposal', row.id)}${hidden('decision', 'approve')}${hidden('hash', row.payload_hash)}`, 'Approve and run', { secondary: row !== first })}
       ${form('proposal.decide', '/app/proposals', h`${hidden('proposal', row.id)}${hidden('decision', 'reject')}${field('Reason to reject', 'note')}`, 'Reject', { secondary: true })}</div>` : ''}
     ${result(row)}`,
-  { extra: tag(row.status === 'pending' ? 'Pending' : row.status === 'approved' ? 'Approved' : 'Rejected') }))
-  return page(env, 'Proposals', actor, h`<h1>Proposals</h1><p class="gk-lede">An agent prepares; a maintenance lead approves or rejects. Approving runs the normal command as you, and refuses if the records it relied on have changed.</p>
+  { extra: tag(row.status === 'pending' ? 'Pending' : row.status === 'approved' ? row.application ? 'Applied' : 'Approved' : 'Rejected') }))
+  return page(env, 'Proposals', actor, h`<h1>Proposals</h1><p class="gk-lede">An agent prepares proposals. Company policy controls supported agent applications; ordinary human approval still requires a different maintenance lead. Changes refuse if the records they relied on have changed.</p>
     ${rows.length ? items : h`<div class="gk-empty"><h2>No proposals yet</h2><p>An agent with its own access prepares proposals through Gasket's API.</p></div>`}`, { url })
 }

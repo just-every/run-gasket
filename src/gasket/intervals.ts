@@ -45,7 +45,7 @@ export async function setIntervalLimit(env: Bindings, actor: Actor, input: Input
 export async function intervalBasis(env: Bindings, actor: Actor, payload: Record<string,string>) {
   let rollback: Row | null = null
   if (payload.rollbackOf) {
-    rollback = await one<Row>(env, 'SELECT * FROM gk_interval_changes WHERE proposal_id=? AND schedule_id=?', payload.rollbackOf, payload.schedule)
+    rollback = await one<Row>(env, 'SELECT * FROM gk_all_interval_changes WHERE proposal_id=? AND schedule_id=?', payload.rollbackOf, payload.schedule)
     insist(rollback, 'rollback_not_found', 404)
     const schedule = await one<Row>(env, 'SELECT * FROM gk_schedules WHERE id=?', payload.schedule)
     insist(schedule, 'schedule_not_found', 404)
@@ -60,7 +60,12 @@ export async function intervalBasis(env: Bindings, actor: Actor, payload: Record
   return { ...evidence, limits, rollback }
 }
 
-export async function applyInterval(env: Bindings, actor: Actor, payload: Record<string,string>, basis: Awaited<ReturnType<typeof intervalBasis>>, proposal: string, also: D1PreparedStatement[]) {
+export interface IntervalPolicyApplication {
+  sponsor: string; agent: string; operation: string; decision: string; disposition: string
+  approver: string | null; hash: string; source: string; basis: string
+}
+
+export async function applyInterval(env: Bindings, actor: Actor, payload: Record<string,string>, basis: Awaited<ReturnType<typeof intervalBasis>>, proposal: string, also: D1PreparedStatement[], policy?: IntervalPolicyApplication) {
   requireCapability(actor, 'proposal.decide')
   const schedule = basis.schedule, days = payload.everyDays ? Number(payload.everyDays) : schedule.every_days, units = payload.everyUnits || schedule.every_units
   const revision = schedule.revision + 1
@@ -68,7 +73,9 @@ export async function applyInterval(env: Bindings, actor: Actor, payload: Record
   // Approval changes subsequent cadence only; the normal completion scheduler advances it.
   await commit(env, [guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_schedules WHERE id=? AND revision=? AND active=1)', schedule.id, schedule.revision),
     stmt(env, 'UPDATE gk_schedules SET every_days=?, every_units=?, revision=revision+1 WHERE id=?', days,units,schedule.id),
-    stmt(env, 'INSERT INTO gk_interval_changes (proposal_id,schedule_id,revision,before_days,after_days,before_units,after_units,rollback_plan,rollback_of,approved_by,approved_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', proposal,schedule.id,revision,schedule.every_days,days,schedule.every_units,units,payload.rollbackPlan,payload.rollbackOf || null,actor.id,now()), ...also],
+    ...(policy ? [stmt(env, `INSERT INTO gk_interval_policy_changes
+      (proposal_id,schedule_id,revision,before_days,after_days,before_units,after_units,rollback_plan,sponsor_id,agent_id,operation_id,decision_id,disposition,approver_id,applied_at,payload_hash,evidence_hash,basis_json)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, proposal,schedule.id,revision,schedule.every_days,days,schedule.every_units,units,payload.rollbackPlan,policy.sponsor,policy.agent,policy.operation,policy.decision,policy.disposition,policy.approver,now(),policy.hash,policy.source,policy.basis)] : [stmt(env, 'INSERT INTO gk_interval_changes (proposal_id,schedule_id,revision,before_days,after_days,before_units,after_units,rollback_plan,rollback_of,approved_by,approved_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)', proposal,schedule.id,revision,schedule.every_days,days,schedule.every_units,units,payload.rollbackPlan,payload.rollbackOf || null,actor.id,now())]), ...also],
   { actor: actor.id, action: 'schedule.interval', subject: schedule.id, detail: { proposal, revision, fromDays: schedule.every_days, toDays: days, fromUnits: schedule.every_units, toUnits: units, rollbackPlan: payload.rollbackPlan, rollbackOf: payload.rollbackOf || null, limits: basis.limits.map(l => l.id) } })
   return { id: schedule.id }
 }
