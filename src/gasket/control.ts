@@ -35,6 +35,7 @@ async function consequences(env: Bindings, order: Record<string, any>, action: t
       : `Preventive schedule "${schedule!.title}" keeps its cadence; its next due date stays ${schedule!.next_due_date ?? 'at its meter value'}`)
   }
   for (const row of await all(env, `SELECT number FROM gk_work_orders WHERE follow_up_of = ? AND status IN ${OPEN}`, order.id)) notes.push(`Follow-up ${label(row.number)} stays open`)
+  for (const row of await all(env, 'SELECT w.number FROM gk_work_dependencies d JOIN gk_work_orders w ON w.id=d.work_order_id WHERE d.predecessor_id=? AND d.active=1 ORDER BY w.number', order.id)) notes.push(`Dependent ${label(row.number)} requires this work to remain independently approved`)
   if (action === 'reschedule' && due! < today) notes.push('The new due date has already passed, so the work order is overdue')
   return { refused: null, notes }
 }

@@ -1,3 +1,4 @@
+import { dependencyFixture } from './work-dependencies.mjs'
 import { printPackFixture, paperPayload } from './print-packs.mjs'
 import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 import { fileURLToPath } from 'node:url'
@@ -82,6 +83,16 @@ export async function recoveryJourney() {
     const mismatched = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-mismatch', name: 'Different recovery model', serial: 'R-150', model: 'P-250', location: 'Plant' })).id
     await h.api('bom.revise', owner, { ...applicability, asset: mismatched })
     const refusedWork = (await h.api('workorder.create', owner, { asset: mismatched, title: 'Restored model refusal', due: today, assignee: member })).id
+    const dependencyRecords=await dependencyFixture(h,owner,member,asset)
+    const retainedDependencies=await h.api(`work/${dependencyRecords.work}`,owner)
+    for(const id of [dependencyRecords.work,dependencyRecords.predecessor]) {
+      const retained=await h.api(`work/${id}`,owner)
+      const preview=await h.api(`record-erasure-preview?kind=work&id=${id}`,owner)
+      assert.equal(preview.eligible,false)
+      assert.equal(preview.dependencies.gk_work_dependencies,1)
+      assert.equal((await h.api('record.erase',owner,{kind:'work',id,token:preview.token,confirm:true},409)).error,'record_retained')
+      assert.deepEqual(await h.api(`work/${id}`,owner),retained,'retained dependency prevents erasure without changing referenced work')
+    }
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
     const paperWork=await printPackFixture(h,owner,member)
@@ -100,7 +111,7 @@ export async function recoveryJourney() {
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')
     assert.ok(!bytes.includes(Buffer.from(credential.token)), 'service bearer secrets are absent from exports')
     const records = bytes.toString().trim().split('\n').map(line => JSON.parse(line))
-    for(const table of ['gk_print_packs','gk_print_previews','gk_print_entries','gk_conversations','gk_messages','gk_message_reads']) assert.ok(records[0].tables.some(row=>row.name===table),'the archive inventories direct messaging records')
+    for(const table of ['gk_print_packs','gk_print_previews','gk_print_entries','gk_conversations','gk_messages','gk_message_reads','gk_work_dependencies','gk_work_dependency_history']) assert.ok(records[0].tables.some(row=>row.name===table),'the archive inventories direct messaging records')
     const archivedMessages=records.flatMap(record=>record.items??[]).filter(item=>item.kind==='row'&&item.table==='gk_messages')
     assert.deepEqual(archivedMessages.map(item=>item.row.body).sort(),['synthetic-gasket-recovery-message','synthetic-gasket-recovery-reply'])
     assert.ok(!bytes.includes(Buffer.from(bearerHash)), 'archives exclude the usable bearer verifier as well as its token')
@@ -124,6 +135,10 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
+      assert.deepEqual(await restored.api(`work/${dependencyRecords.work}`,signed),retainedDependencies,'inactive restore reconciles current links, all attributed link revisions and native readiness')
+      assert.equal((await restored.api('workorder.dependency',signed,dependencyRecords.payload,409)).error,'stale')
+      assert.deepEqual(await restored.api(`work/${dependencyRecords.work}`,signed),retainedDependencies,'restored replay changes neither work nor history')
+      console.log('PROBE PLAN-005 recovery: public erasure doors refuse retained links; rer export and import -> current links and attributed history reconcile, replay has no effect')
       assert.deepEqual(await modelFacts(restored, signed), retainedModels, 'inactive restore preserves model identity history and both BOM restriction revisions with attribution')
       assert.deepEqual((await restored.api(`work/${accepted.id}`, signed)).reservations, retainedReservations, 'inactive restore preserves approved substitute commitments')
       const beforeRefusal = { parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }

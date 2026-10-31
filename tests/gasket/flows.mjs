@@ -1,3 +1,4 @@
+import { workDependenciesJourney } from './work-dependencies.mjs'
 import { printPacksJourney } from './print-packs.mjs'
 import { messagesJourney } from './messages.mjs'
 import { workPaginationJourney } from './work-pagination.mjs'
@@ -54,7 +55,7 @@ import { now, zone } from './clock.mjs'
 // and complete archive reconciliation in their original order.
 const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
-  [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
+  [workDependenciesJourney, 'core'], [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
   [privateFileLinksJourney, 'automation'],
   [requiredMigrationJourney,'inventory'],
@@ -100,6 +101,7 @@ const unzip = buffer => {
 }
 
 try {
+  await check('Revisioned predecessor readiness and independent review', workDependenciesJourney)
   await check('Controlled print packs and authenticated paper entry', printPacksJourney)
   await check('Retained direct messages and participant authority', messagesJourney)
   await check('Complete authorized work pages and bounded CSV', workPaginationJourney)

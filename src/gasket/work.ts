@@ -1,3 +1,4 @@
+import { workDependencies } from './work-dependencies'
 import { pageRows, WORK_EXPORT_LIMIT, type PageSource } from './pagination'
 import { cell } from './audit'
 import { laborView } from './labor'
@@ -412,6 +413,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const origin = await correctionOrigin(env, id)
   // PM-002: the reading that raised this preventive work, as evidence.
   const trigger = order.trigger_reading_id ? await one(env, 'SELECT r.id, r.value, r.taken_on, r.provenance, r.source, r.quality, g.name AS meter, g.unit FROM gk_readings r JOIN gk_meters g ON g.id = r.meter_id WHERE r.id = ?', order.trigger_reading_id) : null
+  const dependencies = await workDependencies(env, id)
   const chase = await chaseOf(env, order, actor.today)
   const crew = await crewOf(env, order, actor)
   const { items_json: _items, ...rest } = order
@@ -427,7 +429,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const signatures = await signaturesOf(env, order)
   const calibration = order.calibration_task ? { grace_days: order.grace_days, overdue_after: addDays(order.due_date, order.grace_days ?? 0), certificate: evidence.filter(file => file.certificate).at(-1) ?? null } : null
   const timeEntries = await all(env, 'SELECT t.id, t.worked_on, t.minutes, t.note, t.recorded_at, m.name AS recorded_by FROM gk_time_entries t LEFT JOIN gk_members m ON m.id = t.recorded_by WHERE t.work_order_id = ? ORDER BY t.recorded_at, t.id', id)
-  return { ...rest, timeEntries, requestSources:await requestSources(env,actor,id), trigger, tools, signatures, documents: await workDocuments(env, id), calibration, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, labor: await laborView(env, actor, id), fields, mine: order.assignee_id === actor.id, missing: submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length, tools, certificateRequired: Boolean(calibration && !calibration.certificate), resign: resignBlockers(signatures, order.version) }) }
+  return { ...rest, dependencies, timeEntries, requestSources:await requestSources(env,actor,id), trigger, tools, signatures, documents: await workDocuments(env, id), calibration, chase, crew, collaborating: crew.collaborating, items, meters, readings, parts, reservations: reserved, bom, downtime, findings, evidence, reviews, decisions, control, merged, origin, comments, costs, labor: await laborView(env, actor, id), fields, mine: order.assignee_id === actor.id, missing: [...dependencies.links.filter(row => row.active && !row.satisfied).map(row => `predecessor WO-${String(row.number).padStart(4, '0')} needs current independent approval`), ...submitBlockers({ items, findings, downtime, unacknowledged: Boolean(origin && !order.acknowledged_at), fields, evidenceRequired: Boolean(order.requires_evidence) && !evidence.length, tools, certificateRequired: Boolean(calibration && !calibration.certificate), resign: resignBlockers(signatures, order.version) })] }
 }
 
 /**

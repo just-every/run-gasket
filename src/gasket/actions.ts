@@ -1,3 +1,4 @@
+import { changeWorkDependency } from './work-dependencies'
 import { issuePrintPack, previewPrintEntry, acceptPrintEntry } from './print-packs'
 import { startConversation, sendMessage, readConversation } from './messages'
 import { saveLanguage, saveIntakeTranslation } from './languages'
@@ -95,6 +96,7 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'workorder.dependency': changeWorkDependency,
   'printpack.issue':issuePrintPack, 'printpack.preview':previewPrintEntry, 'printpack.accept':(env,actor,input,request)=>acceptPrintEntry(env,actor,input,doorOf(request)),
   'conversation.start': startConversation, 'message.send': sendMessage, 'conversation.read': readConversation,
   'language.preference':(env,actor,input)=>saveLanguage(env,actor,input),
