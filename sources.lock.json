@@ -208,7 +208,7 @@
       "executable": false
     },
     "CONTRACT.md": {
-      "sha256": "a57d6e4d67ae8eeabb49ab2aaa722d5dee887047da6c1c509e75d9e75dd4e121",
+      "sha256": "83578d2fd6ef98f8302cdb60f3ff0f79e75767be8b90bdd2cf8262f004e575fb",
       "executable": false
     },
     "DEMO.md": {
@@ -1456,7 +1456,7 @@
       "executable": false
     },
     "src/gasket/agent-door/intervals.ts": {
-      "sha256": "00da234d3e37be31804825dd560c86d0f073745826763ae0bb4de2f22980db73",
+      "sha256": "43963250e7803cf1e89ce09a7bc9742f0f2758dfdcfb5e5f0c91331cd7b76335",
       "executable": false
     },
     "src/gasket/agent-door/native.ts": {
@@ -4728,7 +4728,7 @@
       "executable": false
     },
     "tests/gasket/agent-interval-policy.mjs": {
-      "sha256": "0fe09f028e02993821677b577b997e438fb439276b4a1ecc29b7eb597ec0748b",
+      "sha256": "318fc83d426600b57f73a6a5b68ae0db6ae5c25f38e20fb81bc3fc8a9aac72f0",
       "executable": false
     },
     "tests/gasket/agent-native-journey.mjs": {

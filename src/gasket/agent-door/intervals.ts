@@ -21,13 +21,15 @@ export function intervalTools(env: Bindings): ToolDefinition[] {
     async target(args, ctx) { return { kind: 'schedule', id: (await resolve(args, ctx)).basis.schedule.id } },
     async summary(args, ctx) {
       const { basis } = await resolve(args, ctx)
+      const meter = basis.assets[0].meters.find(row => row.id === basis.schedule.meter_id)
+      const unit = String(meter?.unit ?? 'recorded units')
       return { target: { id: basis.schedule.id, name: basis.schedule.title }, items: [
         ...(basis.change.fromDays === null ? [] : [`Calendar interval: ${basis.change.fromDays} days to ${basis.change.toDays} days.`]),
-        ...(basis.change.fromUnits === null ? [] : [`Counter interval: ${basis.change.fromUnits} to ${basis.change.toUnits} recorded units.`]),
+        ...(basis.change.fromUnits === null ? [] : [`Counter interval (${meter?.name ?? 'schedule meter'}): ${basis.change.fromUnits} ${unit} to ${basis.change.toUnits} ${unit}.`]),
         `Evidence from ${basis.from} through ${basis.to}; schedule revision ${basis.schedule.revision}.`,
         ...basis.limits.map(limit => `${String(limit.source).toUpperCase()} bounds: ${[
           limit.min_days === null ? '' : `${limit.min_days} to ${limit.max_days} days`,
-          limit.min_units === null ? '' : `${limit.min_units} to ${limit.max_units} counter units`,
+          limit.min_units === null ? '' : `${limit.min_units} to ${limit.max_units} ${unit}`,
         ].filter(Boolean).join('; ')}. Reference revision ${limit.revision}: ${limit.reference}`),
         basis.expectedEffect, ...basis.uncertainty, basis.rollbackPlan,
       ] }
