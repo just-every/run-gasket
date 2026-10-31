@@ -185,9 +185,12 @@ export async function workDependenciesJourney() {
     for(const source of [preventive,await make('Synthetic cost-corrected predecessor')]) {
       const target=await make('Synthetic dependent after financial correction')
       await action(await linkPayload(target,source))
-      await complete(source)
+      await h.api('workorder.submit',cookies.tech,{workOrder:source,version:(await read(source)).version})
+      // Correcting a dimension while review is pending also preserves the submitted cycle.
+      await h.api('work.cost_center',owner,{workOrder:source,version:(await read(source)).version,costCenter:center})
+      await h.api('workorder.review',cookies.reviewer,{workOrder:source,version:(await read(source)).version,decision:'approve'})
       const approved=await read(source)
-      assert.equal((await read(target)).dependencies.ready,true)
+      assert.equal((await read(target)).dependencies.ready,true,`${approved.kind} predecessor approved after a pending-review cost correction is ready`)
       await h.api('work.cost_center',owner,{workOrder:source,version:approved.version,costCenter:center})
       const corrected=await read(source)
       assert.equal(corrected.version,approved.version+1)

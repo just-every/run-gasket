@@ -5,11 +5,11 @@ import { all, commit, guard, insist, newId, now, one, stmt } from './core'
 import type { Input } from './input'
 
 const OPEN = "('open','in_progress','returned')"
-// Closure must retain independent approval of its submitted maintenance revision.
+// Closure must retain independent approval within its current submission cycle.
 // Later cost-center corrections change the work version without invalidating completion.
 const COMPLETE = `p.status='closed' AND p.merged_into IS NULL AND p.closed_at IS NOT NULL
   AND EXISTS(SELECT 1 FROM gk_reviews r WHERE r.work_order_id=p.id AND r.decision='approved'
-    AND r.version=p.submitted_version+1 AND r.reviewer=p.closed_by AND r.reviewer<>p.assignee_id)`
+    AND r.version>p.submitted_version AND r.version<p.version AND r.reviewer=p.closed_by AND r.reviewer<>p.assignee_id)`
 const SATISFIED = `NOT EXISTS(SELECT 1 FROM gk_work_dependencies d LEFT JOIN gk_work_orders p ON p.id=d.predecessor_id
   WHERE d.work_order_id=? AND d.active=1 AND NOT COALESCE((${COMPLETE}),0))`
 
