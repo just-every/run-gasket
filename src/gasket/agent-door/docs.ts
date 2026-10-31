@@ -1,4 +1,5 @@
 import { commentTools } from './comments'
+import { correctiveProposalTools } from './outcomes'
 import { reassignmentTools } from './reassignment'
 import type { Bindings } from '../../auth.server'
 import { mutationTools } from './tools'
@@ -10,7 +11,7 @@ import { capabilities, notTools } from './index'
 export function agentDocumentation(request: Request, env: Bindings): Response | null {
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
-  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...commentTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...commentTools(env), ...correctiveProposalTools(env)].sort((a, b) => a.name.localeCompare(b.name))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -36,6 +37,8 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     '',
     'Internal plain-text work comments use native comment.post under the current human sponsor’s existing record and comment rights. Their stored work target determines the standard classification. Native threads retain agent-for-sponsor attribution. The native agent role gains no comment right, and native service credentials gain no comment scope. Photos, mentions, edits and handoff summaries are outside this adapter.',
     '',
+    'The maintenance coordinator reads source records and prepares corrective proposals. The corrective application tool executes under an allowing policy; a review disposition creates a genuine review record and retains the pending native proposal for an independent lead or owner decision. Outcome investigations retain the exact assessment and source fingerprint, remeasure before execution and fence changed evidence with the work and receipt in one transaction. Interval reversals and maintenance sign-off retain their separate commitment gaps. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
+      '',
     '## Other doors',
     '',
     ...notTools.map(item => `- ${item.reason}: ${item.clauses.join(', ')}`),

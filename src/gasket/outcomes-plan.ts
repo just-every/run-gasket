@@ -32,7 +32,7 @@ export async function planOutcome(env: Bindings, actor: Actor, input: Input) {
 export async function outcomeFollowUp(env: Bindings, actor: Actor, input: Input, reversal: boolean) {
   requireCapability(actor,'proposal.prepare')
   const report = await readOutcome(env,actor,input.text('outcome'))
-  const current = await assessOutcome(env,actor,Input.of({window:report.source.window}))
+  const current = await assessOutcome(env,actor,Input.of({window:report.source.window}), false)
   insist(current.id === report.id,'outcome_stale',409,{current:current.id})
   if(reversal) {
     insist(report.status === 'worsening','outcome_not_worsening',409)

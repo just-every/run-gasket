@@ -17,6 +17,7 @@ import { isDate } from './dates'
 import { agentContext, agentPolicyFence } from './agent-door/context'
 import { canonical } from '../modules/agent-door/policy/document'
 import { fromMilli, meterNumber, toMilli } from './quantity'
+import { assessOutcome, readOutcome } from './outcomes'
 
 const KINDS = ['schedule', 'corrective', 'count', 'reassign', 'interval', 'merge'] as const
 type Kind = typeof KINDS[number]
@@ -52,6 +53,15 @@ async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string
   }
   const asset = await one(env, 'SELECT id, revision FROM gk_assets WHERE id = ?', payload.asset)
   insist(asset, 'asset_not_found', 404)
+  if (kind === 'corrective' && payload.outcome) {
+    const report = await readOutcome(env, actor, payload.outcome)
+    insist(report.subject.asset === asset.id, 'outcome_asset_mismatch', 409)
+    insist(['unproven', 'worsening', 'no_improvement'].includes(report.status), 'investigation_not_required', 409)
+    // A fresh comparison is computed without rewriting or adding retained assessments.
+    const current = await assessOutcome(env, actor, Input.of({ window: report.source.window }), false)
+    insist(current.id === report.id && current.source.sourceHash === report.source.sourceHash, 'outcome_stale', 409)
+    return { asset: asset.id, assetRevision: asset.revision, outcome: report.id, sourceHash: report.source.sourceHash, window: report.source.window }
+  }
   return { asset: asset.id, assetRevision: asset.revision }
 }
 
@@ -124,7 +134,7 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
   const command = Input.of(proposal.kind === 'count' ? { ...payload, seen: String((basis as { moves: number }).moves) } : payload)
   // The command and the decision commit in one batch: a second approver finds it decided.
   const also = (resultId: string) => [
-    ...(['reassign', 'interval', 'merge'].includes(proposal.kind) ? [auditFence(env, revision)] : []),
+    ...(['reassign', 'interval', 'merge'].includes(proposal.kind) || payload.outcome ? [auditFence(env, revision)] : []),
     guard(env, 'already_decided', `EXISTS(SELECT 1 FROM ${table} WHERE id = ? AND status = 'pending')`, proposal.id),
     stmt(env, `UPDATE ${table} SET status = 'approved', decided_by = ?, decided_at = ?, decision_note = ?, result_id = ? WHERE id = ?`, actor.id, now(), note, resultId, proposal.id),
     stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.approve', proposal.id, JSON.stringify({ hash: proposal.payload_hash, result: resultId })),
@@ -136,6 +146,56 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
     : proposal.kind === 'corrective' ? await createCorrective(env, actor, command, options)
     : proposal.kind === 'reassign' ? await assign(env, actor, command, options)
     : await countPart(env, actor, command, options)
+  return { id: proposal.id, status: 'approved', result: result.id }
+}
+
+/** Only corrective application is exposed here; money and maintenance standards keep their native doors. */
+export async function correctiveApplication(env: Bindings, actor: Actor, input: Input, completed = false) {
+  requireCapability(actor, 'proposal.decide')
+  const proposal = await one<Row>(env, 'SELECT * FROM gk_proposals WHERE id=?', input.text('proposal', { max: 100 }))
+  insist(proposal, 'proposal_not_found', 404)
+  insist(proposal.kind === 'corrective', 'unsupported_proposal_kind', 409)
+  insist(input.text('hash', { max: 64 }) === proposal.payload_hash, 'proposal_changed', 409)
+  const payload = JSON.parse(proposal.payload_json) as Record<string, string>
+  if (completed && proposal.status === 'approved' && proposal.result_id) return { proposal, payload, basis: JSON.parse(proposal.basis_json) }
+  insist(proposal.status === 'pending', 'already_decided', 409)
+  const basis = await basisOf(env, 'corrective', payload, actor)
+  insist(JSON.stringify(basis) === proposal.basis_json, 'proposal_stale', 409)
+  return { proposal, payload, basis }
+}
+
+/** The application receipt, source fence, work and attribution commit together. Review invents no human decision. */
+export async function applyCorrectiveProposal(env: Bindings, actor: Actor, input: Input, disposition: string) {
+  const ctx = agentContext()
+  insist(ctx, 'agent_policy_required', 403)
+  const revision = await auditRevision(env)
+  const { proposal, payload, basis } = await correctiveApplication(env, actor, input)
+  if (disposition === 'review') return { id: proposal.id, status: 'pending', result: null }
+  insist(['autonomous', 'approval'].includes(disposition), 'agent_policy_required', 403)
+  let approver: string | null = null
+  if (disposition === 'approval') {
+    for (const person of ctx.approvers) {
+      if (person.id === actor.id || person.id === proposal.prepared_by) continue
+      const eligible = await one(env, `SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+        WHERE m.id=? AND m.status='active' AND o.status='active' AND (o.role='owner' OR (m.role='lead'
+          AND EXISTS(SELECT 1 FROM gk_site_memberships WHERE site_id='primary' AND member_id=m.id AND status='active')))`, person.id)
+      if (eligible) { approver = person.id; break }
+    }
+    insist(approver, 'independent_decision_required', 403)
+  }
+  const also = (result: string) => [
+    auditFence(env, revision),
+    guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id=? AND status='pending' AND payload_hash=? AND basis_json=?)", proposal.id, proposal.payload_hash, proposal.basis_json),
+    ...(approver ? [guard(env, 'independent_decision_required', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+      WHERE m.id=? AND m.status='active' AND o.status='active' AND (o.role='owner' OR (m.role='lead'
+        AND EXISTS(SELECT 1 FROM gk_site_memberships WHERE site_id='primary' AND member_id=m.id AND status='active'))))`, approver)] : []),
+    stmt(env, "UPDATE gk_proposals SET status='approved',decided_by=?,decided_at=?,decision_note=?,result_id=? WHERE id=?", approver, now(),
+      approver ? 'Independent company-policy approval' : 'Company policy authorized agent execution; no human approval asserted.', result, proposal.id),
+    stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.apply', proposal.id, JSON.stringify({
+      hash: proposal.payload_hash, result, basis, disposition, preparedBy: ctx.actor, approvers: ctx.approvers, operationId: ctx.operationId,
+    })),
+  ]
+  const result = await createCorrective(env, actor, Input.of(payload), { proposal: proposal.id, also })
   return { id: proposal.id, status: 'approved', result: result.id }
 }
 
