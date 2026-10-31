@@ -1,8 +1,9 @@
+import { canonical } from '../../modules/agent-door/policy/document'
 import type { ToolContext, Person } from '../../modules/agent-door/index.ts'
 import { ToolRefusal } from '../../modules/agent-door/index.ts'
 import type { Bindings } from '../../auth.server'
 import { type Actor, type Role, siteZone } from '../actor'
-import { GasketError, one } from '../core'
+import { GasketError, insist, one } from '../core'
 import { today } from '../dates'
 import { authorizeOperationalSite } from '../site-access'
 import { withSiteAuthority } from '../site-context'
@@ -37,4 +38,20 @@ export async function nativeCall<T>(env: Bindings, ctx: ToolContext, run: (actor
     if (error instanceof GasketError) throw new ToolRefusal(error.code)
     throw error
   }
+}
+
+/** Resolve an actual running policy admission before a native proposal application. */
+export async function nativeDisposition(env: Bindings, ctx: ToolContext, tool: string) {
+  const admission = await one(env, `SELECT a.row,a.evidence FROM agent_door_audit a
+    JOIN agent_door_usage u ON u.decision_id=a.id WHERE a.agent=?
+    AND json_extract(a.row,'$.operation_id')=? AND json_extract(a.row,'$.sponsor.id')=?
+    AND json_extract(a.row,'$.tool')=? AND json_extract(a.row,'$.outcome')='running'
+    ORDER BY a.sequence DESC LIMIT 1`, ctx.agent.id, ctx.operationId, ctx.person.id, tool)
+  insist(admission?.evidence, 'agent_policy_required', 403)
+  const row = JSON.parse(admission.row), evidence = JSON.parse(admission.evidence)
+  const policy = await one<NativePolicyFence>(env, 'SELECT envelope,local_document,local_revision FROM agent_door_state WHERE id=1')
+  const envelope = policy?.envelope ? JSON.parse(policy.envelope) : null
+  const document = envelope ? envelope.document : policy?.local_document ? JSON.parse(policy.local_document) : null
+  insist(row.revision === (envelope ? envelope.revision : policy?.local_revision) && canonical(evidence.document) === canonical(document), 'agent_policy_changed', 409)
+  return row.decision as string
 }

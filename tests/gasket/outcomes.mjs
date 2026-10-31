@@ -4,8 +4,8 @@ import { pathToFileURL } from 'node:url'
 import { harness } from './harness.mjs'
 import { offset, zone } from './clock.mjs'
 
-export async function outcomeJourney() {
-  const initial=await harness({clockOffset:offset-8*86_400_000});let h=initial
+export async function outcomeJourney({ bindings, investigate, proposalGate = false } = {}) {
+  const initial=await harness({bindings,proposalGate,clockOffset:offset-8*86_400_000});let h=initial
   try {
     const cookie={owner:await h.owner()},ids={},assets=[],meters=[],plans={},baselineJobs=[]
     await h.api('site.configure',cookie.owner,{name:'Lake Erie Compressor Works',timezone:zone})
@@ -14,7 +14,7 @@ export async function outcomeJourney() {
     }
     const base=(await h.api('me',cookie.owner)).today
     const day=n=>{const d=new Date(`${base}T12:00Z`);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
-    const reopen=async n=>{await h.stop();h=await harness({installation:initial.installation,vars:initial.vars,clockOffset:offset+(n-8)*86_400_000});cookie.owner=await h.signIn(initial.vars.OWNER_EMAIL);for(const key of ['lead','max','agent'])cookie[key]=await h.signIn(`${key}@example.test`)}
+    const reopen=async n=>{await h.stop();h=await harness({installation:initial.installation,vars:initial.vars,proposalGate,clockOffset:offset+(n-8)*86_400_000});cookie.owner=await h.signIn(initial.vars.OWNER_EMAIL);for(const key of ['lead','max','agent'])cookie[key]=await h.signIn(`${key}@example.test`)}
     for(let i=0;i<3;i++) {
       assets.push((await h.api('asset.create',cookie.lead,{tag:`OUT-CMP-${i+1}`,name:`Compressor ${i+1} for packaging hall production`,location:'Lake Erie plant',category:'Air compressor'})).id)
       meters.push((await h.api('meter.create',cookie.lead,{asset:assets[i],name:'Operating hours',kind:'counter',unit:'h'})).id)
@@ -130,6 +130,21 @@ export async function outcomeJourney() {
       await registryBrowser(h,cookie,improved)
     }
 
+    const fresh = await assess(plans.worsening)
+    const nativeInvestigation = await h.api('outcome.investigate', cookie.agent, { outcome: fresh.id })
+    const retained = (await h.api('proposals', cookie.lead)).find(row => row.id === nativeInvestigation.id)
+    assert.equal(retained.basis.outcome, fresh.id)
+    assert.equal(retained.basis.sourceHash, fresh.source.sourceHash)
+    assert.equal(retained.basis.window, plans.worsening)
+    await h.api('proposal.decide', cookie.agent, { proposal: retained.id, hash: retained.payload_hash, decision: 'approve' }, 403)
+    const investigated = await h.api('proposal.decide', cookie.lead, { proposal: retained.id, hash: retained.payload_hash, decision: 'approve' })
+    const corrective = await h.api(`work/${investigated.result}`, cookie.lead)
+    assert.deepEqual([corrective.kind, corrective.asset_id, corrective.status], ['corrective', assets[0], 'open'])
+    assert.equal(corrective.description, fresh.uncertainty.join(' '))
+    assert.equal((await h.api('proposals', cookie.lead)).find(row => row.id === retained.id).decided_by, ids.lead)
+    assert.deepEqual(await h.api(`outcomes/${fresh.id}`, cookie.lead), fresh)
+    console.log('PROBE AGENT-004 native decision: outcome.investigate then independent proposal.decide -> one open corrective investigation with retained source fingerprint')
+    if (investigate) await investigate({ h, cookie, ids, assets, meters, plans, day, gap, worse, reading, periodWork, assess, schedule, baselineJobs })
     console.log('AGENT-004 approved intervention, matched exposure, telemetry gap, production reduction, notices and human-approved reversal passed')
   } finally {await h.close();if(h!==initial)await initial.close()}
 }

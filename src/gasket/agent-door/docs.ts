@@ -1,4 +1,5 @@
 import { reassignmentTools } from './reassignment'
+import { correctiveProposalTools } from './outcomes'
 import type { Bindings } from '../../auth.server'
 import { mutationTools } from './tools'
 import { procedureTools } from './procedures'
@@ -9,7 +10,7 @@ import { capabilities, notTools } from './index'
 export function agentDocumentation(request: Request, env: Bindings): Response | null {
   if (new URL(request.url).pathname !== '/docs/agents') return null
   if (!['GET', 'HEAD'].includes(request.method)) return new Response(null, { status: 405, headers: { Allow: 'GET, HEAD' } })
-  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env)].sort((a, b) => a.name.localeCompare(b.name))
+  const tools = [...recordTools(env), ...mutationTools(env), ...procedureTools(env), ...reassignmentTools(env), ...correctiveProposalTools(env)].sort((a, b) => a.name.localeCompare(b.name))
   const body = [
     '# Gasket maintenance coordinator',
     '',
@@ -32,6 +33,7 @@ export function agentDocumentation(request: Request, env: Bindings): Response | 
     'This Core adoption exposes the listed software jobs. It does not expose native purchasing, provider model runs, role administration, physical attestations, import, deployment or device operations as MCP jobs. Existing native screens and their permissions remain authoritative. Native maintenance events, resources, prompts and subscriptions are undeclared. Resource refresh, multi-sponsor completion, outside mail and queued continuations remain unproved. No cost reservation or provider call is registered. The 0.2.91 conformance journey checks Core jobs and typed refusals for omitted families.',
     '',
     'The maintenance coordinator reads source records and stages proposals through the listed tools. Existing overdue reassignment proposals can execute under company policy, with exact source evidence and current assignee eligibility rechecked atomically. Standard review retains a real review record; a company-required independent approval retains its genuine lead or owner. Autonomous execution invents no human approval. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
+    'The maintenance coordinator reads source records and prepares corrective proposals. The corrective application tool executes under an allowing policy; a review disposition creates a genuine review record and retains the pending native proposal for an independent lead or owner decision. Outcome investigations retain the exact assessment and source fingerprint, remeasure before execution and fence changed evidence with the work and receipt in one transaction. Interval reversals and maintenance sign-off retain their separate commitment gaps. An agent never certifies physical work, isolation, receipt, a person’s approval or an outside provider challenge.',
     '',
     '## Other doors',
     '',
