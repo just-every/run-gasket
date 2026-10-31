@@ -15,6 +15,8 @@ import { assign, createCorrective } from './work'
 import { assigneeFits } from './crew'
 import { auditFence, auditRevision, followUpCase } from './agent-follow-up'
 import { isDate } from './dates'
+import { agentContext, agentPolicyFence } from './agent-door/context'
+import { canonical } from '../modules/agent-door/policy/document'
 import { fromMilli, meterNumber, toMilli } from './quantity'
 
 const KINDS = ['schedule', 'corrective', 'count', 'reassign', 'interval', 'merge'] as const
@@ -33,7 +35,12 @@ async function basisOf(env: Bindings, kind: Kind, payload: Record<string, string
     const order = await one(env, 'SELECT team_id FROM gk_work_orders WHERE id=?', payload.workOrder)
     await assigneeFits(env, payload.assignee, order.team_id)
     insist(payload.assignee !== state.assignee, 'already_assigned', 409)
-    return { workOrder: state.workOrder, version: state.version, rule: state.rule, blockers: state.blockers, queries: state.queries, linked: state.linked }
+    const eligible = await one(env, `SELECT m.id,m.role,m.status,m.operator_id,o.status AS operator_status,o.role AS operator_role,
+      sm.status AS site_status,tm.added_at AS team_joined_at FROM gk_members m LEFT JOIN oa_operators o ON o.id=m.operator_id
+      LEFT JOIN gk_site_memberships sm ON sm.member_id=m.id AND sm.site_id='primary'
+      LEFT JOIN gk_team_members tm ON tm.member_id=m.id AND tm.team_id=? WHERE m.id=?`, order.team_id, payload.assignee)
+    insist(eligible?.operator_status === 'active' && eligible.site_status === 'active', 'assignee_not_assignable', 409)
+    return { workOrder: state.workOrder, version: state.version, rule: state.rule, blockers: state.blockers, queries: state.queries, linked: state.linked, eligible }
   }
   if (kind === 'count') {
     const part = await partDetail(env, actor, payload.part)
@@ -136,5 +143,68 @@ export async function decide(env: Bindings, actor: Actor, input: Input) {
 export async function proposalList(env: Bindings, _actor: Actor) {
   const rows = await all(env, `SELECT p.*, COALESCE((SELECT json_extract(a.detail,'$.preparedBy.label') FROM gk_audit a WHERE a.subject=p.id AND a.action='proposal.prepare' ORDER BY a.seq LIMIT 1),m.name) AS prepared_by_name, d.name AS decided_by_name FROM gk_all_proposals p LEFT JOIN gk_members m ON m.id = p.prepared_by LEFT JOIN gk_members d ON d.id = p.decided_by
     ORDER BY p.status = 'pending' DESC, p.prepared_at DESC LIMIT 200`)
-  return rows.map(row => ({ ...row, payload: JSON.parse(row.payload_json), basis: JSON.parse(row.basis_json), payload_json: undefined, basis_json: undefined }))
+  return Promise.all(rows.map(async row => ({ ...row, ...(row.kind === 'reassign' ? { source: await sha256Hex(row.basis_json) } : {}), payload: JSON.parse(row.payload_json), basis: JSON.parse(row.basis_json), payload_json: undefined, basis_json: undefined })))
+}
+
+/** An existing reassignment, remeasured through native facts, never model-supplied evidence. */
+export async function reassignmentProposal(env: Bindings, actor: Actor, id: string, hash: string, source: string, completed = false) {
+  requireCapability(actor, 'work.assign')
+  const proposal = await one(env, "SELECT * FROM gk_proposals WHERE id=? AND kind='reassign'", id)
+  insist(proposal, 'proposal_not_found', 404)
+  insist(hash === proposal.payload_hash && source === await sha256Hex(proposal.basis_json), 'proposal_changed', 409)
+  const payload = JSON.parse(proposal.payload_json) as Record<string, string>
+  const basis = JSON.parse(proposal.basis_json)
+  if (!completed) {
+    insist(proposal.status === 'pending', 'already_decided', 409)
+    const current = await basisOf(env, 'reassign', payload, actor)
+    insist(JSON.stringify(current) === proposal.basis_json, 'proposal_stale', 409)
+  }
+  return { proposal, payload, basis, source }
+}
+
+/** Only a running, policy-admitted agent call may use the autonomous application path. */
+export async function applyReassignment(env: Bindings, actor: Actor, input: Input) {
+  const ctx = agentContext(), policy = agentPolicyFence()
+  insist(ctx && policy, 'forbidden', 403)
+  const revision = await auditRevision(env)
+  const { proposal, payload, basis, source } = await reassignmentProposal(env, actor,
+    input.text('proposal', { max: 100 }), input.text('hash', { max: 64 }), input.text('source', { max: 64 }))
+  const admission = await one(env, `SELECT id,row,evidence FROM agent_door_audit
+    WHERE json_extract(row,'$.operation_id')=? AND json_extract(row,'$.tool')='gasket.proposals.reassign'
+      AND json_extract(row,'$.outcome')='running' ORDER BY sequence DESC LIMIT 1`, ctx.operationId)
+  insist(admission, 'agent_policy_changed', 409)
+  const decision = JSON.parse(admission.row), evidence = JSON.parse(admission.evidence)
+  const envelope = policy.envelope ? JSON.parse(policy.envelope) : null
+  const document = envelope?.document ?? (policy.local_document ? JSON.parse(policy.local_document) : null)
+  insist(decision.sponsor.id === actor.id && decision.agent.id === ctx.agent.id && decision.idempotency_key === ctx.idempotencyKey
+    && decision.revision === (envelope?.revision ?? policy.local_revision) && canonical(document) === canonical(evidence.document)
+    && ['autonomous','review','approval'].includes(decision.decision), 'agent_policy_changed', 409)
+  // A company-required approval is a genuine current person's decision, retained separately from preparation.
+  const decider = decision.decision === 'approval' ? ctx.approvers.find(person => person.id !== proposal.prepared_by) : null
+  if (decision.decision === 'approval') {
+    insist(decider, 'own_proposal', 403)
+    const member = await one(env, `SELECT m.id FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+      WHERE m.id=? AND m.status='active' AND o.status='active' AND (o.role='owner' OR m.role='lead')`, decider!.id)
+    insist(member, 'forbidden', 403)
+  }
+  const team = (await one(env, 'SELECT team_id FROM gk_work_orders WHERE id=?', payload.workOrder)).team_id
+  const also = (result: string) => [
+    auditFence(env, revision),
+    guard(env, 'assignee_not_assignable', `EXISTS(SELECT 1 FROM gk_members m JOIN oa_operators o ON o.id=m.operator_id
+      JOIN gk_site_memberships sm ON sm.member_id=m.id AND sm.site_id='primary'
+      WHERE m.id=? AND m.status='active' AND m.role=? AND o.status='active' AND o.role=? AND sm.status='active'
+      AND (? IS NULL OR EXISTS(SELECT 1 FROM gk_team_members tm WHERE tm.team_id=? AND tm.member_id=m.id AND tm.added_at IS ?)))`,
+      basis.eligible.id, basis.eligible.role, basis.eligible.operator_role, team,
+      team, basis.eligible.team_joined_at),
+    guard(env, 'agent_policy_changed', "EXISTS(SELECT 1 FROM agent_door_audit WHERE id=? AND row=? AND evidence=?)", admission.id, admission.row, admission.evidence),
+    guard(env, 'already_decided', "EXISTS(SELECT 1 FROM gk_proposals WHERE id=? AND status='pending' AND payload_hash=? AND basis_json=?)", proposal.id, proposal.payload_hash, proposal.basis_json),
+    stmt(env, `UPDATE gk_proposals SET status='approved',decided_by=?,decided_at=?,decision_note=?,result_id=? WHERE id=?`,
+      decider?.id ?? null, now(), `Company policy ${decision.revision}: ${decision.decision}; decision ${decision.decision_id ?? decision.id}`, result, proposal.id),
+    stmt(env, AUDIT_INSERT, now(), actor.id, actor.id, 'proposal.apply', proposal.id, JSON.stringify({
+      hash: proposal.payload_hash, source, basis, result, decision: decision.decision_id ?? decision.id, disposition: decision.decision,
+      preparedBy: ctx.actor, approvers: ctx.approvers, operationId: ctx.operationId,
+    })),
+  ]
+  await assign(env, actor, Input.of({ ...payload, version: basis.version }), { proposal: proposal.id, also })
+  return { id: proposal.id, status: 'approved', result: payload.workOrder }
 }
