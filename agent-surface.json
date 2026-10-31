@@ -324,7 +324,10 @@
         "asset"
       ]
     },
-    "journey": "tests/gasket/agent-native-journey.mjs"
+    "journey": "tests/gasket/agent-native-journey.mjs",
+    "fixtures": {
+      "module": "tests/gasket/agent-reassignment-fixtures.mjs"
+    }
   },
   "journey": [
     {
@@ -661,6 +664,36 @@
           "class": "standard"
         }
       ]
+    },
+    {
+      "id": "reassignment",
+      "tool": "gasket.proposals.reassign",
+      "args": {
+        "proposal": {
+          "$fixture": "reassignment",
+          "pointer": "/proposal"
+        },
+        "hash": {
+          "$fixture": "reassignment",
+          "pointer": "/hash"
+        },
+        "source": {
+          "$fixture": "reassignment",
+          "pointer": "/source"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "target": {
+        "kind": "work",
+        "id": {
+          "$fixture": "reassignment",
+          "pointer": "/workOrder"
+        }
+      }
     }
   ],
   "capabilities": [
