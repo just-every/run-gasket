@@ -94,7 +94,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run deps
       - name: Check generated contract documents
-        run: node scripts/contract-docs.mjs check
+        run: node src/base/contract-docs.mjs check
       - name: Install Chromium
         run: |
           set -euo pipefail
@@ -178,7 +178,9 @@ jobs:
           pnpm run test:requests
 
   # Preserve the shared fixture and archive comparison together; standalone
-  # journeys use separate installations in required parallel shards.
+  # journeys use separate installations in required parallel shards. Workspace
+  # conditional save recovery owns a shard so its browser journeys do not consume
+  # the core journeys' 15-minute budget. Every matrix entry is required.
   flows:
     needs: plan
     if: needs.plan.outputs.skip != 'true'
@@ -187,11 +189,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [core, automation, inventory, reports]
+        shard: [core, automation, inventory-1, inventory-2, inventory-3, reports, workspace]
     env:
       CI: 'true'
       WRANGLER_SEND_METRICS: 'false'
       GASKET_FLOWS_SHARD: ${{ matrix.shard }}
+      GASKET_MIGRATION_ROWS: '2000'
       API_SCREENSHOTS: /tmp/gasket-api
       PLANNING_SCREENSHOTS: /tmp/gasket-planning
       REPORT_SCREENSHOTS: /tmp/gasket-reports

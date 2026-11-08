@@ -36,7 +36,7 @@ export async function assetHistory(env: Bindings, actor: Actor, id: string) {
       'bom.revise': `Bill of materials revision ${detail.revision} saved${detail.note ? `: ${detail.note}` : ''}`,
       'downtime.classify': `Stop reclassified from ${detail.from?.planned ? 'planned' : `failure${detail.from?.failureMode ? ` (${detail.from.failureMode})` : ''}`} to ${detail.to?.planned ? 'planned' : `failure${detail.to?.failureMode ? ` (${detail.to.failureMode})` : ''}`}: ${detail.reason ?? ''}`,
     }
-    if (labels[row.action]) push(row.at, row.action.split('.')[0], row.subject === id ? null : row.subject, labels[row.action].trim(), name(row))
+    if (labels[row.action]) push(row.at, row.action.split('.')[0], row.subject === id ? null : row.subject, labels[row.action].trim(), detail.preparedBy?.label ?? name(row))
   }
   for (const row of await all(env, 'SELECT r.work_order_id, r.item, r.outcome, r.value, r.note, r.recorded_at, m.name AS who, w.checklist_revision_id FROM gk_result_log r JOIN gk_work_orders w ON w.id = r.work_order_id LEFT JOIN gk_members m ON m.id = r.recorded_by WHERE w.asset_id = ? ORDER BY r.seq', id)) {
     push(row.recorded_at, 'result', row.work_order_id, `Checklist item ${row.item + 1}: ${row.outcome === 'attention' ? 'needs attention' : row.outcome}${row.value !== null ? ` at ${row.value}` : ''}${row.note ? ` (${row.note})` : ''}`, name(row))

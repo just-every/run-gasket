@@ -1,3 +1,4 @@
+import { printPackCard } from './print-packs'
 import { safetyState } from '../safety'
 import { safetyCard } from './safety'
 import { stockSources } from '../stock-sources'
@@ -18,9 +19,9 @@ import { daysBetween, localNow, showClock, showDate, showDay, showInstant, showL
 import { partList } from '../parts'
 import { usd } from '../bad-actors'
 import { assignable, site } from '../site'
-import { TABS, pendingProposals, recentActivity, workToday, type Tab } from '../today'
+import { TABS, pendingProposals, recentActivity, workToday, todayPageRows, type Tab } from '../today'
 import { woDigits } from '../quantity'
-import { workList, workOrderDetail } from '../work'
+import { workList, workPageRows, workOrderDetail } from '../work'
 import { teamList } from '../crew'
 import { kitList, substituteList } from '../reservations'
 import { chaseCard } from './chasing'
@@ -112,15 +113,17 @@ const shortTask = (title: string) => {
 
 export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const mine = url.searchParams.get('mine') === '1', state = url.searchParams.get('state')
-  const filtered = mine || state === 'closed' || state === 'open'
+  const filtered = mine || state === 'closed' || state === 'open' || url.searchParams.has('team')
   const tab = (TABS as readonly string[]).includes(url.searchParams.get('tab') ?? '') ? url.searchParams.get('tab') as Tab : 'today'
   const [today, place, pending, activity] = await Promise.all([workToday(env, actor, url), site(env), pendingProposals(env), recentActivity(env, actor)])
-  const rows = filtered ? await workList(env, actor, url) : today.tabs[tab]
-  const all = url.searchParams.get('all') === '1', shown = all ? rows : rows.slice(0, SHOWN)
+  const selection = new URL(url)
+  if (!selection.searchParams.has('limit')) selection.searchParams.set('limit', selection.searchParams.get('all') === '1' ? '100' : String(SHOWN))
+  const result = filtered ? await workPageRows(env, actor, selection) : await todayPageRows(env, actor, selection)
+  const rows = result.rows, shown = rows
   const assigner = can(actor, 'work.assign')
   const here = (params: string) => `/app${params ? `?${params}` : ''}`
 
-  const tabs = h`<nav class="gk-count-tabs" aria-label="Today's work">${TABS.map((key, index) => h`${index === 1 ? raw('<span class="gk-tab-rule" aria-hidden="true"></span>') : ''}<a href="${here(key === 'today' ? '' : `tab=${key}`)}" class="gk-count-tab gk-count-${key}"${!filtered && key === tab ? raw(' aria-current="page"') : ''}>${TAB_LABEL[key]} <b class="gk-num">${today.tabs[key].length}</b></a>`)}</nav>`
+  const tabs = h`<nav class="gk-count-tabs" aria-label="Today's work">${TABS.map((key, index) => h`${index === 1 ? raw('<span class="gk-tab-rule" aria-hidden="true"></span>') : ''}<a href="${here(key === 'today' ? '' : `tab=${key}`)}" class="gk-count-tab gk-count-${key}"${!filtered && key === tab ? raw(' aria-current="page"') : ''}>${TAB_LABEL[key]} <b class="gk-num">${today.counts[key]}</b></a>`)}</nav>`
 
   const filters = h`<nav class="gk-tab-filters" aria-label="Other work lists">${[['state=open', 'All open', state === 'open' && !mine], ['mine=1', 'Assigned to me', mine], ['state=closed', 'Closed', state === 'closed']].map(([params, label, on]) => h`<a href="${here(params as string)}"${on ? raw(' aria-current="page"') : ''}>${label}</a>`)}</nav>`
   const agent = pending.count && pending.latest && (can(actor, 'proposal.decide') || can(actor, 'proposal.prepare')) ? h`<p class="gk-agent">${ICON.proposals}<span class="gk-agent-text"><b>${pending.latest.prepared_by}:</b> ${pending.latest.reasoning.split(/(?<=\.)\s/)[0]}</span><span class="gk-approval"><i class="gk-dot" aria-hidden="true"></i>${pending.count} proposal${pending.count === 1 ? '' : 's'} waiting for a decision</span><a class="gk-agent-link" href="/app/proposals">Review</a></p>` : ''
@@ -134,7 +137,12 @@ export async function workPage(env: Bindings, actor: Actor, url: URL) {
   const [title, text] = filtered ? [state === 'closed' ? 'No closed work orders yet' : mine ? 'Nothing is assigned to you' : 'No open work orders', 'Work orders appear here when a schedule falls due or when you raise corrective work on an asset.'] : emptyText[tab]
   const empty = h`<div class="gk-empty gk-empty-flat"><img src="/brand/assets/clipboard.svg" alt="" width="160" height="128"><h2>${title}</h2><p>${text}</p>${assigner && !filtered && tab === 'today' ? h`<p><a class="gk-button gk-secondary" href="/app/schedules">Go to schedules</a></p>` : ''}</div>`
 
-  const more = rows.length > shown.length ? h`<a class="gk-more-rows" href="${here([filtered ? url.searchParams.toString() : tab === 'today' ? '' : `tab=${tab}`, 'all=1'].filter(Boolean).join('&'))}">+ ${rows.length - shown.length} more</a>` : ''
+  const continuation = new URLSearchParams(selection.searchParams)
+  continuation.set('cursor', result.next ?? '')
+  const first = new URLSearchParams(selection.searchParams); first.delete('cursor')
+  const exportParams = new URLSearchParams(selection.searchParams); exportParams.delete('cursor'); exportParams.set('snapshot', result.start)
+  const more = h`<nav class="gk-more-rows" aria-label="Work pages"><span role="status">${result.total ? result.offset + 1 : 0}–${result.offset + rows.length} of ${result.total} work orders</span> ${result.offset ? h`<a href="${here(first.toString())}">First page</a> ` : ''}${result.next ? h`<a href="${here(continuation.toString())}">Next page</a>` : ''}</nav>${filtered ? h`<p><a href="/app/work.csv?${exportParams.toString()}">Download work CSV</a> · Up to 2,000 matching work orders. Larger or changed lists are refused; accepted work and files are preserved.</p>` : ''}`
+
   const next = today.next.length ? h`<p class="gk-next">${ICON.calendar}<span><b>${showDay(today.next[0].due_date, { short: true })}</b> next: ${today.next.map((row, index) => h`${index ? ' · ' : ''}<a href="/app/work/${row.id}" title="${row.title}">${woDigits(row.number)} ${row.asset_tag ?? row.location}</a> ${shortTask(row.title)}`)}</span><a href="${here('state=open')}">All open work</a></p>` : ''
 
   let log: Html = h``
@@ -221,7 +229,13 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const RESERVATION: Record<string, string> = { open: 'Reserved', issued: 'Issued', released: 'Released' }
   const held = w.reservations.length ? table(['Reserved', 'Quantity', 'Still needed', 'State'], w.reservations.map(row => [h`${row.part.name}<span class="gk-sub">${row.part.number}${row.insteadOf ? ` · instead of ${row.insteadOf.number}` : ''}${row.kit ? ` · ${row.kit}` : ''}</span>`,
     amount(row.quantity, row.part.unit), amount(row.stillNeeded, row.part.unit), h`${tag(RESERVATION[row.state])}${row.releaseReason ? h`<span class="gk-sub">${row.releaseReason}</span>` : ''}`]), 'Reservations', { wrap: [0, 3] }) : ''
-  const kits = planning ? await kitList(env) : [], swaps = planning ? await substituteList(env) : []
+  const kits = planning ? await kitList(env) : []
+  // BOM approvals belong in the same planning form as site-wide approvals.
+  const bomSwaps = (w.bom?.lines ?? []).flatMap(line => line.alternates.map(alt => ({
+    part_id: line.part.id, part_number: line.part.number, part_name: line.part.name,
+    substitute_id: alt.part.id, substitute_number: alt.part.number, substitute_name: alt.part.name,
+  })))
+  const swaps = planning ? [...new Map([...await substituteList(env), ...bomSwaps].map(row => [`${row.part_id}:${row.substitute_id}`, row])).values()] : []
   const reserveForms = planning && stock.length ? h`<div class="gk-split">${post('workorder.reserve', h`${select('Part', 'part', stock.map(part => ({ value: part.id, label: `${part.number} ${part.name} (${amount(part.available, part.unit)} available)` })), '', { blank: 'Choose a part' })}${field('Quantity', 'quantity', { attrs: 'inputmode="decimal"' })}
       ${swaps.length ? select('Instead of', 'insteadOf', [...new Map(swaps.map(row => [row.part_id, { value: row.part_id, label: `${row.part_number} ${row.part_name}` }])).values()], '', { required: false, blank: 'The part itself' }) : ''}`, 'Reserve part', { secondary: true })}
     ${kits.length ? post('workorder.reserve', h`${select('Repair kit', 'kit', kits.map(kit => ({ value: kit.id, label: `${kit.name}: ${kit.lines.map(line => `${line.quantity} ${line.number}`).join(', ')}` })), '', { blank: 'Choose a kit' })}
@@ -235,7 +249,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
     ${recording ? post('workorder.evidence', h`${fileField('Photo or document', 'file', { required: true, accept: '.png,.jpg,.jpeg,.webp,.heic,.pdf', hint: 'PNG, JPEG, WebP, HEIC or PDF, up to 1.5 MB. A photo step takes an image.' })}${w.items.length ? select('For checklist step', 'item', w.items.map(item => ({ value: String(item.index), label: `${item.index + 1}. ${item.text}${item.kind === 'photo' ? ' (photo required)' : ''}` })), w.items.find(item => item.kind === 'photo' && item.applies && !item.photos)?.index.toString() ?? '', { required: false, blank: 'The whole work order' }) : ''}${evidenceFields(actor)}${w.calibration ? checkbox('This is the calibration certificate', 'certificate', !w.calibration.certificate) : ''}`, 'Attach evidence', { multipart: true, secondary: true }) : ''}${recording ? annotateForm(w, post) : ''}`, { id: 'evidence' })
   // FIELD-005: signatures bound to the work's version.
   const signatures = signaturesCard(w, actor, post, recording)
-  // ASSET-008: the tools this work needs, which one was used, and a calibration's grace window.
+  // ASSET-008 / ASSET-010: the tools this work needs, which one was used, and a calibration's grace window.
   const toolsCard = w.tools.length || w.calibration ? card(w.calibration ? 'Calibration' : 'Tools', h`${w.calibration ? h`<p class="gk-sub">Due ${showDate(w.due_date)}, overdue after ${showDate(w.calibration.overdue_after)}. ${w.calibration.certificate ? `Certificate: ${w.calibration.certificate.filename}` : 'Attach the certificate under Inspection evidence.'}</p>` : ''}
     ${w.tools.length ? h`<ul class="gk-plain-list">${w.tools.map(tool => h`<li>${tool.name}<span class="gk-sub">${tool.identifier ? `Used ${tool.identifier} · ${tool.recorded_by}` : 'Not recorded yet'}</span></li>`)}</ul>` : ''}
     ${recording && w.tools.length ? post('workorder.tool', h`${select('Tool', 'tool', w.tools.map(tool => ({ value: String(tool.position), label: tool.name })), String(w.tools.find(tool => !tool.identifier)?.position ?? 0))}${field('Which one (serial or asset number)', 'identifier')}`, 'Record tool used', { secondary: true }) : ''}`, { id: 'tools' }) : ''
@@ -298,7 +312,7 @@ export async function workOrderPage(env: Bindings, actor: Actor, id: string, url
   const body = h`${backLink('/app', 'Work orders')}${band}
     ${actor.role !== 'agent' ? h`<p><a class="gk-button gk-secondary" href="/app/work/${w.id}/report.pdf">Download work PDF</a></p>` : ''}
     ${can(actor, 'work.assign') ? h`<details class="gk-details"><summary>Download several work PDFs</summary><form method="get" action="/app/work-reports.zip" class="gk-form">${field('Work order numbers', 'numbers', { value: String(w.number), hint: 'Comma-separated numbers, up to 20. For example: 1, 2, 3.' })}<button type="submit" class="gk-secondary">Download PDFs as ZIP</button></form></details>` : ''}
-    <div class="gk-columns"><div class="gk-col-main">${await safetyCard(env,actor,w,back)}${origin}${requestSourcesCard(w.requestSources)}${task}${missCard}${toolsCard}${checklist}${readings}${timeEntries}${w.bom ? bomCard(w.bom, actor.zone) : ''}${parts}${laborCard(w.labor, actor, { id: w.id, back, recording })}${evidence}${signatures}${workDocumentsCard(w, lead && w.asset_id && ['open', 'in_progress', 'returned'].includes(w.status) ? await all(env, 'SELECT id, title, current_revision FROM gk_documents WHERE asset_id = ? ORDER BY kind, title', w.asset_id) : null, back)}${commentsCard(w.comments, actor, { field: 'workOrder', id: w.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${lead && ['open', 'in_progress', 'returned', 'submitted'].includes(w.status) ? card('Priority', form('workorder.priority', back, h`${hidden('workOrder', w.id)}${select('Priority', 'priority', PRIORITIES.map(value => ({ value, label: PRIORITY_LABELS[value] })), w.priority)}${field('Reason', 'reason')}`, 'Change priority', { secondary: true }), { id: 'priority' }) : ''}${waitingCard}${fieldsCard}${costCard(w, actor, back)}${findings}${reviews}${assign}${control}
+    <div class="gk-columns"><div class="gk-col-main">${await safetyCard(env,actor,w,back)}${origin}${(w.mine || w.collaborating) && can(actor,'work.do') && w.checklist_revision_id ? await printPackCard(env,actor,{id:w.id,version:w.version,canIssue:recording}) : ''}${requestSourcesCard(w.requestSources)}${task}${missCard}${toolsCard}${checklist}${readings}${timeEntries}${w.bom ? bomCard(w.bom, actor.zone) : ''}${parts}${laborCard(w.labor, actor, { id: w.id, back, recording })}${evidence}${signatures}${workDocumentsCard(w, lead && w.asset_id && ['open', 'in_progress', 'returned'].includes(w.status) ? await all(env, 'SELECT id, title, current_revision FROM gk_documents WHERE asset_id = ? ORDER BY kind, title', w.asset_id) : null, back)}${commentsCard(w.comments, actor, { field: 'workOrder', id: w.id }, back, await mentionable(env, actor))}</div><div class="gk-col-side">${decisions}${crewCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${chaseCard(w, actor, back, (await assignable(env)).map(person => ({ id: person.id, name: person.name })))}${downtime}${lead && ['open', 'in_progress', 'returned', 'submitted'].includes(w.status) ? card('Priority', form('workorder.priority', back, h`${hidden('workOrder', w.id)}${select('Priority', 'priority', PRIORITIES.map(value => ({ value, label: PRIORITY_LABELS[value] })), w.priority)}${field('Reason', 'reason')}`, 'Change priority', { secondary: true }), { id: 'priority' }) : ''}${waitingCard}${fieldsCard}${costCard(w, actor, back)}${findings}${reviews}${assign}${control}
     ${details([['Work order id', w.id], ['Version', w.version], ['Schedule', w.schedule_title ?? '—'], ...(w.trigger ? [['Raised by reading', `${w.trigger.meter} ${w.trigger.value}${w.trigger.unit === 'condition' ? '' : ` ${w.trigger.unit}`}, taken ${showLocal(w.trigger.taken_on)}${w.trigger.provenance === 'feed' ? ` (feed: ${w.trigger.source})` : ''}`] as [string, unknown]] : []), ['Created', showInstant(w.created_at, actor.zone)]])}</div></div>`
   return page(env, `${woNumber(w.number)} ${w.asset_name}`, actor, h`${equivalent ? card('Satisfied by approved equivalent', h`<p>This occurrence was not performed separately. <a href="/app/work/${equivalent.higher_work}">${woNumber(equivalent.higher_number)}</a> supplies its approved evidence. <a href="/app/programs">Inspect the mapping and occurrence</a>.</p>`) : ''}${body}`, { url, bar: working || reviewing ? bar : undefined })
 }

@@ -100,6 +100,8 @@ export async function reserve(env: Bindings, actor: Actor, input: Input) {
   requireCapability(actor, 'work.assign')
   const order = await one(env, `SELECT id, number, asset_id FROM gk_work_orders WHERE id = ? AND status IN ${OPEN}`, input.text('workOrder', { max: 100 }))
   insist(order, 'work_order_not_open', 409)
+  // Fence compatibility reads against a concurrent identity or BOM revision change.
+  const basis = await one(env, 'SELECT revision, (SELECT COALESCE(MAX(number), 0) FROM gk_bom_revisions WHERE asset_id = a.id) AS bom_revision FROM gk_assets a WHERE id = ?', order.asset_id)
   const kitId = input.text('kit', { optional: true, max: 100 }) || null
   let lines: { requested: string; quantity: number }[]
   const swaps = new Map<string, string>()
@@ -127,9 +129,10 @@ export async function reserve(env: Bindings, actor: Actor, input: Input) {
     rows.push({ id: newId(), part: chosen, requested, quantity: line.quantity })
   }
   await commit(env, [
+    ...(basis ? [guard(env, 'stale', 'EXISTS(SELECT 1 FROM gk_assets WHERE id = ? AND revision = ?) AND (SELECT COALESCE(MAX(number), 0) FROM gk_bom_revisions WHERE asset_id = ?) = ?', order.asset_id, basis.revision, order.asset_id, basis.bom_revision)] : []),
     ...rows.map((row, line) => stmt(env, 'INSERT INTO gk_reservations (id, work_order_id, part_id, requested_part_id, kit_id, quantity_milli, line, reserved_by, reserved_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', row.id, order.id, row.part.id, row.requested.originalId, kitId, row.quantity, line, actor.id, now())),
     ...rows.map(row => guard(env, 'insufficient_available', `${ON_HAND_OF} - ${RESERVED_OF} >= 0`, row.part.id, row.part.id)),
-  ], { actor: actor.id, action: 'workorder.reserve', subject: order.id, detail: { kit: kitId, lines: rows.map(row => ({ reservation: row.id, part: row.part.id, ...(row.requested.id !== row.part.id ? { insteadOf: row.requested.id } : {}), quantity: fromMilli(row.quantity) })) } })
+  ], { actor: actor.id, action: 'workorder.reserve', subject: order.id, detail: { kit: kitId, compatibility: basis, lines: rows.map(row => ({ reservation: row.id, part: row.part.id, ...(row.requested.id !== row.part.id ? { insteadOf: row.requested.id } : {}), quantity: fromMilli(row.quantity) })) } })
   return { id: order.id, reservations: rows.map(row => row.id) }
 }
 

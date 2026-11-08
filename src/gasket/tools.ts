@@ -1,8 +1,8 @@
-// ASSET-008: the tools a route or schedule says its work needs. Each work order
+// ASSET-008 / ASSET-010: the tools a route or schedule says its work needs. Each work order
 // it issues lists them, and the person doing the work records which one they
 // used (a serial or asset number), so a calibration's reference standard is
 // traceable; submission waits until every listed tool is recorded. A tool
-// register with calibration due dates is PLAN-004's.
+// register identity and calibration dates are PLAN-010's; booking is PLAN-004's.
 import type { Bindings } from '../auth.server'
 import type { Actor } from './actor'
 import { all, commit, guard, insist, now, stmt } from './core'

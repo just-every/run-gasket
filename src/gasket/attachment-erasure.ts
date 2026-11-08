@@ -9,6 +9,7 @@ import { commit, guard, insist, now, one, stmt } from './core'
 const ELIGIBLE = `EXISTS(SELECT 1 FROM gk_evidence e JOIN gk_work_orders w ON w.id=e.work_order_id
  WHERE e.id=? AND w.version=? AND w.status IN ('open','in_progress','returned')
  AND w.submitted_version IS NULL AND w.requires_evidence=0 AND e.item IS NULL AND e.certificate=0
+ AND NOT EXISTS(SELECT 1 FROM gk_print_entries paper WHERE paper.evidence_id=e.id)
  AND NOT EXISTS(SELECT 1 FROM gk_signatures s WHERE s.work_order_id=w.id)
  AND NOT EXISTS(SELECT 1 FROM gk_calibration_certificates c WHERE c.work_order_id=w.id)
  AND NOT EXISTS(SELECT 1 FROM gk_evidence certificate WHERE certificate.work_order_id=w.id AND certificate.certificate=1)
@@ -22,9 +23,10 @@ export async function attachmentErasurePreview(env: Bindings, actor: Actor, id: 
   insist(evidence || saved, 'evidence_not_found', 404)
   if (!evidence) return { id, erased: true, result: JSON.parse(saved.result_json) }
   const annotations = (await one(env, 'SELECT COUNT(*) AS n FROM gk_annotations WHERE evidence_id=?', id)).n
+  const paperEntries = (await one(env, 'SELECT COUNT(*) AS n FROM gk_print_entries WHERE evidence_id=?', id)).n
   return { id, erased: false, work: evidence.work_order_id, version: evidence.version, eligible: Boolean(await one(env, `SELECT 1 WHERE ${ELIGIBLE}`, id, evidence.version, now())),
-    dependencies: { attachments: 1, bytes: evidence.size, annotations },
-    obligations: ['Held, submitted, signed, required and certificate evidence is retained.', 'Maintenance work and anonymized audit remain. Prior downloads remain outside local erasure.', 'Later restores require the later erasure journal.'] }
+    dependencies: { attachments: 1, bytes: evidence.size, annotations, ...(paperEntries ? { paperEntries } : {}) },
+    obligations: ['Held, submitted, signed, required and certificate evidence is retained.', 'Maintenance work and anonymized audit remain. Prior downloads remain outside local erasure.', 'Later restores require the later erasure journal.', ...(paperEntries ? ['Controlled paper originals remain linked to their durable entry receipt.'] : [])] }
 }
 export async function eraseAttachment(env: Bindings, actor: Actor, input: Input) {
   insist(actor.role === 'owner', 'forbidden', 403)

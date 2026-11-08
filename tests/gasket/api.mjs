@@ -2,11 +2,29 @@
 import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
-import { harness, file, exerciseKeyedActions, assertDocumented as documented } from './harness.mjs'
+import { harness, file, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 import { png } from './fixtures.mjs'
 import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 
 export async function apiJourney() {
+  const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
+  const documented = (name, value) => {
+    assertDocumented(name, value)
+    const validate = (schema, actual, path) => {
+      if (schema.$ref) return validate(specification.components.schemas[schema.$ref.split('/').at(-1)], actual, path)
+      if (schema.type) {
+        const types = [schema.type].flat()
+        assert.ok(types.some(type => type === 'null' ? actual === null : type === 'array' ? Array.isArray(actual) : type === 'integer' ? Number.isSafeInteger(actual) : type === 'object' ? actual !== null && typeof actual === 'object' && !Array.isArray(actual) : typeof actual === type), path + ' matches its published type')
+      }
+      if (schema.enum) assert.ok(schema.enum.includes(actual), path + ' matches its published choices')
+      if (actual && !Array.isArray(actual) && typeof actual === 'object') {
+        for (const key of schema.required ?? []) assert.ok(Object.hasOwn(actual, key), path + '.' + key + ' is present')
+        for (const [key, child] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(actual, key)) validate(child, actual[key], path + '.' + key)
+      }
+      if (Array.isArray(actual) && schema.items) for (const [index, child] of actual.entries()) validate(schema.items, child, path + '[' + index + ']')
+    }
+    validate(specification.components.schemas[name], value, name)
+  }
   const h = await harness({ clockInstant: Date.UTC(2026, 9, 26, 16) })
   let resumed
   try {
@@ -39,7 +57,6 @@ export async function apiJourney() {
       assert.equal(response.status, status, JSON.stringify(result, (key,value) => ['token','secret'].includes(key) ? '[redacted]' : value))
       return { result, replayed: response.headers.get('idempotency-replayed') }
     }
-    const specification = JSON.parse(readFileSync(new URL('../../openapi.json', import.meta.url), 'utf8'))
     const example = action => structuredClone(specification.paths['/' + action].post.requestBody.content[['application', 'json'].join('/')].example)
     const repeat = async (action, body, key, cookie = owner) => {
       const first = await write(action, body, key, cookie)
@@ -343,7 +360,8 @@ export async function apiJourney() {
     const timeBody = { ...example('workorder.time'), workOrder: job, version: (await order(lead)).version }
     const time = await repeat('workorder.time', timeBody, 'synthetic-gasket-time', lead)
     const readingsBody = { ...example('workorder.readings'), workOrder: job, meter: [meter.id] }
-    await repeat('workorder.readings', readingsBody, 'synthetic-gasket-reading', lead)
+    const reading = await repeat('workorder.readings', readingsBody, 'synthetic-gasket-reading', lead)
+    assert.deepEqual(reading, { id: job, meters: [meter.id], created: [] }, 'reading responses and durable replay retain the recorded meters')
     await write('workorder.readings', { ...readingsBody, value: ['41'] }, 'synthetic-gasket-backwards-reading', lead, 409)
     const finding = await repeat('finding.record', { ...example('finding.record'), workOrder: job }, 'synthetic-gasket-finding', lead)
     await repeat('downtime.start', { ...example('downtime.start'), workOrder: job }, 'synthetic-gasket-stop', lead)
@@ -585,7 +603,13 @@ export async function apiJourney() {
     const promotedAudit = (await h.api('audit?action=asset.create', owner)).rows.find(row => row.subject === promotedAsset.id)
     assert.equal(promotedAudit.role, 'owner')
     assert.equal(promotedAudit.authority, `Owner, service credential ${promoted.id}`)
-    assert.equal((await h.raw('/auth/operator/role', { cookie: otherOwner, body: { operatorId: memberSession.operator.id, role: 'member' } })).status, 200)
+    assert.equal((await h.raw('/auth/operator/role', { cookie: promotedOwner, body: { operatorId: memberSession.operator.id, role: 'member' } })).status, 200)
+    const selfDemotion = (await h.api('audit?action=service.invalidate', otherOwner)).rows.filter(row => row.subject === promoted.id)
+    assert.equal(selfDemotion.length, 1)
+    assert.equal(selfDemotion[0].actor, member)
+    assert.equal(selfDemotion[0].role, 'owner', 'self-demotion retains the authority that authorized the account change')
+    assert.equal(selfDemotion[0].authority, 'Owner')
+    assert.deepEqual(JSON.parse(selfDemotion[0].detail), { credential: promoted.id, issuingOwner: member, cause: 'operator.role' })
     await scoped(promoted.token, 'assets', undefined, undefined, 401)
     const credential = () => h.api('service.create', owner, { name: 'Synthetic owner lifecycle', scopes: ['assets:read', 'asset.create'], expiresAt: Date.UTC(2026, 9, 27), consent: true })
     const lifecycle = await credential()

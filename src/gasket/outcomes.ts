@@ -33,7 +33,7 @@ export async function readOutcome(env: Bindings, _actor: Actor, id: string) {
   return JSON.parse(stored.report_json)
 }
 
-export async function assessOutcome(env: Bindings, actor: Actor, input: Input) {
+export async function assessOutcome(env: Bindings, actor: Actor, input: Input, retain = true) {
   requireCapability(actor, 'proposal.prepare')
   const fence = await auditRevision(env)
   const plan = await one<Row>(env, 'SELECT * FROM gk_outcome_windows WHERE id=?', input.text('window', { max: 100 }))
@@ -60,7 +60,7 @@ export async function assessOutcome(env: Bindings, actor: Actor, input: Input) {
     all<Row>(env, `SELECT * FROM gk_work_orders WHERE asset_id IN (${slots}) ORDER BY id`, ...ids),
     classifiedStops(env, stopScope, ...ids, post.end, baseline.start),
     all<Row>(env, `SELECT c.* FROM gk_downtime_classes c JOIN gk_downtime d ON d.id=c.downtime_id WHERE ${stopScope} ORDER BY c.recorded_at,c.id`, ...ids, post.end, baseline.start),
-    all<Row>(env, `SELECT c.*,w.asset_id FROM gk_work_costs c JOIN gk_work_orders w ON w.id=c.work_order_id WHERE w.asset_id IN (${slots}) AND c.recorded_at>=? AND c.recorded_at<? ORDER BY c.recorded_at,c.id`, ...ids, baseline.startAt, post.endAt),
+    all<Row>(env, `SELECT c.*,w.asset_id FROM gk_work_costs c JOIN gk_work_orders w ON w.id=c.work_order_id WHERE w.asset_id IN (${slots}) ORDER BY c.recorded_at,c.id`, ...ids),
     all<Row>(env, `SELECT * FROM gk_asset_lifecycle WHERE asset_id IN (${slots}) ORDER BY asset_id`, ...ids),
   ])
   const hourMeters = ids.map(id => meters.find(meter => meter.asset_id === id && meter.kind === 'counter' && HOUR_UNITS.includes(String(meter.unit).toLowerCase())))
@@ -155,6 +155,7 @@ export async function assessOutcome(env: Bindings, actor: Actor, input: Input) {
       'Failures are unplanned, nondegraded stops starting in the window under the latest retained classification. Downtime includes planned and unplanned nondegraded stops, clipped to the window; degraded operation is excluded.',
       'Rates use failures starting, clipped downtime and native posted USD cost entries within the same observed meter span. Full-window totals remain separate. Imported cost fields and estimated production losses are not posted actual costs.',
       'Peer rates pool numerators over measured operating hours, never average raw counts. Relative change is subject post-minus-baseline rate minus pooled peer post-minus-baseline rate.'] }
+  if (!retain) return report
   let recipients: Row[] = []
   if (status === 'worsening' || status === 'unproven') {
     recipients = await all<Row>(env, "SELECT id FROM gk_members WHERE status='active' AND role='lead' ORDER BY id")

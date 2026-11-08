@@ -1,6 +1,6 @@
 # Agent instructions
 
-Lander-Regenerate: node scripts/contract-docs.mjs write
+Lander-Regenerate: node src/base/contract-docs.mjs write
 Lander-Regenerate: node scripts/edition-authoring/cli.mjs lock
 
 ## Launch for review

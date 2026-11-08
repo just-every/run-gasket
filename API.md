@@ -6,7 +6,7 @@ Every screen in Gasket uses the same handlers as this JSON API, so a person and 
 
 An agent gets its own sign-in: the owner gives an email address the **agent** role on *People and access*. The agent signs in with Base's ordinary email link (`POST /auth/magic-link`, then the emailed `/auth/confirm` link) and sends the session cookie it receives. A request without a live session answers `401 {"error":"authentication_required"}`; ended access answers `401` or `403`. Every `POST` must carry an `Origin` header equal to the installation's origin.
 
-Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **agent**. An agent can read everything below and call `proposal.prepare`; every other action answers `403 {"error":"forbidden"}` for it.
+Roles: **owner**, **lead**, **maintainer**, **supervisor** and **agent**. Role and record checks apply to each door. Direct conversations require human participation even for an owner; an agent and a service credential cannot access them. Agents retain their bounded proposal permissions.
 
 ## Reading
 
@@ -41,6 +41,18 @@ Roles: **owner** (everything), **lead**, **maintainer**, **supervisor** and **ag
 | `proposals` | Proposals with payload, reasoning, basis, status and decision |
 | `imports` | The move-in journal (lead, owner) |
 | `audit` (`?action=`, `?from=`, `?to=`, `?site=`, `?limit=`, `?before=`) | Audit entries newest first, 100 a page (`limit` up to 500); `next` continues with `before`. `action` is one action or a family such as `workorder`; `from` and `to` are site-local dates; each entry carries the role it acted under and its authority (supervisor, owner). `/app/audit.csv` with the same filters downloads every matching entry. |
+
+### Complete work lists and bounded CSV
+
+`GET /api/gasket/work` retains its array response and existing work fields. Read `X-Total-Count` for the exact authorized total, then follow the `Link` header with `rel="next"`, or pass `X-Next-Cursor` as `cursor`. `GET /api/gasket/work-page` returns the same records as `{rows,total,offset,next,start}`. Both accept `state=open` or `state=closed`, `mine=1`, `team`, and `limit` from 1 through 200 (default 100). A maintainer still sees only assigned work and active collaborations. The existing `work:read` service scope permits both JSON doors; no other scope is implied.
+
+The Work screen shows exact tab totals, the visible range, Next page and First page. Its normal six-row view is a bounded page; `all=1` selects 100 rows per page. Today, Overdue, In progress and Done today retain their existing assignment boundary. Counts include every match, independently of the current page. Sort ties resolve by work number and identity.
+
+Cursors are opaque, authenticated, deterministic for unchanged reads, and bound to the current actor, session, role, site day and normalized filters. Altered or foreign cursors return `invalid_cursor` (400). Audited estate changes or changed totals refuse continuation with `work_snapshot_changed` (409); restart from the first page. These are conservative snapshot checks: an unrelated audited change can also require a restart. Page size may change without changing the selected records.
+
+`GET /app/work.csv` downloads the complete authorized open or closed work list with the same `state`, `mine` and `team` filters. The screen's download binds to its displayed snapshot. JSON clients may pass a page's `start` token as `snapshot`. Downloads are bounded to 2,000 matching orders; `exportLimit` may select a lower positive ceiling. A larger selection returns `work_export_limit_exceeded` (413), and a changed snapshot returns 409, before any CSV bytes or attachment header are returned. Narrow the filters or restart the download. Accepted records and original evidence are unchanged by either refusal. CSV contains the work list fields and escapes spreadsheet formulas; it is not a complete archive or an attachment download.
+
+This primary-site slice makes no claim of qualification at the SAFE-003 target estate capacity, complete estate exports, additional operational sites, or native offline packs. Version 1's existing collection response and live-read search semantics remain as documented below.
 
 ## Changing
 
@@ -597,6 +609,8 @@ For example, send `GET /api/gasket/v1/assets?limit=50`, then `GET /api/gasket/v1
 
 For the following 209 actions, optionally send `Idempotency-Key` with JSON on either API base. Keys are 1 through 128 ASCII letters, digits, dots, underscores, colons or hyphens. Send the **same JSON bytes** on every retry. The key belongs to the authenticated member across actions and both bases, not to a browser session. Reusing it for another action or different bytes returns `409 {"error":"idempotency_key_conflict"}`. An unsupported action with a key returns `400 {"error":"idempotency_not_supported"}` before invoking it; it never silently performs an unprotected write. Ordinary keyed JSON bodies and stored results are limited to 64,000 bytes, except the original-file, import and retained-assessment allowances documented below. Document creation, document revision and work evidence allow 2,064,000 bytes of JSON, including base64 content and metadata, while each decoded original retains its 1,500,000-byte limit. Catalog photos also allow 2,064,000 bytes of JSON and retain the 1,500,000-byte decoded photo limit. Comment posts allow 8,064,000 bytes of JSON with at most four photos, each at most 1,500,000 decoded bytes. Signatures allow 330,668 bytes of JSON and retain the 200,000-byte decoded mark limit. Larger bodies return 413; oversized decoded files return 400. Multipart requests with a key return 415.
 
+The original thirty-six actions remain in the receipt allowlist: `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` and `document.link`.
+
 The receipt allowlist includes the planning, safety, schedule and labor operations listed below, together with `asset.create`, `asset.update`, `part.create`, `part.receive`, `part.count`, `workorder.create`, `checklist.create`, `checklist.revise`, `template.save`, `workorder.assign`, `workorder.results`, `workorder.issue`, `workorder.return`, `workorder.submit`, `workorder.review`, `meter.create`, `schedule.create`, `workorder.evidence`, `workorder.annotate`, `workorder.time`, `workorder.readings`, `workorder.tool`, `workorder.sign`, `finding.record`, `downtime.start`, `downtime.end`, `workorder.cancel`, `workorder.reopen`, `customfield.save`, `customfield.retire`, `customvalue.set`, `part.category`, `document.add`, `document.revise`, `document.expiry` `document.link`, `asset.move`, `asset.lifecycle`, `asset.agreement`, `asset.contact`, `asset.sighting`, `asset.state`, `asset.retire`, `meter.feed`, `meter.adjust` `meter.window`, `part.price`, `part.substitute`, `kit.create`, `bom.revise`, `workorder.reserve` `reservation.release`, `part.photo`, `comment.post` and `comment.edit`.
 
 A successful maintenance retry returns the original JSON result and `Idempotency-Replayed: true`; the first response says `false`. One-time credential and signing-key issuance instead replays secret-free metadata, as described under Complete native write retries. It does not create another audit event, stock receipt, work order or asset revision. Current active membership, role and relevant create-work policy are checked again before replay. A role change refuses replay, even when the new role could make a new write. Replayed work creation also rechecks current access to that work record. Execution receipts recheck the current assignee or permitted collaborator; submission still requires the assignee. Review receipts require current review authority and independence from the work. A completed receipt remains replayable after its own transition to submitted, closed or returned; new keys still run every ordinary state, version, evidence and stock guard.
@@ -605,7 +619,7 @@ A durable claim is stored before execution. An overlapping request, or a claim i
 
 Example: POST `/api/gasket/v1/asset.create` with the JSON content type, the installation's `Origin`, a member session cookie and `Idempotency-Key: synthetic-gasket-1`. Body: `{"tag":"00042","name":"Pump","location":"Workshop"}`. If the response is lost, repeat those exact bytes with the same key. Read the returned id using the asset detail door and inspect its history or the register page. Errors use the existing `{error,detail?}` contract: 400 invalid input, 401 absent session, 403 forbidden access, 404 absent record or route, 409 conflict, 413 oversized keyed body and 415 unsupported keyed media type.
 
-The native catalogue now describes every existing maintenance read model and mutation. The current implementation is recorded under INT-001; guarded landing verifies its exact candidate before publication. All current native mutation actions accept write keys; read-only previews deliberately do not retain claims. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
+The native catalogue describes 209 maintenance mutations and 93 read models. INT-001 retains current main's partial judgment and inherited gaps in CONTRACT.md pending independent review and guarded landing. The 209 listed native mutation actions accept write keys; read-only previews deliberately do not retain claims. CT approved the existing service-credential policy with riders on 26 October 2026; the synchronized dated passage in CONTRACT.md and ACCEPTANCE.md preserves the remaining lifecycle and inherited obligations. Future service identities must inherit the same current record permissions and approval refusals.
 
 ### Crew, work control and purchasing retries
 
@@ -705,7 +719,7 @@ operations share the workspace handlers, retained result history and audit.
 Each documented keyed request can retry its original bytes without adding
 another revision, handoff, result log, movement, submission or review.
 
-Procedure, assignment and execution schemas are part of the complete current native catalogue. The 209-action receipt allowlist covers every current mutation and explicitly refuses keys on read-only previews. Broader delegated identity and multi-site duties remain with their administration clauses.
+Procedure, assignment and execution schemas are part of the expanded native catalogue. The 209-action receipt allowlist explicitly refuses keys on read-only previews. Broader delegated identity and multi-site duties remain with their administration clauses.
 
 A template saved through JSON retains `requiredFields` in its current revision and
 in work created from it. Both accepted field-list spellings are validated; when
@@ -1000,7 +1014,7 @@ qualification. A hold racing erasure cannot also succeed. Nothing deletes
 automatically. Tool history and unrelated qualifications are preserved.
 
 An eligible operation removes every retired version of the same qualification
-for that person, its renewal notices and private correction and retirement
+for that person, its renewal notices, copied qualification facts in automation inputs, and private correction and retirement
 audit payloads. Audit actor, role, action, record, site and time remain; user
 identity erasure is separate. The result reports removed and anonymized counts,
 is stored without reference text and is returned unchanged on a retry. Earlier
@@ -1053,7 +1067,7 @@ erasure until reconciled; the application does not guess which person owns them.
 
 ## Complete native write retries
 
-Every current native mutation accepts an optional write key on either API base.
+Each of the 209 listed native mutations accepts an optional write key on either API base.
 The 209 operations include the prior maintenance actions and these additional groups:
 
 | Area | Actions |
@@ -1108,7 +1122,7 @@ remain outside local erasure. This does not certify legal retention sufficiency.
 
 ### Native read catalogue and transfer recovery
 
-`openapi.json` describes all 93 current native read models and the five versioned
+`openapi.json` describes 93 native read models and the five versioned
 original-file download routes. Collection and detail responses retain the native
 record rights; report and historical projections retain their documented bounds,
 source omissions and role-dependent fields. Nullable source facts do not become
@@ -1124,3 +1138,68 @@ and automation inactive. A later erasure journal refuses an older archive before
 publication, and a later compatible archive preserves the erased identity and client
 metadata. These are local native recovery results, with no claim about copies a
 recipient retained outside this installation.
+
+## Online direct conversations
+
+This PLAN-008 slice supports retained text between two existing active human members of the operational primary site. It does not deliver external notifications or queue offline messages. Only the two fixed participants can list, open, send or mark their conversation read; an owner has no content-reading bypass. Current session, human role and primary-site membership are checked at every door and again within each write batch. An ended participant loses access; the remaining active participant can read retained history, but cannot send to the ended person.
+
+- `GET /api/gasket/message-people` supplies eligible people without private contacts.
+- `GET /api/gasket/conversations` supplies only the caller's conversations with message and unread totals.
+- `GET /api/gasket/conversations/ID` supplies original author, time and text in sequence order, and the caller's read marker. Reading JSON alone does not change that marker.
+- `POST /api/gasket/conversation.start` takes `member`. The same pair always returns the same conversation `id`.
+- `POST /api/gasket/message.send` takes `conversation`, `submissionKey` and `body`. Text is trimmed, line endings normalized, and bounded to 2,000 characters. Supply one stable key of 16 to 100 ASCII letters, digits or hyphens for each intended message. Retry with the same key and normalized text after a lost response: the original message and time return with `replayed: true`. Reusing that author's key with changed text or a different conversation refuses with `409` and changes nothing. Another participant has an independent key namespace.
+- `POST /api/gasket/conversation.read` takes `conversation` and `through`, the sequence of a message the caller has seen in that conversation. It advances only that person's marker. Old retries cannot move it backwards; a foreign or future message sequence is refused.
+
+The corresponding pages are `/app/messages` and `/app/messages/ID`; their labelled forms use the same actions. The composer keeps its submission key during failed-save recovery. Mark read explicitly acknowledges the displayed messages. Message bodies have no edit or delete door, remain outside audit metadata, and are retained with original attribution. Retained participant and author references prevent user erasure. Portable archives include conversations, original messages, read markers and retry identities; source sessions are excluded and restored automation stays inactive. Conversation-specific retention and legal-hold controls remain outstanding in PLAN-008.
+
+## Private manual revision links
+
+An ordinary authenticated member may call `POST /api/gasket/document.privateLink`
+with a `revision` identifier. The response contains a relative `href`, `expiresAt`
+in epoch milliseconds, `filename`, `revision` and `asset`. The asset's Documents
+card also opens a private revision link page with the expiry and download action.
+Issuance is stateless and creates no delegated permission or stored credential.
+
+Links last five minutes and require the exact issuing browser session. Issuance
+and download both require current membership and record access in the operational
+primary site. A different actor, another session for the same actor, sign-out,
+revoked access, an altered revision or an altered expiry refuses the download.
+An expired link returns 410; fresh issuance requires current access again.
+Adding a new master revision preserves the linked original. Downloads preserve
+original bytes and use an attachment disposition, no-store caching, no-referrer,
+nosniff and a sandbox policy. Service credentials and other private-file kinds
+are outside this door. Cross-site file links remain unqualified under ADMIN-008.
+
+## Retained execution records and original files
+
+OpenAPI request examples now cover meters, calendar schedules with required tools,
+small evidence uploads, annotations, original time entries, readings, findings,
+planned downtime, technician and independent supervisor signatures, cancellation
+and reopening. They also cover custom-field creation, rename, value changes and
+retirement, part categories, document originals, immutable revisions, expiry and
+revision links pinned to work. A retired custom definition and its last value and
+history remain readable. These are ordinary member operations; no service scope
+was added. New effects retain their existing state, version, quantity and authority
+checks. Signature retries recheck either execution authority or independent review
+authority according to the original role.
+
+Versioned original-byte downloads are `GET /api/gasket/v1/documents/REVISION_ID/file`,
+`GET /api/gasket/v1/evidence/EVIDENCE_ID/file` and
+`GET /api/gasket/v1/signature-marks/SIGNATURE_ID/file`. They use the same private-file
+handlers as workspace downloads and refuse service credentials. Document download
+identities name immutable revisions. Keyed JSON uses the action-specific ceilings documented above, including
+encoded file content; every decoded original retains its native file limit. No upload body or original file is stored in a retry
+receipt.
+
+OpenAPI also describes the tested asset, work and part detail responses, retained
+custom values, evidence, signatures, time, readings, findings, downtime and
+secret-free credential metadata. The API journey checks those shapes against actual
+responses as well as independently asserting their business values. Additional
+maintenance entities and comprehensive schemas remain INT-001 work.
+
+Archive proof inspects the credential rows and original archive bytes: usable bearer
+values and their verifiers are absent, metadata retains inactive placeholders,
+export preserves source authority and restore refuses source tokens. After the
+restored record counts are reconciled, the owner deliberately issues a new
+credential and can revoke it again. This does not establish client-side custody,
+legal retention, full metadata erasure or complete multi-site archive coverage.

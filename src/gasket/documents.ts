@@ -149,11 +149,29 @@ export const workDocuments = async (env: Bindings, workOrderId: string) => (awai
   FROM gk_work_documents w JOIN gk_documents d ON d.id = w.document_id JOIN gk_document_revisions r ON r.id = w.revision_id LEFT JOIN gk_members m ON m.id = r.added_by LEFT JOIN gk_members l ON l.id = w.linked_by WHERE w.work_order_id = ? ORDER BY d.kind, d.title`, workOrderId))
   .map(row => ({ ...row, newer: row.current_revision > row.revision }))
 
-/** One revision's file. */
-export async function documentFile(env: Bindings, _actor: Actor, id: string) {
-  const row = await one<{ filename: string; media_type: string; bytes: ArrayBuffer }>(env, 'SELECT filename, media_type, bytes FROM gk_document_revisions WHERE id = ?', id)
+/** Recheck the ordinary primary-site record boundary before reading any revision. */
+export async function readableDocumentRevision(env: Bindings, actor: Actor, id: string) {
+  insist(!actor.service, 'forbidden', 403)
+  const allowed = await one(env, `SELECT 1 FROM oa_sessions s JOIN oa_operators o ON o.id=s.operator_id JOIN gk_members m ON m.operator_id=o.id
+    JOIN gk_sites site ON site.id='primary' AND site.state='active'
+    WHERE s.id=? AND m.id=? AND s.revoked_at IS NULL AND s.expires_at>? AND s.operator_version=o.version
+      AND o.status='active' AND m.status='active' AND (o.role='owner' OR EXISTS(
+        SELECT 1 FROM gk_site_memberships sm WHERE sm.member_id=m.id AND sm.site_id='primary' AND sm.status='active'))`, actor.sessionId, actor.id, Date.now())
+  insist(allowed, 'forbidden', 403)
+  const row = await one<Row>(env, `SELECT r.*, d.asset_id, d.kind FROM gk_document_revisions r
+    JOIN gk_documents d ON d.id=r.document_id JOIN gk_assets a ON a.id=d.asset_id WHERE r.id=?`, id)
   insist(row, 'document_not_found', 404)
-  return new Response(new Uint8Array(row.bytes), { headers: { 'content-type': row.media_type, 'content-disposition': `inline; filename="${row.filename.replace(/["\\]/g, '_')}"`, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" } })
+  return row
+}
+
+/** Original bytes with a sandbox and no browser or intermediary cache. */
+export function documentFileResponse(row: Row, download = false) {
+  return new Response(new Uint8Array(row.bytes), { headers: { 'content-type': row.media_type, 'content-disposition': `${download ? 'attachment' : 'inline'}; filename="${row.filename.replace(/["\\]/g, '_')}"`, 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff', 'content-security-policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" } })
+}
+
+/** One revision's file through its existing authenticated door. */
+export async function documentFile(env: Bindings, actor: Actor, id: string) {
+  return documentFileResponse(await readableDocumentRevision(env, actor, id))
 }
 
 const safeName = (text: string) => text.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'file'

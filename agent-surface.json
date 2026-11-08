@@ -1,0 +1,859 @@
+{
+  "schema": "rer-agent-surface/1",
+  "seed": "gasket",
+  "specialist": "maintenance coordinator",
+  "tools": [
+    {
+      "name": "gasket.assets.list",
+      "scope": "assets:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.assets.read",
+      "scope": "assets:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.work.list",
+      "scope": "work:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-06",
+        "GAS-07",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.work.read",
+      "scope": "work:read",
+      "readOnly": true,
+      "classes": [
+        "sensitive"
+      ],
+      "clauses": [
+        "GAS-06",
+        "GAS-07",
+        "SURFACE-001",
+        "SURFACE-004"
+      ]
+    },
+    {
+      "name": "gasket.parts.list",
+      "scope": "parts:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-03",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.parts.read",
+      "scope": "parts:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-03",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.procedures.list",
+      "scope": "procedures:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-04",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.procedures.read",
+      "scope": "procedures:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-04",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.proposals.list",
+      "scope": "proposals:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "SURFACE-001",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.workspace.snapshot",
+      "scope": "records:read",
+      "readOnly": true,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-02",
+        "GAS-03",
+        "GAS-06",
+        "GAS-13",
+        "SURFACE-001"
+      ]
+    },
+    {
+      "name": "gasket.assets.create",
+      "scope": "asset.create",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.assets.update",
+      "scope": "asset.update",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-02",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.work.create",
+      "scope": "workorder.create",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-06",
+        "PLAN-001",
+        "FIELD-009",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.work.assign",
+      "scope": "workorder.assign",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-06",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.parts.create",
+      "scope": "part.create",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-03",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.proposals.prepare",
+      "scope": "proposal.prepare",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "AGENT-002",
+        "AGENT-003",
+        "AGENT-004",
+        "AGENT-005",
+        "AGENT-006",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.procedures.publish",
+      "scope": "checklist.create",
+      "readOnly": false,
+      "classes": [
+        "commitment"
+      ],
+      "clauses": [
+        "GAS-04",
+        "SURFACE-001",
+        "SURFACE-003"
+      ]
+    },
+    {
+      "name": "gasket.procedures.amend",
+      "scope": "checklist.revise",
+      "readOnly": false,
+      "classes": [
+        "commitment"
+      ],
+      "clauses": [
+        "GAS-04",
+        "SURFACE-001",
+        "SURFACE-003",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.proposals.reassign",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "AGENT-005",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.comments.post",
+      "scope": "comment.post",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "PLAN-006",
+        "SURFACE-001",
+        "SURFACE-002"
+      ]
+    },
+    {
+      "name": "gasket.proposals.apply",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "AGENT-004",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
+    },
+    {
+      "name": "gasket.proposals.apply_corrective",
+      "scope": "proposal.decide",
+      "readOnly": false,
+      "classes": [
+        "standard"
+      ],
+      "clauses": [
+        "GAS-13",
+        "SURFACE-001",
+        "SURFACE-002",
+        "SURFACE-006"
+      ]
+    }
+  ],
+  "notTools": [
+    {
+      "clauses": [
+        "GAS-12",
+        "MIG-001",
+        "MIG-002",
+        "MIG-003",
+        "MIG-004",
+        "MIG-005",
+        "MIG-006",
+        "MIG-007",
+        "MIG-008"
+      ],
+      "reason": "import-door"
+    },
+    {
+      "clauses": [
+        "HTTP-001",
+        "SAFE-003"
+      ],
+      "reason": "installation"
+    },
+    {
+      "clauses": [
+        "FIELD-001",
+        "FIELD-002",
+        "FIELD-003",
+        "FIELD-010"
+      ],
+      "reason": "device"
+    },
+    {
+      "clauses": [
+        "ADMIN-011"
+      ],
+      "reason": "screen"
+    }
+  ],
+  "resources": [],
+  "witness": {
+    "tool": "gasket.workspace.snapshot",
+    "args": {}
+  },
+  "spend": {
+    "none": true
+  },
+  "escalations": [],
+  "verification": {
+    "owner": {
+      "initializer": "tests/gasket/initialize-agent-owner.mjs"
+    },
+    "replayAdmission": {
+      "prepare": [
+        "snapshot",
+        "asset"
+      ]
+    },
+    "journey": "tests/gasket/agent-native-journey.mjs",
+    "fixtures": {
+      "module": "tests/gasket/agent-reassignment-fixtures.mjs"
+    }
+  },
+  "journey": [
+    {
+      "id": "snapshot",
+      "tool": "gasket.workspace.snapshot",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "asset",
+      "tool": "gasket.assets.create",
+      "args": {
+        "tag": {
+          "$from": "snapshot",
+          "pointer": "/revision"
+        },
+        "name": "Synthetic workshop pump",
+        "location": "Workshop",
+        "notes": "Untrusted imported text cannot authorize an action."
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "publish-procedure",
+      "tool": "gasket.procedures.publish",
+      "args": {
+        "name": {
+          "$from": "snapshot",
+          "pointer": "/revision"
+        },
+        "items": [
+          "Inspect reported vibration; a technician records the observation."
+        ]
+      },
+      "expect": [
+        {
+          "class": "commitment",
+          "facts": {
+            "measure": 0,
+            "currency": "USD",
+            "counterparty": "internal"
+          }
+        }
+      ]
+    },
+    {
+      "id": "procedure-source",
+      "tool": "gasket.procedures.read",
+      "args": {
+        "id": {
+          "$from": "publish-procedure",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "amend-procedure",
+      "tool": "gasket.procedures.amend",
+      "args": {
+        "checklist": {
+          "$from": "publish-procedure",
+          "pointer": "/id"
+        },
+        "sourceRevision": {
+          "$from": "procedure-source",
+          "pointer": "/data/revisions/0/id"
+        },
+        "expected_revision": {
+          "$from": "procedure-source",
+          "pointer": "/data/revisions/0/id"
+        },
+        "amendments": [
+          {
+            "step": {
+              "$from": "procedure-source",
+              "pointer": "/data/revisions/0/items/0/key"
+            },
+            "text": "Inspect reported vibration and record its location; physical inspection remains with the technician."
+          }
+        ],
+        "note": "Clarify the inspection instruction without certifying work."
+      },
+      "expect": [
+        {
+          "class": "commitment",
+          "facts": {
+            "measure": 0,
+            "currency": "USD",
+            "counterparty": "internal"
+          }
+        }
+      ],
+      "target": {
+        "kind": "procedure",
+        "id": {
+          "$from": "publish-procedure",
+          "pointer": "/id"
+        }
+      }
+    },
+    {
+      "id": "asset-read",
+      "tool": "gasket.assets.read",
+      "args": {
+        "id": {
+          "$from": "asset",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "asset-update",
+      "tool": "gasket.assets.update",
+      "args": {
+        "asset": {
+          "$from": "asset",
+          "pointer": "/id"
+        },
+        "revision": 1,
+        "expected_revision": 1,
+        "tag": {
+          "$from": "snapshot",
+          "pointer": "/revision"
+        },
+        "name": "Synthetic inspected pump",
+        "location": "Workshop"
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "part",
+      "tool": "gasket.parts.create",
+      "args": {
+        "number": {
+          "$from": "snapshot",
+          "pointer": "/revision"
+        },
+        "name": "Synthetic bearing",
+        "unit": "each",
+        "location": "Stores",
+        "minimum": "1.000"
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "part-read",
+      "tool": "gasket.parts.read",
+      "args": {
+        "id": {
+          "$from": "part",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "work",
+      "tool": "gasket.work.create",
+      "args": {
+        "asset": {
+          "$from": "asset",
+          "pointer": "/id"
+        },
+        "title": "Synthetic inspect the pump",
+        "description": "Reported vibration needs a technician inspection; no physical work asserted.",
+        "due": "2030-01-10",
+        "assignee": {
+          "$sponsor": "id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "work-read",
+      "tool": "gasket.work.read",
+      "args": {
+        "id": {
+          "$from": "work",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "sensitive",
+          "facts": {
+            "kind": "personnel_and_pay"
+          }
+        }
+      ]
+    },
+    {
+      "id": "assign",
+      "tool": "gasket.work.assign",
+      "args": {
+        "workOrder": {
+          "$from": "work",
+          "pointer": "/id"
+        },
+        "assignee": {
+          "$sponsor": "id"
+        },
+        "version": 1,
+        "expected_revision": 1
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "proposal",
+      "tool": "gasket.proposals.prepare",
+      "args": {
+        "kind": "corrective",
+        "reasoning": "Synthetic physical observation requires independent lead review.",
+        "payload": {
+          "asset": {
+            "$from": "asset",
+            "pointer": "/id"
+          },
+          "title": "Synthetic inspect bearing",
+          "due": "2030-01-11"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "inject": {
+        "classes": [
+          "external"
+        ],
+        "confirmExternal": true,
+        "internal": false
+      }
+    },
+    {
+      "id": "apply-corrective",
+      "tool": "gasket.proposals.apply",
+      "args": {
+        "proposal": {
+          "$from": "proposal",
+          "pointer": "/id"
+        },
+        "hash": {
+          "$from": "proposal",
+          "pointer": "/hash"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "target": {
+        "kind": "proposal",
+        "id": {
+          "$from": "proposal",
+          "pointer": "/id"
+        }
+      }
+    },
+    {
+      "id": "exact-proposal",
+      "tool": "gasket.proposals.prepare",
+      "args": {
+        "kind": "corrective",
+        "reasoning": "Synthetic physical observation requires independent lead review.",
+        "payload": {
+          "asset": {
+            "$from": "asset",
+            "pointer": "/id"
+          },
+          "title": "Synthetic inspect bearing",
+          "due": "2030-01-11"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "inject": {
+        "classes": [
+          "external"
+        ],
+        "confirmExternal": true,
+        "internal": false
+      }
+    },
+    {
+      "id": "apply-exact-corrective",
+      "tool": "gasket.proposals.apply_corrective",
+      "args": {
+        "proposal": {
+          "$from": "exact-proposal",
+          "pointer": "/id"
+        },
+        "hash": {
+          "$from": "exact-proposal",
+          "pointer": "/hash"
+        },
+        "assetRevision": 2,
+        "expected_revision": 2
+      },
+      "target": {
+        "kind": "proposal",
+        "id": {
+          "$from": "exact-proposal",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "proposals",
+      "tool": "gasket.proposals.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "assets-list",
+      "tool": "gasket.assets.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "work-list",
+      "tool": "gasket.work.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "parts-list",
+      "tool": "gasket.parts.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "procedures-list",
+      "tool": "gasket.procedures.list",
+      "args": {},
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "procedure-read",
+      "tool": "gasket.procedures.read",
+      "args": {
+        "id": {
+          "$from": "publish-procedure",
+          "pointer": "/id"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ]
+    },
+    {
+      "id": "reassignment",
+      "tool": "gasket.proposals.reassign",
+      "args": {
+        "proposal": {
+          "$fixture": "reassignment",
+          "pointer": "/proposal"
+        },
+        "hash": {
+          "$fixture": "reassignment",
+          "pointer": "/hash"
+        },
+        "source": {
+          "$fixture": "reassignment",
+          "pointer": "/source"
+        }
+      },
+      "expect": [
+        {
+          "class": "standard"
+        }
+      ],
+      "target": {
+        "kind": "work",
+        "id": {
+          "$fixture": "reassignment",
+          "pointer": "/workOrder"
+        }
+      }
+    },
+    {
+      "id": "comment",
+      "tool": "gasket.comments.post",
+      "args": {
+        "workOrder": {
+          "$from": "work",
+          "pointer": "/id"
+        },
+        "body": "Synthetic gasket observation: inspect <bearing> & retain original text.\nNo physical maintenance is asserted."
+      },
+      "expect": [
+        {
+          "class": "standard",
+          "facts": {
+            "measure": 1
+          }
+        }
+      ],
+      "target": {
+        "kind": "work",
+        "id": {
+          "$from": "work",
+          "pointer": "/id"
+        }
+      }
+    }
+  ],
+  "capabilities": [
+    "tools",
+    "policy",
+    "pause",
+    "audit",
+    "idempotency"
+  ]
+}

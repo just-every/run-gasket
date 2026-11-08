@@ -3,7 +3,8 @@ const queued=await queuedEntrypoint(import.meta.url,'verify:runtime');if(queued!
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer } from 'node:net'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -17,11 +18,18 @@ const persist = await mkdtemp(join(tmpdir(), 'foundation-runtime-'))
 // Migration progress grows with the schema; stream it rather than exceeding
 // execFileSync's default 1 MiB capture buffer before any runtime assertion runs.
 execFileSync(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'd1', 'migrations', 'apply', 'foundation', '--local', '--persist-to', persist, '--config', 'dist/server/wrangler.json'], { stdio: 'inherit', env: { ...process.env, CI: '1', WRANGLER_SEND_METRICS: 'false' } })
-const worker = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--inspector-port', '0', '--local', '--persist-to', persist, '--ip', '127.0.0.1', '--config', 'dist/server/wrangler.json', '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
+const origin = `http://127.0.0.1:${port}`
+// Private routes use the same configured native auth as an installed origin.
+const envFile = join(persist, '.env')
+await writeFile(envFile, Object.entries({
+  AUTH_ORIGIN: origin, AUTH_LOCAL: 'true',
+  OWNER_EMAIL: ['synthetic-gasket-1', 'example.test'].join('@'),
+  SESSION_SECRET: randomBytes(32).toString('base64url'),
+}).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n'), { mode: 0o600 })
+const worker = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'dev', '--env-file', envFile, '--inspector-port', '0', '--local', '--persist-to', persist, '--ip', '127.0.0.1', '--config', 'dist/server/wrangler.json', '--port', String(port)], { stdio: ['ignore', 'pipe', 'pipe'] })
 let output = ''
 worker.stdout.on('data', chunk => { output += chunk })
 worker.stderr.on('data', chunk => { output += chunk })
-const origin = `http://127.0.0.1:${port}`
 try {
   let ready = false
   for (let attempt = 0; attempt < 120; attempt++) {
@@ -42,7 +50,13 @@ try {
   for (const path of ['/missing', '/health/extra', '/api', '/api/missing']) {
     assert.equal((await fetch(`${origin}${path}`)).status, 404, path)
   }
-  console.log('HTTP-001 passed against emitted local Worker: health, the installed homepage, HTTP and document 404s')
+  const signedOut = await fetch(`${origin}/app`, { redirect: 'manual', credentials: 'omit' })
+  assert.equal(signedOut.status, 303)
+  assert.equal(signedOut.headers.get('location'), '/signin?returnTo=%2Fapp')
+  assert.equal(new URL(signedOut.headers.get('location'), origin).origin, origin)
+  assert.equal(signedOut.headers.get('cache-control'), 'no-store')
+  assert.equal(await signedOut.text(), '', 'A signed-out redirect must expose no private workspace content')
+  console.log('HTTP-001 passed against emitted local Worker: health, the installed homepage, HTTP and document 404s, signed-out private-page redirect')
 } finally {
   worker.kill('SIGTERM')
   await new Promise(resolve => worker.exitCode !== null ? resolve() : worker.once('exit', resolve))

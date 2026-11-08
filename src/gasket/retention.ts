@@ -1,3 +1,4 @@
+// Direct conversations and messages are retained indefinitely; no erasure door is offered.
 import { qualificationErasurePreview } from './qualification-erasure'
 import { attachmentErasurePreview } from './attachment-erasure'
 // Conservative retention default: retain indefinitely, with no automatic erasure.

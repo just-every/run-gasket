@@ -10,6 +10,8 @@ import { all, one, type Row } from './core'
 import { today, zonedInstant } from './dates'
 import { woDigits } from './quantity'
 import { OPEN } from './work'
+import { pageRows, type PageSource } from './pagination'
+import { addDays } from './dates'
 
 export const TABS = ['today', 'overdue', 'progress', 'done'] as const
 export type Tab = typeof TABS[number]
@@ -32,31 +34,50 @@ const ROWS = `SELECT w.id, w.number, w.title, w.kind, w.status, w.due_date, w.su
   w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location
   FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id`
 
-const ORDER: Record<Part, number> = { overdue: 0, progress: 1, due: 2, done: 3 }
-
-/** Today's plate in the order a manager reads it: overdue, in progress, due, done. */
-async function plate(env: Bindings, actor: Actor, mine: boolean) {
-  // Finished work counts only on the day it finished; two days back covers every site zone.
-  const rows = await all(env, `${ROWS} WHERE (w.status IN ${OPEN} OR (w.status IN ('submitted', 'closed') AND COALESCE(w.closed_at, w.submitted_at) >= ?))${mine ? ' AND w.assignee_id = ?' : ''} ORDER BY w.due_date, w.number LIMIT 1000`, Date.now() - 2 * 86400000, ...(mine ? [actor.id] : []))
-  const placed = rows.flatMap(row => { const part = partOf(row, actor); return part ? [{ ...row, part }] : [] }).sort((a, b) => ORDER[a.part as Part] - ORDER[b.part as Part])
-  return { rows, placed }
+/** SQL classification uses the site's exact day, including daylight saving. */
+function plateSource(actor: Actor, mine: boolean): PageSource {
+  const start = zonedInstant(actor.zone, `${actor.today}T00:00`)
+  const end = zonedInstant(actor.zone, `${addDays(actor.today, 1)}T00:00`)
+  const open = `w.status IN ${OPEN}`
+  const part = `CASE WHEN ${open} AND w.due_date < ? THEN 'overdue' WHEN w.status='in_progress' THEN 'progress' WHEN ${open} AND w.due_date=? THEN 'due' WHEN (CASE WHEN w.status='submitted' THEN w.submitted_at WHEN w.status='closed' THEN w.closed_at END)>=? AND (CASE WHEN w.status='submitted' THEN w.submitted_at WHEN w.status='closed' THEN w.closed_at END)<? THEN 'done' END`
+  return { sql: `SELECT * FROM (${ROWS.replace('SELECT ', `SELECT ${part} AS part, `)}) WHERE part IS NOT NULL ${mine ? 'AND assignee_id=?' : ''}`,
+    args: [actor.today, actor.today, start, end, ...(mine ? [actor.id] : [])], order: "CASE part WHEN 'overdue' THEN 0 WHEN 'progress' THEN 1 WHEN 'due' THEN 2 ELSE 3 END, due_date, number, id", filters: { list: 'today', mine } }
 }
 
-/** Whether this person only ever sees their own work, whatever the page asks for. */
 const ownAlways = (actor: Actor) => ownOnly(actor, new URL('http://gasket.invalid/app'))
 
-/**
- * Today's tabs and next day follow the page's filter. The decision panel follows the site for anyone who reads the
- * site's work: "Assigned to me" narrows the table, not the manager's overdue decision.
- */
+async function plateCounts(env: Bindings, actor: Actor, mine: boolean) {
+  const source = plateSource(actor, mine)
+  const counts: Record<Tab, number> = { today: 0, overdue: 0, progress: 0, done: 0 }
+  for (const row of await all(env, `WITH items AS (${source.sql}) SELECT part, COUNT(*) AS n FROM items GROUP BY part`, ...source.args)) {
+    counts.today += row.n
+    if (row.part !== 'due') counts[row.part as Tab] = row.n
+  }
+  return counts
+}
+
+export async function todayPageRows(env: Bindings, actor: Actor, url: URL) {
+  const mine = ownOnly(actor, url)
+  const tab = TABS.includes(url.searchParams.get('tab') as Tab) ? url.searchParams.get('tab') as Tab : 'today'
+  const source = plateSource(actor, mine)
+  if (tab !== 'today') { source.sql = `SELECT * FROM (${source.sql}) WHERE part=?`; source.args.push(tab) }
+  source.filters = { list: 'today', mine, tab }
+  return pageRows(env, actor, url, source)
+}
+
+/** Exact counters and the decision panel do not depend on the visible page. */
 export async function workToday(env: Bindings, actor: Actor, url: URL) {
   const mine = ownOnly(actor, url), own = ownAlways(actor)
   const scope = mine ? ' AND w.assignee_id = ?' : '', who = mine ? [actor.id] : []
-  const { rows, placed } = await plate(env, actor, mine)
-  const tabs: Record<Tab, Row[]> = { today: placed, overdue: placed.filter(row => row.part === 'overdue'), progress: placed.filter(row => row.part === 'progress'), done: placed.filter(row => row.part === 'done') }
-  const next = await all(env, `${ROWS} WHERE w.status IN ${OPEN} AND w.due_date = (SELECT MIN(due_date) FROM gk_work_orders x WHERE x.status IN ${OPEN} AND x.due_date > ?${mine ? ' AND x.assignee_id = ?' : ''})${scope} ORDER BY w.number LIMIT 4`, actor.today, ...who, ...who)
-  const site = mine && !own ? await plate(env, actor, false) : { rows, placed }
-  return { tabs, next, own, exception: await exceptionOf(env, actor, site.placed.filter(row => row.part === 'overdue'), site.rows) }
+  const counts = await plateCounts(env, actor, mine)
+  const next = await all(env, `${ROWS} WHERE w.status IN ${OPEN} AND w.due_date = (SELECT MIN(due_date) FROM gk_work_orders x WHERE x.status IN ${OPEN} AND x.due_date > ?${mine ? ' AND x.assignee_id = ?' : ''})${scope} ORDER BY w.number,w.id LIMIT 4`, actor.today, ...who, ...who)
+  const source = plateSource(actor, own)
+  // Prefer the first undecided overdue order, then the latest decision. Only
+  // one decision is displayed, so this query never materializes the estate.
+  const since = zonedInstant(actor.zone, `${actor.today}T00:00`)
+  const overdue = await all(env, `WITH items AS (${source.sql}) SELECT * FROM items WHERE part='overdue' ORDER BY (SELECT MAX(seq) FROM gk_audit WHERE action='workorder.plan' AND subject=items.id AND at>=?) IS NOT NULL, (SELECT MAX(seq) FROM gk_audit WHERE action='workorder.plan' AND subject=items.id AND at>=?) DESC, due_date,number,id LIMIT 1`, ...source.args, since, since)
+  const busy = overdue[0]?.assignee_id ? await all(env, `${ROWS} WHERE w.assignee_id=? AND w.status='in_progress' ORDER BY w.number,w.id`, overdue[0].assignee_id) : []
+  return { counts, next, own, exception: await exceptionOf(env, actor, overdue, busy) }
 }
 
 export type Plan = { value: string; label: string; cost: string }
@@ -118,8 +139,8 @@ export async function pendingProposals(env: Bindings) {
 
 /** The rail's counts: today's plate for this person (the Today tab) and proposals waiting for a decision. */
 export async function railCounts(env: Bindings, actor: Actor) {
-  const [{ placed }, pending] = await Promise.all([plate(env, actor, ownAlways(actor)), pendingProposals(env)])
-  return { work: placed.length, proposals: pending.count }
+  const [counts, pending] = await Promise.all([plateCounts(env, actor, ownAlways(actor)), pendingProposals(env)])
+  return { work: counts.today, proposals: pending.count }
 }
 
 /** The latest changes for people who may read the audit trail. */

@@ -1,4 +1,8 @@
+import { issuePrintPack, previewPrintEntry, acceptPrintEntry } from './print-packs'
+import { startConversation, sendMessage, readConversation } from './messages'
+import { saveLanguage, saveIntakeTranslation } from './languages'
 import { saveResourceGrant } from './resource-authority'
+import { issuePrivateManualLink } from './private-file-links'
 import { eraseRecord } from './record-erasure'
 import { createSite, updateSite, setSiteMembership } from './site-access'
 import { eraseQualification } from './qualification-erasure'
@@ -91,6 +95,11 @@ import { addEvidence, assign, cancel, createCorrective, decidePlan, downtimeEnd,
 type Handler = (env: Bindings, actor: Actor, input: Input, request: Request) => Promise<unknown>
 
 export const actions: Record<string, Handler> = {
+  'printpack.issue':issuePrintPack, 'printpack.preview':previewPrintEntry, 'printpack.accept':(env,actor,input,request)=>acceptPrintEntry(env,actor,input,doorOf(request)),
+  'conversation.start': startConversation, 'message.send': sendMessage, 'conversation.read': readConversation,
+  'language.preference':(env,actor,input)=>saveLanguage(env,actor,input),
+  'language.default':(env,actor,input)=>saveLanguage(env,actor,input,true),
+  'language.catalog':saveIntakeTranslation,
   'report.schedule': saveReportSchedule,
   'service.create': createServiceCredential, 'service.revoke': revokeServiceCredential,
   'safety.publish': (env,actor,input) => publishSafety(env,actor,input),
@@ -149,6 +158,7 @@ export const actions: Record<string, Handler> = {
   'asset.lifecycle': (env, actor, input) => setLifecycle(env, actor, input),
   'asset.agreement': (env, actor, input) => addAgreement(env, actor, input),
   'asset.contact': (env, actor, input) => addContact(env, actor, input),
+  'document.privateLink': (env, actor, input) => issuePrivateManualLink(env, actor, input.text('revision', { max: 100 })),
   'document.add': (env, actor, input) => addDocument(env, actor, input),
   'document.revise': (env, actor, input) => reviseDocument(env, actor, input),
   'document.expiry': (env, actor, input) => setExpiry(env, actor, input),
@@ -212,7 +222,7 @@ export const actions: Record<string, Handler> = {
   'comment.edit': (env, actor, input) => editComment(env, actor, input),
   'comment.read': (env, actor, input) => markRead(env, actor, input),
   'workorder.time': recordTime,
-  'workorder.readings': async (env, actor, input) => { const kept = await recordReadings(env, actor, input); const created = []; for (const meter of kept.meters) created.push(...await evaluateMeter(env, actor, meter)); return { id: kept.id, created } },
+  'workorder.readings': async (env, actor, input) => { const kept = await recordReadings(env, actor, input); const created = []; for (const meter of kept.meters) created.push(...await evaluateMeter(env, actor, meter)); return { id: kept.id, meters: kept.meters, created } },
   'workorder.issue': (env, actor, input) => issue(env, actor, input),
   'workorder.return': (env, actor, input) => giveBack(env, actor, input),
   'downtime.start': (env, actor, input) => downtimeStart(env, actor, input),

@@ -1,3 +1,6 @@
+import { pageRows, WORK_EXPORT_LIMIT, type PageSource } from './pagination'
+import { cell } from './audit'
+import { agentContext } from './agent-door/context'
 import { laborView } from './labor'
 import { requestSources } from './request-sources'
 // Clauses 6–8: work orders, assignment and the assigned person's record of the
@@ -62,9 +65,11 @@ export const touch = (env: Bindings, order: { id: string; version: number }) => 
   stmt(env, "UPDATE gk_work_orders SET version = version + 1, status = 'in_progress' WHERE id = ?", order.id),
 ]
 
-export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also, door }: FromProposal & { door?: Door } = {}) {
-  requireCapability(actor, proposal ? 'proposal.decide' : 'work.create')
-  if (!proposal) insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
+export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also, door, policyExecution }: FromProposal & { door?: Door; policyExecution?: boolean } = {}) {
+  // Agent attribution comes from the authenticated native context, never caller input.
+  const sourceDoor = agentContext()?.door ?? door
+  requireCapability(actor, proposal && !policyExecution ? 'proposal.decide' : 'work.create')
+  if (!proposal || policyExecution) insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
   // PLAN-001: work names an asset or, with no asset, a location (the text given, trimmed); never both.
   const assetId = input.text('asset', { optional: true, max: 100 }) || null, location = input.text('location', { optional: true, max: 160 }) || null
   insist(Boolean(assetId) !== Boolean(location), 'asset_or_location')
@@ -101,8 +106,8 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   if (assignee) await assigneeFits(env, assignee, crew.team)
   const estimateMinutes = estimate(input) ?? (template?.estimate_minutes as number | null) ?? null
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, required_fields, requires_evidence, checklist_revision_id, work_started_on, work_ended_on, created_via, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, template?.required_fields ?? null, template?.requires_evidence ?? 0, checklistRevision, startedOn, endedOn, door ?? null, actor.id, now()), ...(also?.(id) ?? [])],
-    { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(checklistRevision ? { checklistRevision } : {}), ...(startedOn ? { startedOn, endedOn } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}), ...(door ? { door } : {}) } })
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, required_fields, requires_evidence, checklist_revision_id, work_started_on, work_ended_on, created_via, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, template?.required_fields ?? null, template?.requires_evidence ?? 0, checklistRevision, startedOn, endedOn, sourceDoor ?? null, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(checklistRevision ? { checklistRevision } : {}), ...(startedOn ? { startedOn, endedOn } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}), ...(sourceDoor ? { door: sourceDoor } : {}) } })
   return { id }
 }
 
@@ -111,6 +116,7 @@ export async function assign(env: Bindings, actor: Actor, input: Input, { also }
   requireCapability(actor, 'work.assign')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
   insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  if (input.has('version')) insist(input.integer('version', { min: 1 }) === order.version, 'stale', 409)
   const assignee = input.text('assignee', { max: 100 }), note = input.text('note', { optional: true, max: 1000 }) || null
   const crew = await crewChoice(env, input, order)
   await assigneeFits(env, assignee, crew.team)
@@ -168,6 +174,13 @@ export async function cancel(env: Bindings, actor: Actor, input: Input) {
 /** Clause 7 and FIELD-004: an answer for each step of the pinned revision that applies, with a note; a number step naming a meter also keeps the value as that meter's reading. */
 export async function recordResults(env: Bindings, actor: Actor, input: Input) {
   const order = await workable(env, actor, input)
+  const plan = await resultStatements(env, actor, input, order)
+  await commit(env, [...touch(env, order), ...plan.statements], plan.audits)
+  return { id: order.id }
+}
+
+/** Shared validation and atomic effects for ordinary and authenticated paper entry. */
+export async function resultStatements(env: Bindings, actor: Actor, input: Input, order: Row) {
   insist(order.checklist_revision_id, 'no_checklist', 409)
   const revision = await one(env, 'SELECT items_json FROM gk_checklist_revisions WHERE id = ?', order.checklist_revision_id)
   const steps = JSON.parse(revision!.items_json) as ChecklistItem[], count = steps.length
@@ -202,8 +215,7 @@ export async function recordResults(env: Bindings, actor: Actor, input: Input) {
   insist(recorded.length, 'invalid_outcome')
   // PM-004: results the checklist's failure rule covers raise their correction in the same batch.
   const correction = await correctionStatements(env, actor, order, recorded)
-  await commit(env, [...touch(env, order), ...statements, ...correction.statements], [{ actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded, statusChanged: order.status !== 'in_progress' } }, ...correction.audits])
-  return { id: order.id }
+  return { statements: [...statements, ...correction.statements], recorded, audits: [{ actor: actor.id, action: 'workorder.results', subject: order.id, detail: { recorded, statusChanged: order.status !== 'in_progress' } }, ...correction.audits] }
 }
 
 export async function addEvidence(env: Bindings, actor: Actor, input: Input, door: Door) {
@@ -220,7 +232,7 @@ export async function addEvidence(env: Bindings, actor: Actor, input: Input, doo
     insist(item < steps.length, 'invalid_item')
     if (kindOf(steps[item]) === 'photo') insist(mediaType.startsWith('image/'), 'photo_required')
   }
-  // ASSET-008: a calibration's certificate is evidence marked as such, on calibration work only.
+  // ASSET-010: a calibration's certificate is evidence marked as such, on calibration work only.
   const certificate = input.flag('certificate')
   if (certificate) insist(order.schedule_id && await one(env, 'SELECT 1 FROM gk_schedules WHERE id = ? AND calibration = 1', order.schedule_id), 'not_calibration', 409)
   // FIELD-005: before or after the work, when it was taken (site time, never ahead of now) and the door it came through.
@@ -364,8 +376,8 @@ export type WorkView = Row & { requestSources: Awaited<ReturnType<typeof request
 /** Everything about one work order, for its page and the JSON door. */
 export async function workOrderDetail(env: Bindings, actor: Actor, id: string): Promise<WorkView> {
   // Work at a location with no asset (PLAN-001) shows the location where an asset's name and place would be.
-  const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
-    m.name AS assignee_name, cr.name AS created_by_name, s.calibration AS calibration_task, s.grace_days, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
+  const order = await one(env, `SELECT w.*, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, a.serial AS asset_serial, a.model AS asset_model, COALESCE(a.location, w.location) AS asset_location, a.custodian AS asset_custodian, a.category AS asset_category,
+    m.name AS assignee_name, COALESCE((SELECT json_extract(audit.detail,'$.preparedBy.label') FROM gk_audit audit WHERE audit.subject=w.id AND audit.action='workorder.create' ORDER BY audit.seq LIMIT 1),cr.name) AS created_by_name, s.calibration AS calibration_task, s.grace_days, ws.label AS waiting_label, c.name AS checklist_name, r.number AS checklist_revision, r.items_json, s.title AS schedule_title, f.number AS follow_up_of_number, mi.number AS merged_into_number, t.name AS template_name
     FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_members cr ON cr.id = w.created_by LEFT JOIN gk_work_templates t ON t.id = w.template_id LEFT JOIN gk_work_statuses ws ON ws.id = w.waiting_status
     LEFT JOIN gk_checklist_revisions r ON r.id = w.checklist_revision_id LEFT JOIN gk_checklists c ON c.id = r.checklist_id
     LEFT JOIN gk_schedules s ON s.id = w.schedule_id LEFT JOIN gk_work_orders f ON f.id = w.follow_up_of LEFT JOIN gk_work_orders mi ON mi.id = w.merged_into WHERE w.id = ?`, id)
@@ -390,7 +402,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
     .map(row => ({ ...row, obligation: obligation(row) }))
   const reserved = await reservations(env, 'r.work_order_id = ?', id)
   // ASSET-006: the asset's current bill of materials, with stock and fit, for planning.
-  const bom = order.asset_id ? await bomOf(env, { id: order.asset_id, serial: order.asset_serial }, await partList(env, actor)) : null
+  const bom = order.asset_id ? await bomOf(env, { id: order.asset_id, serial: order.asset_serial, model: order.asset_model }, await partList(env, actor)) : null
   const reviews = await all(env, 'SELECT r.version, r.decision, r.reason, m.name AS reviewer, r.at FROM gk_reviews r LEFT JOIN gk_members m ON m.id = r.reviewer WHERE r.work_order_id = ? ORDER BY r.at', id)
   const decisions = (await all(env, `SELECT a.at, a.detail, m.name AS decided_by, h.name AS holder, t.name AS too FROM gk_audit a LEFT JOIN gk_members m ON m.id = a.actor
     LEFT JOIN gk_members h ON h.id = json_extract(a.detail, '$.holder') LEFT JOIN gk_members t ON t.id = json_extract(a.detail, '$.to') WHERE a.action = 'workorder.plan' AND a.subject = ? ORDER BY a.at DESC, a.seq DESC`, id))
@@ -410,7 +422,7 @@ export async function workOrderDetail(env: Bindings, actor: Actor, id: string): 
   const comments = await thread(env, actor, 'work', id), costs = await workCosts(env, id, actor)
   // PLAN-001: custom field values, and what the fields and the template require before review.
   const fields = await fieldsOf(env, order)
-  // ASSET-008: the tools this work needs and which were used; a calibration's grace window and certificate.
+  // ASSET-008 / ASSET-010: the tools this work needs and which were used; a calibration's grace window and certificate.
   const tools = await toolsOf(env, id)
   // FIELD-005: each photo's annotations, and the work's signatures with their state against its version.
   const annotations = await annotationsOf(env, id)
@@ -450,17 +462,54 @@ export function submitBlockers({ items, findings, downtime, unacknowledged = fal
 }
 
 /** Work lists: everything open, one team's (`team`), or one person's own: assigned to them or collaborating on it (PLAN-002). */
-export async function workList(env: Bindings, actor: Actor, url: URL) {
+export function workSource(actor: Actor, url: URL): PageSource {
   const mine = url.searchParams.get('mine') === '1' || (!can(actor, 'work.assign') && !can(actor, 'work.review') && actor.role !== 'agent')
   const team = url.searchParams.get('team')
   const state = url.searchParams.get('state') ?? 'open'
   const filter = state === 'closed' ? "w.status IN ('closed', 'cancelled')" : "w.status NOT IN ('closed', 'cancelled')"
   const collaborating = 'EXISTS(SELECT 1 FROM gk_collaborators c WHERE c.work_order_id = w.id AND c.member_id = ? AND c.removed_at IS NULL)'
-  return await all(env, `SELECT w.id, w.number, w.title, w.kind, w.priority, w.status, w.due_date, w.version, w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location, m.name AS assignee, w.assignee_id,
+  return { sql: `SELECT w.closed_at AS closed_sort, w.id, w.number, w.title, w.kind, w.priority, w.status, w.due_date, w.version, w.asset_id, a.tag AS asset_tag, COALESCE(a.name, w.location) AS asset_name, COALESCE(a.location, w.location) AS asset_location, a.category AS asset_category, w.location, m.name AS assignee, w.assignee_id,
     t.name AS team, w.trade, w.shift, (SELECT label FROM gk_work_statuses WHERE id = w.waiting_status) AS waiting, CASE WHEN w.assignee_id = ? THEN 'assignee' WHEN ${collaborating} THEN 'collaborator' END AS my_part
     FROM gk_work_orders w LEFT JOIN gk_assets a ON a.id = w.asset_id LEFT JOIN gk_members m ON m.id = w.assignee_id LEFT JOIN gk_teams t ON t.id = w.team_id
-    WHERE ${filter} ${mine ? `AND (w.assignee_id = ? OR ${collaborating})` : ''} ${team ? 'AND w.team_id = ?' : ''} ORDER BY ${state === 'closed' ? 'w.closed_at DESC' : 'w.due_date, w.number'} LIMIT 500`,
-  actor.id, actor.id, ...(mine ? [actor.id, actor.id] : []), ...(team ? [team] : []))
+    WHERE ${filter} ${mine ? `AND (w.assignee_id = ? OR ${collaborating})` : ''} ${team ? 'AND w.team_id = ?' : ''}`,
+    args: [actor.id, actor.id, ...(mine ? [actor.id, actor.id] : []), ...(team ? [team] : [])],
+    order: state === 'closed' ? 'closed_sort DESC, number, id' : 'due_date, number, id', filters: { list: 'work', mine, team, state } }
+}
+
+
+export async function workPageRows(env: Bindings, actor: Actor, url: URL) {
+  const page = await pageRows(env, actor, url, workSource(actor, url))
+  return { ...page, rows: page.rows.map(({ closed_sort, ...row }) => row) }
+}
+
+/** Legacy array callers retain their fields; HTTP adds continuation headers. */
+export async function workList(env: Bindings, actor: Actor, url: URL) {
+  return (await workPageRows(env, actor, url)).rows
+}
+
+/** A CSV is complete or refused before any bytes are served. */
+export async function workCsv(env: Bindings, actor: Actor, url: URL) {
+  const ceiling = url.searchParams.get('exportLimit') ?? String(WORK_EXPORT_LIMIT)
+  insist(/^\d{1,4}$/.test(ceiling) && +ceiling >= 1 && +ceiling <= WORK_EXPORT_LIMIT, 'invalid_export_limit')
+  insist(!url.searchParams.has('cursor'), 'export_requires_start')
+  const selection = new URL(url)
+  selection.searchParams.set('limit', '200')
+  if (url.searchParams.has('snapshot')) selection.searchParams.set('cursor', url.searchParams.get('snapshot')!)
+  let page = await workPageRows(env, actor, selection)
+  insist(page.offset === 0, 'export_requires_start')
+  insist(page.total <= +ceiling, 'work_export_limit_exceeded', 413, { limit: +ceiling, total: page.total, message: 'Narrow the work filters. No partial CSV was returned.' })
+  const rows = [...page.rows], total = page.total
+  const start = page.start
+  while (page.next) {
+    selection.searchParams.set('cursor', page.next)
+    page = await workPageRows(env, actor, selection)
+    rows.push(...page.rows)
+  }
+  selection.searchParams.set('cursor', start)
+  await workPageRows(env, actor, selection)
+  insist(rows.length === total, 'work_snapshot_changed', 409)
+  const fields = ['id', 'number', 'title', 'kind', 'priority', 'status', 'due_date', 'version', 'asset_id', 'asset_tag', 'asset_name', 'asset_location', 'asset_category', 'location', 'assignee', 'assignee_id', 'team', 'trade', 'shift', 'waiting', 'my_part']
+  return [fields, ...rows.map(row => fields.map(field => row[field] ?? ''))].map(row => row.map(cell).join(',')).join('\r\n') + '\r\n'
 }
 
 export async function evidenceFile(env: Bindings, _actor: Actor, id: string) {

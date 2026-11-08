@@ -74,7 +74,7 @@ export async function scheduleFields(env: Bindings, input: Input) {
 }
 
 export interface FromProposal { proposal?: string; also?: (id: string) => D1PreparedStatement[] }
-/** ASSET-008: a calibration task is a schedule with a grace window (days); its cadence runs from completion unless it says otherwise. */
+/** ASSET-010: a calibration task is a schedule with a grace window (days); its cadence runs from completion unless it says otherwise. */
 export interface ScheduleKind extends FromProposal { calibration?: number }
 
 export async function createSchedule(env: Bindings, actor: Actor, input: Input, { proposal, also, calibration }: ScheduleKind = {}) {

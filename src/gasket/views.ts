@@ -1,3 +1,6 @@
+import { readPrintPack, readPrintPreview, workPrintPacks } from './print-packs'
+import { conversations, conversation, messagePeople } from './messages'
+import { languagePreferences } from './languages'
 import { resourceRecords } from './resource-records'
 import { publicRecordErasurePreview } from './record-erasure'
 import { siteDirectory } from './site-access'
@@ -70,11 +73,14 @@ import { proposalList } from './proposals'
 import { scheduleList } from './schedules'
 import { schedulerView } from './scheduler'
 import { members, site } from './site'
-import { workList, workOrderDetail } from './work'
+import { workList, workPageRows, workOrderDetail } from './work'
 
 type View = (env: Bindings, actor: Actor, id: string, url: URL) => Promise<unknown>
 
 export const views: Record<string, View> = {
+  printPack:readPrintPack, printPreview:readPrintPreview, workPrintPacks,
+  conversations: (env,actor)=>conversations(env,actor), conversation:(env,actor,id)=>conversation(env,actor,id), messagePeople:(env,actor)=>messagePeople(env,actor),
+  languages:languagePreferences,
   sites: (env, actor, id) => siteDirectory(env, actor, id || undefined),
   historyReport:(env,actor,_id,url)=>historyReport(env,actor,url),
   reportSchedules: (env,actor) => reportSchedules(env,actor),
@@ -137,6 +143,7 @@ export const views: Record<string, View> = {
   checklists: (env, actor) => checklistList(env, actor),
   checklist: (env, actor, id) => checklistDetail(env, actor, id),
   schedules: (env, actor) => scheduleList(env, actor),
+  workPage: (env, actor, _id, url) => workPageRows(env, actor, url),
   work: (env, actor, _id, url) => workList(env, actor, url),
   workOrder: (env, actor, id) => workOrderDetail(env, actor, id),
   workComments: async (env, actor, id) => { insist(await one(env, 'SELECT 1 FROM gk_work_orders WHERE id = ?', id), 'work_order_not_found', 404); return await thread(env, actor, 'work', id) },

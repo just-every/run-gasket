@@ -2,6 +2,9 @@
 // lists, so the access proof can crawl every one of them.
 // API patterns are relative to /api/gasket/; page patterns are absolute.
 export const API_DOORS: [string, string][] = [
+  ['^print-packs/([\\w-]+)$','printPack'], ['^print-previews/([\\w-]+)$','printPreview'], ['^work/([\\w-]+)/print-packs$','workPrintPacks'],
+  ['^conversations$', 'conversations'], ['^conversations/([\\w-]+)$', 'conversation'], ['^message-people$', 'messagePeople'],
+  ['^languages$', 'languages'],
   ['^sites$', 'sites'], ['^sites/([\\w-]+)$', 'sites'],
   ['^spreadsheet-imports$', 'spreadsheetImports'],
   ['^spreadsheet-imports/([\\w-]+)/rows$', 'spreadsheetReconciliation'],
@@ -42,11 +45,20 @@ export const API_DOORS: [string, string][] = [
   ['^me$', 'me'], ['^site$', 'site'], ['^members$', 'members'],
   ['^assets$', 'assets'], ['^assets/([\\w-]+)$', 'asset'], ['^assets/([\\w-]+)/history$', 'history'],
   ['^parts$', 'parts'], ['^parts/([\\w-]+)$', 'part'], ['^checklists$', 'checklists'], ['^checklists/([\\w-]+)$', 'checklist'],
-  ['^schedules$', 'schedules'], ['^work$', 'work'], ['^work/([\\w-]+)$', 'workOrder'], ['^work/([\\w-]+)/comments$', 'workComments'], ['^assets/([\\w-]+)/comments$', 'assetComments'], ['^board$', 'board'],
+  ['^schedules$', 'schedules'], ['^work-page$', 'workPage'], ['^work$', 'work'], ['^work/([\\w-]+)$', 'workOrder'], ['^work/([\\w-]+)/comments$', 'workComments'], ['^assets/([\\w-]+)/comments$', 'assetComments'], ['^board$', 'board'],
   ['^proposals$', 'proposals'], ['^imports$', 'imports'], ['^audit$', 'audit'], ['^codes$', 'codes'], ['^failures$', 'failures'], ['^closures$', 'closures'], ['^scheduler$', 'scheduler'], ['^notices$', 'notices'], ['^chase-rule$', 'chaseRule'], ['^teams$', 'teams'], ['^performance$', 'performance'], ['^reliability$', 'reliability'], ['^availability$', 'availability'], ['^bad-actors$', 'badActors'], ['^templates$', 'templates'], ['^routes$', 'routes'], ['^calibrations$', 'calibrations'], ['^work-fields$', 'workFields'], ['^kits$', 'kits'], ['^valuation$', 'valuation'], ['^counts$', 'counts'], ['^stores$', 'stores'], ['^counts/([\\w-]+)$', 'count'],
 ]
 
 export const PAGE_DOORS: [string, string][] = [
+  ['^/app/print-packs/([\\w-]+)/print$','printSheet'],
+  ['^/app/print-packs/([\\w-]+)$','printPack'], ['^/app/print-packs/([\\w-]+)/pack\\.pdf$','printPackPdf'],
+  ['^/app/print-previews/([\\w-]+)$','printPreview'], ['^/app/print-previews/([\\w-]+)/original$','paperOriginal'],
+  ['^/app/messages$', 'messages'], ['^/app/messages/([\\w-]+)$', 'conversation'],
+  ['^/app/work\\.csv$', 'workCsv'],
+  ['^/app/settings/language$', 'language'],
+  ['^/app/settings/language/catalog\\.json$', 'languageCatalog'],
+  ['^/app/manual-links/([\\w-]+)$', 'privateManualLink'],
+  ['^/app/private-manual-files/([\\w-]+)$', 'privateManualFile'],
   ['^/app/settings/erasure$', 'recordErasure'],
   ['^/app/move-in/templates/((?:assets|parts|work|locations|pms)\\.(?:csv|xls|xlsx))$', 'spreadsheetTemplate'],
   ['^/app/move-in/reconciliation/([\\w-]+)$', 'spreadsheetReconciliation'],

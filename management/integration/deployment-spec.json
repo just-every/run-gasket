@@ -657,21 +657,9 @@
     },
     {
       "binding": "DB",
-      "name": "0100_service_lifecycle_audit.sql",
-      "sha256": "2e039dedb93d520d75e98415479d78c7b551314b04a90210d242168a57539fe9",
-      "sql": "-- Only a live mutation batch supplies this context; no authority survives it.\nCREATE TABLE gk_authority_actor (\n  singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n  actor TEXT NOT NULL,\n  action TEXT NOT NULL,\n  at INTEGER NOT NULL\n);\n\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,\n    (SELECT CASE WHEN o.role='owner' THEN 'owner' ELSE m.role END\n      FROM gk_members m LEFT JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=a.actor),\n    'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
-    },
-    {
-      "binding": "DB",
       "name": "0101_qualification_erasure.sql",
       "sha256": "78acc2b972f5f6f29ce40a2722b26f34480cd28e4d53897238e84098541cc5ec",
       "sql": "-- Explicit erasure preserves safety evidence and all audit attribution.\nCREATE TABLE gk_qualification_erasure_results (\n resource_id TEXT PRIMARY KEY,\n result_json TEXT NOT NULL CHECK(json_valid(result_json))\n);\nALTER TABLE gk_retention_scope_holds RENAME TO gk_retention_scope_holds_old;\nCREATE TABLE gk_retention_scope_holds (\n kind TEXT NOT NULL CHECK(kind IN ('attachment','user','qualification')),\n record_id TEXT NOT NULL, held INTEGER NOT NULL CHECK(held IN (0,1)),\n reason TEXT NOT NULL, revision INTEGER NOT NULL, changed_by TEXT NOT NULL, changed_at INTEGER NOT NULL,\n PRIMARY KEY(kind,record_id)\n);\nINSERT INTO gk_retention_scope_holds SELECT * FROM gk_retention_scope_holds_old;\nDROP TABLE gk_retention_scope_holds_old;\nDROP TRIGGER gk_retired_resources_delete;\nCREATE TRIGGER gk_retired_resources_delete BEFORE DELETE ON gk_retired_resources\nWHEN NOT (OLD.kind='qualification' AND EXISTS(SELECT 1 FROM gk_guard WHERE code='qualification_erasure' AND ok=1))\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n-- Preserve both record and qualification erasure after their independent migrations.\nDROP TRIGGER gk_audit_no_update;\nCREATE TRIGGER gk_audit_no_update BEFORE UPDATE ON gk_audit\nWHEN NOT (\n NEW.detail='{}' AND NEW.seq=OLD.seq AND NEW.at=OLD.at AND NEW.actor=OLD.actor\n AND NEW.action=OLD.action AND NEW.subject=OLD.subject AND NEW.role IS OLD.role\n AND (\n  (EXISTS(SELECT 1 FROM gk_guard WHERE code='request_erasure' AND ok=1)\n   AND OLD.action IN ('request.submit','request.triage','request.reply','request.convert','workorder.create','request.clock','request.escalation'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='record_erasure' AND ok=1))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='qualification_erasure' AND ok=1)\n   AND OLD.action IN ('planning.qualification','planning.retire'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='attachment_erasure' AND ok=1)\n   AND OLD.action IN ('workorder.evidence','workorder.annotate'))\n )\n)\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n\n\n-- Opaque evidence identities fence delayed captures without retaining personal facts.\nCREATE TABLE gk_erased_qualification_records (record_id TEXT PRIMARY KEY);\n"
-    },
-    {
-      "binding": "DB",
-      "name": "0101_service_authority_snapshot.sql",
-      "sha256": "9f7665ced012b523e6440f7b79be2d6db113cb8bb0fb9d21a6a42f3f1360f1cb",
-      "sql": "-- Preserve the authority that authorized the batch before a self-demotion.\nALTER TABLE gk_authority_actor ADD COLUMN role TEXT;\n\nDROP TRIGGER gk_service_invalidation_audit;\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,a.role,'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
     },
     {
       "binding": "DB",
@@ -684,6 +672,66 @@
       "name": "0103_qualification_hold_erasure.sql",
       "sha256": "df9560f54891638c259b1bf2f6f82081edf46bf7c4170c225ae4453b4eee3f8d",
       "sql": "-- Eligible qualification erasure redacts its released hold audit payloads.\nDROP TRIGGER gk_audit_no_update;\nCREATE TRIGGER gk_audit_no_update BEFORE UPDATE ON gk_audit\nWHEN NOT (\n NEW.detail='{}' AND NEW.seq=OLD.seq AND NEW.at=OLD.at AND NEW.actor=OLD.actor\n AND NEW.action=OLD.action AND NEW.subject=OLD.subject AND NEW.role IS OLD.role\n AND (\n  (EXISTS(SELECT 1 FROM gk_guard WHERE code='request_erasure' AND ok=1)\n   AND OLD.action IN ('request.submit','request.triage','request.reply','request.convert','workorder.create','request.clock','request.escalation'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='record_erasure' AND ok=1))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='qualification_erasure' AND ok=1)\n   AND OLD.action IN ('planning.qualification','planning.retire','resource.grant','resource.grant.revoke','retention.hold'))\n  OR (EXISTS(SELECT 1 FROM gk_guard WHERE code='attachment_erasure' AND ok=1)\n   AND OLD.action IN ('workorder.evidence','workorder.annotate'))\n )\n)\nBEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0104_direct_messages.sql",
+      "sha256": "d87619f697527f742dac8c80dcc9a866363553d3306c1b331f9ff170ca9d362b",
+      "sql": "-- Direct conversations have two fixed participants and retained original text.\nCREATE TABLE gk_conversations (\n  id TEXT PRIMARY KEY,\n  site_id TEXT NOT NULL REFERENCES gk_sites(id) CHECK (site_id = 'primary'),\n  member_low TEXT NOT NULL REFERENCES gk_members(id),\n  member_high TEXT NOT NULL REFERENCES gk_members(id),\n  created_by TEXT NOT NULL REFERENCES gk_members(id),\n  created_at INTEGER NOT NULL,\n  CHECK (member_low < member_high),\n  CHECK (created_by IN (member_low, member_high)),\n  UNIQUE (site_id, member_low, member_high)\n);\nCREATE TABLE gk_messages (\n  seq INTEGER PRIMARY KEY AUTOINCREMENT,\n  id TEXT NOT NULL UNIQUE,\n  conversation_id TEXT NOT NULL REFERENCES gk_conversations(id),\n  author_id TEXT NOT NULL REFERENCES gk_members(id),\n  author_name TEXT NOT NULL,\n  submission_key TEXT NOT NULL,\n  body TEXT NOT NULL CHECK (length(body) BETWEEN 1 AND 2000),\n  created_at INTEGER NOT NULL,\n  UNIQUE (author_id, submission_key)\n);\nCREATE INDEX gk_messages_conversation ON gk_messages(conversation_id, seq);\nCREATE TABLE gk_message_reads (\n  conversation_id TEXT NOT NULL REFERENCES gk_conversations(id),\n  member_id TEXT NOT NULL REFERENCES gk_members(id),\n  read_seq INTEGER NOT NULL DEFAULT 0 CHECK (read_seq >= 0),\n  read_at INTEGER NOT NULL,\n  PRIMARY KEY (conversation_id, member_id)\n);\nCREATE TRIGGER gk_conversations_no_update BEFORE UPDATE ON gk_conversations BEGIN SELECT RAISE(ABORT, 'gasket_immutable'); END;\nCREATE TRIGGER gk_conversations_no_delete BEFORE DELETE ON gk_conversations BEGIN SELECT RAISE(ABORT, 'gasket_immutable'); END;\nCREATE TRIGGER gk_messages_no_update BEFORE UPDATE ON gk_messages BEGIN SELECT RAISE(ABORT, 'gasket_immutable'); END;\nCREATE TRIGGER gk_messages_no_delete BEFORE DELETE ON gk_messages BEGIN SELECT RAISE(ABORT, 'gasket_immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0105_display_languages.sql",
+      "sha256": "217d17ccee2d75a88c2ba127688200c70c8bb5171821b4a6416d3aceeb3d8843",
+      "sql": "-- Display preferences confer no identity, record access or delivery authority.\nCREATE TABLE gk_language_settings (\n  singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n  locale TEXT NOT NULL CHECK(locale IN ('en-US','es-US'))\n);\nINSERT INTO gk_language_settings VALUES(1,'en-US');\nCREATE TABLE gk_member_languages (\n  member_id TEXT PRIMARY KEY REFERENCES gk_members(id),\n  locale TEXT NOT NULL CHECK(locale IN ('en-US','es-US'))\n);\nCREATE TABLE gk_intake_translations (\n  locale TEXT NOT NULL CHECK(locale='es-US'),\n  key TEXT NOT NULL,\n  value TEXT NOT NULL,\n  PRIMARY KEY(locale,key)\n);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0106_business_settings.sql",
+      "sha256": "a16f736a781aa3fe02a2e090c993f8c360c904f9fb6d86126acdab6e1f24e773",
+      "sql": "CREATE TABLE bs_settings (\n  singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n  rev INTEGER NOT NULL DEFAULT 0,\n  document TEXT,\n  applied_at TEXT,\n  stopped INTEGER NOT NULL DEFAULT 0 CHECK(stopped IN(0,1)),\n  token TEXT NOT NULL DEFAULT ''\n);\nCREATE TABLE bs_overrides (\n  field TEXT PRIMARY KEY CHECK(field IN('display_name','owner_name','brand_color','logo','timezone')),\n  value TEXT NOT NULL,\n  actor TEXT NOT NULL,\n  changed_at TEXT NOT NULL\n);\nCREATE TABLE bs_logo (\n  singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n  sha256 TEXT NOT NULL,\n  type TEXT NOT NULL,\n  bytes BLOB NOT NULL\n);\nCREATE TABLE bs_team (\n  email TEXT PRIMARY KEY,\n  operator_id TEXT,\n  invite INTEGER NOT NULL,\n  state TEXT NOT NULL CHECK(state IN('invited','active','inactive','conflict'))\n);\nCREATE TABLE bs_audit (\n  id INTEGER PRIMARY KEY,\n  actor TEXT NOT NULL,\n  action TEXT NOT NULL,\n  field TEXT,\n  changed_at TEXT NOT NULL\n);\n-- An INSERT of NULL fails the transaction if a concurrent write invalidated its fence.\nCREATE TABLE bs_assert (value INTEGER NOT NULL);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0106_controlled_print_packs.sql",
+      "sha256": "8318cd3aa9cdc2fb6c16d704d0524c09a781dc3363ef456a7d5257f87572d015",
+      "sql": "-- Printed identifiers confer no authority; all retrieval and capture uses live human work authority.\nCREATE TABLE gk_print_packs (\n  id TEXT PRIMARY KEY,\n  work_order_id TEXT NOT NULL REFERENCES gk_work_orders(id),\n  work_version INTEGER NOT NULL,\n  checklist_revision_id TEXT NOT NULL REFERENCES gk_checklist_revisions(id),\n  issued_by TEXT NOT NULL REFERENCES gk_members(id),\n  issued_at INTEGER NOT NULL,\n  content_json TEXT NOT NULL,\n  content_sha256 TEXT NOT NULL,\n  pdf_bytes BLOB NOT NULL,\n  pdf_sha256 TEXT NOT NULL\n);\nCREATE TABLE gk_print_previews (\n  id TEXT PRIMARY KEY,\n  pack_id TEXT NOT NULL REFERENCES gk_print_packs(id),\n  work_order_id TEXT NOT NULL REFERENCES gk_work_orders(id),\n  entrant_id TEXT NOT NULL REFERENCES gk_members(id),\n  submission_key TEXT NOT NULL,\n  payload_json TEXT NOT NULL,\n  payload_sha256 TEXT NOT NULL,\n  original_name TEXT NOT NULL,\n  original_type TEXT NOT NULL,\n  original_bytes BLOB NOT NULL,\n  original_sha256 TEXT NOT NULL,\n  performed_on TEXT NOT NULL,\n  created_at INTEGER NOT NULL,\n  UNIQUE(entrant_id, submission_key)\n);\nCREATE TABLE gk_print_entries (\n  id TEXT PRIMARY KEY REFERENCES gk_print_previews(id),\n  pack_id TEXT NOT NULL REFERENCES gk_print_packs(id),\n  work_order_id TEXT NOT NULL REFERENCES gk_work_orders(id),\n  entrant_id TEXT NOT NULL REFERENCES gk_members(id),\n  evidence_id TEXT NOT NULL REFERENCES gk_evidence(id),\n  accepted_version INTEGER NOT NULL,\n  accepted_at INTEGER NOT NULL,\n  receipt_json TEXT NOT NULL\n);\nCREATE INDEX gk_print_packs_work ON gk_print_packs(work_order_id);\nCREATE INDEX gk_print_previews_work ON gk_print_previews(work_order_id);\nCREATE TRIGGER gk_print_packs_no_update BEFORE UPDATE ON gk_print_packs BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_print_packs_no_delete BEFORE DELETE ON gk_print_packs BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_print_previews_no_update BEFORE UPDATE ON gk_print_previews BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_print_previews_no_delete BEFORE DELETE ON gk_print_previews BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_print_entries_no_update BEFORE UPDATE ON gk_print_entries BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\nCREATE TRIGGER gk_print_entries_no_delete BEFORE DELETE ON gk_print_entries BEGIN SELECT RAISE(ABORT,'gasket_immutable'); END;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0107_business_people.sql",
+      "sha256": "51aa39622d866b987d71b6e37c9a8300e7f24c54a55611edaab669ed051b01cd",
+      "sql": "ALTER TABLE bs_settings ADD COLUMN owner_id TEXT CHECK(owner_id IS NULL OR owner_id <> '');\nALTER TABLE bs_team ADD COLUMN business_id TEXT CHECK(business_id IS NULL OR business_id <> '');\nALTER TABLE bs_team ADD COLUMN business_role TEXT CHECK(business_role IS NULL OR business_role IN('admin','member'));\nCREATE UNIQUE INDEX bs_team_business_id ON bs_team(business_id) WHERE business_id IS NOT NULL;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0108_agent_door.sql",
+      "sha256": "016d8a98b964385f5c4a13447361c3c783910a76aaf4606b0e0081482bc819cc",
+      "sql": "CREATE TABLE IF NOT EXISTS agent_door_state (\n  id INTEGER PRIMARY KEY CHECK(id=1), envelope TEXT, local_document TEXT,\n  local_revision INTEGER NOT NULL DEFAULT 0, local_paused INTEGER NOT NULL DEFAULT 0,\n  decision_lock TEXT, decision_until INTEGER\n);\nCREATE TABLE IF NOT EXISTS agent_door_agents (\n  id TEXT PRIMARY KEY, name TEXT NOT NULL, specialist TEXT, sponsor TEXT NOT NULL,\n  sponsor_name TEXT NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,\n  window INTEGER NOT NULL DEFAULT 0, requests INTEGER NOT NULL DEFAULT 0\n);\nCREATE TABLE IF NOT EXISTS agent_door_audit (\n  sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, at TEXT NOT NULL,\n  agent TEXT NOT NULL, classes TEXT NOT NULL, row TEXT NOT NULL, evidence TEXT\n);\nCREATE INDEX IF NOT EXISTS agent_door_audit_agent ON agent_door_audit(agent,sequence);\nCREATE TABLE IF NOT EXISTS agent_door_calls (\n  agent TEXT NOT NULL, key TEXT NOT NULL, digest TEXT NOT NULL, decision_id TEXT NOT NULL,\n  created_at INTEGER NOT NULL, state TEXT NOT NULL, outcome TEXT, PRIMARY KEY(agent,key)\n);\nCREATE TABLE IF NOT EXISTS agent_door_approvals (\n  id TEXT PRIMARY KEY, state TEXT NOT NULL, saved TEXT NOT NULL, approvals TEXT NOT NULL DEFAULT '[]',\n  result TEXT, version INTEGER NOT NULL DEFAULT 0\n);\nCREATE TABLE IF NOT EXISTS agent_door_reviews (\n  id TEXT PRIMARY KEY, state TEXT NOT NULL, saved TEXT NOT NULL, marked_by TEXT, marked_at TEXT\n);\nCREATE TABLE IF NOT EXISTS agent_door_events (\n  sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, uri TEXT NOT NULL, event TEXT NOT NULL\n);\nCREATE INDEX IF NOT EXISTS agent_door_events_uri ON agent_door_events(uri,sequence);\nCREATE TABLE IF NOT EXISTS agent_door_usage (\n  decision_id TEXT PRIMARY KEY, at INTEGER NOT NULL, seed TEXT NOT NULL, specialist TEXT, agent TEXT NOT NULL,\n  classes TEXT NOT NULL\n);\nCREATE INDEX IF NOT EXISTS agent_door_usage_day ON agent_door_usage(at);\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0109_pm_attempt_recovery.sql",
+      "sha256": "ef3e9f959f969fd6d977691e44f1ff4546aeffd394275ff64125f221f398aca7",
+      "sql": "-- Interrupted PM jobs retain their input and reconcile effects before catch-up.\nALTER TABLE gk_automation_jobs ADD COLUMN lease_expires_at INTEGER;\nALTER TABLE gk_automation_jobs ADD COLUMN recovered_by TEXT REFERENCES gk_automation_jobs(id);\nUPDATE gk_automation_jobs SET lease_expires_at=0 WHERE rule_id='pm' AND state='running';\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0110_service_lifecycle_audit.sql",
+      "sha256": "2e039dedb93d520d75e98415479d78c7b551314b04a90210d242168a57539fe9",
+      "sql": "-- Only a live mutation batch supplies this context; no authority survives it.\nCREATE TABLE gk_authority_actor (\n  singleton INTEGER PRIMARY KEY CHECK(singleton=1),\n  actor TEXT NOT NULL,\n  action TEXT NOT NULL,\n  at INTEGER NOT NULL\n);\n\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,\n    (SELECT CASE WHEN o.role='owner' THEN 'owner' ELSE m.role END\n      FROM gk_members m LEFT JOIN oa_operators o ON o.id=m.operator_id WHERE m.id=a.actor),\n    'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0111_service_authority_snapshot.sql",
+      "sha256": "9f7665ced012b523e6440f7b79be2d6db113cb8bb0fb9d21a6a42f3f1360f1cb",
+      "sql": "-- Preserve the authority that authorized the batch before a self-demotion.\nALTER TABLE gk_authority_actor ADD COLUMN role TEXT;\n\nDROP TRIGGER gk_service_invalidation_audit;\nCREATE TRIGGER gk_service_invalidation_audit AFTER UPDATE OF revoked_at ON gk_api_credentials\nWHEN OLD.revoked_at IS NULL AND NEW.revoked_at IS NOT NULL\n  AND EXISTS(SELECT 1 FROM gk_authority_actor WHERE action IN ('operator.role','operator.status','access.role','access.end'))\nBEGIN\n  INSERT INTO gk_audit(at,actor,role,action,subject,detail)\n  SELECT a.at,a.actor,a.role,'service.invalidate',NEW.id,\n    json_object('credential',NEW.id,'issuingOwner',NEW.member_id,'cause',a.action)\n  FROM gk_authority_actor a;\nEND;\n"
+    },
+    {
+      "binding": "DB",
+      "name": "0112_bom_models.sql",
+      "sha256": "3116d7e25ab2f4ba1cd1b2aab063c9f196ad0c520916f627b9626f539b5ede9f",
+      "sql": "-- Preserve existing model-unknown identities and unrestricted historical BOMs.\n-- Model bounds are immutable with their BOM revision, like serial bounds.\nALTER TABLE gk_assets ADD COLUMN model TEXT;\nALTER TABLE gk_bom_lines ADD COLUMN model_from TEXT;\nALTER TABLE gk_bom_lines ADD COLUMN model_to TEXT;\nALTER TABLE gk_bom_alternates ADD COLUMN model_from TEXT;\nALTER TABLE gk_bom_alternates ADD COLUMN model_to TEXT;\n"
     }
   ],
   "compatibilityDate": "2026-09-08",
@@ -698,8 +746,7 @@
     "MAIL_PROVIDER": "",
     "MAIL_FROM": "",
     "MAIL_RELAY_URL": "",
-    "MAIL_ACCOUNT_ID": "",
-    "OWNER_EMAIL": ""
+    "MAIL_ACCOUNT_ID": ""
   },
   "secretNames": [
     "SESSION_SECRET",

@@ -1,3 +1,10 @@
+import { printPackPage, printPreviewPage, printSheetPage } from './ui/print-packs'
+import { paperOriginal, printPackPdf } from './print-packs'
+import { printError, printText } from './print-catalog'
+import { messagesPage, conversationPage } from './ui/messages'
+import { displayLocale, intakeLanguage, intakeError, intakeCompleteness, languageCookie, type IntakeLanguage } from './languages'
+import { downloadPrivateManual } from './private-file-links'
+import { privateManualLinkPage } from './ui/documents'
 import { recordErasurePage } from './ui/record-erasure'
 import { authorizeOperationalSite } from './site-access'
 import { withSiteAuthority } from './site-context'
@@ -53,7 +60,7 @@ import { ledgerCsv } from './lifecycle'
 import { reconciliationCsv } from './valuation'
 import { Input } from './input'
 import { site } from './site'
-import { evidenceFile } from './work'
+import { evidenceFile, workPageRows, workCsv } from './work'
 import { signatureMark } from './signatures'
 import { commentPhoto } from './comments'
 import { documentFile, jobPack } from './documents'
@@ -84,7 +91,7 @@ import { availabilityPage } from './ui/availability'
 import { badActorsPage } from './ui/bad-actors'
 import { badActorsCsv } from './bad-actors'
 import { templatesPage } from './ui/templates'
-import { accessPage, auditPage, morePage, sitePage } from './ui/settings'
+import { accessPage, auditPage, morePage, sitePage, languagePage } from './ui/settings'
 import { workOrderPage, workPage } from './ui/work'
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
@@ -108,8 +115,10 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
   if (request.method === 'POST' && request.headers.get('origin') !== env.AUTH_ORIGIN) return api ? json({ error: 'invalid_origin' }, 403) : new Response('Forbidden', { status: 403 })
   if (!['GET', 'HEAD', 'POST'].includes(request.method)) return new Response(null, { status: 405, headers: { allow: 'GET, HEAD, POST' } })
   let actor: Actor | null = null
+  let language: IntakeLanguage | undefined
   try {
     actor = await currentActor(env, request)
+    if (publicRequest) language = await intakeLanguage(env,await displayLocale(env,actor,request))
     if (actor?.service && !api) throw new GasketError('service_scope_forbidden', 403)
     const directoryDoor = /^\/api\/gasket\/(?:v1\/)?(?:sites(?:\/[\w-]+)?|site\.(?:create|update|membership))$/.test(url.pathname) || /^\/app\/do\/site\.(?:create|update|membership)$/.test(url.pathname)
     if (actor && !directoryDoor) await authorizeOperationalSite(env, actor, request)
@@ -130,17 +139,17 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
         } catch (error) {
           const { code, status } = failure(error)
           // Intake's single atomic insert either returns its existing keyed receipt or refuses.
-          if(request.headers.get('accept')?.includes(['application', 'json'].join('/'))) return json({error:code,persistence:status < 500 ? 'none' : 'unconfirmed'},status)
+          if(request.headers.get('accept')?.includes(['application', 'json'].join('/'))) return json({error:code,message:intakeError(language!,code),persistence:status < 500 ? 'none' : 'unconfirmed'},status)
           const source = new URL(url); source.searchParams.set('target',input.text('target',{optional:true,max:100}))
-          const original = await requestPortalPage(env,actor,source,id)
+          const original = await requestPortalPage(env,actor,source,id,request)
           const receipt = `/request/${id}/received/${encodeURIComponent(input.text('submissionKey',{optional:true,max:100}))}`
-          const message = `Save failed: ${describeError(code)} ${status < 500 ? 'Nothing was saved by this submission.' : 'Check the receipt before retrying.'}`
-          const recovered = await failedForm(original,url.pathname,input,message,receipt,status < 500,status)
+          const message = language!.text('failed',{detail:intakeError(language!,code)}) + ' ' + language!.text(status < 500 ? 'nothingSaved' : 'unconfirmed')
+          const recovered = await failedForm(original,url.pathname,input,message,receipt,status < 500,status,language)
           if (recovered) return recovered
           throw error
         }
       }
-      return key ? await requestReceiptPage(env,url,id,key) : await requestPortalPage(env,actor,url,id)
+      return key ? await requestReceiptPage(env,url,id,key,request,actor) : await requestPortalPage(env,actor,url,id,request)
     }
     if (!actor) {
       if (api) return json({ error: 'authentication_required' }, 401)
@@ -154,8 +163,31 @@ export async function gasketResponse(request: Request, original: Bindings): Prom
     return await withSiteAuthority(actor, () => pageResponse(env, actor!, request, url))
   } catch (error) {
     const { code, status, detail } = failure(error)
-    if (api || (publicRequest && request.headers.get('accept')?.includes(['application', 'json'].join('/')))) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
-    if (code === 'site_not_found' || code === 'site_not_operational') return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+    if (publicRequest) {
+      language ??= await intakeLanguage(env,await displayLocale(env,null,request))
+      if (request.headers.get('accept')?.includes(['application','json'].join('/'))) return json({error:code,message:intakeError(language,code)},status)
+      const t=language.text
+      return languageCookie(await page(env,t('error_title'),null,h`<h1>${t('error_title')}</h1><p role="alert">${intakeError(language,code)}</p><p><a href="/request/${publicRequest[1]}">${t('back')}</a></p>`,{url,status,language}),request,actor)
+    }
+    // Refused site selections never render a feature page or its primary-site shell.
+    if (code === 'site_not_found' || code === 'site_not_operational') {
+      if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
+      return new Response('Site access unavailable', { status, headers: { 'content-type': ['text', 'plain'].join('/') + '; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+    }
+    if (/print-packs|print-previews|printpack[.]/.test(url.pathname)) {
+      const locale=await displayLocale(env,actor,request), message=printError(locale,code)
+      if(api)return json({error:code,message},status)
+      return page(env,printText(locale)('title'),actor,h`<h1>${printText(locale)('title')}</h1><p role="alert">${message}</p>`,{url,status,language:await intakeLanguage(env,locale)})
+    }
+    if (api) return json({ error: code, ...(detail === undefined ? {} : { detail }) }, status)
+    if (code === 'work_snapshot_changed' || code === 'work_export_limit_exceeded') {
+      const restart = new URLSearchParams([...url.searchParams].filter(([key]) => ['state', 'mine', 'team', 'tab', 'limit', 'all'].includes(key)))
+      const limits = detail as { total?: number; limit?: number } | undefined
+      const message = code === 'work_snapshot_changed'
+        ? 'Work changed while this list or download was open. Restart to read a complete current snapshot.'
+        : `The ${limits?.total ?? 'matching'} work orders exceed the selected download limit of ${limits?.limit ?? 2000}. Narrow the work filters and try again.`
+      return page(env, 'Work list needs a restart', actor, h`<h1>Work list needs a restart</h1><p role="alert">${message}</p><p>No partial download was returned. Accepted work and original files are unchanged.</p><p><a class="gk-button gk-secondary" href="/app?${restart.toString()}">Restart work list</a></p>`, { url, status })
+    }
     if (status === 404) return page(env, 'Not found', actor, h`<h1>Not found</h1><p>There is nothing here you can open.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status: 404 })
     return page(env, 'That did not work', actor, h`<h1>That did not work</h1><p>${code.replace(/_/g, ' ')}.</p><p><a class="gk-button gk-secondary" href="/app">Back to work</a></p>`, { status })
   }
@@ -191,6 +223,17 @@ async function apiResponse(env: Bindings, actor: Actor, request: Request, url: U
     if (download) return await ({ documents: documentFile, evidence: evidenceFile, 'signature-marks': signatureMark, 'part-photos': partPhoto, 'comment-photos': commentPhoto }[download[1]]!)(env, actor, download[2])
   }
   if (versioned && ['assets', 'work', 'parts'].includes(path)) return json(await apiEstate(env, actor, path, url))
+  if (path === 'work') {
+    const result = await workPageRows(env, actor, url)
+    const response = json(result.rows)
+    response.headers.set('x-total-count', String(result.total))
+    if (result.next) {
+      response.headers.set('x-next-cursor', result.next)
+      const next = new URL(url); next.searchParams.set('cursor', result.next)
+      response.headers.set('link', `<${next.pathname}${next.search}>; rel="next"`)
+    }
+    return response
+  }
   const { view, id } = route(path)
   return json(await view(env, actor, id, url))
 }
@@ -220,11 +263,16 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
     const receipt = `/app/save-receipts/${id}`
     const claimed = await beginSave(env, actor, id, name!)
     try {
-      if (!claimed) throw new GasketError('save_already_attempted', 409)
+      if (!claimed) {
+        if (!['printpack.preview','printpack.accept'].includes(name!)) throw new GasketError('save_already_attempted', 409)
+        // A durable paper retry cannot borrow a different member's receipt or a different action.
+        const prior = await readSave(env, actor, id)
+        if (prior.action !== name) throw new GasketError('save_already_attempted', 409)
+      }
       const result = await action(saveBindings(env, id), actor, input, request) as { id?: string; job?: string } | Response | null
       if (result instanceof Response) { await finishSave(env, id, 'saved'); return result }
       const destination = returnTo.replace('{id}', encodeURIComponent(result?.id ?? ''))
-      const notice = name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.'
+      const notice = name?.startsWith('printpack.') ? printText(await displayLocale(env,actor,request))('saved') : name === 'automation.catchup' ? 'Catch-up execution recorded. Check its outcome below.' : name === 'workorders.generate' ? created(result) : name === 'workorders.fromTemplate' ? raised(result) : 'Saved.'
       await finishSave(env, id, 'saved', destination)
       if (enhanced) return json({ saved: true, destination, notice, receipt })
       return redirect(destination, 'notice', notice)
@@ -232,7 +280,8 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
       const { code, status } = failure(error)
       if (claimed) await finishSave(env, id, 'failed')
       const outcome = await readSave(env, actor, id)
-      const message = `Save failed: ${describeError(code)} ${saveMessage(outcome)}`
+      const printLocale=name?.startsWith('printpack.') ? await displayLocale(env,actor,request) : null
+      const message = printLocale ? printError(printLocale,code) + ' ' + printText(printLocale)(outcome.batches ? 'unconfirmed':'none') : `Save failed: ${describeError(code)} ${saveMessage(outcome)}`
       const retry = outcome.state === 'failed' && outcome.batches === 0
       if (enhanced) return json({ saved: false, error: message, receipt, retry, nextSaveId: retry ? newId() : null }, status)
       if (!input.has('__gk_save') && !request.headers.has('referer') && status < 500) return redirect(returnTo.replace('/{id}', ''), 'error', code)
@@ -240,7 +289,7 @@ async function pageResponse(env: Bindings, actor: Actor, request: Request, url: 
       const source = referer.origin === url.origin && (referer.pathname === '/app' || referer.pathname.startsWith('/app/')) ? referer : new URL('/app', url.origin)
       try {
         const original = await pageResponse(env, actor, new Request(source), source)
-        const recovered = await failedForm(original, path, input, message, receipt, retry, status)
+        const recovered = await failedForm(original, path, input, message, receipt, retry, status, printLocale ? await intakeLanguage(env,printLocale) : undefined)
         if (recovered) return recovered
       } catch { /* A changed permission must not render a now-forbidden source page. */ }
       return page(env, 'Save failed', actor, h`<h1>Save failed</h1>${await retainedForm(path,input,message,receipt,retry)}`, { status })
@@ -268,6 +317,13 @@ const guarded = (allowed: (actor: Actor) => boolean, render: Page): Page => asyn
 }
 
 const pages: Record<string, Page> = {
+  printSheet:printSheetPage, printPack:printPackPage, printPreview:printPreviewPage, printPackPdf:(env,actor,_url,id)=>printPackPdf(env,actor,id), paperOriginal:(env,actor,_url,id)=>paperOriginal(env,actor,id),
+  messages: messagesPage, conversation: conversationPage,
+  workCsv: async (env, actor, url) => new Response(await workCsv(env, actor, url), { headers: { 'content-type': ['text', 'csv'].join('/') + '; charset=utf-8', 'content-disposition': 'attachment; filename=work.csv', 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff' } }),
+  language:languagePage,
+  languageCatalog:async(env,actor)=>new Response(JSON.stringify(await intakeCompleteness(env,actor),null,2),{headers:{'content-type':['application','json'].join('/'),'cache-control':'private, no-store','content-disposition':'attachment; filename=intake-catalog-completeness.json','x-content-type-options':'nosniff'}}),
+  privateManualLink: privateManualLinkPage,
+  privateManualFile: (env, actor, url, id) => downloadPrivateManual(env, actor, id, url),
   spreadsheetReconciliation: reconciliationPage,
   spreadsheetTemplate: guarded(actor=>can(actor,'import.run'),async(_env,_actor,_url,id)=>{
     const [kind,format]=id.split('.') as [SheetKind,'csv'|'xls'|'xlsx']

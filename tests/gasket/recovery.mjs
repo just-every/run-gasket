@@ -1,3 +1,4 @@
+import { printPackFixture, paperPayload } from './print-packs.mjs'
 import { erasureFixture, eraseFixture } from './record-erasure.mjs'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
@@ -43,7 +44,18 @@ export async function recoveryJourney() {
     const lead = await h.signIn('synthetic-gasket-recovery@example.test')
     await h.api('recovery', lead, undefined, 403)
     await h.api('recovery.drill', lead, { receipt: 'synthetic-gasket-1', confirm: true }, 403)
-    const asset = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-recovery', name: 'Recovery pump', location: 'Plant' })).id
+    const asset = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-recovery', name: 'Recovery pump', serial: 'R-150', model: 'P-150', location: 'Plant' })).id
+    await h.submit('asset.update', lead, { asset, revision: 1, tag: 'synthetic-gasket-recovery', name: 'Recovery pump', serial: 'R-150', model: 'P-175', location: 'Plant' }, `/app/assets/${asset}`)
+    const bearing = (await h.api('part.create', lead, { number: 'synthetic-gasket-bearing', name: 'Recovery bearing', unit: 'each' })).id
+    const alternate = (await h.api('part.create', lead, { number: 'synthetic-gasket-alternate', name: 'Recovery substitute', unit: 'each' })).id
+    await h.api('part.receive', lead, { part: alternate, quantity: '3' })
+    const applicability = { asset, part: [bearing], quantity: ['1'], serialFrom: ['R-100'], serialTo: ['R-199'], modelFrom: ['P-100'], modelTo: ['P-199'], alternateFor: [bearing], alternate: [alternate], alternateFrom: ['R-100'], alternateTo: ['R-199'], alternateModelFrom: ['P-100'], alternateModelTo: ['P-199'], tool: ['Bearing puller'] }
+    await h.api('bom.revise', lead, { ...applicability, note: 'Original model approval' })
+    await h.api('bom.revise', lead, { ...applicability, revision: 1, quantity: ['2'], note: 'Two bearings per repair' })
+    const modelFacts = async (client, signed) => {
+      const row = await client.api(`assets/${asset}`, signed)
+      return { model: row.model, serial: row.serial, versions: row.versions, bom: row.bom }
+    }
     const checklist = (await h.api('checklist.create', owner, { name: 'Recovery inspection', items: ['Listen for noise'] })).id
     const today = (await h.api('me', owner)).today
     const member=(await h.api('me',owner)).id
@@ -61,6 +73,15 @@ export async function recoveryJourney() {
     await h.api('planning.retire',owner,{kind:'tool',id:resourceTool,reason:'Gauge withdrawn before backup',revision:(await h.api('planning',owner)).revision})
     const retiredResources=(await h.api('planning',owner)).retired
     const recoveryLead=(await h.api('members',owner)).find(m=>m.role==='lead').id
+    const direct=(await h.api('conversation.start',owner,{member:recoveryLead})).id
+    const directSubmission={conversation:direct,submissionKey:randomUUID(),body:'synthetic-gasket-recovery-message'}
+    const directMessage=(await h.api('message.send',owner,directSubmission)).message
+    await h.api('conversation.read',lead,{conversation:direct,through:directMessage.seq})
+    await h.api('message.send',lead,{conversation:direct,submissionKey:randomUUID(),body:'synthetic-gasket-recovery-reply'})
+    const directOwner=await h.api(`conversations/${direct}`,owner)
+    const directLead=await h.api(`conversations/${direct}`,lead)
+    assert.equal(directOwner.unread,1)
+    assert.equal(directLead.unread,0)
     const stewardship=(await h.api('planning.grant',owner,{grantee:recoveryLead,site:'primary',kind:'tool',target:'',name:'Recovery gauge',revision:0,enabled:true,consent:true,reason:'Maintain the recovery gauge'})).id
     await h.api('schedule.create', owner, { asset, checklist, title: 'Recovery PM', everyDays: 30, firstDue: today })
     const credential = await h.api('service.create', owner, { name: 'Synthetic recovery service', scopes: ['assets:read'], expiresAt: Date.now() + 30 * 86400_000, consent: true })
@@ -70,15 +91,31 @@ export async function recoveryJourney() {
     const subscription = await h.api('webhook.subscribe', owner, { name: 'Recovery receiver', endpoint: 'https://receiver.example.test/recovery', events: ['work.changed'] })
     await h.api('webhook.control', owner, { subscription: subscription.id, revision: 1, paused: false, reason: 'Receiver confirmed' })
     const accepted = await h.api('workorder.create', owner, { asset, title: 'Accepted before backup', due: today, assignee: (await h.api('me', owner)).id })
+    await h.api('workorder.reserve', lead, { workOrder: accepted.id, part: alternate, insteadOf: bearing, quantity: '2' })
+    const retainedModels = await modelFacts(h, owner)
+    assert.deepEqual([retainedModels.model, retainedModels.versions[0].value.model], ['P-175', 'P-150'])
+    assert.deepEqual(retainedModels.bom.revisions.map(row => [row.number, row.createdBy, row.lines[0].model_from, row.alternates[0].model_to]), [[2, 'Recovery lead', 'P-100', 'P-199'], [1, 'Recovery lead', 'P-100', 'P-199']])
     const workPhoto = (await h.api('workorder.evidence', owner, { workOrder: accepted.id, version: 1, file: file('synthetic-gasket-private-photo.png', png, 'image/png') })).evidence
+    const retainedReservations = (await h.api(`work/${accepted.id}`, owner)).reservations
     const portal = (await h.api('request.portal', owner, { name: 'Recovery intake', fields: [] })).id
     const intakeTarget = (await h.api('request.target', owner, { portal, kind: 'asset', asset, name: 'Recovery pump', publishConsent: true })).id
     assert.equal((await h.raw(`/request/${portal}`, { cookie: owner, body: { target: intakeTarget, submissionKey: randomUUID(), description: 'synthetic-gasket-private-fault', urgency: 'normal', contact: 'synthetic-gasket-private-contact', photo: file('request.png', png, 'image/png') } })).status, 303)
     const request = (await h.api('search?kind=request&q=synthetic-gasket-private-fault', owner)).rows[0].id
     const photo = (await h.api(`requests/${request}`, owner)).files[0].id
+    const mismatched = (await h.api('asset.create', owner, { tag: 'synthetic-gasket-mismatch', name: 'Different recovery model', serial: 'R-150', model: 'P-250', location: 'Plant' })).id
+    await h.api('bom.revise', owner, { ...applicability, asset: mismatched })
+    const refusedWork = (await h.api('workorder.create', owner, { asset: mismatched, title: 'Restored model refusal', due: today, assignee: member })).id
     const sourceSchedule = await h.api('schedules', owner)
     const sourceRules = (await h.api('automation' + '/jobs', owner)).rules
+    const paperWork=await printPackFixture(h,owner,member)
+    const paperPack=(await h.api('printpack.issue',owner,{workOrder:paperWork.work,version:1})).id
+    const paperPdf=Buffer.from(await (await h.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:owner})).arrayBuffer())
+    const paperPreview=(await h.api('printpack.preview',owner,paperPayload(paperWork,paperPack,`${today}T00:00`))).id
+    const paperDraft=await h.api(`print-previews/${paperPreview}`,owner)
+    const paperAccept={preview:paperPreview,digest:paperDraft.digest,confirm:true}
+    const paperReceipt=(await h.api('printpack.accept',owner,paperAccept)).receipt
     const erasedRecords=await erasureFixture(h,owner,asset)
+    const paperSnapshot=await h.api(`work/${paperWork.work}`,owner)
     await h.stop()
     const archive = join(h.installation.root, 'exports', 'recovery.rer')
     await interruptExport(h.installation.root, archive)
@@ -96,6 +133,9 @@ export async function recoveryJourney() {
     assert.ok(!bytes.includes(Buffer.from(subscription.secret)), 'the one-time signing key is absent')
     assert.ok(!bytes.includes(Buffer.from(credential.token)), 'service bearer secrets are absent from exports')
     const records = bytes.toString().trim().split('\n').map(line => JSON.parse(line))
+    for(const table of ['gk_print_packs','gk_print_previews','gk_print_entries','gk_conversations','gk_messages','gk_message_reads']) assert.ok(records[0].tables.some(row=>row.name===table),'the archive inventories direct messaging records')
+    const archivedMessages=records.flatMap(record=>record.items??[]).filter(item=>item.kind==='row'&&item.table==='gk_messages')
+    assert.deepEqual(archivedMessages.map(item=>item.row.body).sort(),['synthetic-gasket-recovery-message','synthetic-gasket-recovery-reply'])
     assert.ok(!bytes.includes(Buffer.from(bearerHash)), 'archives exclude the usable bearer verifier as well as its token')
     const credentials = records.flatMap(record => record.items ?? []).filter(item => item.kind === 'row' && item.table === 'gk_api_credentials')
     assert.deepEqual(credentials.map(item=>item.row.id).sort(),[credential.id,erasedRecords.credential.id].sort())
@@ -123,11 +163,30 @@ export async function recoveryJourney() {
       assert.equal((await restored.raw('/setup', { cookie: signed, form: new URLSearchParams({ confirm: 'yes' }) })).status, 303)
       assert.deepEqual(Buffer.from(await (await restored.raw(`/app/request-files/${photo}`, { cookie: signed })).arrayBuffer()), png, 'restored original attachment bytes reconcile')
       assert.equal((await restored.api('service-credentials', signed)).find(row => row.id === credential.id).revoked_at, 0)
+      assert.deepEqual(await modelFacts(restored, signed), retainedModels, 'inactive restore preserves model identity history and both BOM restriction revisions with attribution')
+      assert.deepEqual((await restored.api(`work/${accepted.id}`, signed)).reservations, retainedReservations, 'inactive restore preserves approved substitute commitments')
+      const beforeRefusal = { parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }
+      assert.equal((await restored.api('workorder.reserve', signed, { workOrder: refusedWork, part: alternate, insteadOf: bearing, quantity: '1' }, 409)).error, 'substitute_not_compatible')
+      assert.deepEqual({ parts: await restored.api('parts', signed), work: await restored.api(`work/${refusedWork}`, signed) }, beforeRefusal)
+      console.log('PROBE ASSET-006 inactive restore: rer export and import then authenticated JSON -> model history, BOM restrictions and substitute reservations reconcile; mismatched reservation remains refused without effects')
+
+      assert.equal((await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:owner})).status,303,'source sessions cannot open restored packs')
+      assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-packs/${paperPack}/pack.pdf`,{cookie:signed})).arrayBuffer()),paperPdf,'immutable pack bytes reconcile after inactive restore')
+      assert.deepEqual(Buffer.from(await (await restored.raw(`/app/print-previews/${paperPreview}/original`,{cookie:signed})).arrayBuffer()),png,'the original paper bytes and digest reconcile')
+      assert.deepEqual((await restored.api('printpack.accept',signed,paperAccept)).receipt,paperReceipt,'durable receipt survives restore and makes a replay inert')
+      assert.deepEqual(await restored.api(`work/${paperWork.work}`,signed),paperSnapshot,'restore and replay duplicate no result or original')
       const restoredPlanning=await restored.api('planning',signed)
       const restoredGrant=(await restored.api('resource-records',signed)).grants.find(g=>g.id===stewardship)
       assert.equal(restoredGrant.active,0,'restoring an archive never reactivates stewardship')
       assert.equal(restoredGrant.effective,0)
       const restoredLead=await restored.signIn((await restored.api('members',signed)).find(m=>m.id===recoveryLead).email)
+      assert.equal((await restored.raw(`/api/gasket/conversations/${direct}`,{cookie:owner})).status,401,'a source session cannot read restored messages')
+      assert.deepEqual(await restored.api(`conversations/${direct}`,signed),directOwner,'restored originals and owner unread state reconcile')
+      assert.deepEqual(await restored.api(`conversations/${direct}`,restoredLead),directLead,'each participant keeps their independent read marker')
+      const restoredReplay=await restored.api('message.send',signed,directSubmission)
+      assert.equal(restoredReplay.replayed,true)
+      assert.deepEqual(restoredReplay.message,directMessage,'restoration preserves durable submission identity without a second message')
+      assert.equal((await restored.api('audit?action=message.send',signed)).rows.length,2)
       await restored.api('planning.tool',restoredLead,{name:'Recovery gauge',identifier:'synthetic-gasket-restore-denied',calibrationDue:'2099-12-31',revision:restoredPlanning.revision},403)
       assert.deepEqual(restoredPlanning.retired,retiredResources,'retired evidence and attribution reconcile after empty restore')
       assert.deepEqual((await restored.api(`/automation/jobs?job=${expiryJob.job}`,signed)).input.qualificationReminders,reminderEvidence,'qualification reminder inputs survive retirement and inactive empty restore')
@@ -178,7 +237,7 @@ export async function recoveryJourney() {
       assert.equal(restored.mails.length, mailCount, 'restored jobs send no mail')
       if (process.env.GASKET_RECOVERY_SCREENSHOTS) {
         const { chromium } = await import('@playwright/test')
-        const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain','--password-store=basic'] })
+        const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
         try {
           for (const width of [1440,390]) {
             const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
@@ -204,6 +263,8 @@ export async function recoveryJourney() {
       const unchanged = await harness({ vars: h.vars, installation: target })
       try {
         const stillOwner = await unchanged.signIn(h.vars.OWNER_EMAIL)
+        assert.deepEqual((await unchanged.api('printpack.accept',stillOwner,paperAccept)).receipt,paperReceipt,'paper receipt remains durable after restored Worker restart')
+        assert.deepEqual(await unchanged.api(`conversations/${direct}`,stillOwner),directOwner,'restored messaging remains durable after another Worker restart')
         assert.deepEqual(await unchanged.api('work?state=open', stillOwner), before, 'nonempty refusal writes no work')
         assert.deepEqual(await unchanged.api('schedules', stillOwner), schedules, 'nonempty refusal changes no PMs')
       } finally { await unchanged.close() }
@@ -211,6 +272,7 @@ export async function recoveryJourney() {
     let source = await harness({ vars: h.vars, installation: h.installation })
     try {
       const signed = await source.signIn(h.vars.OWNER_EMAIL)
+      assert.deepEqual(await source.api(`conversations/${direct}`,signed),directOwner,'export leaves source messages and read state unchanged')
       assert.equal((await source.raw('/api/gasket/v1/assets', { headers: { authorization: `Bearer ${credential.token}` } })).status, 200, 'export leaves the source credential active')
       const backup = await source.api('recovery', signed)
       assert.equal(backup.backup.kind, 'backup')
@@ -311,7 +373,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) await recoveryJourney()
 
 export async function backupBrowser(h, cookie) {
   const { chromium } = await import('@playwright/test')
-  const browser = await chromium.launch({ headless: true, args: ['--use-mock-keychain','--password-store=basic'] })
+  const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
   try {
     for (const width of [1440,390]) {
       const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })

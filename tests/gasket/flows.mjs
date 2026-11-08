@@ -1,3 +1,8 @@
+import { printPacksJourney } from './print-packs.mjs'
+import { messagesJourney } from './messages.mjs'
+import { workPaginationJourney } from './work-pagination.mjs'
+import { languageJourney } from './languages.mjs'
+import { privateFileLinksJourney } from './private-file-links.mjs'
 import { siteAccessJourney } from './site-access.mjs'
 import { reportSchedulesJourney } from './report-schedules.mjs'
 import { genericMigrationJourney } from './generic-migration.mjs'
@@ -12,8 +17,10 @@ import { workPdfJourney } from './work-pdf.mjs'
 import { costingJourney } from './work-costing.mjs'
 import { laborJourney } from './labor-costs.mjs'
 import { outcomeJourney } from './outcomes.mjs'
+import { agentOutcomePolicyJourney } from './agent-outcome-policy.mjs'
 import { agentRunJourney } from './agent-runs.mjs'
 import { intervalJourney } from './intervals.mjs'
+import { conditionalWorkspaceJourney } from './intervals-browser.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
 import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
 const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued !== null) process.exit(queued)
@@ -22,6 +29,8 @@ const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued
 // Worker with real local D1. No provider is involved; all people are invented.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
+import { mkdir } from 'node:fs/promises'
+import { chromium } from '@playwright/test'
 import { join } from 'node:path'
 import { crc32 } from 'node:zlib'
 import { API_DOORS, PAGE_DOORS } from '../../src/gasket/doors.ts'
@@ -29,6 +38,7 @@ import { assetsCsv, historyAssetsCsv, laterWorkCsv, partsCsv, png, readingsCsv, 
 import { file, harness, exerciseKeyedActions, assertDocumented } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney, connectorJourney } from './automation.mjs'
+import { pmInterruptionJourney } from './pm-interruption.mjs'
 import { replenishmentJourney } from './replenishment.mjs'
 import { receivingJourney } from './receiving.mjs'
 import { workReturnsJourney } from './work-returns.mjs'
@@ -42,19 +52,25 @@ import { vendorFollowUpJourney } from './vendor-follow-up.mjs'
 import { now, zone } from './clock.mjs'
 
 // Standalone journeys own their installations; core retains its shared fixture
-// and complete archive reconciliation in their original order.
+// and complete archive reconciliation in their original order. The policy outcome
+// journey repeats the complete outcome fixture; use the lighter workspace shard
+// so reports keeps its required report-pack, PDF and retention journeys in budget.
+const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
-  [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
-  [genericMigrationJourney,'inventory'],
-  [safetyJourney,'inventory'],
-  [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
-  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [connectorJourney, 'automation'],
-  [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
+  [printPacksJourney, 'inventory-1'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory-2'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
+  [languageJourney, 'reports'],
+  [privateFileLinksJourney, 'automation'],
+  [requiredMigrationJourney,'inventory-1'],
+  [safetyJourney,'inventory-3'],
+  [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory-3'],
+  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
+  [workReturnsJourney, 'inventory-3'], [replenishmentJourney, 'inventory-2'], [vendorFollowUpJourney, 'inventory-2'],
+  [conditionalWorkspaceJourney, 'workspace'],
+  [outcomeJourney, 'reports'], [agentOutcomePolicyJourney, 'workspace'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
-assert.ok(['all', 'core', 'automation', 'inventory', 'reports'].includes(shard), `Unknown flows shard: ${shard}`)
+assert.ok(['all', 'core', 'automation', 'inventory-1', 'inventory-2', 'inventory-3', 'reports', 'workspace'].includes(shard), `Unknown flows shard: ${shard}`)
 const h = shard === 'all' || shard === 'core' ? await harness() : null
 let passed = 0
 const check = async (id, run) => {
@@ -87,6 +103,11 @@ const unzip = buffer => {
 }
 
 try {
+  await check('Controlled print packs and authenticated paper entry', printPacksJourney)
+  await check('Retained direct messages and participant authority', messagesJourney)
+  await check('Complete authorized work pages and bounded CSV', workPaginationJourney)
+  await check('Intake language preferences and localized capture', languageJourney)
+  await check('Private manual links retain session and revision boundaries', privateFileLinksJourney)
   await check('Versioned API paging and durable write retries', apiJourney)
   await check('Isolation evidence and portable compliance pack',safetyJourney)
   await check('Qualification expiry and resource booking constraints',qualificationPlanningJourney)
@@ -217,12 +238,39 @@ try {
     assert.equal((await h.api('work?mine=1', cookie.mo)).length, 0)
     await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.mo })
     assert.equal((await h.api('work?mine=1', cookie.mo))[0].id, ids.pm)
-    await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.agent }, 409)
-    await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.sam }, 409)
+    assert.equal((await h.api('work?mine=1', cookie.max)).length, 0)
+    const email = ['synthetic-gasket-26', 'example.test'].join(String.fromCharCode(64))
+    const ended = (await h.api('access.give', cookie.owner, { name: 'Synthetic Gasket maintainer', email, role: 'maintainer' })).id
+    const endedCookie = await h.signIn(email)
+    assert.equal((await h.api('me', endedCookie)).role, 'maintainer')
+    const active = (await h.api('members', cookie.owner)).find(person => person.id === ended)
+    assert.deepEqual([active.role, active.status], ['maintainer', 'active'])
+    assert.ok((await (await h.raw(`/app/work/${ids.pm}`, { cookie: cookie.lead })).text()).includes(`value="${ended}"`), 'the active maintainer is offered for assignment')
+    await h.api('access.end', cookie.owner, { member: ended })
+    const people = await h.api('members', cookie.owner)
+    assert.deepEqual([people.find(person => person.id === ended).role, people.find(person => person.id === ended).status], ['maintainer', 'ended'])
+    const unknown = 'synthetic-gasket-26-unknown'
+    assert.ok(!people.some(person => person.id === unknown), 'the unknown assignee has no membership')
+    const assignment = async () => {
+      const order = await wo('lead', ids.pm)
+      return {
+        work: { id: order.id, number: order.number, asset: order.asset_id, kind: order.kind, title: order.title, status: order.status, assignee: order.assignee_id, version: order.version, handoffs: order.crew.handoffs },
+        max: await h.api('work?mine=1', cookie.max),
+        mo: await h.api('work?mine=1', cookie.mo),
+      }
+    }
+    const beforeRefusal = await assignment()
+    assert.equal(beforeRefusal.work.assignee, ids.mo)
+    assert.deepEqual(beforeRefusal.work.handoffs.map(row => [row.from, row.to]), [['Max Ortiz', 'Mo Haddad']])
+    for (const [reason, assignee] of [['ended member', ended], ['unknown person', unknown], ['agent', ids.agent], ['supervisor', ids.sam]]) {
+      const refused = await h.api('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee }, 409)
+      assert.equal(refused.error, 'assignee_not_assignable', reason)
+      assert.deepEqual(await assignment(), beforeRefusal, `${reason} refusal preserves work identity, assignee, version, handoffs and both queues`)
+    }
     await h.api('workorder.assign', cookie.max, { workOrder: ids.pm, assignee: ids.max }, 403)
     await h.submit('workorder.assign', cookie.lead, { workOrder: ids.pm, assignee: ids.max }, `/app/work/${ids.pm}`)
     assert.equal((await wo('max', ids.pm)).assignee_id, ids.max)
-    ids.corrective = (await h.api('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Replace fryer thermostat', due: addDays(today, -2), assignee: ids.mo })).id
+    ids.corrective = (await h.submit('workorder.create', cookie.lead, { asset: ids.fryer, title: 'Replace fryer thermostat', due: addDays(today, -2), assignee: ids.mo }, '/app/work/{id}')).pathname.split('/').pop()
     assert.equal((await wo('mo', ids.corrective)).kind, 'corrective')
     // The Work panel's decision on overdue work: keeping it with its holder is offered first and chosen, the person
     // deciding is never offered to take it, and once decided the panel shows the decision instead of the plans.
@@ -281,7 +329,7 @@ try {
     assert.equal((await h.raw(`/app/evidence/${evidence.id}`)).status, 303, 'evidence is never public')
   })
 
-  await check('GAS-08 parts, downtime and findings', async () => {
+  await check('GAS-08, GAS-14 and GAS-15 parts, downtime and findings', async () => {
     await h.api('workorder.issue', cookie.max, { workOrder: ids.pm, part: ids.drier, quantity: '2' })
     await h.api('workorder.issue', cookie.max, { workOrder: ids.pm, part: ids.drier, quantity: '10' }, 409)
     await h.api('workorder.return', cookie.max, { workOrder: ids.pm, part: ids.drier, quantity: '1' })
@@ -309,7 +357,7 @@ try {
     const early = await h.api('workorder.submit', cookie.max, { workOrder: ids.pm, version: order.version }, 409)
     assert.equal(early.error, 'not_ready_for_review')
     await h.api('workorder.results', cookie.max, { workOrder: ids.pm, outcome: ['pass', 'pass', 'attention', 'fail'], note: ['', '', 'Light dust, cleaned', 'Loose terminal, tightened'] })
-    // Two non-passing steps and one finding (linked to step 4 in GAS-08): each step needs its own linked finding.
+    // Two non-passing steps and one finding (linked to step 4 in GAS-15): each step needs its own linked finding.
     order = await wo('max', ids.pm)
     assert.equal(order.missing.length, 1)
     assert.match(order.missing[0], /^step 3\b/)
@@ -358,15 +406,117 @@ try {
 
   await check('GAS-10 overdue and downtime board', async () => {
     await h.api('downtime.start', cookie.mo, { workOrder: ids.corrective, startedOn: ago(100), reason: 'Thermostat failed' })
-    const board = await h.api('board', cookie.sam)
-    assert.ok(board.overdue.some(row => row.id === ids.corrective), 'the corrective work due two days ago is overdue')
-    assert.ok(board.followUps.some(row => row.id === ids.followUp))
-    assert.ok(board.down.some(row => row.asset_id === ids.fryer))
-    assert.equal(board.downtime.find(row => row.asset_id === ids.compressor).minutes, 31)
-    assert.ok(board.lowParts.some(part => part.id === ids.drier), 'three filter driers are below the minimum of four')
-    assert.ok(!board.lowParts.some(part => part.id === ids.oilPart))
+    for (const role of ['lead', 'sam']) {
+      const board = await h.api('board', cookie[role])
+      assert.ok(board.overdue.some(row => row.id === ids.corrective), 'the corrective work due two days ago is overdue')
+      assert.ok(board.followUps.some(row => row.id === ids.followUp))
+      assert.ok(board.down.some(row => row.asset_id === ids.fryer))
+      assert.equal(board.downtime.find(row => row.asset_id === ids.compressor).minutes, 31)
+      assert.ok(board.lowParts.some(part => part.id === ids.drier), 'three filter driers are below the minimum of four')
+      assert.ok(!board.lowParts.some(part => part.id === ids.oilPart))
+    }
     await h.api('board', cookie.max, undefined, 403)
     assert.match(await (await h.raw('/app/board', { cookie: cookie.lead })).text(), /Twin fryer/)
+
+    // A separate persisted installation keeps historic outages out of the other
+    // core journeys. Freeze the emitted Worker's clock for exact elapsed totals.
+    const instant = now(), wallNow = localAt(instant), day = wallNow.slice(0, 10)
+    const windowStart = `${addDays(day, -30)}T00:00`
+    const at = (days, time) => `${addDays(day, days)}T${time}`
+    // Parse the submitted wall-clock timestamps independently of board helpers.
+    const minutes = (from, to) => (Date.parse(`${to}:00Z`) - Date.parse(`${from}:00Z`)) / 60_000
+    const isolated = await harness({ clockInstant: instant })
+    try {
+      const owner = await isolated.owner(), people = {}, sessions = {}
+      await isolated.api('site.configure', owner, { name: 'Downtime window workshop', timezone: zone })
+      for (const role of ['lead', 'supervisor', 'maintainer']) {
+        const email = [`board-${role}`, 'example.test'].join('@')
+        people[role] = (await isolated.api('access.give', owner, { name: `Board ${role}`, email, role })).id
+        sessions[role] = await isolated.signIn(email)
+      }
+      const assets = {}, jobs = {}, sources = {}
+      for (const [key, name] of [['expired', 'Expired outage pump'], ['closed', 'Window crossing compressor'], ['open', 'Open outage fan'], ['longOpen', 'Historic open mixer']]) {
+        assets[key] = (await isolated.api('asset.create', sessions.lead, { tag: `BOARD-${key}`, name, location: 'Window workshop' })).id
+        jobs[key] = (await isolated.api('workorder.create', sessions.lead, { asset: assets[key], title: name, due: addDays(day, -1), assignee: people.maintainer })).id
+        sources[key] = []
+      }
+      const outage = async (key, startedOn, endedOn) => {
+        const { downtime } = await isolated.api('downtime.start', sessions.maintainer, { workOrder: jobs[key], startedOn, reason: `Recorded ${key} outage` })
+        if (endedOn) await isolated.api('downtime.end', sessions.maintainer, { workOrder: jobs[key], endedOn })
+        sources[key].push({ id: downtime, startedOn, endedOn: endedOn ?? null })
+      }
+      await outage('expired', at(-40, '09:10'), at(-38, '10:40'))
+      await outage('closed', at(-40, '08:05'), at(-39, '09:35'))
+      await outage('closed', at(-31, '23:15'), at(-29, '01:25'))
+      await outage('closed', at(-5, '09:10'), at(-5, '11:40'))
+      await outage('open', at(-2, '10:15'))
+      await outage('longOpen', at(-32, '18:35'))
+      // The public work detail proves these are original persisted timestamps,
+      // including excluded history and NULL ends, rather than report fixtures.
+      for (const key of Object.keys(assets)) {
+        const work = await isolated.api(`work/${jobs[key]}`, sessions.maintainer)
+        assert.deepEqual(work.downtime.map(row => [row.id, row.started_on, row.ended_on]).sort(), sources[key].map(row => [row.id, row.startedOn, row.endedOn]).sort())
+        assert.deepEqual(work.downtime.map(row => [row.id, row.minutes]).sort(), sources[key].map(row => [row.id, row.endedOn ? minutes(row.startedOn, row.endedOn) : null]).sort(), 'source records retain full closed durations and unended outages')
+      }
+      const expected = [
+        { asset_id: assets.closed, minutes: minutes(windowStart, sources.closed[1].endedOn) + minutes(sources.closed[2].startedOn, sources.closed[2].endedOn), events: 2 },
+        { asset_id: assets.open, minutes: minutes(sources.open[0].startedOn, wallNow), events: 1 },
+        { asset_id: assets.longOpen, minutes: minutes(windowStart, wallNow), events: 1 },
+      ].sort((a, b) => b.minutes - a.minutes)
+      const expectedDown = ['open', 'longOpen'].map(key => ({ asset_id: assets[key], minutesSoFar: minutes(sources[key][0].startedOn, wallNow) })).sort((a, b) => a.asset_id.localeCompare(b.asset_id))
+
+      // Populate the existing board's other categories, including a real
+      // submitted order, without disturbing the historic outage source rows.
+      const submitted = (await isolated.api('workorder.create', sessions.lead, { asset: assets.closed, title: 'Ready for independent review', due: day, assignee: people.maintainer })).id
+      await isolated.api('workorder.submit', sessions.maintainer, { workOrder: submitted, version: (await isolated.api(`work/${submitted}`, sessions.maintainer)).version })
+      const finding = await isolated.api('finding.record', sessions.maintainer, { workOrder: jobs.open, severity: 'high', text: 'Fan bearing needs corrective work', followUp: true })
+      const part = (await isolated.api('part.create', sessions.lead, { number: 'BOARD-BEARING', name: 'Replacement fan bearing', unit: 'each', minimum: '2' })).id
+      for (const role of ['lead', 'supervisor']) {
+        const view = await isolated.api('board', sessions[role])
+        assert.equal(view.since, windowStart.slice(0, 10))
+        assert.deepEqual(view.downtime.map(({ asset_id, minutes, events }) => ({ asset_id, minutes, events })), expected, `${role}: expired history excluded, closed and open outages clipped, totals and event counts reconciled`)
+        assert.deepEqual(view.down.map(({ asset_id, minutesSoFar }) => ({ asset_id, minutesSoFar })).sort((a, b) => a.asset_id.localeCompare(b.asset_id)), expectedDown, `${role}: down-now elapsed time retains the full open outage`)
+        assert.deepEqual(view.overdue.map(row => row.id).sort(), Object.values(jobs).sort())
+        assert.deepEqual(view.awaitingReview.map(row => row.id), [submitted])
+        assert.deepEqual(view.followUps.map(row => row.id), [finding.followUp])
+        assert.deepEqual(view.lowParts.map(row => row.id), [part])
+      }
+      await isolated.api('board', sessions.maintainer, undefined, 403)
+      assert.equal((await isolated.raw('/app/board', { cookie: sessions.maintainer })).status, 403)
+
+      const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+      try {
+        for (const role of ['lead', 'supervisor']) {
+          const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 1100 } })
+          await context.addCookies(sessions[role].split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: isolated.origin } }))
+          const page = await context.newPage()
+          assert.equal((await page.goto(`${isolated.origin}/app/board`)).status(), 200)
+          const displayed = await page.locator('#downtime tbody tr').evaluateAll(rows => rows.map(row => ({
+            asset_id: row.querySelector('a').getAttribute('href').split('/').pop(),
+            minutes: Number(row.cells[1].textContent.replace(/,/g, '')),
+            events: Number(row.cells[2].textContent.replace(/,/g, '')),
+          })))
+          assert.deepEqual(displayed, expected, `${role}: the board page shows the calculated minutes and event counts`)
+          const down = await page.locator('#down tbody tr').evaluateAll(rows => rows.map(row => ({
+            asset_id: row.querySelector('a').getAttribute('href').split('/').pop(),
+            minutesSoFar: Number(row.cells[1].querySelector('.gk-sub').textContent.replace(/[^\d]/g, '')),
+          })))
+          assert.deepEqual(down.sort((a, b) => a.asset_id.localeCompare(b.asset_id)), expectedDown, `${role}: the board page shows elapsed open minutes`)
+          assert.deepEqual(await page.locator('.gk-tile-n').allTextContents(), ['4', '1', '1', '2', '1'])
+          assert.ok((await page.locator('#review').innerText()).includes('Ready for independent review'))
+          assert.ok((await page.locator('#follow-ups').innerText()).includes('Fan bearing needs corrective work'))
+          if (role === 'lead') {
+            const directory = process.env.BOARD_SCREENSHOTS || `/tmp/gasket-board-${process.pid}`
+            await mkdir(directory, { recursive: true })
+            for (const width of [1440, 390]) {
+              await page.setViewportSize({ width, height: 1100 })
+              await page.screenshot({ path: `${directory}/downtime-board-${width}.png`, fullPage: true })
+            }
+          }
+          await context.close()
+        }
+      } finally { await browser.close() }
+    } finally { await isolated.close() }
   })
 
   await check('GAS-11 asset history and CSV', async () => {
@@ -1416,18 +1566,27 @@ try {
   })
 
   await check('ASSET-006 bill of materials and interchangeable spares', async () => {
-    const motor = (await h.api('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', location: 'Dock' })).id
+    const registered = await h.submit('asset.create', cookie.lead, { tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', model: 'DRV-150', location: 'Dock' }, '/app/assets/{id}')
+    const motor = registered.pathname.split('/').pop()
+    assert.equal(registered.searchParams.get('error'), null)
+    assert.equal((await h.api(`assets/${motor}`, cookie.lead)).model, 'DRV-150')
+    assert.equal((await h.api('assets', cookie.max)).find(row => row.id === motor).model, 'DRV-150')
     const part = async (number, name, quantity) => { const id = (await h.api('part.create', cookie.lead, { number, name, unit: 'each' })).id; if (quantity) await h.api('part.receive', cookie.lead, { part: id, quantity }); return id }
     const open = await part('BRG-6306', 'Open bearing'), shielded = await part('BRG-6306-ZZ', 'Shielded bearing', '2'), c3 = await part('BRG-6306-C3', 'C3 clearance bearing', '2'), belt = await part('BELT-A42', 'Drive belt A42', '1'), other = await part('BRG-9999', 'Unrelated bearing', '1')
-    const revision = { asset: motor, part: [open, belt], quantity: ['2', '1'], serialFrom: ['', 'M-1000'], serialTo: ['', 'M-1999'], alternateFor: [open, open], alternate: [shielded, c3], alternateFrom: ['', 'M-2000'], alternateTo: ['', 'M-2999'], tool: ['Bearing puller', 'Torque wrench'], note: 'From the OEM manual' }
+    const revision = { asset: motor, part: [open, belt], quantity: ['2', '1'], serialFrom: ['', 'M-1000'], serialTo: ['', 'M-1999'], modelFrom: ['DRV-100', 'DRV-100'], modelTo: ['DRV-199', 'DRV-199'], alternateFor: [open, open], alternate: [shielded, c3], alternateFrom: ['', 'M-2000'], alternateTo: ['', 'M-2999'], alternateModelFrom: ['DRV-100', 'DRV-100'], alternateModelTo: ['DRV-199', 'DRV-199'], tool: ['Bearing puller', 'Torque wrench'], note: 'From the OEM manual' }
     await h.api('bom.revise', cookie.max, revision, 403)
+    assert.equal((await h.api('bom.revise', cookie.temp, revision, 401)).error, 'authentication_required')
+    assert.equal((await h.raw('/api/gasket/bom.revise', { body: revision })).status, 401)
     await h.api('bom.revise', cookie.lead, { ...revision, alternateFor: [belt, other] }, 400)
     await h.api('bom.revise', cookie.lead, { ...revision, serialFrom: ['', 'M-2000'], serialTo: ['', 'M-1000'] }, 400)
+    assert.equal((await h.api('bom.revise', cookie.lead, { ...revision, modelFrom: ['DRV-300', ''], modelTo: ['DRV-100', ''] }, 400)).error, 'invalid_model_range')
+    assert.equal((await h.api('bom.revise', cookie.lead, { ...revision, alternateModelFrom: ['DRV-300', ''], alternateModelTo: ['DRV-100', ''] }, 400)).error, 'invalid_model_range')
     assert.equal((await h.api('bom.revise', cookie.lead, revision)).number, 1)
     await h.api('bom.revise', cookie.lead, { ...revision, revision: 0 }, 409)
     // A second revision through the asset page's form; the first stays on record.
     assert.equal((await h.submit('bom.revise', cookie.lead, { ...revision, quantity: ['2', '2'], note: 'Two belts per drive', revision: '1' }, `/app/assets/${motor}`)).searchParams.get('error'), null)
     const bom = (await h.api(`assets/${motor}`, cookie.max)).bom
+    assert.deepEqual(bom.revisions.map(row => [row.createdBy, row.lines[0].model_from, row.lines[0].model_to, row.alternates[0].model_from]), [['Lena Park', 'DRV-100', 'DRV-199', 'DRV-100'], ['Lena Park', 'DRV-100', 'DRV-199', 'DRV-100']])
     assert.deepEqual([bom.revision, bom.revisions.map(row => [row.number, row.note]), bom.tools], [2, [[2, 'Two belts per drive'], [1, 'From the OEM manual']], ['Bearing puller', 'Torque wrench']])
     assert.deepEqual(bom.lines.map(line => [line.part.number, line.quantity, line.available, line.fits, line.short, line.alternates.map(alt => [alt.part.number, alt.available, alt.fits])]),
       [['BRG-6306', '2', '0', true, true, [['BRG-6306-ZZ', '2', true], ['BRG-6306-C3', '2', false]]], ['BELT-A42', '2', '1', true, true, []]], 'the C3 bearing only fits serials M-2000 to M-2999')
@@ -1442,17 +1601,142 @@ try {
     assert.deepEqual(planned.reservations.map(row => [row.part.number, row.insteadOf.number, row.quantity, row.state]), [['BRG-6306-ZZ', 'BRG-6306', '2', 'open']])
     assert.deepEqual(planned.bom.lines[0].alternates.map(alt => [alt.part.number, alt.available]), [['BRG-6306-ZZ', '0'], ['BRG-6306-C3', '2']])
     // A line restricted to other serials does not fit this motor's twin with a later serial.
-    const twin = (await h.api('asset.create', cookie.lead, { tag: 'HK-061', name: 'Conveyor drive motor 2', serial: 'M-2500', location: 'Dock' })).id
-    await h.api('bom.revise', cookie.lead, { asset: twin, part: [belt], quantity: ['1'], serialFrom: ['M-1000'], serialTo: ['M-1999'] })
+    const twin = (await h.api('asset.create', cookie.lead, { tag: 'HK-061', name: 'Conveyor drive motor 2', serial: 'M-2500', model: 'DRV-150', location: 'Dock' })).id
+    await h.api('bom.revise', cookie.lead, { asset: twin, part: [belt], quantity: ['1'], serialFrom: ['M-1000'], serialTo: ['M-1999'], modelFrom: ['DRV-100'], modelTo: ['DRV-199'] })
     const twinJob = (await h.api('workorder.create', cookie.lead, { asset: twin, title: 'Change the belt', due: addDays(today, 2), assignee: ids.max })).id
     assert.equal((await wo('lead', twinJob)).bom.lines[0].fits, false)
     await h.api('workorder.reserve', cookie.lead, { workOrder: twinJob, part: belt, quantity: '1' }, 409)
+    const unchangedRefusal = async (workOrder, fields, error, status = 409, who = 'lead') => {
+      const before = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+      assert.equal((await h.api('workorder.reserve', cookie[who], { workOrder, ...fields }, status)).error, error)
+      assert.deepEqual({ parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }, before, 'refusal changes neither stock nor work reservations')
+    }
+    await unchangedRefusal(twinJob, { part: belt, quantity: '1' }, 'part_not_compatible')
+    const kit = (await h.api('kit.create', cookie.lead, { name: 'Model-restricted repair kit', part: [other, belt], quantity: ['1', '1'] })).id
+    await unchangedRefusal(twinJob, { kit }, 'part_not_compatible')
+    let modelRefusalPage
+    for (const [tag, model] of [['HK-062', 'DRV-250'], ['HK-063', '']]) {
+      const asset = (await h.api('asset.create', cookie.lead, { tag, name: `Conveyor ${tag}`, serial: 'M-1500', model, location: 'Dock' })).id
+      assert.equal((await h.api(`assets/${asset}`, cookie.max)).model, model || null)
+      const restrictions = { asset, part: [belt], quantity: ['1'], serialFrom: ['M-1000'], serialTo: ['M-1999'], modelFrom: ['DRV-100'], modelTo: ['DRV-199'], alternateFor: [belt], alternate: [c3], alternateModelFrom: ['DRV-100'], alternateModelTo: ['DRV-199'] }
+      await h.api('bom.revise', cookie.lead, restrictions)
+      const workOrder = (await h.api('workorder.create', cookie.lead, { asset, title: 'Check model before reserving', due: today, assignee: ids.max })).id
+      assert.equal((await wo('lead', workOrder)).bom.lines[0].fits, false)
+      assert.equal((await wo('lead', workOrder)).bom.lines[0].alternates[0].fits, false)
+      await unchangedRefusal(workOrder, { part: belt, quantity: '1' }, 'part_not_compatible')
+      await unchangedRefusal(workOrder, { part: c3, insteadOf: belt, quantity: '1' }, 'substitute_not_compatible')
+      await unchangedRefusal(workOrder, { kit }, 'part_not_compatible')
+      await unchangedRefusal(workOrder, { kit, swap: [`${belt}:${c3}`] }, 'substitute_not_compatible')
+      // A planner using the work form must see model applicability in the refusal too.
+      for (const [fields, error] of [[{ part: belt, quantity: '1' }, 'part_not_compatible'], [{ part: c3, insteadOf: belt, quantity: '1' }, 'substitute_not_compatible']]) {
+        const before = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+        const refused = await h.submit('workorder.reserve', cookie.lead, { workOrder, ...fields }, `/app/work/${workOrder}`)
+        assert.equal(refused.searchParams.get('error'), error)
+        const page = await (await h.raw(refused.pathname + refused.search, { cookie: cookie.lead })).text()
+        const alert = page.match(/<p[^>]*role="alert"[^>]*>([^<]*)<\/p>/)?.[1]
+        assert.match(alert ?? '', /model/i, 'a model-incompatible reservation explains model applicability')
+        assert.deepEqual({ parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }, before, 'form refusal changes neither stock nor reservations')
+        if (model) modelRefusalPage = refused.pathname + refused.search
+      }
+      if (!model) {
+        await h.api('bom.revise', cookie.lead, { asset, revision: 1, part: [c3], quantity: ['1'] })
+        await h.api('workorder.reserve', cookie.lead, { workOrder, part: c3, quantity: '1' })
+        assert.equal((await wo('lead', workOrder)).reservations[0].quantity, '1', 'an unrestricted line accepts an unknown model')
+      }
+    }
+    const laterRepair = (await h.api('workorder.create', cookie.lead, { asset: motor, title: 'Recheck current compatibility', due: today, assignee: ids.max })).id
+    const identity = { asset: motor, tag: 'HK-060', name: 'Conveyor drive motor', serial: 'M-1500', model: 'DRV-250', location: 'Dock' }
+    const beforeIdentity = await h.api(`assets/${motor}`, cookie.lead)
+    await h.api('asset.update', cookie.max, { ...identity, revision: beforeIdentity.revision }, 403)
+    assert.deepEqual(await h.api(`assets/${motor}`, cookie.lead), beforeIdentity)
+    assert.equal((await h.submit('asset.update', cookie.lead, { ...identity, revision: beforeIdentity.revision }, `/app/assets/${motor}`)).searchParams.get('error'), null)
+    const changed = await h.api(`assets/${motor}`, cookie.lead)
+    assert.deepEqual([changed.model, changed.versions[0].value.model, changed.versions[0].changed_by], ['DRV-250', 'DRV-150', ids.lead])
+    await unchangedRefusal(laterRepair, { part: shielded, insteadOf: open, quantity: '1' }, 'substitute_not_compatible')
+    await unchangedRefusal(laterRepair, { part: belt, quantity: '1' }, 'part_not_compatible')
+    assert.deepEqual((await wo('lead', repair)).reservations, planned.reservations, 'existing commitments survive identity corrections')
+    await h.api('asset.update', cookie.lead, { ...identity, model: 'DRV-150', revision: changed.revision })
+    const { model: _model, ...olderClient } = identity
+    await h.api('asset.update', cookie.lead, { ...olderClient, revision: (await h.api(`assets/${motor}`, cookie.lead)).revision })
+    assert.equal((await h.api(`assets/${motor}`, cookie.lead)).model, 'DRV-150', 'an older identity client preserves the model when omitted')
+    // A new BOM revision can make a previously compatible substitute incompatible, even with site approval.
+    await h.api('part.substitute', cookie.lead, { part: open, substitute: shielded, reason: 'General bearing approval' })
+    await h.api('bom.revise', cookie.lead, { ...revision, revision: 2, alternateModelFrom: ['DRV-200', 'DRV-100'], alternateModelTo: ['DRV-299', 'DRV-199'], note: 'Shielded model restriction corrected' })
+    await unchangedRefusal(laterRepair, { part: shielded, insteadOf: open, quantity: '1' }, 'substitute_not_compatible')
+    const revised = (await h.api(`assets/${motor}`, cookie.lead)).bom
+    assert.deepEqual(revised.revisions.slice(1), bom.revisions, 'earlier revisions retain their quantities, restrictions, author and time')
+    assert.deepEqual((await wo('lead', repair)).reservations, planned.reservations)
+    await h.api('bom.revise', cookie.lead, { ...revision, revision: 3, quantity: ['2', '2'], note: 'OEM model applicability confirmed' })
+    await unchangedRefusal(laterRepair, { part: shielded, insteadOf: open, quantity: '1' }, 'forbidden', 403, 'max')
+    await h.api('reservation.release', cookie.lead, { reservation: planned.reservations[0].id, reason: 'Replanned with current model confirmation' })
+    await h.api('workorder.reserve', cookie.lead, { workOrder: laterRepair, part: shielded, insteadOf: open, quantity: '2' })
+    assert.deepEqual((await wo('lead', laterRepair)).reservations.map(row => [row.part.id, row.insteadOf.id, row.quantity, row.state]), [[shielded, open, '2', 'open']])
+    await h.api('workorder.reserve', cookie.lead, { workOrder: laterRepair, kit })
+    const kitReservations = (await wo('lead', laterRepair)).reservations.filter(row => row.kit === 'Model-restricted repair kit')
+    assert.deepEqual(kitReservations.map(row => [row.part.id, row.quantity, row.state]).sort(), [[other, '1', 'open'], [belt, '1', 'open']].sort(), 'a compatible kit reserves every line')
+    for (const row of kitReservations) await h.api('reservation.release', cookie.lead, { reservation: row.id, reason: 'Kit compatibility confirmed' })
+    console.log('PROBE ASSET-006 kits: public reservation JSON -> compatible kit reserves every line; serial, model and substitute refusals retain all stock and reservations')
+    console.log('PROBE ASSET-006 models and ranges: public asset forms and JSON -> matching, mismatching and unknown identities retained; both restrictions enforced')
+    console.log('PROBE ASSET-006 reservations: public reservation JSON -> incompatible and newly incompatible requests refused with unchanged stock and work; compatible approved substitute reserved')
+    console.log('PROBE ASSET-006 history: public asset JSON -> previous model identity and immutable BOM revision quantities, restrictions, author and time retained')
     assert.ok((await h.api(`assets/${motor}/history`, cookie.sam)).events.some(event => event.what === 'Bill of materials revision 2 saved: Two belts per drive'))
     const page = await (await h.raw(`/app/assets/${motor}`, { cookie: cookie.lead })).text()
-    for (const text of ['Bill of materials', 'Revision 2', 'Out of stock', 'does not fit this serial', 'Bearing puller', 'Save new revision', 'From the OEM manual']) assert.ok(page.includes(text), text)
+    for (const text of ['Bill of materials', 'Revision 4', 'Out of stock', 'does not fit this serial', 'Bearing puller', 'Save new revision', 'From the OEM manual']) assert.ok(page.includes(text), text)
     assert.ok(!(await (await h.raw(`/app/assets/${motor}`, { cookie: cookie.max })).text()).includes('Save new revision'))
     const work = (await (await h.raw(`/app/work/${twinJob}`, { cookie: cookie.lead })).text()).replace(/<[^>]+>/g, '')
-    for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; this asset is M-2500']) assert.ok(work.includes(text), text)
+    for (const text of ['Bill of materials', 'Does not fit', 'Fits serials M-1000 to M-1999; models DRV-100 to DRV-199; this asset is M-2500, model DRV-150']) assert.ok(work.includes(text), text)
+    // Exercise a BOM-only approval in the real work form, without site-wide approval.
+    await h.api('part.substitute', cookie.lead, { part: open, substitute: shielded, withdraw: true, reason: 'Use asset-specific BOM approval' })
+    await h.api('reservation.release', cookie.lead, { reservation: (await wo('lead', laterRepair)).reservations.find(row => row.part.id === shielded && row.state === 'open').id, reason: 'Reserve through the work page' })
+    const browser = await chromium.launch({ headless: true, ...(process.env.GASKET_CHROMIUM ? { executablePath: process.env.GASKET_CHROMIUM } : {}), args: ['--no-sandbox', '--use-mock-keychain', '--password-store=basic'] })
+    try {
+      for (const width of process.env.GASKET_BOM_SCREENSHOTS ? [1440, 390] : [1440]) {
+        const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width, height: 1000 } })
+        await context.addCookies(cookie.lead.split('; ').map(pair => { const at = pair.indexOf('='); return { name: pair.slice(0, at), value: pair.slice(at + 1), url: h.origin } }))
+        const screen = await context.newPage()
+        for (const [name, path] of [['asset', `/app/assets/${motor}`], ['work', `/app/work/${laterRepair}`], ['model-refusal', modelRefusalPage]]) {
+          await screen.goto(h.origin + path)
+          await screen.locator('#bom').waitFor()
+          await screen.evaluate(async () => { await document.fonts.ready })
+          if (width === 1440) {
+            assert.match(await screen.locator('#bom').innerText(), /models DRV-100 to DRV-199/)
+            assert.match(await screen.locator('#bom').innerText(), new RegExp(`Asset model: ${name === 'model-refusal' ? 'DRV-250' : 'DRV-150'} · Serial: M-1500`), 'planning displays the actual identity alongside its applicable ranges')
+            if (name === 'asset') {
+              assert.equal(await screen.locator('input[name="model"]').inputValue(), 'DRV-150')
+              assert.equal(await screen.locator('input[name="modelFrom"]').first().inputValue(), 'DRV-100')
+              assert.equal(await screen.locator('input[name="alternateModelTo"]').first().inputValue(), 'DRV-199')
+            } else {
+              const workOrder = new URL(path, h.origin).pathname.split('/').pop()
+              const before = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+              const form = screen.locator('form[action="/app/do/workorder.reserve"]').filter({ has: screen.getByRole('button', { name: 'Reserve part', exact: true }) })
+              await form.getByLabel('Part', { exact: true }).selectOption(name === 'work' ? shielded : c3)
+              await form.getByLabel('Instead of', { exact: true }).selectOption(name === 'work' ? open : belt)
+              await form.getByLabel('Quantity', { exact: true }).fill(name === 'work' ? '2' : '1')
+              await Promise.all([screen.waitForURL(url => url.searchParams.has(name === 'work' ? 'notice' : 'error')), form.getByRole('button', { name: 'Reserve part', exact: true }).click()])
+              const after = { parts: await h.api('parts', cookie.lead), work: await wo('lead', workOrder) }
+              if (name === 'work') {
+                assert.deepEqual(after.work.reservations.filter(row => row.state === 'open').map(row => [row.part.id, row.insteadOf.id, row.quantity]), [[shielded, open, '2']], 'the browser can reserve a compatible BOM-only substitute')
+                assert.deepEqual(after.parts.map(row => [row.id, row.onHand]), before.parts.map(row => [row.id, row.onHand]), 'reservation moves no stock')
+                assert.match(await screen.locator('main').innerText(), /Shielded bearing/)
+              } else {
+                const alerts = await screen.getByRole('alert').allTextContents()
+                assert.ok(alerts.length, 'the refused form has a visible alert')
+                for (const alert of alerts) assert.match(alert, /model/i, 'every refusal alert explains model applicability')
+                assert.deepEqual(after, before, 'the browser refuses a model-incompatible BOM substitute without effects')
+              }
+            }
+            assert.equal(await screen.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `${name} fits the desktop`)
+          }
+          if (process.env.GASKET_BOM_SCREENSHOTS) {
+            await mkdir(process.env.GASKET_BOM_SCREENSHOTS, { recursive: true })
+            await screen.screenshot({ path: join(process.env.GASKET_BOM_SCREENSHOTS, `${name}-${width}.png`), fullPage: true })
+          }
+        }
+        await context.close()
+      }
+    } finally { await browser.close() }
+    console.log('PROBE ASSET-006 screens: built asset and work pages -> current model, restrictions, stock, BOM-only substitute selection and model refusal displayed')
+
   })
 
   await check('PLAN-006 comments, mentions and shift handoff', async () => {
@@ -2105,7 +2389,7 @@ try {
     for (const text of ['Inspection routes', 'Cold store round', 'Every 7 days', 'Tools: Probe thermometer', 'incomplete', 'Missed: Room 3 locked for stocktake', '1 follow-up']) assert.ok(page.includes(text), text)
   })
 
-  await check('ASSET-008 gauge calibration with tolerances, tools and certificate versions', async () => {
+  await check('ASSET-010 gauge calibration with tolerances, tools and certificate versions', async () => {
     // A calibration task on a pressure gauge: the procedure's limited number steps are its tolerances, two days' grace after due.
     const gauge = (await h.api('asset.create', cookie.lead, { tag: 'PG-7', name: 'Ammonia line pressure gauge', location: 'Plant room A' })).id
     const wipe = (await h.api('checklist.create', cookie.lead, { name: 'Gauge wipe', items: ['Face clean'] })).id
@@ -2128,8 +2412,17 @@ try {
     let job = await wo('max', first)
     for (const owed of ['step 2 (Mid scale 500 kPa) is outside its limits and needs a linked finding with follow-up work', 'record which Deadweight tester was used', 'the calibration needs its certificate attached']) assert.ok(job.missing.includes(owed), owed)
     const adjust = await h.api('finding.record', cookie.max, { workOrder: first, item: 1, severity: 'medium', text: 'Reads 503.1 kPa at 500: adjust the gauge', followUp: true })
-    await h.api('workorder.evidence', cookie.max, { workOrder: first, file: file('PG-7-cert-1.pdf', '%PDF-1.4 PG-7 as found', 'application/pdf'), certificate: true })
     await h.api('workorder.tool', cookie.max, { workOrder: first, tool: 0, identifier: 'DWT-118' })
+    const withoutCertificate = await wo('max', first)
+    assert.deepEqual(withoutCertificate.missing, ['the calibration needs its certificate attached'], 'the linked corrective work and recorded tool leave only the certificate outstanding')
+    const certificatesBefore = (await calibration()).certificates
+    const refused = await h.api('workorder.submit', cookie.max, { workOrder: first, version: withoutCertificate.version }, 409)
+    assert.deepEqual([refused.error, refused.detail.missing], ['not_ready_for_review', ['the calibration needs its certificate attached']])
+    job = await wo('max', first)
+    const submissionState = work => ({ id: work.id, status: work.status, version: work.version, results: work.items.map(item => item.result), tools: work.tools, findings: work.findings, evidence: work.evidence, calibration: work.calibration, reviews: work.reviews })
+    assert.deepEqual(submissionState(job), submissionState(withoutCertificate), 'refused submission preserves the work revision and all recorded calibration evidence')
+    assert.deepEqual((await calibration()).certificates, certificatesBefore, 'refused submission creates no certificate version')
+    await h.api('workorder.evidence', cookie.max, { workOrder: first, file: file('PG-7-cert-1.pdf', '%PDF-1.4 PG-7 as found', 'application/pdf'), certificate: true })
     job = await wo('max', first)
     assert.deepEqual([job.missing, job.calibration.certificate.filename, job.calibration.overdue_after], [[], 'PG-7-cert-1.pdf', addDays(today, 1)])
     await h.api('workorder.submit', cookie.max, { workOrder: first, version: job.version })
@@ -2269,6 +2562,7 @@ try {
   await check('BUY-002 quotes and numbered purchase orders', async () => { await purchaseOrdersJourney(h, cookie, { ...ids, asset: ids.compressor, work: ids.pm }) })
   await check('PM-009 nested programs', nestedJourney)
   await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
+  await check('PM-008 interrupted PM recovery', pmInterruptionJourney)
   await check('INT-002 signed events and durable connector delivery', connectorJourney)
 
   await check('BUY-001 vendor records and maintenance requisitions', async () => {
@@ -2286,10 +2580,12 @@ try {
   await check('BUY-006 vendor delivery follow-up', vendorFollowUpJourney)
 
   await check('AGENT-004 measured reliability outcomes', outcomeJourney)
+  await check('AGENT-004 company-policy outcome investigations', agentOutcomePolicyJourney)
 
   await check('AGENT-009 granted, budgeted and revocable model runs', agentRunJourney)
 
   await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
+  await check('ADMIN-011 conditional workspace save recovery', conditionalWorkspaceJourney)
 
   await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
 
@@ -2298,7 +2594,7 @@ try {
   await check('REPORT-009 definitions and data quality', async () => { await metricsJourney(h, cookie, ids) })
 
   await check('Weekly report delivery and recipient authorization', reportSchedulesJourney)
-  await check('Spreadsheet migration and source reconciliation', genericMigrationJourney)
+  await check('2,000-row spreadsheet migration and source reconciliation', requiredMigrationJourney)
   await check('REPORT-010 work PDF and bulk ZIP', workPdfJourney)
   let laborContext
   await check('Reviewed person time and protected labor costs', async () => { laborContext = await laborJourney(h,cookie,ids) })
