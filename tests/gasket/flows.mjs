@@ -17,8 +17,10 @@ import { workPdfJourney } from './work-pdf.mjs'
 import { costingJourney } from './work-costing.mjs'
 import { laborJourney } from './labor-costs.mjs'
 import { outcomeJourney } from './outcomes.mjs'
+import { agentOutcomePolicyJourney } from './agent-outcome-policy.mjs'
 import { agentRunJourney } from './agent-runs.mjs'
 import { intervalJourney } from './intervals.mjs'
+import { conditionalWorkspaceJourney } from './intervals-browser.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
 import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
 const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued !== null) process.exit(queued)
@@ -50,22 +52,25 @@ import { vendorFollowUpJourney } from './vendor-follow-up.mjs'
 import { now, zone } from './clock.mjs'
 
 // Standalone journeys own their installations; core retains its shared fixture
-// and complete archive reconciliation in their original order.
+// and complete archive reconciliation in their original order. The policy outcome
+// journey repeats the complete outcome fixture; use the lighter workspace shard
+// so reports keeps its required report-pack, PDF and retention journeys in budget.
 const requiredMigrationJourney=()=>genericMigrationJourney({requiredRows:2_000})
 const independent = new Map([
-  [printPacksJourney, 'inventory'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
+  [printPacksJourney, 'inventory-1'], [messagesJourney, 'automation'], [workPaginationJourney, 'inventory-2'], [apiJourney, 'reports'], [reportSchedulesJourney, 'reports'],
   [languageJourney, 'reports'],
   [privateFileLinksJourney, 'automation'],
-  [requiredMigrationJourney,'inventory'],
-  [safetyJourney,'inventory'],
-  [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory'],
+  [requiredMigrationJourney,'inventory-1'],
+  [safetyJourney,'inventory-3'],
+  [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory-3'],
   [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
-  [workReturnsJourney, 'inventory'], [replenishmentJourney, 'inventory'], [vendorFollowUpJourney, 'inventory'],
-  [outcomeJourney, 'reports'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
+  [workReturnsJourney, 'inventory-3'], [replenishmentJourney, 'inventory-2'], [vendorFollowUpJourney, 'inventory-2'],
+  [conditionalWorkspaceJourney, 'workspace'],
+  [outcomeJourney, 'reports'], [agentOutcomePolicyJourney, 'workspace'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
   [workPdfJourney, 'reports'], [retentionJourney, 'reports'],
 ])
 const shard = process.env.GASKET_FLOWS_SHARD ?? 'all'
-assert.ok(['all', 'core', 'automation', 'inventory', 'reports'].includes(shard), `Unknown flows shard: ${shard}`)
+assert.ok(['all', 'core', 'automation', 'inventory-1', 'inventory-2', 'inventory-3', 'reports', 'workspace'].includes(shard), `Unknown flows shard: ${shard}`)
 const h = shard === 'all' || shard === 'core' ? await harness() : null
 let passed = 0
 const check = async (id, run) => {
@@ -2566,10 +2571,12 @@ try {
   await check('BUY-006 vendor delivery follow-up', vendorFollowUpJourney)
 
   await check('AGENT-004 measured reliability outcomes', outcomeJourney)
+  await check('AGENT-004 company-policy outcome investigations', agentOutcomePolicyJourney)
 
   await check('AGENT-009 granted, budgeted and revocable model runs', agentRunJourney)
 
   await check('AGENT-003 evidence-backed PM interval changes', intervalJourney)
+  await check('ADMIN-011 conditional workspace save recovery', conditionalWorkspaceJourney)
 
   await check('AGENT-005 overdue work through verified closure', agentFollowUpJourney)
 

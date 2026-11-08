@@ -21,6 +21,14 @@ const RETRYABLE: Record<string, Capability> = {
   'template.save': 'work.assign', 'workorder.assign': 'work.assign',
   'workorder.results': 'work.do', 'workorder.issue': 'work.do', 'workorder.return': 'work.do',
   'workorder.submit': 'work.do', 'workorder.review': 'work.review',
+  'document.add': 'register.manage', 'document.revise': 'register.manage', 'document.expiry': 'register.manage', 'document.link': 'work.assign',
+  'meter.create': 'register.manage', 'schedule.create': 'work.assign',
+  'customfield.save': 'register.manage', 'customfield.retire': 'register.manage', 'customvalue.set': 'register.manage', 'part.category': 'register.manage',
+  'workorder.evidence': 'work.do', 'workorder.annotate': 'work.do',
+  'workorder.time': 'work.do', 'workorder.readings': 'work.do',
+  'workorder.tool': 'work.do', 'workorder.sign': 'work.do',
+  'finding.record': 'work.do', 'downtime.start': 'work.do', 'downtime.end': 'work.do',
+  'workorder.cancel': 'work.assign', 'workorder.reopen': 'work.assign',
 }
 
 /** Bounded streamed JSON; an idempotency key never silently falls back to a plain write. */
@@ -45,19 +53,20 @@ export async function keyedWrite(env: Bindings, actor: Actor, request: Request, 
   const key = request.headers.get('idempotency-key')!
   insist(/^[A-Za-z0-9._:-]{1,128}$/.test(key), 'invalid_idempotency_key')
   insist(Object.hasOwn(RETRYABLE, action), 'idempotency_not_supported', 400)
-  requireCapability(actor, RETRYABLE[action])
   if (action === 'workorder.create') insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
   const bytes = await body(request)
   const input = await Input.from(new Request(request.url, { method: 'POST', headers: { 'content-type': JSON_TYPE }, body: bytes }))
+  const capability = action === 'workorder.sign' && input.text('role', { max: 12 }) === 'supervisor' ? 'work.review' : RETRYABLE[action]
+  requireCapability(actor, capability)
   // Receipt access must not outlive the record authority that made it.
   // State and version checks stay in the handler for new effects; a completed
   // receipt remains replayable after its own successful state transition.
-  if (action.startsWith('workorder.') && action !== 'workorder.create') {
+  if ((action.startsWith('workorder.') && action !== 'workorder.create') || action === 'document.link' || action === 'finding.record' || action.startsWith('downtime.')) {
     const order = await workOrder(env, input.text('workOrder', { max: 100 }))
-    if (RETRYABLE[action] === 'work.do') {
+    if (capability === 'work.do') {
       insist(order.assignee_id === actor.id || (action !== 'workorder.submit' && await isCollaborator(env, order.id, actor.id)), 'not_your_work', 403)
     }
-    if (action === 'workorder.review') insist(order.assignee_id !== actor.id && !await didWork(env, order.id, actor.id), 'own_work', 403)
+    if (action === 'workorder.review' || (action === 'workorder.sign' && capability === 'work.review')) insist(order.assignee_id !== actor.id && !await didWork(env, order.id, actor.id), 'own_work', 403)
   }
   const principal = actor.service ? `${actor.id}:${actor.service.id}` : actor.id
   const keyHash = await sha256Hex(key), fingerprint = await sha256Hex(bytes)

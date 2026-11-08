@@ -1,5 +1,6 @@
 import { pageRows, WORK_EXPORT_LIMIT, type PageSource } from './pagination'
 import { cell } from './audit'
+import { agentContext } from './agent-door/context'
 import { laborView } from './labor'
 import { requestSources } from './request-sources'
 // Clauses 6–8: work orders, assignment and the assigned person's record of the
@@ -64,9 +65,11 @@ export const touch = (env: Bindings, order: { id: string; version: number }) => 
   stmt(env, "UPDATE gk_work_orders SET version = version + 1, status = 'in_progress' WHERE id = ?", order.id),
 ]
 
-export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also, door }: FromProposal & { door?: Door } = {}) {
-  requireCapability(actor, proposal ? 'proposal.decide' : 'work.create')
-  if (!proposal) insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
+export async function createCorrective(env: Bindings, actor: Actor, input: Input, { proposal, also, door, policyExecution }: FromProposal & { door?: Door; policyExecution?: boolean } = {}) {
+  // Agent attribution comes from the authenticated native context, never caller input.
+  const sourceDoor = agentContext()?.door ?? door
+  requireCapability(actor, proposal && !policyExecution ? 'proposal.decide' : 'work.create')
+  if (!proposal || policyExecution) insist(await createsWork(env, actor), 'create_work_right_revoked', 403)
   // PLAN-001: work names an asset or, with no asset, a location (the text given, trimmed); never both.
   const assetId = input.text('asset', { optional: true, max: 100 }) || null, location = input.text('location', { optional: true, max: 160 }) || null
   insist(Boolean(assetId) !== Boolean(location), 'asset_or_location')
@@ -103,8 +106,8 @@ export async function createCorrective(env: Bindings, actor: Actor, input: Input
   if (assignee) await assigneeFits(env, assignee, crew.team)
   const estimateMinutes = estimate(input) ?? (template?.estimate_minutes as number | null) ?? null
   const id = newId()
-  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, required_fields, requires_evidence, checklist_revision_id, work_started_on, work_ended_on, created_via, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, template?.required_fields ?? null, template?.requires_evidence ?? 0, checklistRevision, startedOn, endedOn, door ?? null, actor.id, now()), ...(also?.(id) ?? [])],
-    { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(checklistRevision ? { checklistRevision } : {}), ...(startedOn ? { startedOn, endedOn } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}), ...(door ? { door } : {}) } })
+  await commit(env, [stmt(env, `INSERT INTO gk_work_orders (id, number, asset_id, location, kind, title, description, due_date, assignee_id, team_id, trade, shift, estimate_minutes, priority, template_id, template_revision, required_fields, requires_evidence, checklist_revision_id, work_started_on, work_ended_on, created_via, status, created_by, created_at) VALUES (?, ${NEXT_NUMBER}, ?, ?, 'corrective', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open', ?, ?)`, id, asset?.id ?? null, location, title, description, due, assignee, crew.team, crew.trade, crew.shift, estimateMinutes, priority, template?.id ?? null, template?.revision ?? null, template?.required_fields ?? null, template?.requires_evidence ?? 0, checklistRevision, startedOn, endedOn, sourceDoor ?? null, actor.id, now()), ...(also?.(id) ?? [])],
+    { actor: actor.id, action: 'workorder.create', subject: id, detail: { ...(asset ? { asset: asset.id } : { location }), title, due, assignee, priority, ...(template ? { template: template.id, templateRevision: template.revision } : {}), ...(checklistRevision ? { checklistRevision } : {}), ...(startedOn ? { startedOn, endedOn } : {}), ...(estimateMinutes ? { estimateMinutes } : {}), ...(crew.team || crew.trade || crew.shift ? crew : {}), ...(proposal ? { proposal } : {}), ...(sourceDoor ? { door: sourceDoor } : {}) } })
   return { id }
 }
 
@@ -113,6 +116,7 @@ export async function assign(env: Bindings, actor: Actor, input: Input, { also }
   requireCapability(actor, 'work.assign')
   const order = await workOrder(env, input.text('workOrder', { max: 100 }))
   insist(['open', 'in_progress', 'returned'].includes(order.status), 'work_order_not_open', 409)
+  if (input.has('version')) insist(input.integer('version', { min: 1 }) === order.version, 'stale', 409)
   const assignee = input.text('assignee', { max: 100 }), note = input.text('note', { optional: true, max: 1000 }) || null
   const crew = await crewChoice(env, input, order)
   await assigneeFits(env, assignee, crew.team)

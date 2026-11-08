@@ -99,6 +99,11 @@ export async function agentFollowUpJourney() {
     } else await h.api('proposal.decide',cookie.lead,{proposal:fresh.id,decision:'approve',hash:fresh.hash})
     assert.equal((await h.api(`work/${pm}`,cookie.owner)).assignee_id,ids.mo)
     assert.equal((await h.api(`work/${pm}`,cookie.owner)).acknowledged_at,null)
+    assert.ok(!(await h.api('work',cookie.max)).some(row=>row.id===pm))
+    assert.ok((await h.api('work',cookie.mo)).some(row=>row.id===pm))
+    const retained = await h.api(`work/${pm}`,cookie.owner)
+    await h.api('proposal.decide',cookie.lead,{proposal:fresh.id,decision:'approve',hash:fresh.hash},409)
+    assert.deepEqual(await h.api(`work/${pm}`,cookie.owner),retained,'decided proposal cannot create another handoff')
     assert.equal((await h.api('proposals',cookie.owner)).find(p=>p.id===fresh.id).status,'approved')
     // Agent recommendations never bypass technician submission or independent review.
     for(const id of [pm,repair]) {
