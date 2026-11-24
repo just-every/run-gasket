@@ -264,7 +264,7 @@
       "executable": false
     },
     "docs/maintenance-semantics.md": {
-      "sha256": "3566aabb637a1b636090cbe47d3149539dd5fa46e37beaa720160b5c687a5c8f",
+      "sha256": "d07ce8f498d7887f6108df16b8e0b3e859abfe8c68c96060fd06ef88b96b7e67",
       "executable": false
     },
     "docs/migration-sources.md": {
@@ -316,7 +316,7 @@
       "executable": false
     },
     "management/integration/deployment-spec.json": {
-      "sha256": "9a46d4e7b9604049fb7c5a57e4d1c6a6dd7d4b0b3c9a2b81699e0c36ad2d83b2",
+      "sha256": "401c6504b95e98dc97dbf08bb27fc7606e5b1984127da5d8f27e88e27c886128",
       "executable": false
     },
     "migrations/core/0001_owner.sql": {
@@ -1540,11 +1540,11 @@
       "executable": false
     },
     "src/gasket/automation-jobs.ts": {
-      "sha256": "5f4668485cfac3d47a6540177adb34e8a41081fc49a44c566aa7087af762b25a",
+      "sha256": "a29b8390352dafb69a21614aeea0ebc958d3c3c24b3ce92af718b956aa4f215f",
       "executable": false
     },
     "src/gasket/automation.ts": {
-      "sha256": "b2b7d3cbd81d8cbb9fcd2f43e116ebad940f141b1cd12d39592686cf531616ae",
+      "sha256": "459af5d9d9caa614dd5bb2219f76dfaaa9c707651a87d99865b9a0365544c93a",
       "executable": false
     },
     "src/gasket/availability.ts": {
@@ -2064,7 +2064,7 @@
       "executable": false
     },
     "src/gasket/scheduler.ts": {
-      "sha256": "8e4d5d22744e972d7c0e094a4515e86080a69159f0b4def88d91a83b0c220626",
+      "sha256": "706c81d9f81b56886998bd82ca36c29cc0665b677b3c0977dde33860e9e6bddd",
       "executable": false
     },
     "src/gasket/schedules.ts": {
@@ -4708,7 +4708,7 @@
       "executable": false
     },
     "tests/emitted-worker.mjs": {
-      "sha256": "e2ee5e321c80f20a15444b021785493363d75fb51bf12ed58d18e732bdec3847",
+      "sha256": "8e2c5d2a2cf7eceb93b6f7332d52941174432ed0101f56afc3b84d8264abfe05",
       "executable": false
     },
     "tests/gasket/agent-comments.mjs": {
@@ -4796,7 +4796,7 @@
       "executable": false
     },
     "tests/gasket/flows.mjs": {
-      "sha256": "26b4d24402b86a05ea5c4e9e2eebe44f6e2be7121b151f77466c80d935ceec8b",
+      "sha256": "25860f064f635706976a0f12623592e7991dca70d3cf1520bfac52d89c9f370a",
       "executable": false
     },
     "tests/gasket/form-save-gate.mjs": {
@@ -4812,7 +4812,7 @@
       "executable": false
     },
     "tests/gasket/harness.mjs": {
-      "sha256": "5269275b851a5fbdd37a7e1d44cdf2d1cd0d78b29a289d6927a4e6dec480d60c",
+      "sha256": "a1a189c0651b7f439472f85c9bd13d5c80706988cc788f78c2b31cc55c0921fc",
       "executable": false
     },
     "tests/gasket/initialize-agent-owner.mjs": {
@@ -4820,7 +4820,7 @@
       "executable": false
     },
     "tests/gasket/installation.mjs": {
-      "sha256": "8271a4430c170fe94e4344cca0470f611bed0dacaaa657ace9097e2d4d31102f",
+      "sha256": "98ea3b8ff45925a4d33c03d9d1de2526ad376f3768b586ccb212308b1f54ba53",
       "executable": false
     },
     "tests/gasket/intervals-browser.mjs": {

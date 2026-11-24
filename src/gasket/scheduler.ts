@@ -25,6 +25,7 @@ import { site } from './site'
 import { automationAuthority } from './automation-context'
 import { automationInputs } from './automation-inputs'
 import { runJob, type AutomationRule, type Source } from './automation-jobs'
+import { pruneAutomationHistory } from './automation-retention'
 
 export const SCHEDULER = { id: 'scheduler', name: 'Gasket scheduler', cron: '*/15 * * * *', missedAfterMinutes: 45 }
 
@@ -60,6 +61,7 @@ export async function runScheduler(env: Bindings, at: number, cron = SCHEDULER.c
       await executeRule(env, 'connectors', day, 'cron', { instant: at })
       await overdueRuleEvents(env,at)
       await runReportSchedules(env)
+      await pruneAutomationHistory(env, at, previous?.ran_at ?? null)
       const created = pm.output?.created.length ?? 0
       const runs = routes.output && 'runs' in routes.output ? routes.output.runs : []
       await env.DB.batch([stmt(env, "UPDATE gk_scheduler_runs SET created=?,finished_at=?,state='completed' WHERE id=? AND state='running'", created + runs.reduce((sum: number, run: any) => sum + run.workOrders.length, 0), now(), id)])

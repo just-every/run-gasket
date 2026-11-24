@@ -70,7 +70,9 @@ export async function automationHealth(env: Bindings, actor: Actor) {
 }
 export async function ledgerView(env: Bindings, actor: Actor, url?: URL) {
   requireCapability(actor, 'board.read')
-  const ledger = await automationLedger(env), job = url?.searchParams.get('job')
+  const job = url?.searchParams.get('job') || undefined, limit = url?.searchParams.get('limit') ?? undefined
+  insist(limit === undefined || (/^\d{1,3}$/.test(limit) && +limit >= 1 && +limit <= 200), 'invalid_limit')
+  const ledger = await automationLedger(env, { job, before: url?.searchParams.get('before') || undefined, limit: limit === undefined ? undefined : +limit })
   if (!can(actor,'site.manage')) ledger.jobs=ledger.jobs.map(row=>{const {qualificationReminders:_,...input}=row.input;return {...row,input,output:visibleOutput(actor,row.output)}})
   if (!can(actor,'work.assign')) ledger.jobs=ledger.jobs.map(row=>{const {requestResponse:_,...input}=row.input;return {...row,input,output:visibleOutput(actor,row.output)}})
   if (!can(actor, 'work.review')) ledger.jobs = ledger.jobs.map(row => {
@@ -85,6 +87,6 @@ export async function ledgerView(env: Bindings, actor: Actor, url?: URL) {
       costCenters: facts.costCenters, envelopeBudgetAccess: false,
     } } }
   })
-  if (!job) return ledger
-  const record = ledger.jobs.find(row => row.id === job); insist(record, 'job_not_found', 404); return record
+  if (job === undefined) return ledger
+  const record = ledger.jobs[0]; insist(record, 'job_not_found', 404); return record
 }
