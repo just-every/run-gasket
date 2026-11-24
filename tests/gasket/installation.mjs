@@ -29,6 +29,8 @@ export async function installation() {
   return {
     root,
     migrate: () => run(join(checkout, 'node_modules/.bin/wrangler'), ['d1', 'migrations', 'apply', 'foundation', '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc'], root),
+    /** Runs SQL against the installation's local D1 (the Worker must be stopped) and returns the JSON result sets. */
+    sql: async command => JSON.parse(await run(join(checkout, 'node_modules/.bin/wrangler'), ['d1', 'execute', 'foundation', '--local', '--persist-to', '.wrangler/state', '--config', 'wrangler.jsonc', '--json', '--command', command], root)),
     rer: (...args) => run(join(checkout, 'node_modules/.bin/rer'), [...args, '--cwd', root, '--non-interactive'], root),
     remove: () => rm(root, { recursive: true, force: true }),
   }

@@ -39,6 +39,7 @@ import { file, harness } from './harness.mjs'
 import { installation } from './installation.mjs'
 import { automationJourney, connectorJourney } from './automation.mjs'
 import { pmInterruptionJourney } from './pm-interruption.mjs'
+import { cronBudgetJourney } from './cron-d1-budget.mjs'
 import { replenishmentJourney } from './replenishment.mjs'
 import { receivingJourney } from './receiving.mjs'
 import { workReturnsJourney } from './work-returns.mjs'
@@ -63,7 +64,7 @@ const independent = new Map([
   [requiredMigrationJourney,'inventory-1'],
   [safetyJourney,'inventory-3'],
   [qualificationPlanningJourney,'core'], [calendarPlanningJourney,'inventory-3'],
-  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [connectorJourney, 'automation'],
+  [ruleSourcesJourney, 'automation'], [rulesJourney, 'automation'], [customFieldsJourney, 'reports'], [nestedJourney, 'automation'], [automationJourney, 'automation'], [pmInterruptionJourney, 'automation'], [cronBudgetJourney, 'automation'], [connectorJourney, 'automation'],
   [workReturnsJourney, 'inventory-3'], [replenishmentJourney, 'inventory-2'], [vendorFollowUpJourney, 'inventory-2'],
   [conditionalWorkspaceJourney, 'workspace'],
   [outcomeJourney, 'reports'], [agentOutcomePolicyJourney, 'workspace'], [agentRunJourney, 'reports'], [intervalJourney, 'automation'], [agentFollowUpJourney, 'reports'],
@@ -2554,6 +2555,7 @@ try {
   await check('PM-009 nested programs', nestedJourney)
   await check('PM-008 scheduler controls and retained execution evidence', automationJourney)
   await check('PM-008 interrupted PM recovery', pmInterruptionJourney)
+  await check('PM-001 scheduler and Today D1 read cost stays flat with history', cronBudgetJourney)
   await check('INT-002 signed events and durable connector delivery', connectorJourney)
 
   await check('BUY-001 vendor records and maintenance requisitions', async () => {
