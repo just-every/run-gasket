@@ -803,6 +803,10 @@
       "sha256": "3116d7e25ab2f4ba1cd1b2aab063c9f196ad0c520916f627b9626f539b5ede9f",
       "executable": false
     },
+    "migrations/core/0113_d1_read_cost.sql": {
+      "sha256": "85672e0bf2ec05429980563e5ebcdf682e6a75e583f90ba1e6db2bb157d43be6",
+      "executable": false
+    },
     "ONBOARDING.md": {
       "sha256": "5d20f1bd0c24def0cd6c1165d1a58d0472ad0f02f2b60047014bda962eaf4274",
       "executable": false
@@ -1541,6 +1545,10 @@
     },
     "src/gasket/automation-jobs.ts": {
       "sha256": "a29b8390352dafb69a21614aeea0ebc958d3c3c24b3ce92af718b956aa4f215f",
+      "executable": false
+    },
+    "src/gasket/automation-retention.ts": {
+      "sha256": "3e5bce4318da564bca7122d0edd18b3c71df5e32c4634d4e84270e513f98dbfc",
       "executable": false
     },
     "src/gasket/automation.ts": {
@@ -4787,8 +4795,16 @@
       "sha256": "04ba5fe552a3b99545b43b095c9c578ca6a5b387c831131fadeffd2ec530dbbb",
       "executable": false
     },
+    "tests/gasket/cron-d1-budget.mjs": {
+      "sha256": "590637f2bc7cd4b56fccf3d9f730e38550c4c01dac529bc555abab1a4edbd4ca",
+      "executable": false
+    },
     "tests/gasket/custom-fields.mjs": {
       "sha256": "59b69689c656e0ab9608c474851746583ab0863bc8d6820f6195cbf4d0c3e085",
+      "executable": false
+    },
+    "tests/gasket/d1-meter.mjs": {
+      "sha256": "5a34b156fc9b4b709f3b41f3578d4de231677adb753c2715e18dedb7b836e9f6",
       "executable": false
     },
     "tests/gasket/fixtures.mjs": {
