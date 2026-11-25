@@ -40,7 +40,7 @@ export interface Bindings {
  INSTALLATION_KEY_PREVIOUS?: string
  SESSION_SECRET: string
  SETUP_TOKEN?: string
- MAIL_PROVIDER?: 'development' | 'rer' | 'resend' | 'sendgrid' | 'cloudflare'
+ MAIL_PROVIDER?: 'none' | 'development' | 'rer' | 'resend' | 'sendgrid' | 'cloudflare'
  MAIL_FROM?: string
  MAIL_API_KEY?: string
  MAIL_RELAY_URL?: string
@@ -48,7 +48,7 @@ export interface Bindings {
 }
 
 export const runtimeBindings = (env: Bindings): Bindings => env.RER_DEV_ORIGIN && env.AUTH_LOCAL === 'true' ? { ...env, AUTH_ORIGIN: env.RER_DEV_ORIGIN } : env
-export const authConfig = (env: Bindings): AuthConfig => ({ dependencies: true, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true', OWNER_EMAIL: env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN, MAIL_FROM: env.MAIL_FROM, branding: { productName: branding.name, accentColor: branding.primaryColor, signInPath: '/signin', theme: theme.href } })
+export const authConfig = (env: Bindings): AuthConfig => ({ dependencies: true, origin: env.AUTH_ORIGIN, local: env.AUTH_LOCAL === 'true', OWNER_EMAIL: env.OWNER_EMAIL, SESSION_SECRET: env.SESSION_SECRET, SETUP_TOKEN: env.SETUP_TOKEN, MAIL_FROM: env.MAIL_PROVIDER === 'none' ? undefined : env.MAIL_FROM, branding: { productName: branding.name, accentColor: branding.primaryColor, signInPath: '/signin', theme: theme.href } })
 export function operatorAuth(env: Bindings) {
  const auth = createOperatorAuth({ db: attributedDatabase(env.DB), config: authConfig(env), mailSender: operatorMail(env), clientIp: request => request.headers.get('CF-Connecting-IP') ?? '' })
  const attributed = async <T,>(request: Request, action: string, run: () => Promise<T>) => {
@@ -57,6 +57,7 @@ export function operatorAuth(env: Bindings) {
   return withAccountAuthority(env.DB, session.operator.id, action, run)
  }
  return { ...auth,
+  emailSignInAvailable: env.MAIL_PROVIDER !== 'none' && auth.emailSignInAvailable,
   setRole: (request: Request, operator: string, role: 'owner' | 'member') => attributed(request, 'operator.role', () => auth.setRole(request, operator, role)),
   setOperatorStatus: (request: Request, operator: string, status: 'active' | 'inactive') => attributed(request, 'operator.status', () => auth.setOperatorStatus(request, operator, status)),
  }
@@ -83,6 +84,10 @@ export async function authResponse(request: Request, original: Bindings): Promis
  }
  if (url.pathname.startsWith('/auth/')) {
   const response = await createAuthHandler(operatorAuth(env))(request)
+  if (env.MAIL_PROVIDER === 'none' && response?.status === 503 && response.headers.get('content-type')?.startsWith('application/json')) {
+   const body: { error?: string } = await response.json()
+   return Response.json(body.error === 'mail_unavailable' ? { error: 'mail_off' } : body, response)
+  }
   if (url.pathname === '/auth/signout' && request.method === 'POST' && response?.status === 204) {
    const headers = new Headers(response.headers)
    // Storage clearing also applies to fetch callers. The durable generation

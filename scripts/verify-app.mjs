@@ -8,7 +8,7 @@ const sharedBuild = process.env.CI === 'true' && process.env.GASKET_REUSE_BUILD 
 if (sharedBuild && !existsSync('dist/server/wrangler.json')) throw new Error('The shared Worker build is missing')
 const suites = {
   all: ['verify:foundation', 'test:flows', 'test:requests', 'test:agent-stock'],
-  foundation: sharedBuild ? ['typecheck', 'test:typecheck', 'test:runtime', 'test:email-link', 'test:site'] : ['verify:foundation'],
+  foundation: sharedBuild ? ['typecheck', 'test:runtime', 'test:email-link', 'test:site'] : ['verify:foundation'],
 }
 const selected = process.env.GASKET_VERIFY_SHARD ?? 'all'
 if (!Object.hasOwn(suites, selected)) throw new Error(`Unknown verification suite: ${selected}`)

@@ -22,8 +22,6 @@ import { agentRunJourney } from './agent-runs.mjs'
 import { intervalJourney } from './intervals.mjs'
 import { conditionalWorkspaceJourney } from './intervals-browser.mjs'
 import { partCatalogJourney } from './part-catalog.mjs'
-import { queuedEntrypoint } from '@runeditrun/rer/queued-entry'
-const queued = await queuedEntrypoint(import.meta.url, 'test:flows'); if (queued !== null) process.exit(queued)
 // Gasket's first-release clauses (ACCEPTANCE.md GAS-01 to GAS-13), each through
 // public doors (JSON door, form door, pages and downloads) against the built
 // Worker with real local D1. No provider is involved; all people are invented.

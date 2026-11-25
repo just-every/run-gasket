@@ -23,6 +23,7 @@ export const { install } = lifecycle;
 export const commandAdapter = createCommandAdapter(lifecycle, {
  dev: developmentTarget, preview: previewTarget, verify: ['pnpm', ['run', 'verify:app']], deploy: ownerDeploy('deploy.json', lifecycle),
  portability: recoveryPortability(localPortability({ database: 'foundation', policyModule: 'scripts/installer/archive-policy.mjs', transient: ['local runtime caches and logs'] })),
+ mailOffSignIn: 'rer signin',
  setup: { manifestFile: 'rer-setup.json' }, browserModule: 'scripts/installer/ui/seed.mjs',
  // The run site (rer build --site, rer deploy --site, RER_SITE): the homepage,
  // /run and the docs from src/site/pages.tsx, written to the ignored dist/site;

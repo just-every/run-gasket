@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID, webcrypto } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { serveHosted, HOSTED_ORIGIN } from '../../node_modules/@runeditrun/rer/cli/hosted-output.mjs'
+import { emittedWorker } from '../emitted-worker.mjs'
 import { accessToken, autonomousPolicy, heldPolicy, policyEnvelope, signJws } from '../../src/modules/agent-door/conformance/crypto.mjs'
 import initialize from './initialize-agent-owner.mjs'
 import { chromium } from '@playwright/test'
@@ -12,14 +12,18 @@ export default async function proposalPolicyJourney() {
   const email = ['synthetic-gasket-50', 'example.test'].join('@'), leadEmail = ['synthetic-gasket-51', 'example.test'].join('@')
   const issuer = 'https://synthetic-gasket.invalid', installationId = randomUUID(), kid = randomUUID(), sub = randomUUID()
   const pair = await webcrypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify'])
-  const publicKeys = { [kid]: await webcrypto.subtle.exportKey('jwk', pair.publicKey) }, mails = []
-  const hosted = await serveHosted(fileURLToPath(new URL('../../', import.meta.url)), { bindings: {
+  const publicKeys = { [kid]: await webcrypto.subtle.exportKey('jwk', pair.publicKey) }
+  const hosted = await emittedWorker(origin => ({
     RER_OWNER_CLAIM_ISSUER: issuer, RER_OWNER_CLAIM_INSTALLATION_ID: installationId,
-    RER_OWNER_CLAIM_APP_ORIGIN: HOSTED_ORIGIN, RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(publicKeys),
-    RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: HOSTED_ORIGIN, subject: installationId, email, keys: publicKeys }),
+    RER_OWNER_CLAIM_APP_ORIGIN: origin, RER_OWNER_CLAIM_PUBLIC_KEYS: JSON.stringify(publicKeys),
+    RER_BUSINESS_TRUST: JSON.stringify({ v: 1, issuer, audience: origin, subject: installationId, email, keys: publicKeys }),
     OWNER_EMAIL: email, SETUP_TOKEN: randomUUID(), SESSION_SECRET: randomUUID(), MAIL_PROVIDER: 'resend',
-  }, outboundService: async request => { mails.push(await request.json()); return Response.json({ id: `synthetic-gasket-${mails.length}` }) } })
-  const origin = hosted.origin, request = (url, init = {}) => hosted.fetch(new URL(url, origin).href.slice(origin.length + 1), init)
+  }))
+  const { origin, mails } = hosted
+  const request = (url, init) => {
+    const { pathname, search } = new URL(url, origin)
+    return hosted.request(pathname + search, init)
+  }
   const iat = Math.floor(Date.now() / 1000)
   const signer = { issuer, installationId, kid, privateKey: pair.privateKey }
   let cookie, seq = 0, revision = 0

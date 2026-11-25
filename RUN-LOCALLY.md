@@ -311,15 +311,14 @@ complete remote import, as in the maintained references.
 ## Deployment and command inspection
 
 Real deployment uses the owner-account procedure and its private credentials.
-`rer deploy --dry-run` validates and builds locally, then reads the target
-secret bindings using `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`. It uses
-the same required-secret resolver as deploy: every missing binding and its input
-name is reported with the same nonzero exit and error, including in `--json` mode.
-Secrets held by the target are inherited; optional absent secrets stay unbound.
-Missing credentials or a refused secret-list read fail the dry run. It performs
-no provider writes, uploads, secret changes or resource creation. The default environment is `production`; select another with
-`--environment NAME`. The dry run does not establish upload acceptance,
-hosted health or mail delivery.
+For a Business without a mail provider, set `MAIL_PROVIDER=none` and leave
+`MAIL_FROM` and the mail credential unset. After deployment, run `rer signin`
+from the same checkout with its Cloudflare credentials to get a one-time owner
+link. Email-only invitations, purchase-order sends, vendor reminders and report
+emails require a configured provider.
+`rer deploy --dry-run` validates the inputs, builds locally and prints the
+Worker, bindings and migrations it would use. It makes no provider requests.
+The default environment is `production`. Select another with `--environment NAME`.
 
 `rer describe` reads the current checkout's actual verbs,
 flags, aliases, pins, effects and local state without installing or running

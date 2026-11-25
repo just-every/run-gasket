@@ -3,7 +3,7 @@ import { can, capabilitySql, type Actor } from './actor'
 import { all, commit, GasketError, guard, insist, newId, now, one, stmt, type Row } from './core'
 import { addDays, isDate, localNow, today, zonedInstant } from './dates'
 import type { Input } from './input'
-import { localDevelopment, operatorMail } from '../mail.server.mjs'
+import { localDevelopment, mailOffResult, operatorMail } from '../mail.server.mjs'
 import { REPORTS, reportPack, packCsv, packPdf, type ReportKind } from './report-packs'
 
 async function author(env:Bindings,actor:Actor,row?:Row|null){
@@ -62,6 +62,10 @@ async function deliver(env:Bindings,row:Row,occasion:string,recipient:string){
   try{
     const creator=await member(env,row.owner_id,row.zone),actor=await member(env,recipient,row.zone)
     if(!creator||creator.role!=='owner'||!actor){await result(env,id,'excluded','access_ended');return}
+    if (env.MAIL_PROVIDER === 'none') {
+      await result(env, id, mailOffResult.status, mailOffResult.code, { provider: mailOffResult.provider })
+      return
+    }
     const pack=await reportPack(env,actor,row.report,JSON.parse(row.filters_json),occasion),csv=new TextEncoder().encode(packCsv(pack)),pdf=await packPdf(pack)
     insist(csv.length+pdf.length<=5_000_000,'report_pack_too_large',422)
     // Rendering can yield: recheck both principals and the saved revision immediately before submission.

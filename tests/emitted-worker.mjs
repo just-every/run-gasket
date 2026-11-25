@@ -35,7 +35,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   let generationHook
   let pmHook
   let proposalHook
-  const bindings = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'false', MAIL_PROVIDER: 'resend', MAIL_FROM: 'Gasket <auth@example.test>', MAIL_API_KEY: 'test-only-key', ...vars }
+  const bindings = { AUTH_ORIGIN: origin, AUTH_LOCAL: 'false', MAIL_PROVIDER: 'resend', MAIL_FROM: 'Gasket <auth@example.test>', MAIL_API_KEY: 'test-only-key', ...(typeof vars === 'function' ? {} : vars) }
   const modules = [config.main, ...(await readdir(join(root, 'dist/server/assets'))).filter(file => file.endsWith('.js')).map(file => `assets/${file}`)]
     .map(file => ({ type: 'ESModule', path: join(root, 'dist/server', file) }))
   if (offset !== undefined || instant !== undefined) modules.unshift(
@@ -78,7 +78,8 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
     // Miniflare retains this live port across setOptions({ port: 0 }); configure
     // auth from that address before making requests or exposing the harness.
     origin = (await mf.ready).origin
-    bindings.AUTH_ORIGIN = vars.AUTH_ORIGIN ?? origin
+    const settings = typeof vars === 'function' ? vars(origin) : vars
+    Object.assign(bindings, settings, { AUTH_ORIGIN: settings.AUTH_ORIGIN ?? origin })
     await mf.setOptions(options())
     assert.equal((await mf.ready).origin, origin, 'auth configuration retains the live Worker listener')
     if (installation) return worker()
@@ -89,7 +90,7 @@ export async function emittedWorker(vars, { installation, offset, instant, outbo
   } catch (error) { await close(); throw error }
   return worker()
 
-  function worker() { return { origin, scratch: directory, mails, setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setPMHook: value => { pmHook=value }, setProposalHook: value => { proposalHook=value }, setClockInstant: value => mf.dispatchFetch(`${origin}/cdn-cgi/gasket-test-clock?instant=${value}`), setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step; saveCommits=0 }, getSaveCommits: () => saveCommits, request, scheduled, signInToken, close } }
+  function worker() { return { origin, scratch: directory, mails, database: () => mf.getD1Database('DB'), setMailOutcome: value => { mailOutcome = value }, setGenerationHook: value => { generationHook=value }, setPMHook: value => { pmHook=value }, setProposalHook: value => { proposalHook=value }, setClockInstant: value => mf.dispatchFetch(`${origin}/cdn-cgi/gasket-test-clock?instant=${value}`), setSaveFault: (phase='after', step=1) => { saveFault=phase; saveFaultStep=step; saveCommits=0 }, getSaveCommits: () => saveCommits, request, scheduled, signInToken, close } }
 
   /** One Cron Trigger event, as Cloudflare delivers it, at `at` (ms; default the Worker's now). */
   async function scheduled(cron, at = instant ?? Date.now() + (offset ?? 0)) {

@@ -3,7 +3,7 @@
 // sends it twice, and an in-app escalation to the planners when a late delivery
 // holds open linked work. Every record keeps its job and grant revision.
 import type { Bindings } from '../auth.server'
-import { localDevelopment, operatorMail } from '../mail.server.mjs'
+import { localDevelopment, mailOffResult, operatorMail } from '../mail.server.mjs'
 import { automationAuthority } from './automation-context'
 import { all, AUDIT_INSERT, commit, GasketError, guard, insist, newId, now, stmt, type Row } from './core'
 import { followUps, planners } from './vendor-follow-up'
@@ -32,7 +32,9 @@ async function remind(env: Bindings, row: Row, occasion: string, day: string, ru
   }
   let state = 'failed', provider: string | null = null, providerId: string | null = null, error: string | null = 'mail_not_configured'
   const sender = operatorMail(env), from = env.MAIL_FROM || (localDevelopment(env) || env.RER_DEMO === '1' ? 'Gasket <local@example.test>' : '')
-  if (sender && from) {
+  if (env.MAIL_PROVIDER === 'none') {
+    ({ status: state, provider, providerMessageId: providerId, code: error } = mailOffResult)
+  } else if (sender && from) {
     try {
       const { subject, text } = message(row, occasion, day)
       const escaped = text.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]!))

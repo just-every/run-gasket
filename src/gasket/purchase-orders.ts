@@ -126,6 +126,7 @@ export async function sendPurchaseOrder(env: Bindings, actor: Actor, input: Inpu
   const automatic = !current.approval && !route.legacy && !route.required.length
   insist(current.approval || automatic, 'approval_required', 409)
   const approvalId = current.approval?.id ?? newId()
+  insist(env.MAIL_PROVIDER !== 'none', 'mail_off', 409)
   const sender = operatorMail(env); insist(sender, 'mail_not_configured', 409)
   const from = env.MAIL_FROM || (localDevelopment(env) || env.RER_DEMO === '1' ? 'Gasket <local@example.test>' : '')
   insist(from, 'mail_not_configured', 409)

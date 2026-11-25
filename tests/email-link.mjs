@@ -1,5 +1,3 @@
-import {queuedEntrypoint} from '@runeditrun/rer/queued-entry';
-const queued=await queuedEntrypoint(import.meta.url,'verify:email-link');if(queued!==null)process.exit(queued);
 // The foundation's one end-to-end email-link test: the emitted Worker claims
 // the owner, mails a sign-in link through its real mail provider adapter
 // (captured at the network edge), and the link signs in through confirmation.
@@ -76,3 +74,5 @@ try {
 } finally {
   await h.close()
 }
+
+await import('./mail-off.mjs')

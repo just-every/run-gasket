@@ -77,6 +77,10 @@
           "label": "Local development (mail suppressed)"
         },
         {
+          "value": "none",
+          "label": "Outbound email off"
+        },
+        {
           "value": "rer",
           "label": "RER managed mail"
         },

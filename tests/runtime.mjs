@@ -1,5 +1,3 @@
-import {queuedEntrypoint} from '@runeditrun/rer/queued-entry';
-const queued=await queuedEntrypoint(import.meta.url,'verify:runtime');if(queued!==null)process.exit(queued);
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
 import { createServer } from 'node:net'

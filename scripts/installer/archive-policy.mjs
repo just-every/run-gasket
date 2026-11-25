@@ -8,7 +8,7 @@ export default {
   includeTables: ['oa_operators', 'oa_bootstrap', 'oa_external_identities', 'oa_invitation_cancellations', 'oa_auth_settings', 'oa_auth_audit', 'oa_domain_rules', 'oa_logout_events', 'oc_owner_claims', 'oc_idp_grants'],
   excludeTables: ['rer_dependency_keys', 'rer_dependency_pending', 'rer_dependency_codes'],
   product: ['runeditrun', 'foundation'].join('/'),
-  requiredConfiguration: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'AUTH_ORIGIN', 'MAIL_PROVIDER', 'MAIL_FROM'],
+  requiredConfiguration: ['OWNER_EMAIL', 'SESSION_SECRET', 'SETUP_TOKEN', 'AUTH_ORIGIN', 'MAIL_PROVIDER'],
   exportRow(table, row) {
     // An encrypted connector signing key is still a secret, even without its wrapping key.
     if (table === 'gk_api_credentials') return { ...row, token_hash: `inactive-${row.id}` }
