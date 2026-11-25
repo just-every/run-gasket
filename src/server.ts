@@ -38,7 +38,7 @@ export default withDemo({
     const path = new URL(request.url).pathname
     const business = ['/api/rer/business-settings','/rer-business-logo','/rer-business.css'].includes(path) ? await gasketBusiness(runtime).handle(request) : null
     if (business) return business
-    const agent = path === '/api/rer/agent-policy' || path === '/mcp' || path === '/agents' || path.startsWith('/agents/') || path === '/.well-known/oauth-protected-resource' || path === '/.well-known/oauth-protected-resource/mcp'
+    const agent = path === '/api/rer/agent-policy' || path === '/api/rer/agent-decisions' || path === '/mcp' || path === '/agents' || path.startsWith('/agents/') || path === '/.well-known/oauth-protected-resource' || path === '/.well-known/oauth-protected-resource/mcp'
       ? await gasketAgentDoor(runtime).handle(request) : null
     if (agent) return agent
     const auth = await authResponse(request, env)

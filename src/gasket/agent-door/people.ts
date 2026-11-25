@@ -21,8 +21,9 @@ export function gasketPeople(env: Bindings): PeopleAdapter {
   }
   const operatorId = async (id: string) => (await one(env, 'SELECT operator_id FROM gk_members WHERE id=?', id))?.operator_id as string | undefined
   return {
+    businessStopped: native.businessStopped,
     async sponsor(claims) {
-      const settings = await one(env, 'SELECT owner_id FROM bs_settings WHERE singleton=1 AND stopped=0')
+      const settings = await one(env, 'SELECT owner_id FROM bs_settings WHERE singleton=1')
       if (!settings || settings.owner_id !== claims.sub && !await one(env, "SELECT 1 FROM bs_team WHERE business_id=? AND state IN ('active','invited')", claims.sub)) return null
       return fromOperator(await native.sponsor(claims))
     },
