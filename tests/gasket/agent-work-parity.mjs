@@ -7,11 +7,10 @@ import { chromium } from '@playwright/test'
 
 const jsonType = ['application', 'json'].join('/')
 const formType = ['application', 'x-www-form-urlencoded'].join('/')
-const toolCall = ['tools', 'call'].join('/')
 const errorMeta = ['com.runeditrun', 'error'].join('/')
 
 /** One corrective-work sanity journey, using only the hosted Worker's public doors. */
-export default async function workParity({ request, origin, cookie }) {
+export default async function workParity({ request, origin, cookie, tool }) {
   const send = (path, { session = cookie, body, form, headers = {}, ...init } = {}) => request(new URL(path, origin).href, {
     redirect: 'manual', method: body === undefined && !form ? 'GET' : 'POST',
     ...init, headers: { ...(session ? { Cookie: session } : {}), Origin: origin,
@@ -24,11 +23,10 @@ export default async function workParity({ request, origin, cookie }) {
     return response.json()
   }
   const failure = body => body.error?.data?.code ?? body.result?._meta?.[errorMeta]?.code ?? body.code
-  const mcp = async (token, args) => {
-    const response = await send('/mcp', { session: '', body: { jsonrpc: '2.0', id: 1, method: toolCall, params: { name: 'gasket.work.create', arguments: args } },
-      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'MCP-Protocol-Version': '2025-11-25', 'Mcp-Method': toolCall, 'Mcp-Name': 'gasket.work.create' } })
-    return { status: response.status, body: await response.json() }
-  }
+  // The verifier renews the signed policy before MCP calls during slow browser journeys.
+  const mcp = (token, args) => tool('gasket.work.create', args, {
+    token: token ?? null, version: '2025-11-25', track: false,
+  })
   const owner = await api('me')
   const asset = await api('asset.create', { tag: `synthetic-gasket-${randomUUID()}`, name: 'Synthetic parity pump', location: 'Workshop' })
   const input = { asset: asset.id, title: `Synthetic corrective inspection ${randomUUID()}`, description: 'Inspect vibration and record the physical observation.', due: '2030-01-10', assignee: owner.id }
@@ -121,7 +119,7 @@ export default async function workParity({ request, origin, cookie }) {
   const reply = await mcp(writer.token, args)
   const created = { status: reply.status, ...reply.body }
   assert.equal(created.status, 200)
-  assert.ok(created.result?.structuredContent && !created.result.isError, 'MCP creation succeeds')
+  assert.ok(created.result?.structuredContent && !created.result.isError, `MCP creation succeeds (${failure(reply.body) ?? 'no data'})`)
   await inspect(created.result.structuredContent.id, 'mcp', started, Date.now())
   assert.equal(new Set(accepted.map(row => row.id)).size, 3, 'doors retain distinct genuine work identities')
   assert.equal(new Set(accepted.map(row => row.number)).size, 3, 'doors retain distinct genuine work numbers')
