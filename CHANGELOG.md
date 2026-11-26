@@ -1,5 +1,15 @@
 # Gasket changelog
 
+## 0.1.1 — 2026-11-26
+
+Gasket is free, open source maintenance management (CMMS) for US maintenance teams. It runs on one Cloudflare Worker with D1, and the owner keeps every record.
+
+Prepare Gasket for hosted installation with a deployment descriptor, a committed deployment specification, provider setup and managed mail. Maintenance workflows and retained equipment history remain available through native sign-in.
+
+### Not in this release
+
+External delivery of reminders and provider qualification are not part of this release.
+
 ## 2026-10-28 — Contract structure and source records
 
 The rewrite preserves the last judgement pin and separates current requirements, rulings, mechanism and evidence. It supplies no provider qualification or new completion judgement.
