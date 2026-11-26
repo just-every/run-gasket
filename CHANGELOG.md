@@ -1,5 +1,9 @@
 # Gasket changelog
 
+## 0.1.2 — 2026-11-27
+
+The hosted demo starts again: the sample team are now native operators, so Ray's approval of the agent's proposal is accepted and the first start completes.
+
 ## 0.1.1 — 2026-11-26
 
 Gasket is free, open source maintenance management (CMMS) for US maintenance teams. It runs on one Cloudflare Worker with D1, and the owner keeps every record.
